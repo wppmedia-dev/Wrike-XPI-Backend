@@ -64,7 +64,7 @@ export const WrikeXPICallback = ({ code }, fastify) => {
           encRefreshTokenKey: encRefreshToken?.key,
           uid: userId,
         },
-        { expiresIn: "1h" }
+        { expiresIn: "365d" }
       );
 
       // Sending final response
