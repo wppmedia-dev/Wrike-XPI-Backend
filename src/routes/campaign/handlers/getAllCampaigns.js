@@ -46,20 +46,19 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
 
       const data = wrikeFolderData?.data;
 
-      let campaigns = [];
+      // Optimize the for loop by using map instead of manual for...of and push
+      const campaigns = data.map((folder) => {
+        const folderCustomFieldValues = Object.entries(customFieldIds).reduce(
+          (acc, [key, value]) => {
+            acc[key] =
+              folder?.customFields?.find((field) => field.id === value)
+                ?.value ?? "";
+            return acc;
+          },
+          {}
+        );
 
-      for (const folder of data) {
-        const folderCustomFieldValues = {};
-
-        for (const [key, value] of Object.entries(customFieldIds)) {
-          const cfValue =
-            folder?.customFields?.find((field) => field.id === value)?.value ??
-            "";
-
-          folderCustomFieldValues[key] = cfValue;
-        }
-
-        campaigns.push({
+        return {
           customfieldlist: folder?.customFields,
           noofcrs: folderCustomFieldValues["# CRs"],
           agency: folderCustomFieldValues["Agency*"],
@@ -90,8 +89,8 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
           requestormarket: folderCustomFieldValues["Requestor's Market*"],
           spacename: folderCustomFieldValues["Space Name*"],
           workitemlevel: folderCustomFieldValues["Work Item Level"],
-        });
-      }
+        };
+      });
 
       // Sending final response
       resolve({
