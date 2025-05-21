@@ -13,7 +13,7 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
         });
 
       // Variable Declaration
-      const { filter: filterParams, pageSize } = params;
+      const { filter: filterParams, pageSize = 20 } = params;
 
       let filters;
 
