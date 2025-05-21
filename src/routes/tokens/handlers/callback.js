@@ -1,14 +1,14 @@
 import { encryptWithRandomKey } from "../../../utils/crypto";
 import { GetResponse } from "../../../utils/node-fetch";
 import { Tokens, Users } from "../../../controllers";
-import { getSecrets } from "../../../utils/azure_vault";
+import { getWrikeTokens } from "../../../utils/wrike";
 
 export const WrikeXPICallback = ({ code }, fastify) => {
   return new Promise(async (resolve, reject) => {
     try {
       if (!code) return reject({ message: "Access Token must not be empty" });
 
-      const { access_token, refresh_token } = await getWrikeTokens(code);
+      const { access_token, refresh_token } = await getWrikeTokens({ code });
 
       const encAccessToken = await encryptWithRandomKey(access_token);
       const encRefreshToken = await encryptWithRandomKey(refresh_token);
@@ -94,53 +94,6 @@ const wrikeUserData = (access_token) => {
       resolve(result?.data[0]);
     } catch (err) {
       console.log("Error while getting user details: ", err?.message ?? err);
-      reject(err);
-    }
-  });
-};
-
-const getWrikeTokens = async (code) => {
-  return new Promise(async (resolve, reject) => {
-    try {
-      const { WRIKE_LOGIN_ENDPOINT, WRIKE_REDIRECT_URL } = process.env;
-
-      const secretValues = await getSecrets([
-        "XPI-API-ClientId",
-        "XPI-API-ClientSecret",
-      ]);
-
-      const WRIKE_CLIENT_ID = secretValues["XPI-API-ClientId"];
-      const WRIKE_CLIENT_SECRET = secretValues["XPI-API-ClientSecret"];
-
-      if (!WRIKE_LOGIN_ENDPOINT || !WRIKE_CLIENT_ID || !WRIKE_CLIENT_SECRET) {
-        return reject({
-          message: "Unable to fetch token! Please try after sometimes",
-        });
-      }
-
-      const url = `${WRIKE_LOGIN_ENDPOINT}/token`;
-
-      const result = await GetResponse(
-        url,
-        "POST",
-        {
-          "content-type": "application/x-www-form-urlencoded",
-        },
-        {
-          client_id: WRIKE_CLIENT_ID,
-          client_secret: WRIKE_CLIENT_SECRET,
-          grant_type: "authorization_code",
-          redirect_uri: WRIKE_REDIRECT_URL,
-          code,
-        }
-      );
-
-      if (result?.error)
-        return reject({ message: result["error_description"] });
-
-      resolve(result);
-    } catch (err) {
-      console.log("Error while getting access token: ", err?.message ?? err);
       reject(err);
     }
   });
