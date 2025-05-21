@@ -56,8 +56,6 @@ export const ValidateToken = async (req, reply, fastify) => {
 
     const decodedWrikeToken = await fastify.jwt.decode(wrikeAccessToken);
 
-    console.log("Wrike Token", decodedWrikeToken);
-
     // 30 minutes in milliseconds
     const THIRTY_MINUTES = 30 * 60 * 1000;
     const tokenExpiryTime = decodedWrikeToken.exp * 1000;

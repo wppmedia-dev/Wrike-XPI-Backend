@@ -1,7 +1,8 @@
 import { GetResponse } from "../../../utils/node-fetch";
+import { defaultParser } from "@odata/parser";
 import customFieldIdMeta from "../utils/customFieldsIds";
 
-export const GetCampaign = (wrikeToken, params, fastify) => {
+export const GetAllCampaigns = (wrikeToken, params, fastify) => {
   return new Promise(async (resolve, reject) => {
     try {
       if (!wrikeToken)
@@ -12,20 +13,25 @@ export const GetCampaign = (wrikeToken, params, fastify) => {
         });
 
       // Variable Declaration
-      const { campaignId: folderId } = params;
+      const { filter: filterParams, pageSize } = params;
 
-      if (!folderId)
-        return reject({
-          statusCode: 400,
-          message:
-            "Missing parameter! Required parameter is missing for the requested operation.",
-        });
+      let filters;
+
+      if (filterParams) {
+        filters = defaultParser.filter(filterParams);
+
+        if (!filters)
+          return reject({
+            statusCode: 400,
+            message: "Request is not supported!",
+          });
+      }
 
       const customFieldIds = customFieldIdMeta["live"];
 
       // Get folder data
       const wrikeFolderData = await GetResponse(
-        `${process.env.WRIKE_ENDPOINT}/folders/${folderId}`,
+        `${process.env.WRIKE_ENDPOINT}/spaces/${process.env.CAMPAIGN_SPACE_ID}/folders?project=false&fields=[customFields]&pageSize=${pageSize}&nextPageToken=`,
         "GET",
         {
           "content-type": "application/json",
@@ -38,22 +44,23 @@ export const GetCampaign = (wrikeToken, params, fastify) => {
         return reject({ message: wrikeFolderData?.errorDescription });
       }
 
-      const folderCustomFieldValues = {};
+      const data = wrikeFolderData?.data;
 
-      for (const [key, value] of Object.entries(customFieldIds)) {
-        const cfValue =
-          wrikeFolderData?.data[0]?.customFields?.find(
-            (field) => field.id === value
-          )?.value ?? "";
+      let campaigns = [];
 
-        folderCustomFieldValues[key] = cfValue;
-      }
+      for (const folder of data) {
+        const folderCustomFieldValues = {};
 
-      // Sending final response
-      resolve({
-        data: {
-          type: "Campaign",
-          customfieldlist: wrikeFolderData?.customFields,
+        for (const [key, value] of Object.entries(customFieldIds)) {
+          const cfValue =
+            folder?.customFields?.find((field) => field.id === value)?.value ??
+            "";
+
+          folderCustomFieldValues[key] = cfValue;
+        }
+
+        campaigns.push({
+          customfieldlist: folder?.customFields,
           noofcrs: folderCustomFieldValues["# CRs"],
           agency: folderCustomFieldValues["Agency*"],
           mediabuyingtype: folderCustomFieldValues["Biddable/Non-Biddable*"],
@@ -83,7 +90,13 @@ export const GetCampaign = (wrikeToken, params, fastify) => {
           requestormarket: folderCustomFieldValues["Requestor's Market*"],
           spacename: folderCustomFieldValues["Space Name*"],
           workitemlevel: folderCustomFieldValues["Work Item Level"],
-        },
+        });
+      }
+
+      // Sending final response
+      resolve({
+        type: "Campaign",
+        data: campaigns,
       });
     } catch (err) {
       console.log(err?.message || err);
