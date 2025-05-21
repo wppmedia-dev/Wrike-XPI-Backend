@@ -1,24 +1,19 @@
 const crypto = require("crypto");
 
-export const encryptWithRandomKey = (plainText, old_key) => {
+export const encryptWithRandomKey = (plainText, keyHex) => {
   return new Promise((resolve, reject) => {
     if (!plainText) {
       return reject("Encryption failed: Invalid plain text.");
     }
-
     try {
-      const key =
-        (typeof old_key === "string" ? Buffer.from(old_key, "hex") : old_key) ||
-        crypto.randomBytes(32);
+      const key = keyHex ? Buffer.from(keyHex, "hex") : crypto.randomBytes(32);
       const iv = crypto.randomBytes(16);
-
       const cipher = crypto.createCipheriv("aes-256-cbc", key, iv);
       let encrypted = cipher.update(plainText, "utf8");
       encrypted = Buffer.concat([encrypted, cipher.final()]);
-
       resolve({
         encryptedData: iv.toString("hex") + ":" + encrypted.toString("hex"),
-        key: key.toString("hex"), // return key to user
+        key: key.toString("hex"),
       });
     } catch (error) {
       reject({ message: error.message });
