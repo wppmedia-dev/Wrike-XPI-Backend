@@ -1,5 +1,48 @@
+const shortcodes = {
+  noofcrs: "# CRs",
+  agency: "Agency*",
+  mediabuyingtype: "Biddable/Non-Biddable*",
+  brand: "Brand*",
+  briefeddate: "Briefed Date*",
+  campaignbudget: "Campaign Budget*",
+  campaignenddate: "Campaign End Date*",
+  campaignid: "Campaign ID*",
+  campaignname: "Campaign Name*",
+  campaignobjective: "Campaign Objective*",
+  campaignstartdate: "Campaign Start Date*",
+  campaignfeedbackstatus: "CampaignFeedbackStatus*",
+  ccuid: "CCUID*",
+  mediachannelpractice: "Channel/Practice*",
+  client: "Client*",
+  comments: "Comments*",
+  cssid: "CSSID*",
+  currency: "Currency",
+  customerponumber: "PO Number",
+  debtor: "Debtor*",
+  kpiobjective: "KPI Objective*",
+  originalagency: "Original Agency*",
+  readyforarchive: "ReadyForArchive*",
+  region: "Region*",
+  requestedstartdate: "Requested Start Date*",
+  requestormarket: "Requestor's Market*",
+  spacename: "Space Name*",
+  workitemlevel: "Work Item Level",
+};
+
+function transform(obj) {
+  const result = {};
+  Object.entries(obj).forEach(([key, value]) => {
+    let shortcode = Object.keys(shortcodes).find(
+      (sc) => shortcodes[sc] === key
+    );
+    if (!shortcode) shortcode = key.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+    result[key] = { id: value, shortcode };
+  });
+  return result;
+}
+
 module.exports = {
-  test: {
+  test: transform({
     "CopyToChild*": "IEABCEFLJUAEF4SP",
     "Client*": "IEABCEFLJUAEF4AK",
     "Debtor*": "IEABCEFLJUAEGGC3",
@@ -33,8 +76,8 @@ module.exports = {
     "Channel/Practice*": "",
     "Comments*": "",
     "PO Number": "",
-  },
-  live: {
+  }),
+  live: transform({
     "CopyToChild*": "IEAC7PRTJUADKV3A",
     "Client*": "IEAC7PRTJUAGPHMQ",
     "Debtor*": "IEAC7PRTJUAB72M2",
@@ -69,5 +112,5 @@ module.exports = {
     "Channel/Practice*": "IEAC7PRTJUAB5SNE",
     "Comments*": "IEAC7PRTJUABQSTP",
     "PO Number": "IEAC7PRTJUABDEC7",
-  },
+  }),
 };

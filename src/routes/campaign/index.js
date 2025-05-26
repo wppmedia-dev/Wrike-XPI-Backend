@@ -22,6 +22,7 @@ export const campaignRoute = (fastify, opts, done) => {
     } catch (err) {
       reply.code(err?.statusCode || 500).send({
         success: false,
+        details: err?.details || null,
         message:
           err?.message ||
           "Fatal error Unexpected error occurred and service is unable complete the request.",
@@ -45,6 +46,7 @@ export const campaignRoute = (fastify, opts, done) => {
     } catch (err) {
       reply.code(err?.statusCode || 500).send({
         success: false,
+        details: err?.details || null,
         message:
           err?.message ||
           "Fatal error Unexpected error occurred and service is unable complete the request.",
