@@ -26,7 +26,7 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
         });
 
       // Variable Declaration
-      const { filter: filterParams, pageSize = 20 } = params;
+      const { filter: filterParams, pageSize } = params;
 
       let filters;
       let customFieldsParam = undefined;
@@ -44,7 +44,10 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
         customFieldsParam = extractFilters(filters, customFieldIds);
       }
 
-      let wrikeUrl = `${process.env.WRIKE_ENDPOINT}/spaces/${process.env.CAMPAIGN_SPACE_ID}/folders?fields=[customFields]&pageSize=${pageSize}&nextPageToken=`;
+      let wrikeUrl = `${process.env.WRIKE_ENDPOINT}/spaces/${process.env.CAMPAIGN_SPACE_ID}/folders?fields=[customFields]&nextPageToken=`;
+
+      if (pageSize && pageSize > 0) wrikeUrl += `&pageSize=${pageSize}`;
+
       if (customFieldsParam && customFieldsParam.length > 0) {
         wrikeUrl += `&customFields=${JSON.stringify(customFieldsParam)}`;
       }
