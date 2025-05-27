@@ -1,18 +1,18 @@
 import { GetResponse } from "../../../utils/node-fetch";
 import { defaultParser } from "@odata/parser";
-import customFieldIdMeta from "../utils/customFieldsIds";
+import * as customFieldIdMeta from "../utils/customFieldsIds";
 
 // Operator mapping from OData to your custom operators
 const odataToCustomOp = {
   EqualsExpression: "EqualTo",
   NotEqualsExpression: "NotInRange",
-  LessThanExpression: "LessThan",
-  LessOrEqualExpression: "LessOrEqualTo",
+  LesserThanExpression: "LessThan",
+  LesserOrEqualsExpression: "LessOrEqualTo",
   GreaterThanExpression: "GreaterThan",
-  GreaterOrEqualExpression: "GreaterOrEqualTo",
+  GreaterOrEqualsExpression: "GreaterOrEqualTo",
   HasExpression: "Contains",
-  StartsWithExpression: "StartsWith",
-  EndsWithExpression: "EndsWith",
+  startswith: "StartsWith",
+  endswith: "EndsWith",
 };
 
 export const GetAllCampaigns = (wrikeToken, params, fastify) => {
@@ -145,6 +145,57 @@ function getFieldName(node, customFieldIds) {
   return { name: null, id: null };
 }
 
+function getValues(type, leftValue, rightValue, customFieldIds) {
+  // Comparison node
+  const { id } = getFieldName(leftValue, customFieldIds);
+
+  const comparator = odataToCustomOp[type];
+
+  if (!comparator) {
+    throw {
+      statusCode: 400,
+      message: `Invalid filters: Unsupported operator '${type}' for field '${id}'.`,
+    };
+  }
+
+  let value = rightValue.value;
+  if (typeof value === "string" && value.startsWith("Edm.")) {
+    value = rightValue.raw.replace(/^'|'$/g, "");
+  } else if (typeof value === "string") {
+    value = value.replace(/^'|'$/g, "");
+  }
+  const filterObj = { id, comparator };
+  if (
+    [
+      "EqualTo",
+      "LessThan",
+      "LessOrEqualTo",
+      "GreaterThan",
+      "GreaterOrEqualTo",
+      "Contains",
+      "StartsWith",
+      "EndsWith",
+    ].includes(comparator)
+  ) {
+    filterObj.value = value;
+  } else if (comparator === "InRange") {
+    if (Array.isArray(value)) {
+      if (value.length > 0) filterObj.minValue = value[0];
+      if (value.length > 1) filterObj.maxValue = value[1];
+    } else {
+      filterObj.minValue = value;
+      filterObj.maxValue = value;
+    }
+  } else if (comparator === "NotInRange") {
+    filterObj.minValue = value;
+    filterObj.maxValue = value;
+  } else if (comparator === "ContainsAll" || comparator === "ContainsAny") {
+    filterObj.values = Array.isArray(value) ? value : [value];
+  }
+
+  return filterObj;
+}
+
 function extractFilters(node, customFieldIds, result = []) {
   if (!node) return result;
   if (node.type === "BoolParenExpression") {
@@ -158,51 +209,36 @@ function extractFilters(node, customFieldIds, result = []) {
     };
   }
 
+  if (node.type === "MethodCallExpression") {
+    if (Array.isArray(node.value.parameters)) {
+      result.push(
+        getValues(
+          node?.value?.method,
+          node.value.parameters[0],
+          node.value.parameters[1],
+          customFieldIds
+        )
+      );
+      return result;
+    } else
+      throw {
+        statusCode: 400,
+        message: `Invalid filters: Method call expression with parameters is not supported.`,
+      };
+  }
+
   if (node.type === "AndExpression" || node.type === "OrExpression") {
     extractFilters(node.value.left, customFieldIds, result);
     extractFilters(node.value.right, customFieldIds, result);
   } else if (odataToCustomOp[node.type]) {
-    // Comparison node
-    const { id } = getFieldName(node.value.left, customFieldIds);
+    result.push(
+      getValues(node.type, node.value.left, node.value.right, customFieldIds)
+    );
+  } else
+    throw {
+      statusCode: 400,
+      message: `Invalid filters: Unsupported operator '${node.type}'.`,
+    };
 
-    const comparator = odataToCustomOp[node.type];
-    let value = node.value.right.value;
-    if (typeof value === "string" && value.startsWith("Edm.")) {
-      value = node.value.right.raw.replace(/^'|'$/g, "");
-    } else if (typeof value === "string") {
-      value = value.replace(/^'|'$/g, "");
-    }
-    const filterObj = { id, comparator };
-    if (
-      [
-        "EqualTo",
-        "LessThan",
-        "LessOrEqualTo",
-        "GreaterThan",
-        "GreaterOrEqualTo",
-        "Contains",
-        "StartsWith",
-        "EndsWith",
-      ].includes(comparator)
-    ) {
-      filterObj.value = value;
-    } else if (comparator === "InRange" || comparator === "NotInRange") {
-      if (Array.isArray(value)) {
-        if (value.length > 0) filterObj.minValue = value[0];
-        if (value.length > 1) filterObj.maxValue = value[1];
-      } else {
-        filterObj.minValue = value;
-        filterObj.maxValue = value;
-      }
-    } else if (comparator === "ContainsAll" || comparator === "ContainsAny") {
-      filterObj.values = Array.isArray(value) ? value : [value];
-    } else {
-      throw {
-        statusCode: 400,
-        message: `Invalid filters: Unsupported operator '${comparator}' for field '${id}'.`,
-      };
-    }
-    result.push(filterObj);
-  }
   return result;
 }
