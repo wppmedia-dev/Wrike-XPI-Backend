@@ -43,7 +43,7 @@ export const GetCampaign = (wrikeToken, params, fastify) => {
       for (const [key, value] of Object.entries(customFieldIds)) {
         const cfValue =
           wrikeFolderData?.data[0]?.customFields?.find(
-            (field) => field.id === value
+            (field) => field.id === value.id
           )?.value ?? "";
 
         folderCustomFieldValues[key] = cfValue;
@@ -53,7 +53,7 @@ export const GetCampaign = (wrikeToken, params, fastify) => {
       resolve({
         data: {
           type: "Campaign",
-          customfieldlist: wrikeFolderData?.customFields,
+          customfieldlist: wrikeFolderData?.data[0]?.customFields,
           noofcrs: folderCustomFieldValues["# CRs"],
           agency: folderCustomFieldValues["Agency*"],
           mediabuyingtype: folderCustomFieldValues["Biddable/Non-Biddable*"],
