@@ -1,5 +1,5 @@
 import { GetResponse } from "../../../utils/node-fetch";
-import customFieldIdMeta from "../utils/customFieldsIds";
+import * as customFieldIdMeta from "../utils/customFieldsIds";
 
 export const GetCampaign = (wrikeToken, params, fastify) => {
   return new Promise(async (resolve, reject) => {
