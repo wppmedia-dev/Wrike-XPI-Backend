@@ -44,7 +44,7 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
         customFieldsParam = extractFilters(filters, customFieldIds);
       }
 
-      let wrikeUrl = `${process.env.WRIKE_ENDPOINT}/spaces/${process.env.CAMPAIGN_SPACE_ID}/folders?project=false&fields=[customFields]&pageSize=${pageSize}&nextPageToken=`;
+      let wrikeUrl = `${process.env.WRIKE_ENDPOINT}/spaces/${process.env.CAMPAIGN_SPACE_ID}/folders?fields=[customFields]&pageSize=${pageSize}&nextPageToken=`;
       if (customFieldsParam && customFieldsParam.length > 0) {
         wrikeUrl += `&customFields=${JSON.stringify(customFieldsParam)}`;
       }
