@@ -13,7 +13,7 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
 
       // Variable Declaration
 
-      const { fields: formFields, requetFormId } = params;
+      const { fields: formFields, requetFormId = "IEAC7PRTLIAA552O" } = params;
 
       if (!requetFormId)
         return reject({
@@ -25,20 +25,75 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
       const customFieldIds = customFieldIdMeta["live"];
 
       // Submit Request Form
-      const requestFormData = await submitRequestForm(
-        wrikeToken,
-        requetFormId,
-        formFields
-      );
+      const requestFormData = await getRequestForm(wrikeToken);
 
-      // Sending folder update error response
+      // Sending get request form error response
       if (requestFormData?.errorDescription) {
         return reject({ message: requestFormData?.errorDescription });
       }
 
+      const { pages: requestFormPages = null } = requestFormData?.data?.find(
+        (form) => form.id === requetFormId
+      );
+
+      if (!requestFormPages)
+        return reject({
+          message: `Request form with ID "${requetFormId}" does not exist. Please use a valid request form ID.`,
+        });
+
+      let submitRequestFieldsPayload = [];
+
+      formFields.map((field) => {
+        requestFormPages?.map((page) => {
+          const formFieldData = page?.fields.find(
+            (f) => f.title?.toLowerCase() === field.title?.toLowerCase()
+          );
+
+          if (!formFieldData)
+            return reject({
+              message: `Field with title "${field.title}" does not exist in the request form. Please use a valid title.`,
+            });
+
+          let valuesArray = [];
+          if (formFieldData?.items) {
+            field.values?.map((value) => {
+              const { id = null } = formFieldData?.items.find(
+                (item) => item.title?.toLowerCase() === value?.toLowerCase()
+              );
+
+              valuesArray.push(id);
+            });
+
+            if (valuesArray?.length == 0)
+              return reject({
+                message: `Value "${field.values}" does not exist in the request form field "${field.title}". Please use a valid value.`,
+              });
+          } else {
+            valuesArray = field?.values;
+          }
+
+          submitRequestFieldsPayload.push({
+            fieldId: formFieldData?.id,
+            values: valuesArray,
+          });
+        });
+      });
+
+      // Submit Request Form
+      const submittedRequestFormData = await submitRequestForm(
+        wrikeToken,
+        requetFormId,
+        submitRequestFieldsPayload
+      );
+
+      // Sending submit request form error response
+      if (submittedRequestFormData?.errorDescription) {
+        return reject({ message: submittedRequestFormData?.errorDescription });
+      }
+
       const asynJobData = await getRequestFormStatus(
         wrikeToken,
-        requestFormData?.data[0]?.id
+        submittedRequestFormData?.data[0]?.id
       );
 
       // Sending folder update error response
@@ -46,13 +101,24 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
         return reject({ message: asynJobData?.errorMessage });
       }
 
-      const taskData = await getTask(wrikeToken, asynJobData?.result?.taskId);
+      let outputData = {};
+      if (asynJobData?.result?.projectId)
+        outputData = await getProject(
+          wrikeToken,
+          asynJobData?.result?.projectId
+        );
+      else outputData = await getTask(wrikeToken, asynJobData?.result?.taskId);
+
+      // Sending folder update error response
+      if (outputData?.errorDescription) {
+        return reject({ message: outputData?.errorDescription });
+      }
 
       const folderCustomFieldValues = {};
 
       for (const [key, value] of Object.entries(customFieldIds)) {
         const cfValue =
-          taskData?.data[0]?.customFields?.find(
+          outputData?.data[0]?.customFields?.find(
             (field) => field.id === value.id
           )?.value ?? "";
 
@@ -63,7 +129,7 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
       resolve({
         data: {
           type: "Campaign",
-          customfieldlist: taskData?.data[0]?.customFields,
+          customfieldlist: outputData?.data[0]?.customFields,
           noofcrs: folderCustomFieldValues["# CRs"],
           agency: folderCustomFieldValues["Agency*"],
           mediabuyingtype: folderCustomFieldValues["Biddable/Non-Biddable*"],
@@ -103,6 +169,24 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
       });
     }
   });
+};
+
+const getRequestForm = async (wrikeToken) => {
+  try {
+    // Get folder data
+    const wrikeRequestFormData = await GetResponse(
+      `${process.env.WRIKE_ENDPOINT}/spaces/${process.env.REQUEST_FORM_SPACE_ID}/request_forms`,
+      "GET",
+      {
+        "content-type": "application/json",
+        Authorization: `Bearer ${wrikeToken}`,
+      }
+    );
+
+    return wrikeRequestFormData;
+  } catch (err) {
+    return err;
+  }
 };
 
 const submitRequestForm = async (wrikeToken, requetFormId, formFields) => {
@@ -160,6 +244,24 @@ const getTask = async (wrikeToken, taskId) => {
     // Get folder data
     const wrikeRequestFormData = await GetResponse(
       `${process.env.WRIKE_ENDPOINT}/tasks/${taskId}`,
+      "GET",
+      {
+        "content-type": "application/json",
+        Authorization: `Bearer ${wrikeToken}`,
+      }
+    );
+
+    return wrikeRequestFormData;
+  } catch (err) {
+    return err;
+  }
+};
+
+const getProject = async (wrikeToken, projectId) => {
+  try {
+    // Get folder data
+    const wrikeRequestFormData = await GetResponse(
+      `${process.env.WRIKE_ENDPOINT}/folders/${projectId}`,
       "GET",
       {
         "content-type": "application/json",

@@ -35,7 +35,7 @@ export const ValidateToken = async (req, reply, fastify) => {
     if (!encAccessToken)
       return reply.code(401).send({
         message:
-          "Failed authorization! User is not authorized to access the service.",
+          "Failed authorization! The token is invalid or does not exist.",
       });
 
     let wrikeAccessToken = await decryptWithKey(
