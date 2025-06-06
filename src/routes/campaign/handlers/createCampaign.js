@@ -43,39 +43,50 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
 
       let submitRequestFieldsPayload = [];
 
-      formFields.map((field) => {
-        requestFormPages?.map((page) => {
-          const formFieldData = page?.fields.find(
+      formFields.forEach((field) => {
+        let matchedField = null;
+
+        // Try to find the matching field in any page
+        for (const page of requestFormPages || []) {
+          matchedField = page?.fields.find(
             (f) => f.title?.toLowerCase() === field.title?.toLowerCase()
           );
+          if (matchedField) break; // Exit once found
+        }
 
-          if (!formFieldData)
-            return reject({
-              message: `Field with title "${field.title}" does not exist in the request form. Please use a valid title.`,
-            });
+        if (!matchedField) {
+          return reject({
+            message: `Field with title "${field.title}" does not exist in the request form. Please use a valid title.`,
+          });
+        }
 
-          let valuesArray = [];
-          if (formFieldData?.items) {
-            field.values?.map((value) => {
-              const { id = null } = formFieldData?.items.find(
-                (item) => item.title?.toLowerCase() === value?.toLowerCase()
-              );
+        let valuesArray = [];
 
-              valuesArray.push(id);
-            });
+        if (matchedField.items) {
+          const lowerItemMap = new Map(
+            matchedField.items.map((item) => [
+              item.title?.toLowerCase(),
+              item.id,
+            ])
+          );
 
-            if (valuesArray?.length == 0)
-              return reject({
-                message: `Value "${field.values}" does not exist in the request form field "${field.title}". Please use a valid value.`,
-              });
-          } else {
-            valuesArray = field?.values;
+          for (const value of field.values || []) {
+            const id = lowerItemMap.get(value?.toLowerCase()) || null;
+            valuesArray.push(id);
           }
 
-          submitRequestFieldsPayload.push({
-            fieldId: formFieldData?.id,
-            values: valuesArray,
-          });
+          if (valuesArray.every((id) => id === null)) {
+            return reject({
+              message: `Value "${field.values}" does not exist in the request form field "${field.title}". Please use a valid value.`,
+            });
+          }
+        } else {
+          valuesArray = field.values;
+        }
+
+        submitRequestFieldsPayload.push({
+          fieldId: matchedField.id,
+          values: valuesArray,
         });
       });
 
