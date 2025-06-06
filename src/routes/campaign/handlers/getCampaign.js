@@ -53,7 +53,7 @@ export const GetCampaign = (wrikeToken, params, fastify) => {
       resolve({
         data: {
           type: "Campaign",
-          customfieldlist: wrikeFolderData?.data[0]?.customFields,
+          // customfieldlist: wrikeFolderData?.data[0]?.customFields,
           noofcrs: folderCustomFieldValues["# CRs"],
           agency: folderCustomFieldValues["Agency*"],
           mediabuyingtype: folderCustomFieldValues["Biddable/Non-Biddable*"],

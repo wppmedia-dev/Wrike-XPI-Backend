@@ -75,7 +75,7 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
         );
 
         return {
-          customfieldlist: folder?.customFields,
+          // customfieldlist: folder?.customFields,
           noofcrs: folderCustomFieldValues["# CRs"],
           agency: folderCustomFieldValues["Agency*"],
           mediabuyingtype: folderCustomFieldValues["Biddable/Non-Biddable*"],
