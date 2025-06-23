@@ -7,10 +7,10 @@ const requiredDatahubRequestFormIds = [
   "RF v4Id",
   "Variant Id",
 ];
-let datahubRequestFormId = {};
 let datahubSpaceData = {};
 let datahubEntityData = {};
 let datahubCustomFieldsData = {};
+let datahubRequestFormFieldsData = {};
 
 export const CreateCampaign = (wrikeToken, params, fastify) => {
   return new Promise(async (resolve, reject) => {
@@ -53,6 +53,10 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
         await getCustomFieldsDatahub(wrikeToken);
       }
 
+      if (Object.keys(datahubRequestFormFieldsData).length === 0) {
+        await getRequestFormFieldDatahub(wrikeToken, space, varientId);
+      }
+
       // Submit Request Form
       const requestFormData = await getRequestForm(wrikeToken);
 
@@ -73,13 +77,13 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
       let submitRequestFieldsPayload = [];
 
       // Object.keys(formFields).forEach((field) => {
-      for (const field in formFields) {
+      for (const field in datahubRequestFormFieldsData) {
         let matchedField = null;
 
         // Try to find the matching field in any page
         for (const page of requestFormPages || []) {
           matchedField = page?.fields.find(
-            (f) => f.title?.toLowerCase() === field?.toLowerCase()
+            (f) => f.id === datahubRequestFormFieldsData[field]?.fieldId
           );
           if (matchedField) break; // Exit once found
         }
@@ -296,6 +300,64 @@ const getCustomFieldsDatahub = async (wrikeToken) => {
   }
 };
 
+const getRequestFormFieldDatahub = async (wrikeToken, space, varientId) => {
+  try {
+    const datahubFields = await getDatahubFields(
+      wrikeToken,
+      process.env.DATAHUB_REQUEST_FORM_FIELDS_ID
+    );
+
+    if (datahubFields?.errorDescription) {
+      return Promise.reject({
+        errorDescription: datahubFields?.errorDescription,
+      });
+    }
+
+    let formFieldsIds = {};
+    datahubFields?.data?.forEach((field) => {
+      formFieldsIds[field.title?.toLowerCase()] = field.id;
+    });
+
+    const datahubRecords = await getDatahubRecords(
+      wrikeToken,
+      process.env.DATAHUB_REQUEST_FORM_FIELDS_ID
+    );
+
+    if (datahubRecords?.errorDescription) {
+      return Promise.reject({
+        errorDescription: datahubRecords?.errorDescription,
+      });
+    }
+
+    datahubRecords?.data?.forEach((record) => {
+      if (
+        record.fieldValues[formFieldsIds["space"]]?.[0] ===
+          datahubSpaceData[space?.toLowerCase()] &&
+        record.fieldValues[formFieldsIds["variant id"]] === varientId
+      ) {
+        let customFieldCode = "";
+        for (const cf in datahubCustomFieldsData) {
+          if (
+            datahubCustomFieldsData[cf].id ===
+            record.fieldValues[formFieldsIds["xpi shortcode"]][0]
+          ) {
+            customFieldCode = cf;
+            // return;
+          }
+        }
+
+        if (customFieldCode)
+          datahubRequestFormFieldsData[customFieldCode] = {
+            id: record.id,
+            ["fieldId"]: record.fieldValues[formFieldsIds["field v4id"]],
+          };
+      }
+    });
+  } catch (err) {
+    return Promise.reject(err);
+  }
+};
+
 const findRequestFormId = async (wrikeToken, space, entity, varientId) => {
   try {
     if (Object.keys(datahubSpaceData).length == 0) {
@@ -317,13 +379,12 @@ const findRequestFormId = async (wrikeToken, space, entity, varientId) => {
       };
     }
 
-    if (datahubRequestFormId) {
-      formFields?.data?.forEach((field) => {
-        if (requiredDatahubRequestFormIds.includes(field.title)) {
-          datahubRequestFormId[field.title] = field.id;
-        }
-      });
-    }
+    let formFieldsIds = {};
+    formFields?.data?.forEach((field) => {
+      if (requiredDatahubRequestFormIds.includes(field.title)) {
+        formFieldsIds[field.title] = field.id;
+      }
+    });
 
     const datahubRecords = await getDatahubRecords(
       wrikeToken,
@@ -332,17 +393,16 @@ const findRequestFormId = async (wrikeToken, space, entity, varientId) => {
 
     const datahubMatchedRecord = datahubRecords?.data?.find(
       (record) =>
-        record.fieldValues[datahubRequestFormId["Space"]]?.[0] ===
+        record.fieldValues[formFieldsIds["Space"]]?.[0] ===
           datahubSpaceData[space?.toLowerCase()] &&
-        record.fieldValues[datahubRequestFormId["XPI Entity"]]?.[0] ===
+        record.fieldValues[formFieldsIds["XPI Entity"]]?.[0] ===
           datahubEntityData[entity?.toLowerCase()] &&
-        record.fieldValues[datahubRequestFormId["Variant Id"]] === varientId
+        record.fieldValues[formFieldsIds["Variant Id"]] === varientId
     );
 
     return {
       requiredFormId:
-        datahubMatchedRecord.fieldValues[datahubRequestFormId["RF v4Id"]] ||
-        null,
+        datahubMatchedRecord.fieldValues[formFieldsIds["RF v4Id"]] || null,
     };
   } catch (err) {
     return err;
