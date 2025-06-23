@@ -1,6 +1,11 @@
 import { GetResponse } from "../../../utils/node-fetch";
 import * as customFieldIdMeta from "../utils/customFieldsIds";
 
+const requiredFieldIds = ["XPI Entity", "Space", "RF v4Id", "Variant Id"];
+let requiredFieldIdValues = {};
+let datahubSpaceData = {};
+let datahubEntityData = {};
+
 export const CreateCampaign = (wrikeToken, params, fastify) => {
   return new Promise(async (resolve, reject) => {
     try {
@@ -13,7 +18,17 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
 
       // Variable Declaration
 
-      const { fields: formFields, requetFormId = "IEAC7PRTLIAA552O" } = params;
+      const { space, entity, varientId, fields: formFields } = params;
+
+      const customFieldIds = customFieldIdMeta["live"];
+
+      // Find Request Form ID
+      const requetFormId = await findRequestFormId(
+        wrikeToken,
+        space,
+        entity,
+        varientId
+      );
 
       if (!requetFormId)
         return reject({
@@ -21,8 +36,6 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
           message:
             "Missing parameter! Required parameter requestForm field is missing for the requested operation.",
         });
-
-      const customFieldIds = customFieldIdMeta["live"];
 
       // Submit Request Form
       const requestFormData = await getRequestForm(wrikeToken);
@@ -180,6 +193,126 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
       });
     }
   });
+};
+
+const getSpaceDatahub = async (wrikeToken) => {
+  try {
+    const datahubRecords = await getDatahubRecords(
+      wrikeToken,
+      process.env.DATAHUB_SPACE_ID
+    );
+
+    if (datahubRecords?.errorDescription) {
+      return { errorDescription: datahubRecords?.errorDescription };
+    }
+
+    datahubRecords?.data?.forEach((record) => {
+      datahubSpaceData[record.title?.toLowerCase()] = record.id;
+    });
+  } catch (err) {
+    return err;
+  }
+};
+
+const getEntityDatahub = async (wrikeToken) => {
+  try {
+    const datahubRecords = await getDatahubRecords(
+      wrikeToken,
+      process.env.DATAHUB_ENTITY_ID
+    );
+
+    if (datahubRecords?.errorDescription) {
+      return { errorDescription: datahubRecords?.errorDescription };
+    }
+
+    datahubRecords?.data?.forEach((record) => {
+      datahubEntityData[record.title?.toLowerCase()] = record.id;
+    });
+  } catch (err) {
+    return err;
+  }
+};
+
+const findRequestFormId = async (wrikeToken, space, entity, varientId) => {
+  try {
+    if (Object.keys(datahubSpaceData).length == 0) {
+      await getSpaceDatahub(wrikeToken);
+    }
+
+    if (Object.keys(datahubEntityData).length == 0) {
+      await getEntityDatahub(wrikeToken);
+    }
+
+    const formFields = await getDatahubFields(
+      wrikeToken,
+      process.env.DATAHUB_REQUEST_FORM_ID
+    );
+
+    if (requiredFieldIdValues) {
+      formFields?.data?.forEach((field) => {
+        if (requiredFieldIds.includes(field.title)) {
+          requiredFieldIdValues[field.title] = field.id;
+        }
+      });
+    }
+
+    const datahubRecords = await getDatahubRecords(
+      wrikeToken,
+      process.env.DATAHUB_REQUEST_FORM_ID
+    );
+
+    const datahubMatchedRecord = datahubRecords?.data?.find(
+      (record) =>
+        record.fieldValues[requiredFieldIdValues["Space"]]?.[0] ===
+          datahubSpaceData[space?.toLowerCase()] &&
+        record.fieldValues[requiredFieldIdValues["XPI Entity"]]?.[0] ===
+          datahubEntityData[entity?.toLowerCase()] &&
+        record.fieldValues[requiredFieldIdValues["Variant Id"]] === varientId
+    );
+
+    return (
+      datahubMatchedRecord.fieldValues[requiredFieldIdValues["RF v4Id"]] || null
+    );
+  } catch (err) {
+    return err;
+  }
+};
+
+// Datahub Util Functions
+const getDatahubFields = async (wrikeToken, databaseId) => {
+  try {
+    // Get folder data
+    const datahubFields = await GetResponse(
+      `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/fields`,
+      "GET",
+      {
+        "content-type": "application/json",
+        Authorization: `Bearer ${wrikeToken}`,
+      }
+    );
+
+    return datahubFields;
+  } catch (err) {
+    return err;
+  }
+};
+
+const getDatahubRecords = async (wrikeToken, databaseId) => {
+  try {
+    // Get folder data
+    const datahubRecords = await GetResponse(
+      `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/records`,
+      "GET",
+      {
+        "content-type": "application/json",
+        Authorization: `Bearer ${wrikeToken}`,
+      }
+    );
+
+    return datahubRecords;
+  } catch (err) {
+    return err;
+  }
 };
 
 const getRequestForm = async (wrikeToken) => {
