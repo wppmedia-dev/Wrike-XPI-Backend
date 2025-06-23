@@ -1,8 +1,13 @@
 import { GetResponse } from "../../../utils/node-fetch";
 import * as customFieldIdMeta from "../utils/customFieldsIds";
 
-const requiredFieldIds = ["XPI Entity", "Space", "RF v4Id", "Variant Id"];
-let requiredFieldIdValues = {};
+const requiredDatahubRequestFormIds = [
+  "XPI Entity",
+  "Space",
+  "RF v4Id",
+  "Variant Id",
+];
+let datahubRequestFormId = {};
 let datahubSpaceData = {};
 let datahubEntityData = {};
 
@@ -248,10 +253,10 @@ const findRequestFormId = async (wrikeToken, space, entity, varientId) => {
       process.env.DATAHUB_REQUEST_FORM_ID
     );
 
-    if (requiredFieldIdValues) {
+    if (datahubRequestFormId) {
       formFields?.data?.forEach((field) => {
-        if (requiredFieldIds.includes(field.title)) {
-          requiredFieldIdValues[field.title] = field.id;
+        if (requiredDatahubRequestFormIds.includes(field.title)) {
+          datahubRequestFormId[field.title] = field.id;
         }
       });
     }
@@ -263,15 +268,15 @@ const findRequestFormId = async (wrikeToken, space, entity, varientId) => {
 
     const datahubMatchedRecord = datahubRecords?.data?.find(
       (record) =>
-        record.fieldValues[requiredFieldIdValues["Space"]]?.[0] ===
+        record.fieldValues[datahubRequestFormId["Space"]]?.[0] ===
           datahubSpaceData[space?.toLowerCase()] &&
-        record.fieldValues[requiredFieldIdValues["XPI Entity"]]?.[0] ===
+        record.fieldValues[datahubRequestFormId["XPI Entity"]]?.[0] ===
           datahubEntityData[entity?.toLowerCase()] &&
-        record.fieldValues[requiredFieldIdValues["Variant Id"]] === varientId
+        record.fieldValues[datahubRequestFormId["Variant Id"]] === varientId
     );
 
     return (
-      datahubMatchedRecord.fieldValues[requiredFieldIdValues["RF v4Id"]] || null
+      datahubMatchedRecord.fieldValues[datahubRequestFormId["RF v4Id"]] || null
     );
   } catch (err) {
     return err;
