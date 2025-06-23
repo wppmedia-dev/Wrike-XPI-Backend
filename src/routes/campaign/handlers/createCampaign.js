@@ -10,6 +10,7 @@ const requiredDatahubRequestFormIds = [
 let datahubRequestFormId = {};
 let datahubSpaceData = {};
 let datahubEntityData = {};
+let datahubCustomFieldsData = {};
 
 export const CreateCampaign = (wrikeToken, params, fastify) => {
   return new Promise(async (resolve, reject) => {
@@ -28,12 +29,18 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
       const customFieldIds = customFieldIdMeta["live"];
 
       // Find Request Form ID
-      const requetFormId = await findRequestFormId(
+      const requetForm = await findRequestFormId(
         wrikeToken,
         space,
         entity,
         varientId
       );
+      // Sending submit request form error response
+      if (requetForm?.errorDescription) {
+        return reject({ message: requetForm?.errorDescription });
+      }
+
+      const requetFormId = requetForm?.requiredFormId;
 
       if (!requetFormId)
         return reject({
@@ -41,6 +48,10 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
           message:
             "Missing parameter! Required parameter requestForm field is missing for the requested operation.",
         });
+
+      if (Object.keys(datahubCustomFieldsData).length === 0) {
+        await getCustomFieldsDatahub(wrikeToken);
+      }
 
       // Submit Request Form
       const requestFormData = await getRequestForm(wrikeToken);
@@ -61,26 +72,29 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
 
       let submitRequestFieldsPayload = [];
 
-      formFields.forEach((field) => {
+      // Object.keys(formFields).forEach((field) => {
+      for (const field in formFields) {
         let matchedField = null;
 
         // Try to find the matching field in any page
         for (const page of requestFormPages || []) {
           matchedField = page?.fields.find(
-            (f) => f.title?.toLowerCase() === field.title?.toLowerCase()
+            (f) => f.title?.toLowerCase() === field?.toLowerCase()
           );
           if (matchedField) break; // Exit once found
         }
 
-        if (!matchedField) {
-          return reject({
-            message: `Field with title "${field.title}" does not exist in the request form. Please use a valid title.`,
-          });
-        }
+        if (!matchedField) continue;
+
+        // if (!matchedField) {
+        //   return reject({
+        //     message: `Field with title "${field}" does not exist in the request form. Please use a valid title.`,
+        //   });
+        // }
 
         let valuesArray = [];
 
-        if (matchedField.items) {
+        if (matchedField?.items) {
           const lowerItemMap = new Map(
             matchedField.items.map((item) => [
               item.title?.toLowerCase(),
@@ -88,25 +102,24 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
             ])
           );
 
-          for (const value of field.values || []) {
-            const id = lowerItemMap.get(value?.toLowerCase()) || null;
-            valuesArray.push(id);
-          }
+          const id = lowerItemMap.get(formFields[field]?.toLowerCase()) || null;
 
-          if (valuesArray.every((id) => id === null)) {
+          if (!id) {
             return reject({
-              message: `Value "${field.values}" does not exist in the request form field "${field.title}". Please use a valid value.`,
+              message: `Value "${formFields[field]}" does not exist in the request form field "${field}". Please use a valid value.`,
             });
           }
+
+          valuesArray.push(id);
         } else {
-          valuesArray = field.values;
+          valuesArray = [formFields[field]];
         }
 
         submitRequestFieldsPayload.push({
           fieldId: matchedField.id,
           values: valuesArray,
         });
-      });
+      }
 
       // Submit Request Form
       const submittedRequestFormData = await submitRequestForm(
@@ -208,14 +221,16 @@ const getSpaceDatahub = async (wrikeToken) => {
     );
 
     if (datahubRecords?.errorDescription) {
-      return { errorDescription: datahubRecords?.errorDescription };
+      return Promise.reject({
+        errorDescription: datahubRecords?.errorDescription,
+      });
     }
 
     datahubRecords?.data?.forEach((record) => {
       datahubSpaceData[record.title?.toLowerCase()] = record.id;
     });
   } catch (err) {
-    return err;
+    return Promise.reject(err);
   }
 };
 
@@ -227,14 +242,57 @@ const getEntityDatahub = async (wrikeToken) => {
     );
 
     if (datahubRecords?.errorDescription) {
-      return { errorDescription: datahubRecords?.errorDescription };
+      return Promise.reject({
+        errorDescription: datahubRecords?.errorDescription,
+      });
     }
 
     datahubRecords?.data?.forEach((record) => {
       datahubEntityData[record.title?.toLowerCase()] = record.id;
     });
   } catch (err) {
-    return err;
+    return Promise.reject(err);
+  }
+};
+
+const getCustomFieldsDatahub = async (wrikeToken) => {
+  try {
+    const datahubFields = await getDatahubFields(
+      wrikeToken,
+      process.env.DATAHUB_CUSTOM_FIELDS_ID
+    );
+
+    if (datahubFields?.errorDescription) {
+      return Promise.reject({
+        errorDescription: datahubFields?.errorDescription,
+      });
+    }
+
+    let formFieldsIds = {};
+    datahubFields?.data?.forEach((field) => {
+      formFieldsIds[field.title?.toLowerCase()] = field.id;
+    });
+
+    const datahubRecords = await getDatahubRecords(
+      wrikeToken,
+      process.env.DATAHUB_CUSTOM_FIELDS_ID
+    );
+
+    if (datahubRecords?.errorDescription) {
+      return Promise.reject({
+        errorDescription: datahubRecords?.errorDescription,
+      });
+    }
+
+    datahubRecords?.data?.forEach((record) => {
+      datahubCustomFieldsData[record.title?.toLowerCase()] = {
+        id: record.id,
+        ["cfId"]: record.fieldValues[formFieldsIds["cf id"]],
+        ["code"]: record.fieldValues[formFieldsIds["code"]],
+      };
+    });
+  } catch (err) {
+    return Promise.reject(err);
   }
 };
 
@@ -252,6 +310,12 @@ const findRequestFormId = async (wrikeToken, space, entity, varientId) => {
       wrikeToken,
       process.env.DATAHUB_REQUEST_FORM_ID
     );
+
+    if (formFields?.errorDescription) {
+      return {
+        errorDescription: formFields?.errorDescription,
+      };
+    }
 
     if (datahubRequestFormId) {
       formFields?.data?.forEach((field) => {
@@ -275,9 +339,11 @@ const findRequestFormId = async (wrikeToken, space, entity, varientId) => {
         record.fieldValues[datahubRequestFormId["Variant Id"]] === varientId
     );
 
-    return (
-      datahubMatchedRecord.fieldValues[datahubRequestFormId["RF v4Id"]] || null
-    );
+    return {
+      requiredFormId:
+        datahubMatchedRecord.fieldValues[datahubRequestFormId["RF v4Id"]] ||
+        null,
+    };
   } catch (err) {
     return err;
   }
