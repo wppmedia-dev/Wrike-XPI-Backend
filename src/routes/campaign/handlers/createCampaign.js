@@ -313,7 +313,6 @@ const getCustomFieldsDatahub = async (wrikeToken) => {
         ] = {
           id: record.id,
           ["cfId"]: record.fieldValues[formFieldsIds["cf id"]],
-          ["code"]: record.fieldValues[formFieldsIds["code"]],
         };
     });
   } catch (err) {
