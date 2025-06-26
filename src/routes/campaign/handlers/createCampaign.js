@@ -106,15 +106,31 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
             ])
           );
 
-          const id = lowerItemMap.get(formFields[field]?.toLowerCase()) || null;
+          if (Array.isArray(formFields[field])) {
+            for (const value of formFields[field]) {
+              const matchedFieldItemId =
+                lowerItemMap.get(value?.toLowerCase()) || null;
 
-          if (!id) {
-            return reject({
-              message: `Value "${formFields[field]}" does not exist in the request form field "${field}". Please use a valid value.`,
-            });
+              if (!matchedFieldItemId) {
+                return reject({
+                  message: `Value "${value}" does not exist in the request form field "${field}". Please use a valid value.`,
+                });
+              }
+
+              valuesArray.push(matchedFieldItemId);
+            }
+          } else if (typeof formFields[field] == "string") {
+            const matchedFieldItemId =
+              lowerItemMap.get(formFields[field]?.toLowerCase()) || null;
+
+            if (!matchedFieldItemId) {
+              return reject({
+                message: `Value "${formFields[field]}" does not exist in the request form field "${field}". Please use a valid value.`,
+              });
+            }
+
+            valuesArray.push(matchedFieldItemId);
           }
-
-          valuesArray.push(id);
         } else {
           valuesArray = [formFields[field]];
         }
@@ -348,6 +364,13 @@ const getRequestFormFieldDatahub = async (wrikeToken, space, varientId) => {
 
         if (customFieldCode)
           datahubRequestFormFieldsData[customFieldCode] = {
+            id: record.id,
+            ["fieldId"]: record.fieldValues[formFieldsIds["field v4id"]],
+          };
+        else if (record.fieldValues[formFieldsIds["xpi custom shortcode"]])
+          datahubRequestFormFieldsData[
+            record.fieldValues[formFieldsIds["xpi custom shortcode"]]
+          ] = {
             id: record.id,
             ["fieldId"]: record.fieldValues[formFieldsIds["field v4id"]],
           };
