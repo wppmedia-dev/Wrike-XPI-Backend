@@ -101,7 +101,7 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
         if (matchedField?.items) {
           const lowerItemMap = new Map(
             matchedField.items.map((item) => [
-              item.title?.toLowerCase(),
+              item.title?.trim()?.toLowerCase(),
               item.id,
             ])
           );
@@ -109,7 +109,7 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
           if (Array.isArray(formFields[field])) {
             for (const value of formFields[field]) {
               const matchedFieldItemId =
-                lowerItemMap.get(value?.toLowerCase()) || null;
+                lowerItemMap.get(value?.trim()?.toLowerCase()) || null;
 
               if (!matchedFieldItemId) {
                 return reject({
@@ -119,9 +119,11 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
 
               valuesArray.push(matchedFieldItemId);
             }
-          } else if (typeof formFields[field] == "string") {
+          } else if (typeof formFields[field?.trim()] == "string") {
             const matchedFieldItemId =
-              lowerItemMap.get(formFields[field]?.toLowerCase()) || null;
+              lowerItemMap.get(
+                formFields[field?.trim()]?.trim()?.toLowerCase()
+              ) || null;
 
             if (!matchedFieldItemId) {
               return reject({
@@ -247,7 +249,7 @@ const getSpaceDatahub = async (wrikeToken) => {
     }
 
     datahubRecords?.data?.forEach((record) => {
-      datahubSpaceData[record.title?.toLowerCase()] = record.id;
+      datahubSpaceData[record.title?.trim()?.toLowerCase()] = record.id;
     });
   } catch (err) {
     return Promise.reject(err);
@@ -268,7 +270,7 @@ const getEntityDatahub = async (wrikeToken) => {
     }
 
     datahubRecords?.data?.forEach((record) => {
-      datahubEntityData[record.title?.toLowerCase()] = record.id;
+      datahubEntityData[record.title?.trim()?.toLowerCase()] = record.id;
     });
   } catch (err) {
     return Promise.reject(err);
@@ -290,7 +292,7 @@ const getCustomFieldsDatahub = async (wrikeToken) => {
 
     let formFieldsIds = {};
     datahubFields?.data?.forEach((field) => {
-      formFieldsIds[field.title?.toLowerCase()] = field.id;
+      formFieldsIds[field.title?.trim()?.toLowerCase()] = field.id;
     });
 
     const datahubRecords = await getDatahubRecords(
@@ -305,11 +307,14 @@ const getCustomFieldsDatahub = async (wrikeToken) => {
     }
 
     datahubRecords?.data?.forEach((record) => {
-      datahubCustomFieldsData[record.title?.toLowerCase()] = {
-        id: record.id,
-        ["cfId"]: record.fieldValues[formFieldsIds["cf id"]],
-        ["code"]: record.fieldValues[formFieldsIds["code"]],
-      };
+      if (record.fieldValues[formFieldsIds["short code"]]?.trim())
+        datahubCustomFieldsData[
+          record.fieldValues[formFieldsIds["short code"]]?.trim()?.toLowerCase()
+        ] = {
+          id: record.id,
+          ["cfId"]: record.fieldValues[formFieldsIds["cf id"]],
+          ["code"]: record.fieldValues[formFieldsIds["code"]],
+        };
     });
   } catch (err) {
     return Promise.reject(err);
@@ -331,7 +336,7 @@ const getRequestFormFieldDatahub = async (wrikeToken, space, varientId) => {
 
     let formFieldsIds = {};
     datahubFields?.data?.forEach((field) => {
-      formFieldsIds[field.title?.toLowerCase()] = field.id;
+      formFieldsIds[field.title?.trim()?.toLowerCase()] = field.id;
     });
 
     const datahubRecords = await getDatahubRecords(
@@ -348,7 +353,7 @@ const getRequestFormFieldDatahub = async (wrikeToken, space, varientId) => {
     datahubRecords?.data?.forEach((record) => {
       if (
         record.fieldValues[formFieldsIds["space"]]?.[0] ===
-          datahubSpaceData[space?.toLowerCase()] &&
+          datahubSpaceData[space?.trim()?.toLowerCase()] &&
         record.fieldValues[formFieldsIds["variant id"]] === varientId
       ) {
         let customFieldCode = "";
@@ -417,9 +422,9 @@ const findRequestFormId = async (wrikeToken, space, entity, varientId) => {
     const datahubMatchedRecord = datahubRecords?.data?.find(
       (record) =>
         record.fieldValues[formFieldsIds["Space"]]?.[0] ===
-          datahubSpaceData[space?.toLowerCase()] &&
+          datahubSpaceData[space?.trim()?.toLowerCase()] &&
         record.fieldValues[formFieldsIds["XPI Entity"]]?.[0] ===
-          datahubEntityData[entity?.toLowerCase()] &&
+          datahubEntityData[entity?.trim()?.toLowerCase()] &&
         record.fieldValues[formFieldsIds["Variant Id"]] === varientId
     );
 
