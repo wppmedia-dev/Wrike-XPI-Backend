@@ -59,3 +59,152 @@ export const getWrikeTokens = async ({ code, refresh_token }) => {
     }
   });
 };
+
+// Datahub Util Functions
+export const getDatahubFields = async (wrikeToken, databaseId) => {
+  try {
+    // Get folder data
+    const datahubFields = await GetResponse(
+      `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/fields`,
+      "GET",
+      {
+        "content-type": "application/json",
+        Authorization: `Bearer ${wrikeToken}`,
+      }
+    );
+
+    return datahubFields;
+  } catch (err) {
+    return err;
+  }
+};
+
+export const getDatahubRecords = async (wrikeToken, databaseId) => {
+  try {
+    // Get folder data
+    const datahubRecords = await GetResponse(
+      `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/records`,
+      "GET",
+      {
+        "content-type": "application/json",
+        Authorization: `Bearer ${wrikeToken}`,
+      }
+    );
+
+    return datahubRecords;
+  } catch (err) {
+    return err;
+  }
+};
+
+export const getRequestForm = async (wrikeToken) => {
+  try {
+    // Get folder data
+    const wrikeRequestFormData = await GetResponse(
+      `${process.env.WRIKE_ENDPOINT}/spaces/${process.env.REQUEST_FORM_SPACE_ID}/request_forms`,
+      "GET",
+      {
+        "content-type": "application/json",
+        Authorization: `Bearer ${wrikeToken}`,
+      }
+    );
+
+    return wrikeRequestFormData;
+  } catch (err) {
+    return err;
+  }
+};
+
+export const submitRequestForm = async (
+  wrikeToken,
+  requetFormId,
+  formFields
+) => {
+  try {
+    // Get folder data
+    const wrikeRequestFormData = await GetResponse(
+      `${process.env.WRIKE_ENDPOINT}/request_forms/${requetFormId}/submit`,
+      "POST",
+      {
+        "content-type": "application/json",
+        Authorization: `Bearer ${wrikeToken}`,
+      },
+      {
+        formFields,
+      }
+    );
+
+    return wrikeRequestFormData;
+  } catch (err) {
+    return err;
+  }
+};
+
+export const getRequestFormStatus = async (
+  wrikeToken,
+  asyncJobId,
+  retryCount = 0
+) => {
+  try {
+    // Get async job status (should be GET, not POST)
+    const wrikeRequestFormData = await GetResponse(
+      `${process.env.WRIKE_ENDPOINT}/async_job/${asyncJobId}`,
+      "GET",
+      {
+        "content-type": "application/json",
+        Authorization: `Bearer ${wrikeToken}`,
+      }
+    );
+
+    const jobStatus = wrikeRequestFormData?.data?.[0]?.status;
+
+    if (jobStatus === "InProgress") {
+      if (retryCount >= 10)
+        return { errorMessage: "Async job polling timed out." };
+
+      // Wait 2 seconds before retrying
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      return getRequestFormStatus(wrikeToken, asyncJobId, retryCount + 1);
+    } else if (jobStatus === "Completed" || jobStatus === "Failed") {
+      return wrikeRequestFormData?.data[0];
+    } else return { errorMessage: `Unknown job status: ${jobStatus}` };
+  } catch (error) {
+    return error;
+  }
+};
+
+export const getTask = async (wrikeToken, taskId) => {
+  try {
+    // Get folder data
+    const wrikeRequestFormData = await GetResponse(
+      `${process.env.WRIKE_ENDPOINT}/tasks/${taskId}`,
+      "GET",
+      {
+        "content-type": "application/json",
+        Authorization: `Bearer ${wrikeToken}`,
+      }
+    );
+
+    return wrikeRequestFormData;
+  } catch (err) {
+    return err;
+  }
+};
+
+export const getProject = async (wrikeToken, projectId) => {
+  try {
+    // Get folder data
+    const wrikeRequestFormData = await GetResponse(
+      `${process.env.WRIKE_ENDPOINT}/folders/${projectId}`,
+      "GET",
+      {
+        "content-type": "application/json",
+        Authorization: `Bearer ${wrikeToken}`,
+      }
+    );
+
+    return wrikeRequestFormData;
+  } catch (err) {
+    return err;
+  }
+};
