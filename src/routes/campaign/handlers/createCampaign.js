@@ -77,7 +77,7 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
       let submitRequestFieldsPayload = [];
 
       // Object.keys(formFields).forEach((field) => {
-      for (const field in datahubRequestFormFieldsData) {
+      for (const field in formFields) {
         let matchedField = null;
 
         // Try to find the matching field in any page
