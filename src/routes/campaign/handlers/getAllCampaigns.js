@@ -1,6 +1,5 @@
 import { GetResponse } from "../../../utils/node-fetch";
 import { defaultParser } from "@odata/parser";
-import * as customFieldIdMeta from "../utils/customFieldsIds";
 import { getDatahubFields, getDatahubRecords } from "../../../utils/wrike";
 
 // Operator mapping from OData to your custom operators
