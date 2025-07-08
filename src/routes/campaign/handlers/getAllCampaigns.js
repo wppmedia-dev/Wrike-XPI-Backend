@@ -1,6 +1,7 @@
 import { GetResponse } from "../../../utils/node-fetch";
 import { defaultParser } from "@odata/parser";
 import * as customFieldIdMeta from "../utils/customFieldsIds";
+import { getDatahubFields, getDatahubRecords } from "../../../utils/wrike";
 
 // Operator mapping from OData to your custom operators
 const odataToCustomOp = {
@@ -14,6 +15,8 @@ const odataToCustomOp = {
   startswith: "StartsWith",
   endswith: "EndsWith",
 };
+
+let datahubCustomFieldsData = {};
 
 export const GetAllCampaigns = (wrikeToken, params, fastify) => {
   return new Promise(async (resolve, reject) => {
@@ -30,7 +33,6 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
 
       let filters;
       let customFieldsParam = undefined;
-      const customFieldIds = customFieldIdMeta["live"];
 
       if (filterParams) {
         filters = defaultParser.filter(filterParams);
@@ -41,7 +43,10 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
             message: "Request is not supported!",
           });
 
-        customFieldsParam = extractFilters(filters, customFieldIds);
+        if (Object.keys(datahubCustomFieldsData).length === 0)
+          await getCustomFieldsDatahub(wrikeToken);
+
+        customFieldsParam = extractFilters(filters);
       }
 
       let wrikeUrl = `${process.env.WRIKE_ENDPOINT}/spaces/${process.env.CAMPAIGN_SPACE_ID}/folders?fields=[customFields]&nextPageToken=`;
@@ -64,47 +69,46 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
 
       // Optimize the for loop by using map instead of manual for...of and push
       const campaigns = wrikeFolderData?.data.map((folder) => {
-        const folderCustomFieldValues = Object.entries(customFieldIds).reduce(
-          (acc, [key, value]) => {
-            acc[key] =
-              folder?.customFields?.find((field) => field.id === value.id)
-                ?.value ?? "";
-            return acc;
-          },
-          {}
-        );
+        const folderCustomFieldValues = Object.entries(
+          datahubCustomFieldsData
+        ).reduce((acc, [key, value]) => {
+          acc[key] =
+            folder?.customFields?.find((field) => field.id === value.cfId)
+              ?.value ?? "";
+          return acc;
+        }, {});
 
         return {
           // customfieldlist: folder?.customFields,
-          noofcrs: folderCustomFieldValues["# CRs"],
-          agency: folderCustomFieldValues["Agency*"],
-          mediabuyingtype: folderCustomFieldValues["Biddable/Non-Biddable*"],
-          brand: folderCustomFieldValues["Brand*"],
-          briefeddate: folderCustomFieldValues["Briefed Date*"],
-          campaignbudget: folderCustomFieldValues["Campaign Budget*"],
-          campaignenddate: folderCustomFieldValues["Campaign End Date*"],
-          campaignid: folderCustomFieldValues["Campaign ID*"],
-          campaignname: folderCustomFieldValues["Campaign Name*"],
-          campaignobjective: folderCustomFieldValues["Campaign Objective*"],
-          campaignstartdate: folderCustomFieldValues["Campaign Start Date*"],
+          noofcrs: folderCustomFieldValues["noofcrs"],
+          agency: folderCustomFieldValues["agency"],
+          mediabuyingtype: folderCustomFieldValues["mediabuyingtype"],
+          brand: folderCustomFieldValues["brand"],
+          briefeddate: folderCustomFieldValues["briefeddate"],
+          campaignbudget: folderCustomFieldValues["campaignbudget"],
+          campaignenddate: folderCustomFieldValues["campaignenddate"],
+          campaignid: folderCustomFieldValues["campaignid"],
+          campaignname: folderCustomFieldValues["campaignname"],
+          campaignobjective: folderCustomFieldValues["campaignobjective"],
+          campaignstartdate: folderCustomFieldValues["campaignstartdate"],
           campaignfeedbackstatus:
-            folderCustomFieldValues["CampaignFeedbackStatus*"],
-          ccuid: folderCustomFieldValues["CCUID*"],
-          mediachannelpractice: folderCustomFieldValues["Channel/Practice*"],
-          client: folderCustomFieldValues["Client*"],
-          comments: folderCustomFieldValues["Comments*"],
-          cssid: folderCustomFieldValues["CSSID*"],
-          currency: folderCustomFieldValues["Currency"],
-          customerponumber: folderCustomFieldValues["PO Number"],
-          debtor: folderCustomFieldValues["Debtor*"],
-          kpiobjective: folderCustomFieldValues["KPI Objective*"],
-          originalagency: folderCustomFieldValues["Original Agency*"],
-          readyforarchive: folderCustomFieldValues["ReadyForArchive*"],
-          region: folderCustomFieldValues["Region*"],
-          requestedstartdate: folderCustomFieldValues["Requested Start Date*"],
-          requestormarket: folderCustomFieldValues["Requestor's Market*"],
-          spacename: folderCustomFieldValues["Space Name*"],
-          workitemlevel: folderCustomFieldValues["Work Item Level"],
+            folderCustomFieldValues["campaignfeedbackstatus"],
+          ccuid: folderCustomFieldValues["ccuid"],
+          mediachannelpractice: folderCustomFieldValues["mediachannelpractice"],
+          client: folderCustomFieldValues["client"],
+          comments: folderCustomFieldValues["comments"],
+          cssid: folderCustomFieldValues["cssid"],
+          currency: folderCustomFieldValues["currency"],
+          customerponumber: folderCustomFieldValues["customerponumber"],
+          debtor: folderCustomFieldValues["debtor"],
+          kpiobjective: folderCustomFieldValues["kpiobjective"],
+          originalagency: folderCustomFieldValues["originalagency"],
+          readyforarchive: folderCustomFieldValues["readyforarchive"],
+          region: folderCustomFieldValues["region"],
+          requestedstartdate: folderCustomFieldValues["requestedstartdate"],
+          requestormarket: folderCustomFieldValues["requestormarket"],
+          spacename: folderCustomFieldValues["spacename"],
+          workitemlevel: folderCustomFieldValues["workitemlevel"],
         };
       });
 
@@ -124,33 +128,33 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
   });
 };
 
-function getFieldName(node, customFieldIds) {
+function getFieldName(node) {
   if (!node) return { name: null, id: null };
   if (node.name) {
     // Try to match by shortcode, key, or normalized key
     const name = node.name;
-    let entry = Object.entries(customFieldIds).find(
-      ([key, val]) =>
-        val.shortcode === name ||
-        key === name ||
-        key.replace(/[^a-zA-Z0-9]/g, "").toLowerCase() === name
-    );
-    if (!entry) {
+    // let entry = Object.entries(customFieldIds).find(
+    //   ([key, val]) =>
+    //     val.shortcode === name ||
+    //     key === name ||
+    //     key.replace(/[^a-zA-Z0-9]/g, "").toLowerCase() === name
+    // );
+    if (!datahubCustomFieldsData[name]) {
       // If entry is null, throw an error for invalid filters
       throw {
         statusCode: 400,
         message: `Invalid filters: Field '${name}' is missing or incorrect.`,
       };
     }
-    return { name, id: entry[1].id };
+    return { name, id: datahubCustomFieldsData[name].cfId };
   }
-  if (node.value) return getFieldName(node.value, customFieldIds);
+  if (node.value) return getFieldName(node.value);
   return { name: null, id: null };
 }
 
-function getValues(type, leftValue, rightValue, customFieldIds) {
+function getValues(type, leftValue, rightValue) {
   // Comparison node
-  const { id } = getFieldName(leftValue, customFieldIds);
+  const { id } = getFieldName(leftValue);
 
   const comparator = odataToCustomOp[type];
 
@@ -199,10 +203,10 @@ function getValues(type, leftValue, rightValue, customFieldIds) {
   return filterObj;
 }
 
-function extractFilters(node, customFieldIds, result = []) {
+function extractFilters(node, result = []) {
   if (!node) return result;
   if (node.type === "BoolParenExpression") {
-    return extractFilters(node.value, customFieldIds, result);
+    return extractFilters(node.value, result);
   }
 
   if (node.type === "OrExpression") {
@@ -218,8 +222,7 @@ function extractFilters(node, customFieldIds, result = []) {
         getValues(
           node?.value?.method,
           node.value.parameters[0],
-          node.value.parameters[1],
-          customFieldIds
+          node.value.parameters[1]
         )
       );
       return result;
@@ -231,12 +234,10 @@ function extractFilters(node, customFieldIds, result = []) {
   }
 
   if (node.type === "AndExpression" || node.type === "OrExpression") {
-    extractFilters(node.value.left, customFieldIds, result);
-    extractFilters(node.value.right, customFieldIds, result);
+    extractFilters(node.value.left, result);
+    extractFilters(node.value.right, result);
   } else if (odataToCustomOp[node.type]) {
-    result.push(
-      getValues(node.type, node.value.left, node.value.right, customFieldIds)
-    );
+    result.push(getValues(node.type, node.value.left, node.value.right));
   } else
     throw {
       statusCode: 400,
@@ -245,3 +246,46 @@ function extractFilters(node, customFieldIds, result = []) {
 
   return result;
 }
+
+const getCustomFieldsDatahub = async (wrikeToken) => {
+  try {
+    const datahubFields = await getDatahubFields(
+      wrikeToken,
+      process.env.DATAHUB_CUSTOM_FIELDS_ID
+    );
+
+    if (datahubFields?.errorDescription) {
+      return Promise.reject({
+        errorDescription: datahubFields?.errorDescription,
+      });
+    }
+
+    let formFieldsIds = {};
+    datahubFields?.data?.forEach((field) => {
+      formFieldsIds[field.title?.trim()?.toLowerCase()] = field.id;
+    });
+
+    const datahubRecords = await getDatahubRecords(
+      wrikeToken,
+      process.env.DATAHUB_CUSTOM_FIELDS_ID
+    );
+
+    if (datahubRecords?.errorDescription) {
+      return Promise.reject({
+        errorDescription: datahubRecords?.errorDescription,
+      });
+    }
+
+    datahubRecords?.data?.forEach((record) => {
+      if (record.fieldValues[formFieldsIds["short code"]]?.trim())
+        datahubCustomFieldsData[
+          record.fieldValues[formFieldsIds["short code"]]?.trim()?.toLowerCase()
+        ] = {
+          id: record.id,
+          ["cfId"]: record.fieldValues[formFieldsIds["cf id"]],
+        };
+    });
+  } catch (err) {
+    return Promise.reject(err);
+  }
+};
