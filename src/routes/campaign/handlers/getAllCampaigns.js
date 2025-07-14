@@ -44,7 +44,7 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
         // if (Object.keys(datahubCustomFieldsData).length === 0)
         datahubCustomFieldsData = await getCustomFieldsDatahub(wrikeToken);
 
-        customFieldsParam = extractFilters(filters);
+        customFieldsParam = extractFilters(filters, datahubCustomFieldsData);
       }
 
       let wrikeUrl = `${process.env.WRIKE_ENDPOINT}/spaces/${process.env.CAMPAIGN_SPACE_ID}/folders?fields=[customFields]&nextPageToken=`;
@@ -126,7 +126,7 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
   });
 };
 
-function getFieldName(node) {
+function getFieldName(node, datahubCustomFieldsData) {
   if (!node) return { name: null, id: null };
   if (node.name) {
     // Try to match by shortcode, key, or normalized key
@@ -146,13 +146,13 @@ function getFieldName(node) {
     }
     return { name, id: datahubCustomFieldsData[name].cfId };
   }
-  if (node.value) return getFieldName(node.value);
+  if (node.value) return getFieldName(node.value, datahubCustomFieldsData);
   return { name: null, id: null };
 }
 
-function getValues(type, leftValue, rightValue) {
+function getValues(type, leftValue, rightValue, datahubCustomFieldsData) {
   // Comparison node
-  const { id } = getFieldName(leftValue);
+  const { id } = getFieldName(leftValue, datahubCustomFieldsData);
 
   const comparator = odataToCustomOp[type];
 
@@ -201,10 +201,10 @@ function getValues(type, leftValue, rightValue) {
   return filterObj;
 }
 
-function extractFilters(node, result = []) {
+function extractFilters(node, result = [], datahubCustomFieldsData) {
   if (!node) return result;
   if (node.type === "BoolParenExpression") {
-    return extractFilters(node.value, result);
+    return extractFilters(node.value, result, datahubCustomFieldsData);
   }
 
   if (node.type === "OrExpression") {
@@ -220,7 +220,8 @@ function extractFilters(node, result = []) {
         getValues(
           node?.value?.method,
           node.value.parameters[0],
-          node.value.parameters[1]
+          node.value.parameters[1],
+          datahubCustomFieldsData
         )
       );
       return result;
@@ -232,10 +233,17 @@ function extractFilters(node, result = []) {
   }
 
   if (node.type === "AndExpression" || node.type === "OrExpression") {
-    extractFilters(node.value.left, result);
-    extractFilters(node.value.right, result);
+    extractFilters(node.value.left, result, datahubCustomFieldsData);
+    extractFilters(node.value.right, result, datahubCustomFieldsData);
   } else if (odataToCustomOp[node.type]) {
-    result.push(getValues(node.type, node.value.left, node.value.right));
+    result.push(
+      getValues(
+        node.type,
+        node.value.left,
+        node.value.right,
+        datahubCustomFieldsData
+      )
+    );
   } else
     throw {
       statusCode: 400,
