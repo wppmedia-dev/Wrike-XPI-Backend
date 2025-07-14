@@ -6,7 +6,7 @@ import {
   submitRequestForm,
   getRequestFormStatus,
   getTask,
-  getProject,
+  getFolder,
 } from "../../../utils/wrike";
 
 const requiredDatahubRequestFormIds = [
@@ -218,7 +218,7 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
 
       let outputData = {};
       if (asynJobData?.result?.projectId)
-        outputData = await getProject(
+        outputData = await getFolder(
           wrikeToken,
           asynJobData?.result?.projectId
         );

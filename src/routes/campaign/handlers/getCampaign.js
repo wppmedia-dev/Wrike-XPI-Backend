@@ -1,5 +1,8 @@
-import { GetResponse } from "../../../utils/node-fetch";
-import { getDatahubFields, getDatahubRecords } from "../../../utils/wrike";
+import {
+  getDatahubFields,
+  getDatahubRecords,
+  getFolder,
+} from "../../../utils/wrike";
 
 let datahubCustomFieldsData = {};
 
@@ -26,15 +29,7 @@ export const GetCampaign = (wrikeToken, params, fastify) => {
       if (Object.keys(datahubCustomFieldsData).length === 0)
         await getCustomFieldsDatahub(wrikeToken);
 
-      // Get folder data
-      const wrikeFolderData = await GetResponse(
-        `${process.env.WRIKE_ENDPOINT}/folders/${folderId}`,
-        "GET",
-        {
-          "content-type": "application/json",
-          Authorization: `Bearer ${wrikeToken}`,
-        }
-      );
+      const wrikeFolderData = await getFolder(wrikeToken, folderId);
 
       // Sending folder update error response
       if (wrikeFolderData?.errorDescription) {
