@@ -208,3 +208,25 @@ export const getProject = async (wrikeToken, projectId) => {
     return err;
   }
 };
+
+export const updateFolder = async (
+  wrikeToken,
+  folderId,
+  folderCFUpdateData
+) => {
+  try {
+    // Get folder data
+    const wrikeRequestFormData = await GetResponse(
+      `${process.env.WRIKE_ENDPOINT}/folders/${folderId}?customFields=${JSON.stringify(folderCFUpdateData)}`,
+      "PUT",
+      {
+        "content-type": "application/json",
+        Authorization: `Bearer ${wrikeToken}`,
+      }
+    );
+
+    return wrikeRequestFormData;
+  } catch (err) {
+    return err;
+  }
+};
