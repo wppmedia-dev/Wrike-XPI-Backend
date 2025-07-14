@@ -4,8 +4,6 @@ import {
   getFolder,
 } from "../../../utils/wrike";
 
-let datahubCustomFieldsData = {};
-
 export const GetCampaign = (wrikeToken, params, fastify) => {
   return new Promise(async (resolve, reject) => {
     try {
@@ -26,8 +24,7 @@ export const GetCampaign = (wrikeToken, params, fastify) => {
             "Missing parameter! Required parameter is missing for the requested operation.",
         });
 
-      if (Object.keys(datahubCustomFieldsData).length === 0)
-        await getCustomFieldsDatahub(wrikeToken);
+      const datahubCustomFieldsData = await getCustomFieldsDatahub(wrikeToken);
 
       const wrikeFolderData = await getFolder(wrikeToken, folderId);
 
@@ -122,6 +119,7 @@ const getCustomFieldsDatahub = async (wrikeToken) => {
       });
     }
 
+    let datahubCustomFieldsData = {};
     datahubRecords?.data?.forEach((record) => {
       if (record.fieldValues[formFieldsIds["short code"]]?.trim())
         datahubCustomFieldsData[
@@ -131,6 +129,7 @@ const getCustomFieldsDatahub = async (wrikeToken) => {
           ["cfId"]: record.fieldValues[formFieldsIds["cf id"]],
         };
     });
+    return Promise.resolve(datahubCustomFieldsData);
   } catch (err) {
     return Promise.reject(err);
   }

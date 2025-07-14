@@ -191,11 +191,11 @@ export const getTask = async (wrikeToken, taskId) => {
   }
 };
 
-export const getProject = async (wrikeToken, projectId) => {
+export const getFolder = async (wrikeToken, folderId) => {
   try {
     // Get folder data
     const wrikeRequestFormData = await GetResponse(
-      `${process.env.WRIKE_ENDPOINT}/folders/${projectId}`,
+      `${process.env.WRIKE_ENDPOINT}/folders/${folderId}`,
       "GET",
       {
         "content-type": "application/json",
@@ -219,6 +219,24 @@ export const updateFolder = async (
     const wrikeRequestFormData = await GetResponse(
       `${process.env.WRIKE_ENDPOINT}/folders/${folderId}?customFields=${JSON.stringify(folderCFUpdateData)}`,
       "PUT",
+      {
+        "content-type": "application/json",
+        Authorization: `Bearer ${wrikeToken}`,
+      }
+    );
+
+    return wrikeRequestFormData;
+  } catch (err) {
+    return err;
+  }
+};
+
+export const deleteFolder = async (wrikeToken, folderId) => {
+  try {
+    // Get folder data
+    const wrikeRequestFormData = await GetResponse(
+      `${process.env.WRIKE_ENDPOINT}/folders/${folderId}`,
+      "DELETE",
       {
         "content-type": "application/json",
         Authorization: `Bearer ${wrikeToken}`,

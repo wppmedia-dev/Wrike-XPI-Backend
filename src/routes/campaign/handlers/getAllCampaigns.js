@@ -15,8 +15,6 @@ const odataToCustomOp = {
   endswith: "EndsWith",
 };
 
-let datahubCustomFieldsData = {};
-
 export const GetAllCampaigns = (wrikeToken, params, fastify) => {
   return new Promise(async (resolve, reject) => {
     try {
@@ -32,6 +30,7 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
 
       let filters;
       let customFieldsParam = undefined;
+      let datahubCustomFieldsData = {};
 
       if (filterParams) {
         filters = defaultParser.filter(filterParams);
@@ -42,8 +41,8 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
             message: "Request is not supported!",
           });
 
-        if (Object.keys(datahubCustomFieldsData).length === 0)
-          await getCustomFieldsDatahub(wrikeToken);
+        // if (Object.keys(datahubCustomFieldsData).length === 0)
+        datahubCustomFieldsData = await getCustomFieldsDatahub(wrikeToken);
 
         customFieldsParam = extractFilters(filters);
       }
@@ -275,6 +274,7 @@ const getCustomFieldsDatahub = async (wrikeToken) => {
       });
     }
 
+    let datahubCustomFieldsData = {};
     datahubRecords?.data?.forEach((record) => {
       if (record.fieldValues[formFieldsIds["short code"]]?.trim())
         datahubCustomFieldsData[
@@ -284,6 +284,8 @@ const getCustomFieldsDatahub = async (wrikeToken) => {
           ["cfId"]: record.fieldValues[formFieldsIds["cf id"]],
         };
     });
+
+    return Promise.resolve(datahubCustomFieldsData);
   } catch (err) {
     return Promise.reject(err);
   }
