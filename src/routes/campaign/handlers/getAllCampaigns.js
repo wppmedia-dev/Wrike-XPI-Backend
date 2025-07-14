@@ -15,6 +15,8 @@ const odataToCustomOp = {
   endswith: "EndsWith",
 };
 
+let datahubCustomFieldsData = {};
+
 export const GetAllCampaigns = (wrikeToken, params, fastify) => {
   return new Promise(async (resolve, reject) => {
     try {
@@ -30,7 +32,6 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
 
       let filters;
       let customFieldsParam = undefined;
-      let datahubCustomFieldsData = {};
 
       if (filterParams) {
         filters = defaultParser.filter(filterParams);
@@ -44,7 +45,7 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
         // if (Object.keys(datahubCustomFieldsData).length === 0)
         datahubCustomFieldsData = await getCustomFieldsDatahub(wrikeToken);
 
-        customFieldsParam = extractFilters(filters, datahubCustomFieldsData);
+        customFieldsParam = extractFilters(filters);
       }
 
       let wrikeUrl = `${process.env.WRIKE_ENDPOINT}/spaces/${process.env.CAMPAIGN_SPACE_ID}/folders?fields=[customFields]&nextPageToken=`;
@@ -126,7 +127,7 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
   });
 };
 
-function getFieldName(node, datahubCustomFieldsData) {
+function getFieldName(node) {
   if (!node) return { name: null, id: null };
   if (node.name) {
     // Try to match by shortcode, key, or normalized key
@@ -146,13 +147,13 @@ function getFieldName(node, datahubCustomFieldsData) {
     }
     return { name, id: datahubCustomFieldsData[name].cfId };
   }
-  if (node.value) return getFieldName(node.value, datahubCustomFieldsData);
+  if (node.value) return getFieldName(node.value);
   return { name: null, id: null };
 }
 
-function getValues(type, leftValue, rightValue, datahubCustomFieldsData) {
+function getValues(type, leftValue, rightValue) {
   // Comparison node
-  const { id } = getFieldName(leftValue, datahubCustomFieldsData);
+  const { id } = getFieldName(leftValue);
 
   const comparator = odataToCustomOp[type];
 
@@ -201,10 +202,10 @@ function getValues(type, leftValue, rightValue, datahubCustomFieldsData) {
   return filterObj;
 }
 
-function extractFilters(node, result = [], datahubCustomFieldsData) {
+function extractFilters(node, result = []) {
   if (!node) return result;
   if (node.type === "BoolParenExpression") {
-    return extractFilters(node.value, result, datahubCustomFieldsData);
+    return extractFilters(node.value, result);
   }
 
   if (node.type === "OrExpression") {
@@ -220,8 +221,7 @@ function extractFilters(node, result = [], datahubCustomFieldsData) {
         getValues(
           node?.value?.method,
           node.value.parameters[0],
-          node.value.parameters[1],
-          datahubCustomFieldsData
+          node.value.parameters[1]
         )
       );
       return result;
@@ -233,17 +233,10 @@ function extractFilters(node, result = [], datahubCustomFieldsData) {
   }
 
   if (node.type === "AndExpression" || node.type === "OrExpression") {
-    extractFilters(node.value.left, result, datahubCustomFieldsData);
-    extractFilters(node.value.right, result, datahubCustomFieldsData);
+    extractFilters(node.value.left, result);
+    extractFilters(node.value.right, result);
   } else if (odataToCustomOp[node.type]) {
-    result.push(
-      getValues(
-        node.type,
-        node.value.left,
-        node.value.right,
-        datahubCustomFieldsData
-      )
-    );
+    result.push(getValues(node.type, node.value.left, node.value.right));
   } else
     throw {
       statusCode: 400,
@@ -292,7 +285,6 @@ const getCustomFieldsDatahub = async (wrikeToken) => {
           ["cfId"]: record.fieldValues[formFieldsIds["cf id"]],
         };
     });
-
     return Promise.resolve(datahubCustomFieldsData);
   } catch (err) {
     return Promise.reject(err);
