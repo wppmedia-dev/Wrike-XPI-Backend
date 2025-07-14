@@ -1,3 +1,4 @@
+import { param } from "@odata/parser";
 import {
   getDatahubFields,
   getDatahubRecords,
@@ -80,6 +81,8 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
         });
 
       let submitRequestFieldsPayload = [];
+      let requestFormDefaultFields = {};
+      let defaultFieldPagesCompleted = [];
 
       // Object.keys(formFields).forEach((field) => {
       for (const field in formFields) {
@@ -87,6 +90,23 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
 
         // Try to find the matching field in any page
         for (const page of requestFormPages || []) {
+          // To find the default field values (Runs one tme per page)
+          if (!defaultFieldPagesCompleted.includes(page?.id)) {
+            for (const formField of page.fields || []) {
+              if (!formField?.items) continue;
+
+              const defaultValue = formField?.items.find(
+                (f) => f.selectedByDefault
+              );
+
+              if (!defaultValue?.id) continue;
+
+              requestFormDefaultFields[formField?.id] = defaultValue?.id;
+            }
+
+            defaultFieldPagesCompleted.push(page?.id);
+          }
+
           matchedField = page?.fields.find(
             (f) => f.id === datahubRequestFormFieldsData[field]?.fieldId
           );
@@ -148,6 +168,20 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
         });
       }
 
+      // Appending default fields to the requst form submit api payload
+      for (const defaultFieldId in requestFormDefaultFields || []) {
+        const isDefaultExist = submitRequestFieldsPayload.some(
+          (param) => param.fieldId === defaultFieldId
+        );
+
+        if (isDefaultExist) continue;
+
+        submitRequestFieldsPayload.push({
+          fieldId: defaultFieldId,
+          values: [requestFormDefaultFields[defaultFieldId]],
+        });
+      }
+
       // Submit Request Form
       const submittedRequestFormData = await submitRequestForm(
         wrikeToken,
@@ -199,6 +233,7 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
         data: {
           type: "Campaign",
           // customfieldlist: outputData?.data[0]?.customFields,
+          folderId: outputData?.data[0]?.id,
           noofcrs: folderCustomFieldValues["noofcrs"],
           agency: folderCustomFieldValues["agency"],
           mediabuyingtype: folderCustomFieldValues["mediabuyingtype"],
