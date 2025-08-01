@@ -1,7 +1,7 @@
-import { updateFolder } from "../../../utils/wrike";
+import { getFolder } from "../../../utils/wrike";
 import { getCustomFieldsDatahub } from "../utils/getDHCustomFields";
 
-export const UpdateCampaign = (wrikeToken, params, fastify) => {
+export const GetChannel = (wrikeToken, params, fastify) => {
   return new Promise(async (resolve, reject) => {
     try {
       if (!wrikeToken)
@@ -12,48 +12,29 @@ export const UpdateCampaign = (wrikeToken, params, fastify) => {
         });
 
       // Variable Declaration
+      const { channelId: folderId } = params;
 
-      const { campaignId: folderId, formFields } = params;
+      if (!folderId)
+        return reject({
+          statusCode: 400,
+          message:
+            "Missing parameter! Required parameter is missing for the requested operation.",
+        });
 
-      // Getting cutom fields data from Datahub
-      // if (Object.keys(datahubCustomFieldsData).length === 0) {
       const datahubCustomFieldsData = await getCustomFieldsDatahub(wrikeToken);
-      // }
 
-      let folderCFUpdateData = [];
+      const wrikeFolderData = await getFolder(wrikeToken, folderId);
 
-      Object.keys(formFields).forEach((field) => {
-        // for (const field in formFields) {
-        if (
-          datahubCustomFieldsData[field?.trim()?.toLowerCase()] &&
-          datahubCustomFieldsData[field?.trim()?.toLowerCase()]
-            ?.isCampaignField === true &&
-          datahubCustomFieldsData[field?.trim()?.toLowerCase()]?.isWritable ===
-            true
-        )
-          folderCFUpdateData.push({
-            id: datahubCustomFieldsData[field?.trim()?.toLowerCase()]?.cfId,
-            value: formFields[field],
-          });
-      });
-
-      // Submit Request Form
-      const updatedFolderData = await updateFolder(
-        wrikeToken,
-        folderId,
-        folderCFUpdateData
-      );
-
-      // Sending submit request form error response
-      if (updatedFolderData?.errorDescription) {
-        return reject({ message: updatedFolderData?.errorDescription });
+      // Sending folder update error response
+      if (wrikeFolderData?.errorDescription) {
+        return reject({ message: wrikeFolderData?.errorDescription });
       }
 
       const folderCustomFieldValues = {};
 
       for (const [key, value] of Object.entries(datahubCustomFieldsData)) {
         const cfValue =
-          updatedFolderData?.data[0]?.customFields?.find(
+          wrikeFolderData?.data[0]?.customFields?.find(
             (field) => field.id === value.cfId
           )?.value ?? "";
 
@@ -63,9 +44,9 @@ export const UpdateCampaign = (wrikeToken, params, fastify) => {
       // Sending final response
       resolve({
         data: {
-          type: "Campaign",
+          type: "Channel",
           ...folderCustomFieldValues,
-          // // customfieldlist: outputData?.data[0]?.customFields,
+          // customfieldlist: wrikeFolderData?.data[0]?.customFields,
           // noofcrs: folderCustomFieldValues["noofcrs"],
           // agency: folderCustomFieldValues["agency"],
           // mediabuyingtype: folderCustomFieldValues["mediabuyingtype"],

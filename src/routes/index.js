@@ -2,6 +2,7 @@
 
 import { tokenRoute } from "./tokens";
 import { campaignRoute } from "./campaign";
+import { channelRoute } from "./channel";
 
 // Auth Middleware
 import { ValidateToken } from "../middlewares/authentication";
@@ -21,6 +22,7 @@ export const PrivateRouters = (fastify, opts, done) => {
   );
 
   fastify.register(campaignRoute, { prefix: "/wrikexpi/campaign" });
+  fastify.register(channelRoute, { prefix: "/wrikexpi/channel" });
 
   done();
 };

@@ -1,7 +1,7 @@
 import { updateFolder } from "../../../utils/wrike";
 import { getCustomFieldsDatahub } from "../utils/getDHCustomFields";
 
-export const UpdateCampaign = (wrikeToken, params, fastify) => {
+export const UpdateChannel = (wrikeToken, params, fastify) => {
   return new Promise(async (resolve, reject) => {
     try {
       if (!wrikeToken)
@@ -13,7 +13,7 @@ export const UpdateCampaign = (wrikeToken, params, fastify) => {
 
       // Variable Declaration
 
-      const { campaignId: folderId, formFields } = params;
+      const { channelId: folderId, formFields } = params;
 
       // Getting cutom fields data from Datahub
       // if (Object.keys(datahubCustomFieldsData).length === 0) {
@@ -27,7 +27,7 @@ export const UpdateCampaign = (wrikeToken, params, fastify) => {
         if (
           datahubCustomFieldsData[field?.trim()?.toLowerCase()] &&
           datahubCustomFieldsData[field?.trim()?.toLowerCase()]
-            ?.isCampaignField === true &&
+            ?.isChannelField === true &&
           datahubCustomFieldsData[field?.trim()?.toLowerCase()]?.isWritable ===
             true
         )
@@ -63,7 +63,7 @@ export const UpdateCampaign = (wrikeToken, params, fastify) => {
       // Sending final response
       resolve({
         data: {
-          type: "Campaign",
+          type: "Channel",
           ...folderCustomFieldValues,
           // // customfieldlist: outputData?.data[0]?.customFields,
           // noofcrs: folderCustomFieldValues["noofcrs"],

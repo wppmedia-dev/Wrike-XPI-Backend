@@ -15,7 +15,7 @@ const requiredDatahubRequestFormIds = [
   "Variant Id",
 ];
 
-export const CreateCampaign = (wrikeToken, params, fastify) => {
+export const CreateChannel = (wrikeToken, params, fastify) => {
   return new Promise(async (resolve, reject) => {
     try {
       if (!wrikeToken)

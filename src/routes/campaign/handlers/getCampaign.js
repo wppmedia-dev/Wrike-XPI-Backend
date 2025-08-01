@@ -1,8 +1,4 @@
-import {
-  getDatahubFields,
-  getDatahubRecords,
-  getFolder,
-} from "../../../utils/wrike";
+import { getFolder } from "../../../utils/wrike";
 import { getCustomFieldsDatahub } from "../utils/getDHCustomFields";
 
 export const GetCampaign = (wrikeToken, params, fastify) => {
