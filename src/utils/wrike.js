@@ -248,3 +248,22 @@ export const deleteFolder = async (wrikeToken, folderId) => {
     return err;
   }
 };
+
+export const uploadAttachment = async (wrikeToken, fileBuffer, fileName) => {
+  try {
+    const url = `${process.env.WRIKE_ENDPOINT}/attachments`;
+
+    const headers = {
+      Authorization: `Bearer ${wrikeToken}`,
+      "content-type": "application/octet-stream",
+      "X-Requested-With": "XMLHttpRequest",
+      "X-File-Name": fileName,
+    };
+
+    const result = await GetResponse(url, "POST", headers, fileBuffer, true);
+
+    return result;
+  } catch (err) {
+    throw err;
+  }
+};
