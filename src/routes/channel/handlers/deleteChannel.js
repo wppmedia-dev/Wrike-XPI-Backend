@@ -36,9 +36,9 @@ export const DeleteChannel = (wrikeToken, params, fastify) => {
 
       // // Sending final response
       // resolve({
-      //   message: "Campaign deleted successfully.",
+      //   message: "Channel deleted successfully.",
       //   data: {
-      //     type: "Campaign",
+      //     type: "Channel",
       //   },
       // });
 

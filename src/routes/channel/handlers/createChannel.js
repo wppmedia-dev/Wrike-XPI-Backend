@@ -242,7 +242,7 @@ export const CreateChannel = (wrikeToken, params, fastify) => {
       // Sending final response
       resolve({
         data: {
-          type: "Campaign",
+          type: "Channel",
           ...folderCustomFieldValues,
           // // customfieldlist: outputData?.data[0]?.customFields,
           // folderId: outputData?.data[0]?.id,
