@@ -237,44 +237,45 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
             (field) => field.id === value.cfId
           )?.value ?? "";
 
-        folderCustomFieldValues[key] = cfValue;
+        if (value.isReadable) folderCustomFieldValues[key] = cfValue;
       }
 
       // Sending final response
       resolve({
         data: {
           type: "Campaign",
-          // customfieldlist: outputData?.data[0]?.customFields,
-          folderId: outputData?.data[0]?.id,
-          noofcrs: folderCustomFieldValues["noofcrs"],
-          agency: folderCustomFieldValues["agency"],
-          mediabuyingtype: folderCustomFieldValues["mediabuyingtype"],
-          brand: folderCustomFieldValues["brand"],
-          briefeddate: folderCustomFieldValues["briefeddate"],
-          campaignbudget: folderCustomFieldValues["campaignbudget"],
-          campaignenddate: folderCustomFieldValues["campaignenddate"],
-          campaignid: folderCustomFieldValues["campaignid"],
-          campaignname: folderCustomFieldValues["campaignname"],
-          campaignobjective: folderCustomFieldValues["campaignobjective"],
-          campaignstartdate: folderCustomFieldValues["campaignstartdate"],
-          campaignfeedbackstatus:
-            folderCustomFieldValues["campaignfeedbackstatus"],
-          ccuid: folderCustomFieldValues["ccuid"],
-          mediachannelpractice: folderCustomFieldValues["mediachannelpractice"],
-          client: folderCustomFieldValues["client"],
-          comments: folderCustomFieldValues["comments"],
-          cssid: folderCustomFieldValues["cssid"],
-          currency: folderCustomFieldValues["currency"],
-          customerponumber: folderCustomFieldValues["customerponumber"],
-          debtor: folderCustomFieldValues["debtor"],
-          kpiobjective: folderCustomFieldValues["kpiobjective"],
-          originalagency: folderCustomFieldValues["originalagency"],
-          readyforarchive: folderCustomFieldValues["readyforarchive"],
-          region: folderCustomFieldValues["region"],
-          requestedstartdate: folderCustomFieldValues["requestedstartdate"],
-          requestormarket: folderCustomFieldValues["requestormarket"],
-          spacename: folderCustomFieldValues["spacename"],
-          workitemlevel: folderCustomFieldValues["workitemlevel"],
+          ...folderCustomFieldValues,
+          // // customfieldlist: outputData?.data[0]?.customFields,
+          // folderId: outputData?.data[0]?.id,
+          // noofcrs: folderCustomFieldValues["noofcrs"],
+          // agency: folderCustomFieldValues["agency"],
+          // mediabuyingtype: folderCustomFieldValues["mediabuyingtype"],
+          // brand: folderCustomFieldValues["brand"],
+          // briefeddate: folderCustomFieldValues["briefeddate"],
+          // campaignbudget: folderCustomFieldValues["campaignbudget"],
+          // campaignenddate: folderCustomFieldValues["campaignenddate"],
+          // campaignid: folderCustomFieldValues["campaignid"],
+          // campaignname: folderCustomFieldValues["campaignname"],
+          // campaignobjective: folderCustomFieldValues["campaignobjective"],
+          // campaignstartdate: folderCustomFieldValues["campaignstartdate"],
+          // campaignfeedbackstatus:
+          //   folderCustomFieldValues["campaignfeedbackstatus"],
+          // ccuid: folderCustomFieldValues["ccuid"],
+          // mediachannelpractice: folderCustomFieldValues["mediachannelpractice"],
+          // client: folderCustomFieldValues["client"],
+          // comments: folderCustomFieldValues["comments"],
+          // cssid: folderCustomFieldValues["cssid"],
+          // currency: folderCustomFieldValues["currency"],
+          // customerponumber: folderCustomFieldValues["customerponumber"],
+          // debtor: folderCustomFieldValues["debtor"],
+          // kpiobjective: folderCustomFieldValues["kpiobjective"],
+          // originalagency: folderCustomFieldValues["originalagency"],
+          // readyforarchive: folderCustomFieldValues["readyforarchive"],
+          // region: folderCustomFieldValues["region"],
+          // requestedstartdate: folderCustomFieldValues["requestedstartdate"],
+          // requestormarket: folderCustomFieldValues["requestormarket"],
+          // spacename: folderCustomFieldValues["spacename"],
+          // workitemlevel: folderCustomFieldValues["workitemlevel"],
         },
       });
     } catch (err) {

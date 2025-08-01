@@ -4,6 +4,7 @@ import {
   updateFolder,
   getProject,
 } from "../../../utils/wrike";
+import { getCustomFieldsDatahub } from "../utils/getDHCustomFields";
 
 export const UpdateCampaign = (wrikeToken, params, fastify) => {
   return new Promise(async (resolve, reject) => {
@@ -61,43 +62,44 @@ export const UpdateCampaign = (wrikeToken, params, fastify) => {
             (field) => field.id === value.cfId
           )?.value ?? "";
 
-        folderCustomFieldValues[key] = cfValue;
+        if (value.isReadable) folderCustomFieldValues[key] = cfValue;
       }
 
       // Sending final response
       resolve({
         data: {
           type: "Campaign",
-          // customfieldlist: outputData?.data[0]?.customFields,
-          noofcrs: folderCustomFieldValues["noofcrs"],
-          agency: folderCustomFieldValues["agency"],
-          mediabuyingtype: folderCustomFieldValues["mediabuyingtype"],
-          brand: folderCustomFieldValues["brand"],
-          briefeddate: folderCustomFieldValues["briefeddate"],
-          campaignbudget: folderCustomFieldValues["campaignbudget"],
-          campaignenddate: folderCustomFieldValues["campaignenddate"],
-          campaignid: folderCustomFieldValues["campaignid"],
-          campaignname: folderCustomFieldValues["campaignname"],
-          campaignobjective: folderCustomFieldValues["campaignobjective"],
-          campaignstartdate: folderCustomFieldValues["campaignstartdate"],
-          campaignfeedbackstatus:
-            folderCustomFieldValues["campaignfeedbackstatus"],
-          ccuid: folderCustomFieldValues["ccuid"],
-          mediachannelpractice: folderCustomFieldValues["mediachannelpractice"],
-          client: folderCustomFieldValues["client"],
-          comments: folderCustomFieldValues["comments"],
-          cssid: folderCustomFieldValues["cssid"],
-          currency: folderCustomFieldValues["currency"],
-          customerponumber: folderCustomFieldValues["customerponumber"],
-          debtor: folderCustomFieldValues["debtor"],
-          kpiobjective: folderCustomFieldValues["kpiobjective"],
-          originalagency: folderCustomFieldValues["originalagency"],
-          readyforarchive: folderCustomFieldValues["readyforarchive"],
-          region: folderCustomFieldValues["region"],
-          requestedstartdate: folderCustomFieldValues["requestedstartdate"],
-          requestormarket: folderCustomFieldValues["requestormarket"],
-          spacename: folderCustomFieldValues["spacename"],
-          workitemlevel: folderCustomFieldValues["workitemlevel"],
+          ...folderCustomFieldValues,
+          // // customfieldlist: outputData?.data[0]?.customFields,
+          // noofcrs: folderCustomFieldValues["noofcrs"],
+          // agency: folderCustomFieldValues["agency"],
+          // mediabuyingtype: folderCustomFieldValues["mediabuyingtype"],
+          // brand: folderCustomFieldValues["brand"],
+          // briefeddate: folderCustomFieldValues["briefeddate"],
+          // campaignbudget: folderCustomFieldValues["campaignbudget"],
+          // campaignenddate: folderCustomFieldValues["campaignenddate"],
+          // campaignid: folderCustomFieldValues["campaignid"],
+          // campaignname: folderCustomFieldValues["campaignname"],
+          // campaignobjective: folderCustomFieldValues["campaignobjective"],
+          // campaignstartdate: folderCustomFieldValues["campaignstartdate"],
+          // campaignfeedbackstatus:
+          //   folderCustomFieldValues["campaignfeedbackstatus"],
+          // ccuid: folderCustomFieldValues["ccuid"],
+          // mediachannelpractice: folderCustomFieldValues["mediachannelpractice"],
+          // client: folderCustomFieldValues["client"],
+          // comments: folderCustomFieldValues["comments"],
+          // cssid: folderCustomFieldValues["cssid"],
+          // currency: folderCustomFieldValues["currency"],
+          // customerponumber: folderCustomFieldValues["customerponumber"],
+          // debtor: folderCustomFieldValues["debtor"],
+          // kpiobjective: folderCustomFieldValues["kpiobjective"],
+          // originalagency: folderCustomFieldValues["originalagency"],
+          // readyforarchive: folderCustomFieldValues["readyforarchive"],
+          // region: folderCustomFieldValues["region"],
+          // requestedstartdate: folderCustomFieldValues["requestedstartdate"],
+          // requestormarket: folderCustomFieldValues["requestormarket"],
+          // spacename: folderCustomFieldValues["spacename"],
+          // workitemlevel: folderCustomFieldValues["workitemlevel"],
         },
       });
     } catch (err) {
@@ -108,54 +110,4 @@ export const UpdateCampaign = (wrikeToken, params, fastify) => {
       });
     }
   });
-};
-
-const getCustomFieldsDatahub = async (wrikeToken) => {
-  try {
-    const datahubFields = await getDatahubFields(
-      wrikeToken,
-      process.env.DATAHUB_CUSTOM_FIELDS_ID
-    );
-
-    if (datahubFields?.errorDescription) {
-      return Promise.reject({
-        errorDescription: datahubFields?.errorDescription,
-      });
-    }
-
-    let formFieldsIds = {};
-    datahubFields?.data?.forEach((field) => {
-      formFieldsIds[field.title?.trim()?.toLowerCase()] = field.id;
-    });
-
-    const datahubRecords = await getDatahubRecords(
-      wrikeToken,
-      process.env.DATAHUB_CUSTOM_FIELDS_ID
-    );
-
-    if (datahubRecords?.errorDescription) {
-      return Promise.reject({
-        errorDescription: datahubRecords?.errorDescription,
-      });
-    }
-
-    let datahubCustomFieldsData = {};
-    datahubRecords?.data?.forEach((record) => {
-      if (record.fieldValues[formFieldsIds["short code"]]?.trim())
-        datahubCustomFieldsData[
-          record.fieldValues[formFieldsIds["short code"]]?.trim()?.toLowerCase()
-        ] = {
-          id: record.id,
-          ["cfId"]: record.fieldValues[formFieldsIds["cf id"]],
-          isCampaignField: record.fieldValues[formFieldsIds["campaign"]],
-          isWritable: record.fieldValues[formFieldsIds["api access"]]
-            ?.toLowerCase()
-            ?.includes("write"),
-        };
-    });
-
-    return Promise.resolve(datahubCustomFieldsData);
-  } catch (err) {
-    return Promise.reject(err);
-  }
 };
