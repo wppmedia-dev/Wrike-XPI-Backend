@@ -71,7 +71,7 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
         const folderCustomFieldValues = Object.entries(
           datahubCustomFieldsData
         ).reduce((acc, [key, value]) => {
-          if (!value.isReadable) return acc;
+          if (!value.isReadable || !value.isCampaignField) return acc;
 
           const fieldValue =
             folder?.customFields?.find((field) => field.id === value.cfId)

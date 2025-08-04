@@ -57,7 +57,8 @@ export const UpdateCampaign = (wrikeToken, params, fastify) => {
             (field) => field.id === value.cfId
           )?.value ?? "";
 
-        if (value.isReadable) folderCustomFieldValues[key] = cfValue;
+        if (value.isReadable && value.isCampaignField)
+          folderCustomFieldValues[key] = cfValue;
       }
 
       // Sending final response
