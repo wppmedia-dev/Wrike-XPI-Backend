@@ -48,7 +48,7 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
         customFieldsParam = extractFilters(filters);
       }
 
-      let wrikeUrl = `${process.env.WRIKE_ENDPOINT}/spaces/${process.env.CAMPAIGN_SPACE_ID}/folders?fields=[customFields]&nextPageToken=`;
+      let wrikeUrl = `${process.env.WRIKE_ENDPOINT}/spaces/${process.env.CAMPAIGN_SPACE_ID}/folders?deleted=false&fields=[customFields]&nextPageToken=`;
 
       if (pageSize && pageSize > 0) wrikeUrl += `&pageSize=${pageSize}`;
 
@@ -87,6 +87,7 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
         return {
           ...folderCustomFieldValues,
           // // customfieldlist: folder?.customFields,
+          folderId: folder.id,
           // noofcrs: folderCustomFieldValues["noofcrs"],
           // agency: folderCustomFieldValues["agency"],
           // mediabuyingtype: folderCustomFieldValues["mediabuyingtype"],

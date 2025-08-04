@@ -30,6 +30,13 @@ export const GetCampaign = (wrikeToken, params, fastify) => {
         return reject({ message: wrikeFolderData?.errorDescription });
       }
 
+      if (wrikeFolderData?.data[0]?.scope == "RbFolder") {
+        return resolve({
+          success: false,
+          message: "Invalid Folder ID",
+        });
+      }
+
       const folderCustomFieldValues = {};
 
       for (const [key, value] of Object.entries(datahubCustomFieldsData)) {
@@ -38,7 +45,8 @@ export const GetCampaign = (wrikeToken, params, fastify) => {
             (field) => field.id === value.cfId
           )?.value ?? "";
 
-        if (value.isReadable) folderCustomFieldValues[key] = cfValue;
+        if (value.isReadable && value.isCampaignField)
+          folderCustomFieldValues[key] = cfValue;
       }
 
       // Sending final response

@@ -7,6 +7,7 @@ import {
   getTask,
   getFolder,
 } from "../../../utils/wrike";
+import { getCustomFieldsDatahub } from "../utils/getDHCustomFields";
 
 const requiredDatahubRequestFormIds = [
   "XPI Entity",
@@ -245,7 +246,7 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
           type: "Campaign",
           ...folderCustomFieldValues,
           // // customfieldlist: outputData?.data[0]?.customFields,
-          // folderId: outputData?.data[0]?.id,
+          folderId: outputData?.data[0]?.id,
           // noofcrs: folderCustomFieldValues["noofcrs"],
           // agency: folderCustomFieldValues["agency"],
           // mediabuyingtype: folderCustomFieldValues["mediabuyingtype"],
@@ -330,52 +331,6 @@ const getEntityDatahub = async (wrikeToken) => {
     });
 
     return Promise.resolve(datahubEntityData);
-  } catch (err) {
-    return Promise.reject(err);
-  }
-};
-
-const getCustomFieldsDatahub = async (wrikeToken) => {
-  try {
-    const datahubFields = await getDatahubFields(
-      wrikeToken,
-      process.env.DATAHUB_CUSTOM_FIELDS_ID
-    );
-
-    if (datahubFields?.errorDescription) {
-      return Promise.reject({
-        errorDescription: datahubFields?.errorDescription,
-      });
-    }
-
-    let formFieldsIds = {};
-    datahubFields?.data?.forEach((field) => {
-      formFieldsIds[field.title?.trim()?.toLowerCase()] = field.id;
-    });
-
-    const datahubRecords = await getDatahubRecords(
-      wrikeToken,
-      process.env.DATAHUB_CUSTOM_FIELDS_ID
-    );
-
-    if (datahubRecords?.errorDescription) {
-      return Promise.reject({
-        errorDescription: datahubRecords?.errorDescription,
-      });
-    }
-
-    let datahubCustomFieldsData = {};
-    datahubRecords?.data?.forEach((record) => {
-      if (record.fieldValues[formFieldsIds["short code"]]?.trim())
-        datahubCustomFieldsData[
-          record.fieldValues[formFieldsIds["short code"]]?.trim()?.toLowerCase()
-        ] = {
-          id: record.id,
-          ["cfId"]: record.fieldValues[formFieldsIds["cf id"]],
-        };
-    });
-
-    return Promise.resolve(datahubCustomFieldsData);
   } catch (err) {
     return Promise.reject(err);
   }
