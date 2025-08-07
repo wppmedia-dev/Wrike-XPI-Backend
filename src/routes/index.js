@@ -7,6 +7,10 @@ import { channelRoute } from "./channel";
 // Auth Middleware
 import { ValidateToken } from "../middlewares/authentication";
 
+// Channel Handlers and Schemas for OData routes
+import { GetAllChannels } from "./channel/handlers/getAllChannels";
+import { GetAllChannelsSchema } from "./channel/schema/getAllChannels";
+
 //Public Routes
 export const PublicRouters = (fastify, opts, done) => {
   fastify.register(tokenRoute, { prefix: "/wrikexpi/token" });
@@ -23,6 +27,36 @@ export const PrivateRouters = (fastify, opts, done) => {
 
   fastify.register(campaignRoute, { prefix: "/wrikexpi/campaign" });
   fastify.register(channelRoute, { prefix: "/wrikexpi/channel" });
+
+  // Traditional REST route
+  fastify.get(
+    "/wrikexpi/campaign/:campaignId/channel",
+    GetAllChannelsSchema,
+    async (req, reply) => {
+      try {
+        const result = await GetAllChannels(
+          req?.wrikeToken,
+          { ...req.params, ...req.query },
+          fastify
+        );
+
+        reply.code(result.statusCode || 200).send({
+          success: true,
+          message: result.message,
+          nextPageToken: result.nextPageToken,
+          data: result?.data,
+        });
+      } catch (err) {
+        reply.code(err?.statusCode || 500).send({
+          success: false,
+          details: err?.details || null,
+          message:
+            err?.message ||
+            "Fatal error Unexpected error occurred and service is unable complete the request.",
+        });
+      }
+    }
+  );
 
   done();
 };

@@ -37,7 +37,7 @@ export const getCustomFieldsDatahub = async (wrikeToken) => {
         ] = {
           id: record.id,
           ["cfId"]: record.fieldValues[formFieldsIds["cf id"]],
-          isCampaignField: record.fieldValues[formFieldsIds["campaign"]],
+          isChannelField: record.fieldValues[formFieldsIds["channel"]],
           isWritable: record.fieldValues[formFieldsIds["api access"]]
             ?.toLowerCase()
             ?.includes("write"),

@@ -38,7 +38,8 @@ export const GetChannel = (wrikeToken, params, fastify) => {
             (field) => field.id === value.cfId
           )?.value ?? "";
 
-        if (value.isReadable) folderCustomFieldValues[key] = cfValue;
+        if (value.isReadable && value.isChannelField)
+          folderCustomFieldValues[key] = cfValue;
       }
 
       // Sending final response

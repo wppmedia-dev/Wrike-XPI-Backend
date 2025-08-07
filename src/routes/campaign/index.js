@@ -69,6 +69,7 @@ export const campaignRoute = (fastify, opts, done) => {
       reply.code(result.statusCode || 200).send({
         success: true,
         message: result.message,
+        nextPageToken: result.nextPageToken,
         data: result?.data,
       });
     } catch (err) {

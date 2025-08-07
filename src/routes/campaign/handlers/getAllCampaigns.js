@@ -28,7 +28,7 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
         });
 
       // Variable Declaration
-      const { filter: filterParams, pageSize } = params;
+      const { filter: filterParams, pageSize, nextPageToken } = params;
 
       let filters;
       let customFieldsParam = undefined;
@@ -48,7 +48,14 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
         customFieldsParam = extractFilters(filters);
       }
 
-      let wrikeUrl = `${process.env.WRIKE_ENDPOINT}/spaces/${process.env.CAMPAIGN_SPACE_ID}/folders?deleted=false&fields=[customFields]&nextPageToken=`;
+      if (!datahubCustomFieldsData["workitemlevel"]["cfId"])
+        return reject({
+          statusCode: 400,
+          message:
+            "Missing required datahub customfield mapping field: workitemlevel",
+        });
+
+      let wrikeUrl = `${process.env.WRIKE_ENDPOINT}/spaces/${process.env.CAMPAIGN_SPACE_ID}/folders?deleted=false&fields=[customFields]&customFields=[{"id":"${datahubCustomFieldsData["workitemlevel"]["cfId"]}",value:"Campaign"}]&nextPageToken=${nextPageToken || ""}`;
 
       if (pageSize && pageSize > 0) wrikeUrl += `&pageSize=${pageSize}`;
 
@@ -123,6 +130,7 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
       // Sending final response
       resolve({
         type: "Campaign",
+        nextPageToken: wrikeFolderData.nextPageToken,
         data: campaigns,
       });
     } catch (err) {

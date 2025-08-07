@@ -28,10 +28,21 @@ export const GetAllChannels = (wrikeToken, params, fastify) => {
         });
 
       // Variable Declaration
-      const { filter: filterParams, pageSize } = params;
+      const {
+        filter: filterParams,
+        pageSize,
+        campaignId,
+        nextPageToken,
+      } = params;
+
+      if (!campaignId)
+        return reject({
+          statusCode: 400,
+          message: "Missing required parameter: campaignId",
+        });
 
       let filters;
-      let customFieldsParam = undefined;
+      let customFieldsParam;
 
       if (filterParams) {
         filters = defaultParser.filter(filterParams);
@@ -48,7 +59,14 @@ export const GetAllChannels = (wrikeToken, params, fastify) => {
         customFieldsParam = extractFilters(filters);
       }
 
-      let wrikeUrl = `${process.env.WRIKE_ENDPOINT}/spaces/${process.env.CAMPAIGN_SPACE_ID}/folders?fields=[customFields]&nextPageToken=`;
+      if (!datahubCustomFieldsData["workitemlevel"]["cfId"])
+        return reject({
+          statusCode: 400,
+          message:
+            "Missing required datahub customfield mapping field: workitemlevel",
+        });
+
+      let wrikeUrl = `${process.env.WRIKE_ENDPOINT}/folders/${campaignId}/folders?fields=[customFields]&customFields=[{"id":"${datahubCustomFieldsData["workitemlevel"]["cfId"]}",value:"Channel/Media Type"}]&nextPageToken=${nextPageToken || ""}`;
 
       if (pageSize && pageSize > 0) wrikeUrl += `&pageSize=${pageSize}`;
 
@@ -71,7 +89,7 @@ export const GetAllChannels = (wrikeToken, params, fastify) => {
         const folderCustomFieldValues = Object.entries(
           datahubCustomFieldsData
         ).reduce((acc, [key, value]) => {
-          if (!value.isReadable) return acc;
+          if (!value.isReadable || !value.isChannelField) return acc;
 
           const fieldValue =
             folder?.customFields?.find((field) => field.id === value.cfId)
@@ -86,6 +104,8 @@ export const GetAllChannels = (wrikeToken, params, fastify) => {
 
         return {
           ...folderCustomFieldValues,
+          folderId: folder.id,
+          folderName: folder.title,
           // // customfieldlist: folder?.customFields,
           // noofcrs: folderCustomFieldValues["noofcrs"],
           // agency: folderCustomFieldValues["agency"],
@@ -122,6 +142,7 @@ export const GetAllChannels = (wrikeToken, params, fastify) => {
       // Sending final response
       resolve({
         type: "Channel",
+        nextPageToken: wrikeFolderData.nextPageToken,
         data: channels,
       });
     } catch (err) {
