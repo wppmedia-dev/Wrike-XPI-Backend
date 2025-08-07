@@ -35,7 +35,11 @@ export const GetAllChannels = (wrikeToken, params, fastify) => {
         nextPageToken,
       } = params;
 
-      if (!campaignId)
+      if (
+        !campaignId ||
+        campaignId.includes("campaign_id") ||
+        campaignId.includes("campaignId")
+      )
         return reject({
           statusCode: 400,
           message: "Missing required parameter: campaignId",
@@ -105,7 +109,6 @@ export const GetAllChannels = (wrikeToken, params, fastify) => {
         return {
           ...folderCustomFieldValues,
           folderId: folder.id,
-          folderName: folder.title,
           // // customfieldlist: folder?.customFields,
           // noofcrs: folderCustomFieldValues["noofcrs"],
           // agency: folderCustomFieldValues["agency"],
