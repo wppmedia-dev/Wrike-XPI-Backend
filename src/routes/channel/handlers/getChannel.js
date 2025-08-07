@@ -23,6 +23,13 @@ export const GetChannel = (wrikeToken, params, fastify) => {
 
       const datahubCustomFieldsData = await getCustomFieldsDatahub(wrikeToken);
 
+      if (!datahubCustomFieldsData["workitemlevel"]["cfId"])
+        return reject({
+          statusCode: 400,
+          message:
+            "Missing required datahub customfield mapping field: workitemlevel",
+        });
+
       const wrikeFolderData = await getFolder(wrikeToken, folderId);
 
       // Sending folder update error response
@@ -41,6 +48,12 @@ export const GetChannel = (wrikeToken, params, fastify) => {
         if (value.isReadable && value.isChannelField)
           folderCustomFieldValues[key] = cfValue;
       }
+
+      if (folderCustomFieldValues["workitemlevel"] != "Channel/Media Type")
+        return reject({
+          success: false,
+          message: "Invalid Channel ID",
+        });
 
       // Sending final response
       resolve({

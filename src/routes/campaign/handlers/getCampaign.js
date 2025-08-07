@@ -31,9 +31,9 @@ export const GetCampaign = (wrikeToken, params, fastify) => {
       }
 
       if (wrikeFolderData?.data[0]?.scope == "RbFolder") {
-        return resolve({
+        return reject({
           success: false,
-          message: "Invalid Folder ID",
+          message: "Invalid Campaign ID",
         });
       }
 
@@ -48,6 +48,12 @@ export const GetCampaign = (wrikeToken, params, fastify) => {
         if (value.isReadable && value.isCampaignField)
           folderCustomFieldValues[key] = cfValue;
       }
+
+      if (folderCustomFieldValues["workitemlevel"] != "Campaign")
+        return reject({
+          success: false,
+          message: "Invalid Campaign ID",
+        });
 
       // Sending final response
       resolve({
