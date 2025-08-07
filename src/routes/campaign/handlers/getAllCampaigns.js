@@ -55,9 +55,15 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
             "Missing required datahub customfield mapping field: workitemlevel",
         });
 
-      let wrikeUrl = `${process.env.WRIKE_ENDPOINT}/spaces/${process.env.CAMPAIGN_SPACE_ID}/folders?deleted=false&fields=[customFields]&customFields=[{"id":"${datahubCustomFieldsData["workitemlevel"]["cfId"]}",value:"Campaign"}]&nextPageToken=${nextPageToken || ""}`;
+      let wrikeUrl = `${process.env.WRIKE_ENDPOINT}/spaces/${process.env.CAMPAIGN_SPACE_ID}/folders?deleted=false&fields=[customFields]&nextPageToken=${nextPageToken || ""}`;
 
       if (pageSize && pageSize > 0) wrikeUrl += `&pageSize=${pageSize}`;
+
+      customFieldsParam.push({
+        id: datahubCustomFieldsData["workitemlevel"]["cfId"],
+        comparator: "EqualTo",
+        value: "Campaign",
+      });
 
       if (customFieldsParam && customFieldsParam.length > 0) {
         wrikeUrl += `&customFields=${JSON.stringify(customFieldsParam)}`;

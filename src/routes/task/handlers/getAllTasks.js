@@ -17,7 +17,7 @@ const odataToCustomOp = {
 
 let datahubCustomFieldsData = {};
 
-export const GetAllChannels = (wrikeToken, params, fastify) => {
+export const GetAllTasks = (wrikeToken, params, fastify) => {
   return new Promise(async (resolve, reject) => {
     try {
       if (!wrikeToken)
@@ -31,18 +31,18 @@ export const GetAllChannels = (wrikeToken, params, fastify) => {
       const {
         filter: filterParams,
         pageSize,
-        campaignId,
+        channelId,
         nextPageToken,
       } = params;
 
       if (
-        !campaignId ||
-        campaignId.includes("campaign_id") ||
-        campaignId.includes("campaignId")
+        !channelId ||
+        channelId.includes("channel_id") ||
+        channelId.includes("channelId")
       )
         return reject({
           statusCode: 400,
-          message: "Missing required parameter: campaignId",
+          message: "Missing required parameter: channelId",
         });
 
       let filters;
@@ -70,39 +70,39 @@ export const GetAllChannels = (wrikeToken, params, fastify) => {
             "Missing required datahub customfield mapping field: workitemlevel",
         });
 
-      let wrikeUrl = `${process.env.WRIKE_ENDPOINT}/folders/${campaignId}/folders?fields=[customFields]&nextPageToken=${nextPageToken || ""}`;
+      let wrikeUrl = `${process.env.WRIKE_ENDPOINT}/folders/${channelId}/tasks?fields=[customFields]&nextPageToken=${nextPageToken || ""}`;
 
       if (pageSize && pageSize > 0) wrikeUrl += `&pageSize=${pageSize}`;
 
       customFieldsParam.push({
         id: datahubCustomFieldsData["workitemlevel"]["cfId"],
         comparator: "EqualTo",
-        value: "Channel/Media Type",
+        value: "Task",
       });
 
       if (customFieldsParam && customFieldsParam.length > 0) {
         wrikeUrl += `&customFields=${JSON.stringify(customFieldsParam)}`;
       }
 
-      // Get folder data
-      const wrikeFolderData = await GetResponse(wrikeUrl, "GET", {
+      // Get task data
+      const wrikeTaskData = await GetResponse(wrikeUrl, "GET", {
         "content-type": "application/json",
         Authorization: `Bearer ${wrikeToken}`,
       });
 
-      // Sending folder update error response
-      if (wrikeFolderData?.errorDescription)
-        return reject({ message: wrikeFolderData?.errorDescription });
+      // Sending task update error response
+      if (wrikeTaskData?.errorDescription)
+        return reject({ message: wrikeTaskData?.errorDescription });
 
       // Optimize the for loop by using map instead of manual for...of and push
-      const channels = wrikeFolderData?.data.map((folder) => {
-        const folderCustomFieldValues = Object.entries(
+      const tasks = wrikeTaskData?.data.map((task) => {
+        const taskCustomFieldValues = Object.entries(
           datahubCustomFieldsData
         ).reduce((acc, [key, value]) => {
-          if (!value.isReadable || !value.isChannelField) return acc;
+          if (!value.isReadable || !value.isTaskField) return acc;
 
           const fieldValue =
-            folder?.customFields?.find((field) => field.id === value.cfId)
+            task?.customFields?.find((field) => field.id === value.cfId)
               ?.value ?? "";
 
           // if (fieldValue) {
@@ -113,46 +113,46 @@ export const GetAllChannels = (wrikeToken, params, fastify) => {
         }, {});
 
         return {
-          ...folderCustomFieldValues,
-          folderId: folder.id,
-          // // customfieldlist: folder?.customFields,
-          // noofcrs: folderCustomFieldValues["noofcrs"],
-          // agency: folderCustomFieldValues["agency"],
-          // mediabuyingtype: folderCustomFieldValues["mediabuyingtype"],
-          // brand: folderCustomFieldValues["brand"],
-          // briefeddate: folderCustomFieldValues["briefeddate"],
-          // campaignbudget: folderCustomFieldValues["campaignbudget"],
-          // campaignenddate: folderCustomFieldValues["campaignenddate"],
-          // campaignid: folderCustomFieldValues["campaignid"],
-          // campaignname: folderCustomFieldValues["campaignname"],
-          // campaignobjective: folderCustomFieldValues["campaignobjective"],
-          // campaignstartdate: folderCustomFieldValues["campaignstartdate"],
-          // campaignfeedbackstatus:
-          //   folderCustomFieldValues["campaignfeedbackstatus"],
-          // ccuid: folderCustomFieldValues["ccuid"],
-          // mediachannelpractice: folderCustomFieldValues["mediachannelpractice"],
-          // client: folderCustomFieldValues["client"],
-          // comments: folderCustomFieldValues["comments"],
-          // cssid: folderCustomFieldValues["cssid"],
-          // currency: folderCustomFieldValues["currency"],
-          // customerponumber: folderCustomFieldValues["customerponumber"],
-          // debtor: folderCustomFieldValues["debtor"],
-          // kpiobjective: folderCustomFieldValues["kpiobjective"],
-          // originalagency: folderCustomFieldValues["originalagency"],
-          // readyforarchive: folderCustomFieldValues["readyforarchive"],
-          // region: folderCustomFieldValues["region"],
-          // requestedstartdate: folderCustomFieldValues["requestedstartdate"],
-          // requestormarket: folderCustomFieldValues["requestormarket"],
-          // spacename: folderCustomFieldValues["spacename"],
-          // workitemlevel: folderCustomFieldValues["workitemlevel"],
+          ...taskCustomFieldValues,
+          taskId: task.id,
+          // // customfieldlist: task?.customFields,
+          // noofcrs: taskCustomFieldValues["noofcrs"],
+          // agency: taskCustomFieldValues["agency"],
+          // mediabuyingtype: taskCustomFieldValues["mediabuyingtype"],
+          // brand: taskCustomFieldValues["brand"],
+          // briefeddate: taskCustomFieldValues["briefeddate"],
+          // taskbudget: taskCustomFieldValues["taskbudget"],
+          // taskenddate: taskCustomFieldValues["taskenddate"],
+          // taskid: taskCustomFieldValues["taskid"],
+          // taskname: taskCustomFieldValues["taskname"],
+          // taskobjective: taskCustomFieldValues["taskobjective"],
+          // taskstartdate: taskCustomFieldValues["taskstartdate"],
+          // taskfeedbackstatus:
+          //   taskCustomFieldValues["taskfeedbackstatus"],
+          // ccuid: taskCustomFieldValues["ccuid"],
+          // mediachannelpractice: taskCustomFieldValues["mediachannelpractice"],
+          // client: taskCustomFieldValues["client"],
+          // comments: taskCustomFieldValues["comments"],
+          // cssid: taskCustomFieldValues["cssid"],
+          // currency: taskCustomFieldValues["currency"],
+          // customerponumber: taskCustomFieldValues["customerponumber"],
+          // debtor: taskCustomFieldValues["debtor"],
+          // kpiobjective: taskCustomFieldValues["kpiobjective"],
+          // originalagency: taskCustomFieldValues["originalagency"],
+          // readyforarchive: taskCustomFieldValues["readyforarchive"],
+          // region: taskCustomFieldValues["region"],
+          // requestedstartdate: taskCustomFieldValues["requestedstartdate"],
+          // requestormarket: taskCustomFieldValues["requestormarket"],
+          // spacename: taskCustomFieldValues["spacename"],
+          // workitemlevel: taskCustomFieldValues["workitemlevel"],
         };
       });
 
       // Sending final response
       resolve({
-        type: "Channel",
-        nextPageToken: wrikeFolderData.nextPageToken,
-        data: channels,
+        type: "Task",
+        nextPageToken: wrikeTaskData.nextPageToken,
+        data: tasks,
       });
     } catch (err) {
       console.log(err?.message || err);

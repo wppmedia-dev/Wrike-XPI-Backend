@@ -173,24 +173,6 @@ export const getRequestFormStatus = async (
   }
 };
 
-export const getTask = async (wrikeToken, taskId) => {
-  try {
-    // Get folder data
-    const wrikeRequestFormData = await GetResponse(
-      `${process.env.WRIKE_ENDPOINT}/tasks/${taskId}`,
-      "GET",
-      {
-        "content-type": "application/json",
-        Authorization: `Bearer ${wrikeToken}`,
-      }
-    );
-
-    return wrikeRequestFormData;
-  } catch (err) {
-    return err;
-  }
-};
-
 export const getFolder = async (wrikeToken, folderId) => {
   try {
     // Get folder data
@@ -265,5 +247,61 @@ export const uploadAttachment = async (wrikeToken, fileBuffer, fileName) => {
     return result;
   } catch (err) {
     throw err;
+  }
+};
+
+// Tasks API
+
+export const getTask = async (wrikeToken, folderId) => {
+  try {
+    // Get folder data
+    const wrikeRequestFormData = await GetResponse(
+      `${process.env.WRIKE_ENDPOINT}/tasks/${folderId}`,
+      "GET",
+      {
+        "content-type": "application/json",
+        Authorization: `Bearer ${wrikeToken}`,
+      }
+    );
+
+    return wrikeRequestFormData;
+  } catch (err) {
+    return err;
+  }
+};
+
+export const updateTask = async (wrikeToken, taskId, taskCFUpdateData) => {
+  try {
+    // Get folder data
+    const wrikeRequestFormData = await GetResponse(
+      `${process.env.WRIKE_ENDPOINT}/tasks/${taskId}?customFields=${JSON.stringify(taskCFUpdateData)}`,
+      "PUT",
+      {
+        "content-type": "application/json",
+        Authorization: `Bearer ${wrikeToken}`,
+      }
+    );
+
+    return wrikeRequestFormData;
+  } catch (err) {
+    return err;
+  }
+};
+
+export const deleteTask = async (wrikeToken, taskId) => {
+  try {
+    // Get folder data
+    const wrikeRequestFormData = await GetResponse(
+      `${process.env.WRIKE_ENDPOINT}/tasks/${taskId}`,
+      "DELETE",
+      {
+        "content-type": "application/json",
+        Authorization: `Bearer ${wrikeToken}`,
+      }
+    );
+
+    return wrikeRequestFormData;
+  } catch (err) {
+    return err;
   }
 };
