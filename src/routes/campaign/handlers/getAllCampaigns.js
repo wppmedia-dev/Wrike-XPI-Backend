@@ -81,6 +81,8 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
 
       // Optimize the for loop by using map instead of manual for...of and push
       const campaigns = wrikeFolderData?.data.map((folder) => {
+        if (folder?.scope == "RbFolder") return;
+
         const folderCustomFieldValues = Object.entries(
           datahubCustomFieldsData
         ).reduce((acc, [key, value]) => {

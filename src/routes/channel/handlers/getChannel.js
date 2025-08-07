@@ -37,6 +37,13 @@ export const GetChannel = (wrikeToken, params, fastify) => {
         return reject({ message: wrikeFolderData?.errorDescription });
       }
 
+      if (wrikeFolderData?.data[0]?.scope == "RbFolder") {
+        return reject({
+          success: false,
+          message: "Invalid Campaign ID",
+        });
+      }
+
       const folderCustomFieldValues = {};
 
       for (const [key, value] of Object.entries(datahubCustomFieldsData)) {

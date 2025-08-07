@@ -94,8 +94,9 @@ export const GetAllTasks = (wrikeToken, params, fastify) => {
       if (wrikeTaskData?.errorDescription)
         return reject({ message: wrikeTaskData?.errorDescription });
 
-      // Optimize the for loop by using map instead of manual for...of and push
       const tasks = wrikeTaskData?.data.map((task) => {
+        if (task?.scope == "RbTask") return;
+
         const taskCustomFieldValues = Object.entries(
           datahubCustomFieldsData
         ).reduce((acc, [key, value]) => {

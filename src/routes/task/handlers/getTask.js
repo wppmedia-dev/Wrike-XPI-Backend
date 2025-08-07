@@ -37,6 +37,13 @@ export const GetTask = (wrikeToken, params, fastify) => {
         return reject({ message: wrikeTaskData?.errorDescription });
       }
 
+      if (wrikeTaskData?.data[0]?.scope == "RbTask") {
+        return reject({
+          success: false,
+          message: "Invalid Task ID",
+        });
+      }
+
       const taskCustomFieldValues = {};
 
       for (const [key, value] of Object.entries(datahubCustomFieldsData)) {
