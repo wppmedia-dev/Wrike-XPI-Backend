@@ -8,7 +8,7 @@
   },
   "scripts": {
     "start": "npm run build && node dist",
-    "start:dev": "nodemon --exec babel-node --max-old-space-size=4096 src/index.js",
+    "dev": "nodemon --exec babel-node --max-old-space-size=4096 src/index.js",
     "clean": "rm -rf dist",
     "build": "npm run clean && babel src --out-dir dist",
     "migrate": "node_modules/sequelize-cli/lib/sequelize db:migrate",
