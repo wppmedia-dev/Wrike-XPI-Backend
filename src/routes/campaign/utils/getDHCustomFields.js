@@ -1,6 +1,6 @@
 import { getDatahubFields, getDatahubRecords } from "../../../utils/wrike";
 
-export const getCustomFieldsDatahub = async (wrikeToken) => {
+export const getCustomFieldsDatahub = async (wrikeToken, isMaster = false) => {
   try {
     const datahubFields = await getDatahubFields(
       wrikeToken,
@@ -31,9 +31,17 @@ export const getCustomFieldsDatahub = async (wrikeToken) => {
 
     let datahubCustomFieldsData = {};
     datahubRecords?.data?.forEach((record) => {
-      if (record.fieldValues[formFieldsIds["short code"]]?.trim())
+      if (
+        record.fieldValues[
+          formFieldsIds[isMaster ? "master slug" : "short code"]
+        ]?.trim()
+      )
         datahubCustomFieldsData[
-          record.fieldValues[formFieldsIds["short code"]]?.trim()?.toLowerCase()
+          record.fieldValues[
+            formFieldsIds[isMaster ? "master slug" : "short code"]
+          ]
+            ?.trim()
+            ?.toLowerCase()
         ] = {
           id: record.id,
           ["cfId"]: record.fieldValues[formFieldsIds["cf id"]],

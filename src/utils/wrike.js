@@ -97,6 +97,26 @@ export const getDatahubRecords = async (wrikeToken, databaseId) => {
   }
 };
 
+export const getCustomFields = async (wrikeToken, customFieldId = null) => {
+  try {
+    let url = `${process.env.WRIKE_ENDPOINT}/customfields`;
+
+    // If specific custom field ID is provided
+    if (customFieldId) {
+      url += `/${customFieldId}`;
+    }
+
+    const customFieldsData = await GetResponse(url, "GET", {
+      "content-type": "application/json",
+      Authorization: `Bearer ${wrikeToken}`,
+    });
+
+    return customFieldsData;
+  } catch (err) {
+    return err;
+  }
+};
+
 export const getRequestForm = async (wrikeToken) => {
   try {
     // Get folder data

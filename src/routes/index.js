@@ -4,6 +4,7 @@ import { tokenRoute } from "./tokens";
 import { campaignRoute } from "./campaign";
 import { channelRoute } from "./channel";
 import { taskRoute } from "./task";
+import { masterRoute } from "./master";
 
 // Auth Middleware
 import { ValidateToken } from "../middlewares/authentication";
@@ -33,6 +34,7 @@ export const PrivateRouters = (fastify, opts, done) => {
   fastify.register(campaignRoute, { prefix: "/wrikexpi/campaign" });
   fastify.register(channelRoute, { prefix: "/wrikexpi/channel" });
   fastify.register(taskRoute, { prefix: "/wrikexpi/task" });
+  fastify.register(masterRoute, { prefix: "/wrikexpi/v1.0" });
 
   // Traditional REST route
   fastify.get(
