@@ -18,14 +18,14 @@ export const masterRoute = (fastify, opts, done) => {
         );
 
         reply.code(result.statusCode || 200).send({
-          "@odata.context": `${process.env.API_URL}/${req.params.customfield}/${req.params.shortcode}`,
+          "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.customfield}/${req.params.shortcode}`,
           // message: result.message,
           value: result?.data,
         });
       } catch (err) {
         reply.code(err?.statusCode || 500).send({
           // success: false,
-          "@odata.context": `${process.env.API_URL}/${req.params.customfield}/${req.params.shortcode}`,
+          "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.customfield}/${req.params.shortcode}`,
           // details: err?.details || null,
           message:
             err?.message ||
@@ -44,14 +44,14 @@ export const masterRoute = (fastify, opts, done) => {
       );
 
       reply.code(result.statusCode || 200).send({
-        "@odata.context": `${process.env.API_URL}/${req.params.customfield}`,
+        "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.customfield}`,
         // message: result.message,
         value: result?.data,
       });
     } catch (err) {
       reply.code(err?.statusCode || 500).send({
         // success: false,
-        "@odata.context": `${process.env.API_URL}/${req.params.customfield}`,
+        "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.customfield}`,
         // details: err?.details || null,
         message:
           err?.message ||
