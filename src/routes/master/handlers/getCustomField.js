@@ -42,7 +42,7 @@ export const GetCustomField = (wrikeToken, params, fastify) => {
         });
       }
 
-      if (!datahubCustomFieldsData[customfield]?.isReadable) {
+      if (!datahubCustomFieldsData[customfield]?.isMasterDataFeatureReadable) {
         return reject({
           statusCode: 403,
           message: `Read operation not allowed for shortcode: ${shortcode}`,

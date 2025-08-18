@@ -52,6 +52,10 @@ export const getCustomFieldsDatahub = async (wrikeToken, isMaster = false) => {
           isReadable: record.fieldValues[formFieldsIds["api access"]]
             ?.toLowerCase()
             ?.includes("read"),
+          isMasterDataFeatureReadable:
+            record.fieldValues[formFieldsIds["master data feature"]]?.includes(
+              "Read"
+            ),
         };
     });
 
