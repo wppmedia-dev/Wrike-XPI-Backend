@@ -70,20 +70,25 @@ export const GetMasterDataValue = (wrikeToken, params, fastify) => {
           wrikeToken,
           customFieldData?.data[0]?.settings?.linkToDatabaseInfo
             ?.dataHubDatabaseId,
-          nextPageToken,
-          [],
-          false
+          false, // recursive flag
+          shortcode && shortcode?.length > 0 && shortcode.trim()[0] != ":"
+            ? '{"op": "equals","fld": "FIname","val": "' + shortcode + '"}'
+            : "",
+          nextPageToken ?? null
         );
+
+        if (datahubRecords?.errorDescription)
+          return reject({
+            message:
+              datahubRecords?.errorDescription ??
+              `Something went wrong! Please try again after sometime`,
+          });
 
         newNextPageToken = datahubRecords?.nextPageToken;
 
         if (shortcode && shortcode?.length > 0 && shortcode.trim()[0] != ":") {
           outputValues = "";
-          outputValues = datahubRecords.data.find(
-            (item) =>
-              item?.title?.trim()?.toLowerCase() ===
-              shortcode?.trim()?.toLowerCase()
-          )?.["title"];
+          outputValues = datahubRecords.data[0]?.title;
 
           if (!outputValues) {
             return reject({

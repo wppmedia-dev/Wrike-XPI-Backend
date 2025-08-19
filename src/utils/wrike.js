@@ -82,15 +82,20 @@ export const getDatahubFields = async (wrikeToken, databaseId) => {
 export const getDatahubRecords = async (
   wrikeToken,
   databaseId,
+  isRecursive = true,
+  filter = "",
   pageToken = null,
-  accumulatedData = [],
-  isRecursive = true
+  accumulatedData = []
 ) => {
   try {
-    const url = pageToken
+    let url = pageToken
       ? `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/records?limit=${process.env.WRIKE_DATAHUB_RECORDS_LIMIT ?? "300"}&nextPageToken=${pageToken}`
       : `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/records?limit=${process.env.WRIKE_DATAHUB_RECORDS_LIMIT ?? "300"}`;
 
+    if (filter) {
+      // Properly encode the filter parameter
+      url += `&filter=${filter}`;
+    }
     const response = await GetResponse(url, "GET", {
       "content-type": "application/json",
       Authorization: `Bearer ${wrikeToken}`,
@@ -108,9 +113,10 @@ export const getDatahubRecords = async (
       return await getDatahubRecords(
         wrikeToken,
         databaseId,
+        isRecursive,
+        filter,
         response.nextPageToken,
-        combinedData,
-        isRecursive
+        combinedData
       );
     }
 
