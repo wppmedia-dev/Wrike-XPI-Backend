@@ -83,6 +83,7 @@ export const getDatahubRecords = async (
   wrikeToken,
   databaseId,
   isRecursive = true,
+  fieldIds,
   filter = "",
   pageToken = null,
   accumulatedData = []
@@ -93,8 +94,11 @@ export const getDatahubRecords = async (
       : `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/records?limit=${process.env.WRIKE_DATAHUB_RECORDS_LIMIT ?? "300"}`;
 
     if (filter) {
-      // Properly encode the filter parameter
       url += `&filter=${filter}`;
+    }
+
+    if (fieldIds) {
+      url += `&fieldIds=${fieldIds.join(",")}`;
     }
     const response = await GetResponse(url, "GET", {
       "content-type": "application/json",
@@ -114,6 +118,7 @@ export const getDatahubRecords = async (
         wrikeToken,
         databaseId,
         isRecursive,
+        fieldIds,
         filter,
         response.nextPageToken,
         combinedData
