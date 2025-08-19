@@ -1,5 +1,4 @@
-import { getFolder } from "../../../utils/wrike";
-import { getCustomFieldsDatahub } from "../utils/getDHCustomFields";
+import { getFolder, getDatahubDataById } from "../../../utils/wrike";
 
 export const GetChannel = (wrikeToken, params, fastify) => {
   return new Promise(async (resolve, reject) => {
@@ -21,7 +20,10 @@ export const GetChannel = (wrikeToken, params, fastify) => {
             "Missing parameter! Required parameter is missing for the requested operation.",
         });
 
-      const datahubCustomFieldsData = await getCustomFieldsDatahub(wrikeToken);
+      const datahubCustomFieldsData = await getDatahubDataById(
+        wrikeToken,
+        process.env.DATAHUB_CUSTOM_FIELDS_ID
+      );
 
       if (!datahubCustomFieldsData["workitemlevel"]["cfId"])
         return reject({

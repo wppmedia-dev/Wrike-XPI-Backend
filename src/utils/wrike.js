@@ -97,6 +97,78 @@ export const getDatahubRecords = async (wrikeToken, databaseId) => {
   }
 };
 
+export const getDatahubDataById = async (
+  wrikeToken,
+  datahubId,
+  isMaster = false
+) => {
+  try {
+    if (!datahubId)
+      return Promise.reject({
+        message: "Missing datahubId",
+      });
+
+    const datahubFields = await getDatahubFields(wrikeToken, datahubId);
+
+    if (datahubFields?.errorDescription) {
+      return Promise.reject({
+        errorDescription: datahubFields?.errorDescription,
+      });
+    }
+
+    let formFieldsIds = {};
+    datahubFields?.data?.forEach((field) => {
+      formFieldsIds[field.title?.trim()?.toLowerCase()] = field.id;
+    });
+
+    const datahubRecords = await getDatahubRecords(wrikeToken, datahubId);
+
+    if (datahubRecords?.errorDescription) {
+      return Promise.reject({
+        errorDescription: datahubRecords?.errorDescription,
+      });
+    }
+
+    let datahubCustomFieldsData = {};
+    datahubRecords?.data?.forEach((record) => {
+      if (
+        record.fieldValues[
+          formFieldsIds[isMaster ? "master slug" : "short code"]
+        ]?.trim()
+      )
+        datahubCustomFieldsData[
+          record.fieldValues[
+            formFieldsIds[isMaster ? "master slug" : "short code"]
+          ]
+            ?.trim()
+            ?.toLowerCase()
+        ] = {
+          id: record.id,
+          ["cfId"]: record.fieldValues[formFieldsIds["cf id"]],
+          isCampaignField: record.fieldValues[formFieldsIds["campaign"]],
+          isChannelField: record.fieldValues[formFieldsIds["channel"]],
+          isTaskField: record.fieldValues[formFieldsIds["channel task"]],
+          isWritable:
+            record.fieldValues[formFieldsIds["api access"]]
+              ?.toLowerCase()
+              ?.includes("write") ?? false,
+          isReadable:
+            record.fieldValues[formFieldsIds["api access"]]
+              ?.toLowerCase()
+              ?.includes("read") ?? false,
+          isMasterDataFeatureReadable:
+            record.fieldValues[formFieldsIds["master data feature"]]?.includes(
+              "Read"
+            ) ?? false,
+        };
+    });
+
+    return Promise.resolve(datahubCustomFieldsData);
+  } catch (err) {
+    return Promise.reject(err);
+  }
+};
+
 export const getCustomFields = async (wrikeToken, customFieldId = null) => {
   try {
     let url = `${process.env.WRIKE_ENDPOINT}/customfields`;

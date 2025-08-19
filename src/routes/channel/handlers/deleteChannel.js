@@ -1,9 +1,4 @@
-import {
-  deleteFolder,
-  getDatahubFields,
-  getDatahubRecords,
-} from "../../../utils/wrike";
-import { getCustomFieldsDatahub } from "../utils/getDHCustomFields";
+import { deleteFolder, getDatahubDataById } from "../../../utils/wrike";
 
 export const DeleteChannel = (wrikeToken, params, fastify) => {
   return new Promise(async (resolve, reject) => {
@@ -25,7 +20,10 @@ export const DeleteChannel = (wrikeToken, params, fastify) => {
             "Missing parameter! Required parameter is missing for the requested operation.",
         });
 
-      const datahubCustomFieldsData = await getCustomFieldsDatahub(wrikeToken);
+      const datahubCustomFieldsData = await getDatahubDataById(
+        wrikeToken,
+        process.env.DATAHUB_CUSTOM_FIELDS_ID
+      );
 
       // Get folder data
       const wrikeFolderData = await deleteFolder(wrikeToken, folderId);

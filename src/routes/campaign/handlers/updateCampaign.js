@@ -1,5 +1,4 @@
-import { updateFolder } from "../../../utils/wrike";
-import { getCustomFieldsDatahub } from "../utils/getDHCustomFields";
+import { getDatahubDataById, updateFolder } from "../../../utils/wrike";
 
 export const UpdateCampaign = (wrikeToken, params, fastify) => {
   return new Promise(async (resolve, reject) => {
@@ -17,7 +16,10 @@ export const UpdateCampaign = (wrikeToken, params, fastify) => {
 
       // Getting cutom fields data from Datahub
       // if (Object.keys(datahubCustomFieldsData).length === 0) {
-      const datahubCustomFieldsData = await getCustomFieldsDatahub(wrikeToken);
+      const datahubCustomFieldsData = await getDatahubDataById(
+        wrikeToken,
+        process.env.DATAHUB_CUSTOM_FIELDS_ID
+      );
       // }
 
       let folderCFUpdateData = [];

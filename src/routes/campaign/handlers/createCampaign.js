@@ -6,8 +6,8 @@ import {
   getRequestFormStatus,
   getTask,
   getFolder,
+  getDatahubDataById,
 } from "../../../utils/wrike";
-import { getCustomFieldsDatahub } from "../utils/getDHCustomFields";
 
 const requiredDatahubRequestFormIds = [
   "XPI Entity",
@@ -62,7 +62,10 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
         });
 
       // if (Object.keys(datahubCustomFieldsData).length === 0) {
-      const datahubCustomFieldsData = await getCustomFieldsDatahub(wrikeToken);
+      const datahubCustomFieldsData = await getDatahubDataById(
+        wrikeToken,
+        process.env.DATAHUB_CUSTOM_FIELDS_ID
+      );
       // }
 
       // if (Object.keys(datahubRequestFormFieldsData).length === 0) {

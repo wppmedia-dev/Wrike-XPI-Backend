@@ -1,7 +1,6 @@
-import { getCustomFields } from "../../../utils/wrike";
-import { getCustomFieldsDatahub } from "../../campaign/utils/getDHCustomFields";
+import { getCustomFields, getDatahubDataById } from "../../../utils/wrike";
 
-export const GetCustomField = (wrikeToken, params, fastify) => {
+export const GetMasterDataValue = (wrikeToken, params, fastify) => {
   return new Promise(async (resolve, reject) => {
     try {
       if (!wrikeToken) {
@@ -23,8 +22,9 @@ export const GetCustomField = (wrikeToken, params, fastify) => {
       }
 
       // Get mapping configuration for this customfield
-      const datahubCustomFieldsData = await getCustomFieldsDatahub(
+      const datahubCustomFieldsData = await getDatahubDataById(
         wrikeToken,
+        process.env.DATAHUB_CUSTOM_FIELDS_ID,
         true
       );
 

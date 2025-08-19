@@ -1,4 +1,4 @@
-export const GetCustomFieldSchema = {
+export const GetMasterDataValueSchema = {
   schema: {
     params: {
       type: "object",
