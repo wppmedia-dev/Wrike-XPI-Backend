@@ -18,14 +18,14 @@ export const masterRoute = (fastify, opts, done) => {
         );
 
         reply.code(result.statusCode || 200).send({
-          "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.customfield}/${req.params.shortcode}`,
+          "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.masterSlug}/${req.params.shortcode}`,
           // message: result.message,
           value: result?.data,
         });
       } catch (err) {
         reply.code(err?.statusCode || 500).send({
           // success: false,
-          "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.customfield}/${req.params.shortcode}`,
+          "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.masterSlug}/${req.params.shortcode}`,
           // details: err?.details || null,
           message:
             err?.message ||
@@ -47,7 +47,7 @@ export const masterRoute = (fastify, opts, done) => {
         );
 
         reply.code(result.statusCode || 200).send({
-          "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.customfield}`,
+          "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.masterSlug}`,
           nextPageToken: result?.nextPageToken,
           // message: result.message,
           value: result?.data,
@@ -55,7 +55,7 @@ export const masterRoute = (fastify, opts, done) => {
       } catch (err) {
         reply.code(err?.statusCode || 500).send({
           // success: false,
-          "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.customfield}`,
+          "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.masterSlug}`,
           // details: err?.details || null,
           message:
             err?.message ||
@@ -67,7 +67,7 @@ export const masterRoute = (fastify, opts, done) => {
 
   // // Datahub records
   // fastify.get(
-  //   "/record/:customfield/:shortcode",
+  //   "/record/:masterSlug/:shortcode",
   //   GetCustomFieldSchema,
   //   async (req, reply) => {
   //     try {
@@ -78,14 +78,14 @@ export const masterRoute = (fastify, opts, done) => {
   //       );
 
   //       reply.code(result.statusCode || 200).send({
-  //         "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.customfield}/${req.params.shortcode}`,
+  //         "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.masterSlug}/${req.params.shortcode}`,
   //         // message: result.message,
   //         value: result?.data,
   //       });
   //     } catch (err) {
   //       reply.code(err?.statusCode || 500).send({
   //         // success: false,
-  //         "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.customfield}/${req.params.shortcode}`,
+  //         "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.masterSlug}/${req.params.shortcode}`,
   //         // details: err?.details || null,
   //         message:
   //           err?.message ||
@@ -96,7 +96,7 @@ export const masterRoute = (fastify, opts, done) => {
   // );
 
   // fastify.get(
-  //   "/record/:customfield",
+  //   "/record/:masterSlug",
   //   GetCustomFieldSchema,
   //   async (req, reply) => {
   //     try {
@@ -107,14 +107,14 @@ export const masterRoute = (fastify, opts, done) => {
   //       );
 
   //       reply.code(result.statusCode || 200).send({
-  //         "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.customfield}`,
+  //         "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.masterSlug}`,
   //         // message: result.message,
   //         value: result?.data,
   //       });
   //     } catch (err) {
   //       reply.code(err?.statusCode || 500).send({
   //         // success: false,
-  //         "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.customfield}`,
+  //         "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.masterSlug}`,
   //         // details: err?.details || null,
   //         message:
   //           err?.message ||
