@@ -69,7 +69,7 @@ export const masterRoute = (fastify, opts, done) => {
 
   // Datahub records
   fastify.get(
-    "/record/:masterSlug/:shortcode",
+    "/record/:masterSlug/:recordId",
     GetMasterDataRecordSchema,
     async (req, reply) => {
       try {

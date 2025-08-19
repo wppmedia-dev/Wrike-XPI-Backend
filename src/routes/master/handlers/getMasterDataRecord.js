@@ -16,7 +16,7 @@ export const GetMasterDataRecord = (wrikeToken, params, fastify) => {
         });
       }
 
-      const { masterSlug, shortcode, nextPageToken } = params;
+      const { masterSlug, recordId, nextPageToken } = params;
 
       if (!masterSlug) {
         return reject({
@@ -36,7 +36,7 @@ export const GetMasterDataRecord = (wrikeToken, params, fastify) => {
       if (!datahubCustomFieldsData) {
         return reject({
           statusCode: 404,
-          message: `Custom field mapping not found for shortcode: ${shortcode}`,
+          message: `Custom field mapping not found for recordId: ${recordId}`,
         });
       }
 
@@ -50,7 +50,7 @@ export const GetMasterDataRecord = (wrikeToken, params, fastify) => {
       if (!datahubCustomFieldsData[masterSlug]?.isMasterDataFeatureReadable) {
         return reject({
           statusCode: 403,
-          message: `Read operation not allowed for shortcode: ${shortcode}`,
+          message: `Read operation not allowed for recordId: ${recordId}`,
         });
       }
 
@@ -88,8 +88,8 @@ export const GetMasterDataRecord = (wrikeToken, params, fastify) => {
         dataHubDatabaseId,
         false, // recursive flag
         mirrorFieldIds,
-        shortcode && shortcode?.length > 0 && shortcode.trim()[0] != ":"
-          ? '{"op": "equals","fld": "FIname","val": "' + shortcode + '"}'
+        recordId && recordId?.length > 0 && recordId.trim()[0] != ":"
+          ? '{"op": "equals","fld": "FIid","val": "' + recordId + '"}'
           : "",
         nextPageToken ?? null
       );
@@ -120,14 +120,20 @@ export const GetMasterDataRecord = (wrikeToken, params, fastify) => {
         formFieldsIds[field.id] = field.title?.trim()?.toLowerCase();
       });
 
-      if (shortcode && shortcode?.length > 0 && shortcode.trim()[0] != ":") {
-        outputValues = "";
-        outputValues = datahubRecords.data[0]?.title;
+      if (recordId && recordId?.length > 0 && recordId.trim()[0] != ":") {
+        outputValues = {};
+
+        const record = datahubRecords?.data[0];
+        outputValues = { id: record?.id || record.fieldValues?.FIid };
+        for (const field in record.fieldValues) {
+          outputValues[field == "FIname" ? "value" : formFieldsIds[field]] =
+            record.fieldValues[field];
+        }
 
         if (!outputValues) {
           return reject({
             statusCode: 404,
-            message: `Shortcode not found: ${shortcode}`,
+            message: `recordId not found: ${recordId}`,
           });
         }
       } else {

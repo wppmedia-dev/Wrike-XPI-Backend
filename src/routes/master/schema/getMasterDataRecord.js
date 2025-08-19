@@ -5,7 +5,7 @@ export const GetMasterDataRecordSchema = {
       required: ["masterSlug"],
       properties: {
         masterSlug: { type: "string" },
-        shortcode: { type: "string" },
+        recordId: { type: "string" },
       },
     },
   },
