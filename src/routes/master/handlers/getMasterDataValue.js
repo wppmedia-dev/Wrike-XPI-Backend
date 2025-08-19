@@ -1,4 +1,8 @@
-import { getCustomFields, getDatahubDataById } from "../../../utils/wrike";
+import {
+  getCustomFields,
+  getDatahubGroupedDataById,
+  getDatahubRecords,
+} from "../../../utils/wrike";
 
 export const GetMasterDataValue = (wrikeToken, params, fastify) => {
   return new Promise(async (resolve, reject) => {
@@ -11,7 +15,7 @@ export const GetMasterDataValue = (wrikeToken, params, fastify) => {
         });
       }
 
-      const { customfield, shortcode } = params;
+      const { customfield, shortcode, nextPageToken } = params;
 
       if (!customfield) {
         return reject({
@@ -22,7 +26,7 @@ export const GetMasterDataValue = (wrikeToken, params, fastify) => {
       }
 
       // Get mapping configuration for this customfield
-      const datahubCustomFieldsData = await getDatahubDataById(
+      const datahubCustomFieldsData = await getDatahubGroupedDataById(
         wrikeToken,
         process.env.DATAHUB_CUSTOM_FIELDS_ID,
         true
@@ -54,24 +58,74 @@ export const GetMasterDataValue = (wrikeToken, params, fastify) => {
         datahubCustomFieldsData[customfield]["cfId"]
       );
 
-      let outputValues = customFieldData?.data[0]?.settings?.values;
+      let outputValues;
+      let newNextPageToken = null;
 
-      if (shortcode && shortcode.trim() != ":shortcode") {
-        outputValues = customFieldData?.data[0]?.settings?.values?.find(
-          (item) =>
-            item?.trim()?.toLowerCase() === shortcode?.trim()?.toLowerCase()
+      if (
+        datahubCustomFieldsData[customfield]["cfType"] == "LinkToDatabase" &&
+        customFieldData?.data[0]?.settings?.linkToDatabaseInfo
+          ?.dataHubDatabaseId
+      ) {
+        const datahubRecords = await getDatahubRecords(
+          wrikeToken,
+          customFieldData?.data[0]?.settings?.linkToDatabaseInfo
+            ?.dataHubDatabaseId,
+          nextPageToken,
+          [],
+          false
         );
 
-        if (!outputValues) {
-          return reject({
-            statusCode: 404,
-            message: `Shortcode not found: ${shortcode}`,
+        newNextPageToken = datahubRecords?.nextPageToken;
+
+        if (shortcode && shortcode?.length > 0 && shortcode.trim()[0] != ":") {
+          outputValues = "";
+          outputValues = datahubRecords.data.find(
+            (item) =>
+              item?.title?.trim()?.toLowerCase() ===
+              shortcode?.trim()?.toLowerCase()
+          )?.["title"];
+
+          if (!outputValues) {
+            return reject({
+              statusCode: 404,
+              message: `Shortcode not found: ${shortcode}`,
+            });
+          }
+        } else {
+          outputValues = [];
+          datahubRecords.data.forEach((record) => {
+            outputValues.push({
+              value: record?.title,
+            });
+          });
+        }
+      } else {
+        if (shortcode && shortcode?.length > 0 && shortcode.trim()[0] != ":") {
+          outputValues = "";
+          outputValues = customFieldData?.data[0]?.settings?.values?.find(
+            (item) =>
+              item?.trim()?.toLowerCase() === shortcode?.trim()?.toLowerCase()
+          );
+
+          if (!outputValues) {
+            return reject({
+              statusCode: 404,
+              message: `Shortcode not found: ${shortcode}`,
+            });
+          }
+        } else {
+          outputValues = [];
+          customFieldData?.data[0]?.settings?.values?.forEach((item) => {
+            outputValues.push({
+              value: item,
+            });
           });
         }
       }
 
       resolve({
         data: outputValues,
+        nextPageToken: newNextPageToken,
       });
     } catch (err) {
       console.error("Error in GetCustomField:", err);

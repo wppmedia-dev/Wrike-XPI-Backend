@@ -79,25 +79,53 @@ export const getDatahubFields = async (wrikeToken, databaseId) => {
   }
 };
 
-export const getDatahubRecords = async (wrikeToken, databaseId) => {
+export const getDatahubRecords = async (
+  wrikeToken,
+  databaseId,
+  pageToken = null,
+  accumulatedData = [],
+  isRecursive = true
+) => {
   try {
-    // Get folder data
-    const datahubRecords = await GetResponse(
-      `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/records`,
-      "GET",
-      {
-        "content-type": "application/json",
-        Authorization: `Bearer ${wrikeToken}`,
-      }
-    );
+    const url = pageToken
+      ? `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/records?limit=${process.env.WRIKE_DATAHUB_RECORDS_LIMIT ?? "300"}&nextPageToken=${pageToken}`
+      : `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/records?limit=${process.env.WRIKE_DATAHUB_RECORDS_LIMIT ?? "300"}`;
 
-    return datahubRecords;
+    const response = await GetResponse(url, "GET", {
+      "content-type": "application/json",
+      Authorization: `Bearer ${wrikeToken}`,
+    });
+
+    if (response?.errorDescription) {
+      return response;
+    }
+
+    // Append current page data to accumulated data
+    const combinedData = [...accumulatedData, ...(response?.data || [])];
+
+    // If there's a nextPageToken, recursively fetch the next page
+    if (isRecursive && response?.nextPageToken) {
+      return await getDatahubRecords(
+        wrikeToken,
+        databaseId,
+        response.nextPageToken,
+        combinedData,
+        isRecursive
+      );
+    }
+
+    // Return the final result with all accumulated data
+    return {
+      ...response,
+      data: combinedData,
+      nextPageToken: response?.nextPageToken,
+    };
   } catch (err) {
     return err;
   }
 };
 
-export const getDatahubDataById = async (
+export const getDatahubGroupedDataById = async (
   wrikeToken,
   datahubId,
   isMaster = false
@@ -129,14 +157,14 @@ export const getDatahubDataById = async (
       });
     }
 
-    let datahubCustomFieldsData = {};
+    let datahubData = {};
     datahubRecords?.data?.forEach((record) => {
       if (
         record.fieldValues[
           formFieldsIds[isMaster ? "master slug" : "short code"]
         ]?.trim()
       )
-        datahubCustomFieldsData[
+        datahubData[
           record.fieldValues[
             formFieldsIds[isMaster ? "master slug" : "short code"]
           ]
@@ -160,10 +188,55 @@ export const getDatahubDataById = async (
             record.fieldValues[formFieldsIds["master data feature"]]?.includes(
               "Read"
             ) ?? false,
+          cfType: record.fieldValues[formFieldsIds["cf type"]],
         };
     });
 
-    return Promise.resolve(datahubCustomFieldsData);
+    return Promise.resolve(datahubData);
+  } catch (err) {
+    return Promise.reject(err);
+  }
+};
+
+export const getDatahubDataById = async (wrikeToken, datahubId) => {
+  try {
+    if (!datahubId)
+      return Promise.reject({
+        message: "Missing datahubId",
+      });
+
+    const datahubFields = await getDatahubFields(wrikeToken, datahubId);
+
+    if (datahubFields?.errorDescription) {
+      return Promise.reject({
+        errorDescription: datahubFields?.errorDescription,
+      });
+    }
+
+    let formFieldsIds = {};
+    datahubFields?.data?.forEach((field) => {
+      formFieldsIds[field.id] = field.title?.trim()?.toLowerCase();
+    });
+
+    const datahubRecords = await getDatahubRecords(wrikeToken, datahubId);
+
+    if (datahubRecords?.errorDescription) {
+      return Promise.reject({
+        errorDescription: datahubRecords?.errorDescription,
+      });
+    }
+
+    let datahubData = [];
+    datahubRecords?.data?.forEach((record) => {
+      let fields = {};
+      for (const field in record.fieldValues) {
+        fields[formFieldsIds[field]] = record.fieldValues[field];
+      }
+
+      datahubData.push(fields);
+    });
+
+    return Promise.resolve(datahubData);
   } catch (err) {
     return Promise.reject(err);
   }

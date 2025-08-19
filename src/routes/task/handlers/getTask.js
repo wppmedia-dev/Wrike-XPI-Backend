@@ -1,4 +1,4 @@
-import { getDatahubDataById, getTask } from "../../../utils/wrike";
+import { getDatahubGroupedDataById, getTask } from "../../../utils/wrike";
 
 export const GetTask = (wrikeToken, params, fastify) => {
   return new Promise(async (resolve, reject) => {
@@ -20,7 +20,7 @@ export const GetTask = (wrikeToken, params, fastify) => {
             "Missing parameter! Required parameter is missing for the requested operation.",
         });
 
-      const datahubCustomFieldsData = await getDatahubDataById(
+      const datahubCustomFieldsData = await getDatahubGroupedDataById(
         wrikeToken,
         process.env.DATAHUB_CUSTOM_FIELDS_ID
       );

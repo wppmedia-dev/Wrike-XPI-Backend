@@ -13,7 +13,7 @@ export const masterRoute = (fastify, opts, done) => {
       try {
         const result = await GetMasterDataValue(
           req?.wrikeToken,
-          { ...req.params },
+          { ...req.params, ...req.query },
           fastify
         );
 
@@ -48,6 +48,7 @@ export const masterRoute = (fastify, opts, done) => {
 
         reply.code(result.statusCode || 200).send({
           "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.customfield}`,
+          nextPageToken: result?.nextPageToken,
           // message: result.message,
           value: result?.data,
         });

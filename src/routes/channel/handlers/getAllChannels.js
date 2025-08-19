@@ -1,6 +1,6 @@
 import { GetResponse } from "../../../utils/node-fetch";
 import { defaultParser } from "@odata/parser";
-import { getDatahubDataById } from "../../../utils/wrike";
+import { getDatahubGroupedDataById } from "../../../utils/wrike";
 
 // Operator mapping from OData to your custom operators
 const odataToCustomOp = {
@@ -58,7 +58,7 @@ export const GetAllChannels = (wrikeToken, params, fastify) => {
           });
 
         // if (Object.keys(datahubCustomFieldsData).length === 0)
-        datahubCustomFieldsData = await getDatahubDataById(
+        datahubCustomFieldsData = await getDatahubGroupedDataById(
           wrikeToken,
           process.env.DATAHUB_CUSTOM_FIELDS_ID
         );

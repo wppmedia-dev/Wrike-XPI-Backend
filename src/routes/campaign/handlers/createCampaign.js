@@ -6,7 +6,7 @@ import {
   getRequestFormStatus,
   getTask,
   getFolder,
-  getDatahubDataById,
+  getDatahubGroupedDataById,
 } from "../../../utils/wrike";
 
 const requiredDatahubRequestFormIds = [
@@ -62,7 +62,7 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
         });
 
       // if (Object.keys(datahubCustomFieldsData).length === 0) {
-      const datahubCustomFieldsData = await getDatahubDataById(
+      const datahubCustomFieldsData = await getDatahubGroupedDataById(
         wrikeToken,
         process.env.DATAHUB_CUSTOM_FIELDS_ID
       );

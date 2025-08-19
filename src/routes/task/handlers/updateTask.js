@@ -1,4 +1,4 @@
-import { getDatahubDataById, updateTask } from "../../../utils/wrike";
+import { getDatahubGroupedDataById, updateTask } from "../../../utils/wrike";
 
 export const UpdateTask = (wrikeToken, params, fastify) => {
   return new Promise(async (resolve, reject) => {
@@ -16,7 +16,7 @@ export const UpdateTask = (wrikeToken, params, fastify) => {
 
       // Getting cutom fields data from Datahub
       // if (Object.keys(datahubCustomFieldsData).length === 0) {
-      const datahubCustomFieldsData = await getDatahubDataById(
+      const datahubCustomFieldsData = await getDatahubGroupedDataById(
         wrikeToken,
         process.env.DATAHUB_CUSTOM_FIELDS_ID
       );
