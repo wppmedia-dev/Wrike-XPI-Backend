@@ -80,14 +80,14 @@ export const masterRoute = (fastify, opts, done) => {
         );
 
         reply.code(result.statusCode || 200).send({
-          "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.masterSlug}/${req.params.shortcode}`,
+          "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.masterSlug}/${req.params.recordId}`,
           // message: result.message,
           value: result?.data,
         });
       } catch (err) {
         reply.code(err?.statusCode || 500).send({
           // success: false,
-          "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.masterSlug}/${req.params.shortcode}`,
+          "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.masterSlug}/${req.params.recordId}`,
           // details: err?.details || null,
           message:
             err?.message ||
