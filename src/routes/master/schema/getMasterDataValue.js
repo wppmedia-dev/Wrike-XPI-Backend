@@ -2,9 +2,10 @@ export const GetMasterDataValueSchema = {
   schema: {
     params: {
       type: "object",
-      required: ["customfield"],
+      required: ["masterSlug"],
       properties: {
-        customfield: { type: "string" },
+        masterSlug: { type: "string" },
+        shortcode: { type: "string" },
       },
     },
   },

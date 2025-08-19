@@ -15,13 +15,13 @@ export const GetMasterDataValue = (wrikeToken, params, fastify) => {
         });
       }
 
-      const { customfield, shortcode, nextPageToken } = params;
+      const { masterSlug, shortcode, nextPageToken } = params;
 
-      if (!customfield) {
+      if (!masterSlug) {
         return reject({
           statusCode: 400,
           message:
-            "Missing parameter! Required parameter 'customfield' is missing.",
+            "Missing parameter! Required parameter 'masterSlug' is missing.",
         });
       }
 
@@ -39,14 +39,14 @@ export const GetMasterDataValue = (wrikeToken, params, fastify) => {
         });
       }
 
-      if (!datahubCustomFieldsData[customfield]) {
+      if (!datahubCustomFieldsData[masterSlug]) {
         return reject({
           statusCode: 404,
-          message: `Master slug mapping not found for customfield: ${customfield}`,
+          message: `Master slug mapping not found for masterSlug: ${masterSlug}`,
         });
       }
 
-      if (!datahubCustomFieldsData[customfield]?.isMasterDataFeatureReadable) {
+      if (!datahubCustomFieldsData[masterSlug]?.isMasterDataFeatureReadable) {
         return reject({
           statusCode: 403,
           message: `Read operation not allowed for shortcode: ${shortcode}`,
@@ -55,14 +55,14 @@ export const GetMasterDataValue = (wrikeToken, params, fastify) => {
 
       const customFieldData = await getCustomFields(
         wrikeToken,
-        datahubCustomFieldsData[customfield]["cfId"]
+        datahubCustomFieldsData[masterSlug]["cfId"]
       );
 
       let outputValues;
       let newNextPageToken = null;
 
       if (
-        datahubCustomFieldsData[customfield]["cfType"] == "LinkToDatabase" &&
+        datahubCustomFieldsData[masterSlug]["cfType"] == "LinkToDatabase" &&
         customFieldData?.data[0]?.settings?.linkToDatabaseInfo
           ?.dataHubDatabaseId
       ) {
