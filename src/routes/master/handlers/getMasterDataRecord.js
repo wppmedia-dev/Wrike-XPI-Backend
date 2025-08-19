@@ -133,7 +133,7 @@ export const GetMasterDataRecord = (wrikeToken, params, fastify) => {
       } else {
         outputValues = [];
         datahubRecords?.data?.forEach((record) => {
-          let fields = {};
+          let fields = { id: record?.id || record.fieldValues?.FIid };
           for (const field in record.fieldValues) {
             fields[field == "FIname" ? "value" : formFieldsIds[field]] =
               record.fieldValues[field];
