@@ -1,8 +1,16 @@
 import { getSecrets } from "./azure_vault";
 import { GetResponse } from "./node-fetch";
+import redisClient from "./redis";
 require("dotenv").config();
 
 const { WRIKE_LOGIN_ENDPOINT, WRIKE_REDIRECT_URL } = process.env;
+
+const requiredDatahubRequestFormIds = [
+  "XPI Entity",
+  "Space",
+  "RF v4Id",
+  "Variant Id",
+];
 
 export const getWrikeTokens = async ({ code, refresh_token }) => {
   return new Promise(async (resolve, reject) => {
@@ -82,16 +90,64 @@ export const getDatahubFields = async (wrikeToken, databaseId) => {
 export const getDatahubRecords = async (
   wrikeToken,
   databaseId,
-  isRecursive = true,
-  fieldIds,
-  filter = "",
-  pageToken = null,
-  accumulatedData = []
+  options = {}
 ) => {
   try {
+    // Extract options with defaults
+    const {
+      isRecursive = true,
+      fieldIds,
+      filter = "",
+      pageToken = null,
+      accumulatedData = [],
+      useCache = true,
+      cacheTTL = null,
+    } = options;
+
+    // Set default TTL if not provided (null = unlimited, otherwise use provided value or env default)
+    const ttl =
+      cacheTTL !== null
+        ? cacheTTL
+        : parseInt(process.env.REDIS_DEFAULT_TTL) || 3600;
+
+    // Only cache when getting complete data (no pageToken, no accumulated data)
+    const shouldCache = useCache && !pageToken && accumulatedData.length === 0;
+
+    // Generate cache key based on parameters that affect the result
+    let cacheKey = null;
+    if (shouldCache) {
+      const cacheKeyParts = [
+        "datahub_records",
+        databaseId,
+        isRecursive ? "recursive" : "single",
+        fieldIds ? fieldIds.sort().join(",") : "all_fields",
+        filter || "no_filter",
+      ];
+      cacheKey = redisClient.generateKey(...cacheKeyParts);
+
+      // Try to get from cache first
+      try {
+        const cachedData = await redisClient.get(cacheKey);
+        if (cachedData) {
+          // console.log(`Cache hit for datahub records ${databaseId}`);
+          return cachedData;
+        }
+      } catch (cacheError) {
+        console.warn("Cache read error, proceeding without cache:", cacheError);
+      }
+    }
+
     let url = pageToken
-      ? `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/records?limit=${process.env.WRIKE_DATAHUB_RECORDS_LIMIT ?? "300"}&nextPageToken=${pageToken}`
-      : `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/records?limit=${process.env.WRIKE_DATAHUB_RECORDS_LIMIT ?? "300"}`;
+      ? `${
+          process.env.WRIKE_DATAHUB_ENDPOINT
+        }/databases/${databaseId}/records?limit=${
+          process.env.WRIKE_DATAHUB_RECORDS_LIMIT ?? "300"
+        }&nextPageToken=${pageToken}`
+      : `${
+          process.env.WRIKE_DATAHUB_ENDPOINT
+        }/databases/${databaseId}/records?limit=${
+          process.env.WRIKE_DATAHUB_RECORDS_LIMIT ?? "300"
+        }`;
 
     if (filter) {
       url += `&filter=${filter}`;
@@ -114,45 +170,312 @@ export const getDatahubRecords = async (
 
     // If there's a nextPageToken, recursively fetch the next page
     if (isRecursive && response?.nextPageToken) {
-      return await getDatahubRecords(
-        wrikeToken,
-        databaseId,
+      return await getDatahubRecords(wrikeToken, databaseId, {
         isRecursive,
         fieldIds,
         filter,
-        response.nextPageToken,
-        combinedData
-      );
+        pageToken: response.nextPageToken,
+        accumulatedData: combinedData,
+        useCache: false, // Disable caching for recursive calls
+      });
     }
 
-    // Return the final result with all accumulated data
-    return {
+    // Final result
+    const finalResult = {
       ...response,
       data: combinedData,
       nextPageToken: response?.nextPageToken,
     };
+
+    // Cache the result if this is the initial call and caching is enabled
+    if (shouldCache && cacheKey) {
+      try {
+        const isSaved = await redisClient.set(cacheKey, finalResult, ttl);
+        if (isSaved)
+          console.log(
+            `Data cached for datahub records ${databaseId} with TTL ${
+              ttl === 0 ? "unlimited" : ttl + "s"
+            }`
+          );
+      } catch (cacheError) {
+        console.warn("Cache write error:", cacheError);
+      }
+    }
+
+    return finalResult;
   } catch (err) {
     return err;
   }
 };
 
-export const getDatahubGroupedDataById = async (
+export const getSpaceDatahub = async (
   wrikeToken,
-  datahubId,
-  isMaster = false
+  useCache = true,
+  cacheTTL = null
 ) => {
   try {
-    if (!datahubId)
-      return Promise.reject({
-        message: "Missing datahubId",
-      });
+    // Set default TTL if not provided (null = unlimited, otherwise use provided value or env default)
+    const ttl =
+      cacheTTL !== null
+        ? cacheTTL
+        : parseInt(process.env.REDIS_DEFAULT_TTL) || 3600;
 
-    const datahubFields = await getDatahubFields(wrikeToken, datahubId);
+    // Generate cache key
+    const cacheKey = redisClient.generateKey("space_datahub");
+
+    // Try to get from cache first
+    if (useCache) {
+      try {
+        const cachedData = await redisClient.get(cacheKey);
+        if (cachedData) {
+          return cachedData;
+        }
+      } catch (cacheError) {
+        console.warn("Cache read error, proceeding without cache:", cacheError);
+      }
+    }
+
+    const datahubRecords = await getDatahubRecords(
+      wrikeToken,
+      process.env.DATAHUB_SPACE_ID,
+      {
+        useCache: false,
+      }
+    );
+
+    if (datahubRecords?.errorDescription) {
+      throw datahubRecords;
+    }
+
+    let datahubSpaceData = {};
+    datahubRecords?.data?.forEach((record) => {
+      datahubSpaceData[record.title?.trim()?.toLowerCase()] = record.id;
+    });
+
+    // Cache the result if caching is enabled
+    if (useCache) {
+      try {
+        const isSaved = await redisClient.set(cacheKey, datahubSpaceData, ttl);
+        if (isSaved)
+          console.log(
+            `Data cached for space datahub with TTL ${
+              ttl === 0 ? "unlimited" : ttl + "s"
+            }`
+          );
+      } catch (cacheError) {
+        console.warn("Cache write error:", cacheError);
+      }
+    }
+
+    return datahubSpaceData;
+  } catch (err) {
+    throw err;
+  }
+};
+
+export const getEntityDatahub = async (
+  wrikeToken,
+  useCache = true,
+  cacheTTL = null
+) => {
+  try {
+    // Set default TTL if not provided (null = unlimited, otherwise use provided value or env default)
+    const ttl =
+      cacheTTL !== null
+        ? cacheTTL
+        : parseInt(process.env.REDIS_DEFAULT_TTL) || 3600;
+
+    // Generate cache key
+    const cacheKey = redisClient.generateKey("entity_datahub");
+
+    // Try to get from cache first
+    if (useCache) {
+      try {
+        const cachedData = await redisClient.get(cacheKey);
+        if (cachedData) {
+          return cachedData;
+        }
+      } catch (cacheError) {
+        console.warn("Cache read error, proceeding without cache:", cacheError);
+      }
+    }
+
+    const datahubRecords = await getDatahubRecords(
+      wrikeToken,
+      process.env.DATAHUB_ENTITY_ID,
+      {
+        useCache: false,
+      }
+    );
+
+    if (datahubRecords?.errorDescription) {
+      throw datahubRecords;
+    }
+
+    let datahubEntityData = {};
+    datahubRecords?.data?.forEach((record) => {
+      datahubEntityData[record.title?.trim()?.toLowerCase()] = record.id;
+    });
+
+    // Cache the result if caching is enabled
+    if (useCache) {
+      try {
+        const isSaved = await redisClient.set(cacheKey, datahubEntityData, ttl);
+        if (isSaved)
+          console.log(
+            `Data cached for entity datahub with TTL ${
+              ttl === 0 ? "unlimited" : ttl + "s"
+            }`
+          );
+      } catch (cacheError) {
+        console.warn("Cache write error:", cacheError);
+      }
+    }
+
+    return datahubEntityData;
+  } catch (err) {
+    throw err;
+  }
+};
+
+export const findRequestFormId = async (
+  wrikeToken,
+  space,
+  entity,
+  varientId,
+  datahubSpaceData,
+  datahubEntityData,
+  useCache = true,
+  cacheTTL = null
+) => {
+  try {
+    // Set default TTL if not provided (null = unlimited, otherwise use provided value or env default)
+    const ttl =
+      cacheTTL !== null
+        ? cacheTTL
+        : parseInt(process.env.REDIS_DEFAULT_TTL) || 3600;
+
+    // Generate cache key
+    const cacheKey = redisClient.generateKey(
+      "find_request_form_id",
+      space,
+      entity,
+      varientId
+    );
+
+    // Try to get from cache first
+    if (useCache) {
+      try {
+        const cachedData = await redisClient.get(cacheKey);
+        if (cachedData) {
+          return cachedData;
+        }
+      } catch (cacheError) {
+        console.warn("Cache read error, proceeding without cache:", cacheError);
+      }
+    }
+
+    const formFields = await getDatahubFields(
+      wrikeToken,
+      process.env.DATAHUB_REQUEST_FORM_ID
+    );
+
+    if (formFields?.errorDescription) {
+      throw formFields;
+    }
+
+    let formFieldsIds = {};
+    formFields?.data?.forEach((field) => {
+      if (requiredDatahubRequestFormIds.includes(field.title)) {
+        formFieldsIds[field.title] = field.id;
+      }
+    });
+
+    const datahubRecords = await getDatahubRecords(
+      wrikeToken,
+      process.env.DATAHUB_REQUEST_FORM_ID,
+      {
+        useCache: false,
+      }
+    );
+
+    const datahubMatchedRecord = datahubRecords?.data?.find(
+      (record) =>
+        record.fieldValues[formFieldsIds["Space"]]?.[0] ===
+          datahubSpaceData[space?.trim()?.toLowerCase()] &&
+        record.fieldValues[formFieldsIds["XPI Entity"]]?.[0] ===
+          datahubEntityData[entity?.trim()?.toLowerCase()] &&
+        record.fieldValues[formFieldsIds["Variant Id"]] === varientId
+    );
+
+    const result = {
+      requiredFormId:
+        datahubMatchedRecord.fieldValues[formFieldsIds["RF v4Id"]] || null,
+    };
+
+    // Cache the result if caching is enabled
+    if (useCache) {
+      try {
+        const isSaved = await redisClient.set(cacheKey, result, ttl);
+        if (isSaved)
+          console.log(
+            `Data cached for find request form id ${space}-${entity}-${varientId} with TTL ${
+              ttl === 0 ? "unlimited" : ttl + "s"
+            }`
+          );
+      } catch (cacheError) {
+        console.warn("Cache write error:", cacheError);
+      }
+    }
+
+    return result;
+  } catch (err) {
+    throw err;
+  }
+};
+
+export const getRequestFormFieldDatahub = async (
+  wrikeToken,
+  space,
+  varientId,
+  datahubCustomFieldsData,
+  datahubSpaceData,
+  useCache = true,
+  cacheTTL = null
+) => {
+  try {
+    // Set default TTL if not provided (null = unlimited, otherwise use provided value or env default)
+    const ttl =
+      cacheTTL !== null
+        ? cacheTTL
+        : parseInt(process.env.REDIS_DEFAULT_TTL) || 3600;
+
+    // Generate cache key
+    const cacheKey = redisClient.generateKey(
+      "request_form_field_datahub",
+      space,
+      varientId
+    );
+
+    // Try to get from cache first
+    if (useCache) {
+      try {
+        const cachedData = await redisClient.get(cacheKey);
+        if (cachedData) {
+          return cachedData;
+        }
+      } catch (cacheError) {
+        console.warn("Cache read error, proceeding without cache:", cacheError);
+      }
+    }
+
+    const datahubFields = await getDatahubFields(
+      wrikeToken,
+      process.env.DATAHUB_REQUEST_FORM_FIELDS_ID
+    );
 
     if (datahubFields?.errorDescription) {
-      return Promise.reject({
-        errorDescription: datahubFields?.errorDescription,
-      });
+      throw datahubFields;
     }
 
     let formFieldsIds = {};
@@ -160,12 +483,138 @@ export const getDatahubGroupedDataById = async (
       formFieldsIds[field.title?.trim()?.toLowerCase()] = field.id;
     });
 
-    const datahubRecords = await getDatahubRecords(wrikeToken, datahubId);
+    const datahubRecords = await getDatahubRecords(
+      wrikeToken,
+      process.env.DATAHUB_REQUEST_FORM_FIELDS_ID,
+      {
+        useCache: false,
+      }
+    );
 
     if (datahubRecords?.errorDescription) {
-      return Promise.reject({
-        errorDescription: datahubRecords?.errorDescription,
-      });
+      throw datahubRecords;
+    }
+
+    let datahubRequestFormFieldsData = {};
+    datahubRecords?.data?.forEach((record) => {
+      if (
+        record.fieldValues[formFieldsIds["space"]]?.[0] ===
+          datahubSpaceData[space?.trim()?.toLowerCase()] &&
+        record.fieldValues[formFieldsIds["variant id"]] === varientId
+      ) {
+        let customFieldCode = "";
+        for (const cf in datahubCustomFieldsData) {
+          if (
+            datahubCustomFieldsData[cf].id ===
+            record.fieldValues[formFieldsIds["xpi shortcode"]][0]
+          ) {
+            customFieldCode = cf;
+            // return;
+          }
+        }
+
+        if (customFieldCode)
+          datahubRequestFormFieldsData[customFieldCode] = {
+            id: record.id,
+            ["fieldId"]: record.fieldValues[formFieldsIds["field v4id"]],
+          };
+        else if (record.fieldValues[formFieldsIds["xpi custom shortcode"]])
+          datahubRequestFormFieldsData[
+            record.fieldValues[formFieldsIds["xpi custom shortcode"]]
+          ] = {
+            id: record.id,
+            ["fieldId"]: record.fieldValues[formFieldsIds["field v4id"]],
+          };
+      }
+    });
+
+    // Cache the result if caching is enabled
+    if (useCache) {
+      try {
+        const isSaved = await redisClient.set(
+          cacheKey,
+          datahubRequestFormFieldsData,
+          ttl
+        );
+        if (isSaved)
+          console.log(
+            `Data cached for request form field datahub ${space}-${varientId} with TTL ${
+              ttl === 0 ? "unlimited" : ttl + "s"
+            }`
+          );
+      } catch (cacheError) {
+        console.warn("Cache write error:", cacheError);
+      }
+    }
+
+    return datahubRequestFormFieldsData;
+  } catch (err) {
+    throw err;
+  }
+};
+
+export const getDatahubGroupedDataById = async (
+  wrikeToken,
+  datahubId,
+  isMaster = false,
+  useCache = true,
+  cacheTTL = 0
+) => {
+  try {
+    // Set default TTL if not provided (null = unlimited, otherwise use provided value or env default)
+    // const ttl =
+    // cacheTTL !== null
+    //   ? cacheTTL
+    //   : parseInt(process.env.REDIS_DEFAULT_TTL) || 3600;
+
+    if (!datahubId)
+      throw {
+        message: "Missing datahubId",
+      };
+
+    // Generate cache key
+    const cacheKey = redisClient.generateKey(
+      "datahub_grouped_data",
+      datahubId,
+      isMaster ? "master" : "regular"
+    );
+
+    // Try to get from cache first
+    if (useCache) {
+      try {
+        const cachedData = await redisClient.get(cacheKey);
+        if (cachedData) {
+          // console.log(`Cache hit for datahub ${datahubId}`);
+          return cachedData;
+        }
+        // console.log(`Cache miss for datahub ${datahubId}`);
+      } catch (cacheError) {
+        console.warn("Cache read error, proceeding without cache:", cacheError);
+      }
+    }
+
+    const datahubFields = await getDatahubFields(wrikeToken, datahubId);
+
+    if (datahubFields?.errorDescription) {
+      throw datahubFields;
+    }
+
+    let formFieldsIds = {};
+    datahubFields?.data?.forEach((field) => {
+      formFieldsIds[field.title?.trim()?.toLowerCase()] = field.id;
+    });
+
+    const datahubRecords = await getDatahubRecords(wrikeToken, datahubId, {
+      isRecursive: true,
+      fieldIds: undefined,
+      filter: "",
+      pageToken: null,
+      accumulatedData: [],
+      useCache: false,
+    });
+
+    if (datahubRecords?.errorDescription) {
+      throw datahubRecords;
     }
 
     let datahubData = {};
@@ -203,53 +652,22 @@ export const getDatahubGroupedDataById = async (
         };
     });
 
-    return Promise.resolve(datahubData);
-  } catch (err) {
-    return Promise.reject(err);
-  }
-};
-
-export const getDatahubDataById = async (wrikeToken, datahubId) => {
-  try {
-    if (!datahubId)
-      return Promise.reject({
-        message: "Missing datahubId",
-      });
-
-    const datahubFields = await getDatahubFields(wrikeToken, datahubId);
-
-    if (datahubFields?.errorDescription) {
-      return Promise.reject({
-        errorDescription: datahubFields?.errorDescription,
-      });
-    }
-
-    let formFieldsIds = {};
-    datahubFields?.data?.forEach((field) => {
-      formFieldsIds[field.id] = field.title?.trim()?.toLowerCase();
-    });
-
-    const datahubRecords = await getDatahubRecords(wrikeToken, datahubId);
-
-    if (datahubRecords?.errorDescription) {
-      return Promise.reject({
-        errorDescription: datahubRecords?.errorDescription,
-      });
-    }
-
-    let datahubData = [];
-    datahubRecords?.data?.forEach((record) => {
-      let fields = {};
-      for (const field in record.fieldValues) {
-        fields[formFieldsIds[field]] = record.fieldValues[field];
+    // Cache the result if caching is enabled
+    if (useCache) {
+      try {
+        const isSaved = await redisClient.set(cacheKey, datahubData, cacheTTL);
+        if (isSaved)
+          console.log(
+            `Data cached for datahub ${datahubId} with TTL unlimited`
+          );
+      } catch (cacheError) {
+        console.warn("Cache write error:", cacheError);
       }
+    }
 
-      datahubData.push(fields);
-    });
-
-    return Promise.resolve(datahubData);
+    return datahubData;
   } catch (err) {
-    return Promise.reject(err);
+    throw err;
   }
 };
 
@@ -375,7 +793,9 @@ export const updateFolder = async (
   try {
     // Get folder data
     const wrikeRequestFormData = await GetResponse(
-      `${process.env.WRIKE_ENDPOINT}/folders/${folderId}?customFields=${JSON.stringify(folderCFUpdateData)}`,
+      `${
+        process.env.WRIKE_ENDPOINT
+      }/folders/${folderId}?customFields=${JSON.stringify(folderCFUpdateData)}`,
       "PUT",
       {
         "content-type": "application/json",
@@ -450,7 +870,9 @@ export const updateTask = async (wrikeToken, taskId, taskCFUpdateData) => {
   try {
     // Get folder data
     const wrikeRequestFormData = await GetResponse(
-      `${process.env.WRIKE_ENDPOINT}/tasks/${taskId}?customFields=${JSON.stringify(taskCFUpdateData)}`,
+      `${
+        process.env.WRIKE_ENDPOINT
+      }/tasks/${taskId}?customFields=${JSON.stringify(taskCFUpdateData)}`,
       "PUT",
       {
         "content-type": "application/json",

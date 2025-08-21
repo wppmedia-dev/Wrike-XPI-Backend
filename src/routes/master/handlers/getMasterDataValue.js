@@ -70,11 +70,15 @@ export const GetMasterDataValue = (wrikeToken, params, fastify) => {
           wrikeToken,
           customFieldData?.data[0]?.settings?.linkToDatabaseInfo
             ?.dataHubDatabaseId,
-          false, // recursive flag
-          shortcode && shortcode?.length > 0 && shortcode.trim()[0] != ":"
-            ? '{"op": "equals","fld": "FIname","val": "' + shortcode + '"}'
-            : "",
-          nextPageToken ?? null
+          {
+            isRecursive: false,
+            filter:
+              shortcode && shortcode?.length > 0 && shortcode.trim()[0] != ":"
+                ? '{"op": "equals","fld": "FIname","val": "' + shortcode + '"}'
+                : "",
+            pageToken: nextPageToken ?? null,
+            useCache: false,
+          }
         );
 
         if (datahubRecords?.errorDescription)

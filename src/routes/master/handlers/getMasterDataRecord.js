@@ -86,12 +86,16 @@ export const GetMasterDataRecord = (wrikeToken, params, fastify) => {
       const datahubRecords = await getDatahubRecords(
         wrikeToken,
         dataHubDatabaseId,
-        false, // recursive flag
-        mirrorFieldIds,
-        recordId && recordId?.length > 0 && recordId.trim()[0] != ":"
-          ? '{"op": "equals","fld": "FIid","val": "' + recordId + '"}'
-          : "",
-        nextPageToken ?? null
+        {
+          isRecursive: false,
+          fieldIds: mirrorFieldIds,
+          filter:
+            recordId && recordId?.length > 0 && recordId.trim()[0] != ":"
+              ? '{"op": "equals","fld": "FIid","val": "' + recordId + '"}'
+              : "",
+          pageToken: nextPageToken ?? null,
+          useCache: false,
+        }
       );
 
       if (datahubRecords?.errorDescription)

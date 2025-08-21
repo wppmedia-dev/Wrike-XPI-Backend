@@ -1,20 +1,15 @@
 import {
-  getDatahubFields,
-  getDatahubRecords,
   getRequestForm,
   submitRequestForm,
   getRequestFormStatus,
   getTask,
   getFolder,
   getDatahubGroupedDataById,
+  findRequestFormId,
+  getRequestFormFieldDatahub,
+  getSpaceDatahub,
+  getEntityDatahub,
 } from "../../../utils/wrike";
-
-const requiredDatahubRequestFormIds = [
-  "XPI Entity",
-  "Space",
-  "RF v4Id",
-  "Variant Id",
-];
 
 export const CreateCampaign = (wrikeToken, params, fastify) => {
   return new Promise(async (resolve, reject) => {
@@ -31,11 +26,17 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
       const { space, entity, varientId, fields: formFields } = params;
 
       // if (Object.keys(datahubSpaceData).length == 0) {
-      const datahubSpaceData = await getSpaceDatahub(wrikeToken);
+      const datahubSpaceData = await getSpaceDatahub(wrikeToken, true, 0);
+      if (datahubSpaceData?.errorDescription) {
+        return reject({ message: datahubSpaceData?.errorDescription });
+      }
       // }
 
       // if (Object.keys(datahubEntityData).length == 0) {
-      const datahubEntityData = await getEntityDatahub(wrikeToken);
+      const datahubEntityData = await getEntityDatahub(wrikeToken, true, 0);
+      if (datahubEntityData?.errorDescription) {
+        return reject({ message: datahubEntityData?.errorDescription });
+      }
       // }
 
       // Find Request Form ID
@@ -45,7 +46,9 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
         entity,
         varientId,
         datahubSpaceData,
-        datahubEntityData
+        datahubEntityData,
+        true,
+        0
       );
       // Sending submit request form error response
       if (requetForm?.errorDescription) {
@@ -66,6 +69,9 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
         wrikeToken,
         process.env.DATAHUB_CUSTOM_FIELDS_ID
       );
+      if (datahubCustomFieldsData?.errorDescription) {
+        return reject({ message: datahubCustomFieldsData?.errorDescription });
+      }
       // }
 
       // if (Object.keys(datahubRequestFormFieldsData).length === 0) {
@@ -74,8 +80,15 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
         space,
         varientId,
         datahubCustomFieldsData,
-        datahubSpaceData
+        datahubSpaceData,
+        true,
+        0
       );
+      if (datahubRequestFormFieldsData?.errorDescription) {
+        return reject({
+          message: datahubRequestFormFieldsData?.errorDescription,
+        });
+      }
       // }
 
       // Submit Request Form
@@ -290,176 +303,4 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
       });
     }
   });
-};
-
-const getSpaceDatahub = async (wrikeToken) => {
-  try {
-    const datahubRecords = await getDatahubRecords(
-      wrikeToken,
-      process.env.DATAHUB_SPACE_ID
-    );
-
-    if (datahubRecords?.errorDescription) {
-      return Promise.reject({
-        errorDescription: datahubRecords?.errorDescription,
-      });
-    }
-
-    let datahubSpaceData = {};
-    datahubRecords?.data?.forEach((record) => {
-      datahubSpaceData[record.title?.trim()?.toLowerCase()] = record.id;
-    });
-
-    return Promise.resolve(datahubSpaceData);
-  } catch (err) {
-    return Promise.reject(err);
-  }
-};
-
-const getEntityDatahub = async (wrikeToken) => {
-  try {
-    const datahubRecords = await getDatahubRecords(
-      wrikeToken,
-      process.env.DATAHUB_ENTITY_ID
-    );
-
-    if (datahubRecords?.errorDescription) {
-      return Promise.reject({
-        errorDescription: datahubRecords?.errorDescription,
-      });
-    }
-
-    let datahubEntityData = {};
-    datahubRecords?.data?.forEach((record) => {
-      datahubEntityData[record.title?.trim()?.toLowerCase()] = record.id;
-    });
-
-    return Promise.resolve(datahubEntityData);
-  } catch (err) {
-    return Promise.reject(err);
-  }
-};
-
-const getRequestFormFieldDatahub = async (
-  wrikeToken,
-  space,
-  varientId,
-  datahubCustomFieldsData,
-  datahubSpaceData
-) => {
-  try {
-    const datahubFields = await getDatahubFields(
-      wrikeToken,
-      process.env.DATAHUB_REQUEST_FORM_FIELDS_ID
-    );
-
-    if (datahubFields?.errorDescription) {
-      return Promise.reject({
-        errorDescription: datahubFields?.errorDescription,
-      });
-    }
-
-    let formFieldsIds = {};
-    datahubFields?.data?.forEach((field) => {
-      formFieldsIds[field.title?.trim()?.toLowerCase()] = field.id;
-    });
-
-    const datahubRecords = await getDatahubRecords(
-      wrikeToken,
-      process.env.DATAHUB_REQUEST_FORM_FIELDS_ID
-    );
-
-    if (datahubRecords?.errorDescription) {
-      return Promise.reject({
-        errorDescription: datahubRecords?.errorDescription,
-      });
-    }
-
-    let datahubRequestFormFieldsData = {};
-    datahubRecords?.data?.forEach((record) => {
-      if (
-        record.fieldValues[formFieldsIds["space"]]?.[0] ===
-          datahubSpaceData[space?.trim()?.toLowerCase()] &&
-        record.fieldValues[formFieldsIds["variant id"]] === varientId
-      ) {
-        let customFieldCode = "";
-        for (const cf in datahubCustomFieldsData) {
-          if (
-            datahubCustomFieldsData[cf].id ===
-            record.fieldValues[formFieldsIds["xpi shortcode"]][0]
-          ) {
-            customFieldCode = cf;
-            // return;
-          }
-        }
-
-        if (customFieldCode)
-          datahubRequestFormFieldsData[customFieldCode] = {
-            id: record.id,
-            ["fieldId"]: record.fieldValues[formFieldsIds["field v4id"]],
-          };
-        else if (record.fieldValues[formFieldsIds["xpi custom shortcode"]])
-          datahubRequestFormFieldsData[
-            record.fieldValues[formFieldsIds["xpi custom shortcode"]]
-          ] = {
-            id: record.id,
-            ["fieldId"]: record.fieldValues[formFieldsIds["field v4id"]],
-          };
-      }
-    });
-
-    return Promise.resolve(datahubRequestFormFieldsData);
-  } catch (err) {
-    return Promise.reject(err);
-  }
-};
-
-const findRequestFormId = async (
-  wrikeToken,
-  space,
-  entity,
-  varientId,
-  datahubSpaceData,
-  datahubEntityData
-) => {
-  try {
-    const formFields = await getDatahubFields(
-      wrikeToken,
-      process.env.DATAHUB_REQUEST_FORM_ID
-    );
-
-    if (formFields?.errorDescription) {
-      return {
-        errorDescription: formFields?.errorDescription,
-      };
-    }
-
-    let formFieldsIds = {};
-    formFields?.data?.forEach((field) => {
-      if (requiredDatahubRequestFormIds.includes(field.title)) {
-        formFieldsIds[field.title] = field.id;
-      }
-    });
-
-    const datahubRecords = await getDatahubRecords(
-      wrikeToken,
-      process.env.DATAHUB_REQUEST_FORM_ID
-    );
-
-    const datahubMatchedRecord = datahubRecords?.data?.find(
-      (record) =>
-        record.fieldValues[formFieldsIds["Space"]]?.[0] ===
-          datahubSpaceData[space?.trim()?.toLowerCase()] &&
-        record.fieldValues[formFieldsIds["XPI Entity"]]?.[0] ===
-          datahubEntityData[entity?.trim()?.toLowerCase()] &&
-        record.fieldValues[formFieldsIds["Variant Id"]] === varientId
-    );
-
-    return {
-      requiredFormId:
-        datahubMatchedRecord.fieldValues[formFieldsIds["RF v4Id"]] || null,
-    };
-  } catch (err) {
-    return err;
-  }
 };
