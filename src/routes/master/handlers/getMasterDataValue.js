@@ -15,7 +15,7 @@ export const GetMasterDataValue = (wrikeToken, params, fastify) => {
         });
       }
 
-      const { masterSlug, shortcode, nextPageToken } = params;
+      const { masterSlug, recordId, nextPageToken } = params;
 
       if (!masterSlug) {
         return reject({
@@ -35,7 +35,7 @@ export const GetMasterDataValue = (wrikeToken, params, fastify) => {
       if (!datahubCustomFieldsData) {
         return reject({
           statusCode: 404,
-          message: `Custom field mapping not found for shortcode: ${shortcode}`,
+          message: `Custom field mapping not found for recordId: ${recordId}`,
         });
       }
 
@@ -49,7 +49,7 @@ export const GetMasterDataValue = (wrikeToken, params, fastify) => {
       if (!datahubCustomFieldsData[masterSlug]?.isMasterDataFeatureReadable) {
         return reject({
           statusCode: 403,
-          message: `Read operation not allowed for shortcode: ${shortcode}`,
+          message: `Read operation not allowed for recordId: ${recordId}`,
         });
       }
 
@@ -57,6 +57,12 @@ export const GetMasterDataValue = (wrikeToken, params, fastify) => {
         wrikeToken,
         datahubCustomFieldsData[masterSlug]["cfId"]
       );
+
+      if (!customFieldData?.data || customFieldData?.data.length === 0)
+        return reject({
+          statusCode: 404,
+          message: "Custom field data not found",
+        });
 
       let outputValues;
       let newNextPageToken = null;
@@ -73,53 +79,52 @@ export const GetMasterDataValue = (wrikeToken, params, fastify) => {
           {
             isRecursive: false,
             filter:
-              shortcode && shortcode?.length > 0 && shortcode.trim()[0] != ":"
-                ? '{"op": "equals","fld": "FIname","val": "' + shortcode + '"}'
+              recordId && recordId?.length > 0 && recordId.trim()[0] != ":"
+                ? '{"op": "equals","fld": "FIname","val": "' + recordId + '"}'
                 : "",
             pageToken: nextPageToken ?? null,
             useCache: false,
           }
         );
 
-        if (datahubRecords?.errorDescription)
+        if (!datahubRecords?.data || datahubRecords.data.length === 0)
           return reject({
-            message:
-              datahubRecords?.errorDescription ??
-              `Something went wrong! Please try again after sometime`,
+            statusCode: 404,
+            message: `Datahub records not found`,
           });
 
         newNextPageToken = datahubRecords?.nextPageToken;
 
-        if (shortcode && shortcode?.length > 0 && shortcode.trim()[0] != ":") {
+        if (recordId && recordId?.length > 0 && recordId.trim()[0] != ":") {
           outputValues = "";
           outputValues = datahubRecords.data[0]?.title;
 
           if (!outputValues) {
             return reject({
               statusCode: 404,
-              message: `Shortcode not found: ${shortcode}`,
+              message: `recordId not found: ${recordId}`,
             });
           }
         } else {
           outputValues = [];
-          datahubRecords.data.forEach((record) => {
+          datahubRecords?.data?.forEach((record) => {
             outputValues.push({
               value: record?.title,
             });
           });
         }
       } else {
-        if (shortcode && shortcode?.length > 0 && shortcode.trim()[0] != ":") {
+        if (recordId && recordId?.length > 0 && recordId.trim()[0] != ":") {
           outputValues = "";
           outputValues = customFieldData?.data[0]?.settings?.values?.find(
             (item) =>
-              item?.trim()?.toLowerCase() === shortcode?.trim()?.toLowerCase()
+              item?.trim()?.toLowerCase() === recordId?.trim()?.toLowerCase()
           );
 
           if (!outputValues) {
             return reject({
               statusCode: 404,
-              message: `Shortcode not found: ${shortcode}`,
+              message: `recordId not found: ${recordId}`,
             });
           }
         } else {
@@ -141,6 +146,7 @@ export const GetMasterDataValue = (wrikeToken, params, fastify) => {
       reject({
         message:
           err?.message ||
+          err?.errorDescription ||
           "Fatal error: Unexpected error occurred and service is unable to complete the request.",
       });
     }

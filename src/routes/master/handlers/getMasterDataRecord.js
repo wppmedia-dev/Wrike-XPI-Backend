@@ -59,6 +59,12 @@ export const GetMasterDataRecord = (wrikeToken, params, fastify) => {
         datahubCustomFieldsData[masterSlug]["cfId"]
       );
 
+      if (!customFieldData?.data || customFieldData?.data.length === 0)
+        return reject({
+          statusCode: 404,
+          message: "Custom field data not found",
+        });
+
       let outputValues;
       let newNextPageToken = null;
       const dataHubDatabaseId =
@@ -98,11 +104,10 @@ export const GetMasterDataRecord = (wrikeToken, params, fastify) => {
         }
       );
 
-      if (datahubRecords?.errorDescription)
+      if (!datahubRecords?.data || datahubRecords.data.length === 0)
         return reject({
-          message:
-            datahubRecords?.errorDescription ??
-            `Something went wrong! Please try again after sometime`,
+          statusCode: 404,
+          message: `Datahub records not found`,
         });
 
       newNextPageToken = datahubRecords?.nextPageToken;
@@ -113,11 +118,11 @@ export const GetMasterDataRecord = (wrikeToken, params, fastify) => {
         dataHubDatabaseId
       );
 
-      if (datahubFields?.errorDescription) {
-        return Promise.reject({
-          errorDescription: datahubFields?.errorDescription,
+      if (!datahubFields?.data || datahubFields.data.length === 0)
+        return reject({
+          statusCode: 404,
+          message: "Datahub fields not found",
         });
-      }
 
       let formFieldsIds = {};
       datahubFields?.data?.forEach((field) => {
@@ -162,6 +167,7 @@ export const GetMasterDataRecord = (wrikeToken, params, fastify) => {
       reject({
         message:
           err?.message ||
+          err?.errorDescription ||
           "Fatal error: Unexpected error occurred and service is unable to complete the request.",
       });
     }

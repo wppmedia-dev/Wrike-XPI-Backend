@@ -9,7 +9,7 @@ import { GetMasterDataRecordSchema } from "./schema/getMasterDataRecord";
 export const masterRoute = (fastify, opts, done) => {
   // Custom Field endpoint - supports both single value and list
   fastify.get(
-    "/value/:masterSlug/:shortcode",
+    "/value/:masterSlug/:recordId",
     GetMasterDataValueSchema,
     async (req, reply) => {
       try {

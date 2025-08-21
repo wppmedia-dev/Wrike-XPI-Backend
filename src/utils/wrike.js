@@ -13,59 +13,56 @@ const requiredDatahubRequestFormIds = [
 ];
 
 export const getWrikeTokens = async ({ code, refresh_token }) => {
-  return new Promise(async (resolve, reject) => {
-    try {
-      if (!code && !refresh_token)
-        return reject({
-          message:
-            "Missing parameter! Either code or refresh_token must not be empty",
-        });
+  try {
+    if (!code && !refresh_token)
+      return reject({
+        message:
+          "Missing parameter! Either code or refresh_token must not be empty",
+      });
 
-      const secretValues = await getSecrets([
-        "XPI-API-ClientId",
-        "XPI-API-ClientSecret",
-      ]);
+    const secretValues = await getSecrets([
+      "XPI-API-ClientId",
+      "XPI-API-ClientSecret",
+    ]);
 
-      const WRIKE_CLIENT_ID = secretValues["XPI-API-ClientId"];
-      const WRIKE_CLIENT_SECRET = secretValues["XPI-API-ClientSecret"];
+    const WRIKE_CLIENT_ID = secretValues["XPI-API-ClientId"];
+    const WRIKE_CLIENT_SECRET = secretValues["XPI-API-ClientSecret"];
 
-      if (!WRIKE_LOGIN_ENDPOINT || !WRIKE_CLIENT_ID || !WRIKE_CLIENT_SECRET) {
-        return reject({
-          message: "Unable to fetch token! Please try after sometimes",
-        });
-      }
-
-      const url = `${WRIKE_LOGIN_ENDPOINT}/token`;
-
-      let payload = {
-        client_id: WRIKE_CLIENT_ID,
-        client_secret: WRIKE_CLIENT_SECRET,
-        grant_type: code ? "authorization_code" : "refresh_token",
-        redirect_uri: WRIKE_REDIRECT_URL,
-      };
-
-      if (code) payload.code = code;
-
-      if (refresh_token) payload.refresh_token = refresh_token;
-
-      const result = await GetResponse(
-        url,
-        "POST",
-        {
-          "content-type": "application/x-www-form-urlencoded",
-        },
-        payload
-      );
-
-      if (result?.error)
-        return reject({ message: result["error_description"] });
-
-      resolve(result);
-    } catch (err) {
-      console.log("Error while getting access token: ", err?.message ?? err);
-      reject(err);
+    if (!WRIKE_LOGIN_ENDPOINT || !WRIKE_CLIENT_ID || !WRIKE_CLIENT_SECRET) {
+      return reject({
+        message: "Unable to fetch token! Please try after sometimes",
+      });
     }
-  });
+
+    const url = `${WRIKE_LOGIN_ENDPOINT}/token`;
+
+    let payload = {
+      client_id: WRIKE_CLIENT_ID,
+      client_secret: WRIKE_CLIENT_SECRET,
+      grant_type: code ? "authorization_code" : "refresh_token",
+      redirect_uri: WRIKE_REDIRECT_URL,
+    };
+
+    if (code) payload.code = code;
+
+    if (refresh_token) payload.refresh_token = refresh_token;
+
+    const result = await GetResponse(
+      url,
+      "POST",
+      {
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      payload
+    );
+
+    if (result?.errorDescription) throw result;
+
+    return result;
+  } catch (err) {
+    console.log("Error while getting access token: ", err?.message ?? err);
+    throw err;
+  }
 };
 
 // Datahub Util Functions
@@ -81,9 +78,11 @@ export const getDatahubFields = async (wrikeToken, databaseId) => {
       }
     );
 
+    if (datahubFields?.errorDescription) throw datahubFields;
+
     return datahubFields;
   } catch (err) {
-    return err;
+    throw err;
   }
 };
 
@@ -162,7 +161,7 @@ export const getDatahubRecords = async (
     });
 
     if (response?.errorDescription) {
-      return response;
+      throw response;
     }
 
     // Append current page data to accumulated data
@@ -204,7 +203,7 @@ export const getDatahubRecords = async (
 
     return finalResult;
   } catch (err) {
-    return err;
+    throw err;
   }
 };
 
@@ -685,9 +684,11 @@ export const getCustomFields = async (wrikeToken, customFieldId = null) => {
       Authorization: `Bearer ${wrikeToken}`,
     });
 
+    if (customFieldsData?.errorDescription) throw customFieldsData;
+
     return customFieldsData;
   } catch (err) {
-    return err;
+    throw err;
   }
 };
 
@@ -703,9 +704,11 @@ export const getRequestForm = async (wrikeToken) => {
       }
     );
 
+    if (wrikeRequestFormData?.errorDescription) throw wrikeRequestFormData;
+
     return wrikeRequestFormData;
   } catch (err) {
-    return err;
+    throw err;
   }
 };
 
@@ -728,9 +731,11 @@ export const submitRequestForm = async (
       }
     );
 
+    if (wrikeRequestFormData?.errorDescription) throw wrikeRequestFormData;
+
     return wrikeRequestFormData;
   } catch (err) {
-    return err;
+    throw err;
   }
 };
 
@@ -750,6 +755,8 @@ export const getRequestFormStatus = async (
       }
     );
 
+    if (wrikeRequestFormData?.errorDescription) throw wrikeRequestFormData;
+
     const jobStatus = wrikeRequestFormData?.data?.[0]?.status;
 
     if (jobStatus === "InProgress") {
@@ -761,9 +768,9 @@ export const getRequestFormStatus = async (
       return getRequestFormStatus(wrikeToken, asyncJobId, retryCount + 1);
     } else if (jobStatus === "Completed" || jobStatus === "Failed") {
       return wrikeRequestFormData?.data[0];
-    } else return { errorMessage: `Unknown job status: ${jobStatus}` };
+    } else throw { errorMessage: `Unknown job status: ${jobStatus}` };
   } catch (error) {
-    return error;
+    throw error;
   }
 };
 
@@ -779,9 +786,11 @@ export const getFolder = async (wrikeToken, folderId) => {
       }
     );
 
+    if (wrikeRequestFormData?.errorDescription) throw wrikeRequestFormData;
+
     return wrikeRequestFormData;
   } catch (err) {
-    return err;
+    throw err;
   }
 };
 
@@ -803,9 +812,11 @@ export const updateFolder = async (
       }
     );
 
+    if (wrikeRequestFormData?.errorDescription) throw wrikeRequestFormData;
+
     return wrikeRequestFormData;
   } catch (err) {
-    return err;
+    throw err;
   }
 };
 
@@ -821,9 +832,11 @@ export const deleteFolder = async (wrikeToken, folderId) => {
       }
     );
 
+    if (wrikeRequestFormData?.errorDescription) throw wrikeRequestFormData;
+
     return wrikeRequestFormData;
   } catch (err) {
-    return err;
+    throw err;
   }
 };
 
@@ -839,6 +852,8 @@ export const uploadAttachment = async (wrikeToken, fileBuffer, fileName) => {
     };
 
     const result = await GetResponse(url, "POST", headers, fileBuffer, true);
+
+    if (result?.errorDescription) throw result;
 
     return result;
   } catch (err) {
@@ -860,9 +875,11 @@ export const getTask = async (wrikeToken, folderId) => {
       }
     );
 
+    if (wrikeRequestFormData?.errorDescription) throw wrikeRequestFormData;
+
     return wrikeRequestFormData;
   } catch (err) {
-    return err;
+    throw err;
   }
 };
 
@@ -880,9 +897,11 @@ export const updateTask = async (wrikeToken, taskId, taskCFUpdateData) => {
       }
     );
 
+    if (wrikeRequestFormData?.errorDescription) throw wrikeRequestFormData;
+
     return wrikeRequestFormData;
   } catch (err) {
-    return err;
+    throw err;
   }
 };
 
@@ -898,8 +917,10 @@ export const deleteTask = async (wrikeToken, taskId) => {
       }
     );
 
+    if (wrikeRequestFormData?.errorDescription) throw wrikeRequestFormData;
+
     return wrikeRequestFormData;
   } catch (err) {
-    return err;
+    throw err;
   }
 };
