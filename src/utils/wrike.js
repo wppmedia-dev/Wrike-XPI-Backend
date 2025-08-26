@@ -670,6 +670,140 @@ export const getDatahubGroupedDataById = async (
   }
 };
 
+export const getDatahubDataById = async (
+  wrikeToken,
+  datahubId,
+  filter = [],
+  useCache = true,
+  cacheTTL = null
+) => {
+  try {
+    // Set default TTL if not provided (null = unlimited, otherwise use provided value or env default)
+    const ttl =
+      cacheTTL !== null
+        ? cacheTTL
+        : parseInt(process.env.REDIS_DEFAULT_TTL) || 3600;
+
+    if (!datahubId)
+      return Promise.reject({
+        message: "Missing datahubId",
+      });
+
+    // Generate cache key
+    const cacheKey = redisClient.generateKey("datahub_data_by_id", datahubId);
+
+    // Try to get from cache first
+    if (useCache) {
+      try {
+        const cachedData = await redisClient.get(cacheKey);
+        if (cachedData) {
+          return Promise.resolve(cachedData);
+        }
+      } catch (cacheError) {
+        console.warn("Cache read error, proceeding without cache:", cacheError);
+      }
+    }
+
+    const datahubFields = await getDatahubFields(wrikeToken, datahubId);
+
+    if (datahubFields?.errorDescription) {
+      return Promise.reject({
+        errorDescription: datahubFields?.errorDescription,
+      });
+    }
+
+    let formFieldsIds = {};
+    datahubFields?.data?.forEach((field) => {
+      formFieldsIds[field.id] = field.title?.trim()?.toLowerCase();
+    });
+
+    // Construct filter string if filter array is provided
+    let filterString = "";
+
+    if (Array.isArray(filter) && filter.length > 0) {
+      if (filter.length === 1) {
+        // Single filter condition
+        const filterItem = filter[0];
+        // finding fieldId by value
+        const fieldId =
+          Object.keys(formFieldsIds).find(
+            (key) => formFieldsIds[key] === filterItem.fieldName
+          ) || null;
+
+        filterString =
+          '{"op": "' +
+          (filterItem.op || "equals") +
+          '","fld": "' +
+          fieldId +
+          '","val": "' +
+          filterItem.value +
+          '"}';
+      } else {
+        // Multiple filter conditions with AND logic
+        const conditions = filter.map((filterItem) => {
+          // finding fieldId by value
+          const fieldId =
+            Object.keys(formFieldsIds).find(
+              (key) => formFieldsIds[key] === filterItem.fieldName
+            ) || null;
+
+          return (
+            '{"op": "' +
+            (filterItem.op || "equals") +
+            '","fld": "' +
+            fieldId +
+            '","val": "' +
+            filterItem.value +
+            '"}'
+          );
+        });
+
+        filterString = '{"and": [' + conditions.join(", ") + "]}";
+      }
+    }
+
+    const datahubRecords = await getDatahubRecords(wrikeToken, datahubId, {
+      filter: filterString,
+      useCache: false,
+    });
+
+    if (datahubRecords?.errorDescription) {
+      return Promise.reject({
+        errorDescription: datahubRecords?.errorDescription,
+      });
+    }
+
+    let datahubData = [];
+    datahubRecords?.data?.forEach((record) => {
+      let fields = {};
+      for (const field in record.fieldValues) {
+        fields[formFieldsIds[field]] = record.fieldValues[field];
+      }
+
+      datahubData.push(fields);
+    });
+
+    // Cache the result if caching is enabled
+    if (useCache) {
+      try {
+        const isSaved = await redisClient.set(cacheKey, datahubData, ttl);
+        if (isSaved)
+          console.log(
+            `Data cached for datahub data by id ${datahubId} with TTL ${
+              ttl === 0 ? "unlimited" : ttl + "s"
+            }`
+          );
+      } catch (cacheError) {
+        console.warn("Cache write error:", cacheError);
+      }
+    }
+
+    return Promise.resolve(datahubData);
+  } catch (err) {
+    return Promise.reject(err);
+  }
+};
+
 export const getCustomFields = async (wrikeToken, customFieldId = null) => {
   try {
     let url = `${process.env.WRIKE_ENDPOINT}/customfields`;

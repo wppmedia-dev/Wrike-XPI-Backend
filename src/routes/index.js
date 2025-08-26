@@ -5,6 +5,7 @@ import { campaignRoute } from "./campaign";
 import { channelRoute } from "./channel";
 import { taskRoute } from "./task";
 import { masterRoute } from "./master";
+import { amoebaRoute } from "./amoeba";
 
 // Auth Middleware
 import { ValidateToken } from "../middlewares/authentication";
@@ -35,6 +36,7 @@ export const PrivateRouters = (fastify, opts, done) => {
   fastify.register(channelRoute, { prefix: "/wrikexpi/channel" });
   fastify.register(taskRoute, { prefix: "/wrikexpi/task" });
   fastify.register(masterRoute, { prefix: "/wrikexpi/v1.0" });
+  fastify.register(amoebaRoute, { prefix: "/wrikexpi/amoeba" });
 
   // Traditional REST route
   fastify.get(
