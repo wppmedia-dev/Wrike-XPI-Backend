@@ -1,5 +1,27 @@
 import { getDatahubDataById } from "../../../utils/wrike";
-import { GetResponse } from "../../../utils/node-fetch";
+import { GetResponseWithStatusCode } from "../../../utils/node-fetch";
+
+// HTML entity decoder function using browser-like approach
+function decodeHtmlEntities(text) {
+  // For Node.js, we can use a simple but comprehensive entity map
+  const entityMap = {
+    "&amp;": "&",
+    "&lt;": "<",
+    "&gt;": ">",
+    "&quot;": '"',
+    "&#x27;": "'",
+    "&#39;": "'",
+    "&apos;": "'",
+    "&nbsp;": " ",
+    "&copy;": "©",
+    "&reg;": "®",
+    "&trade;": "™",
+  };
+
+  return text.replace(/&[#\w]+;/g, (entity) => {
+    return entityMap[entity] || entity;
+  });
+}
 
 export const AmoebaHandler = (wrikeToken, req, fastify) => {
   return new Promise(async (resolve, reject) => {
@@ -75,6 +97,9 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
           message: `Multiple amoeba module mappings found for moduleSlug: ${moduleSlug}`,
         });
 
+      if (serviceSlug && datahubRecords[0]["enabled"] === false)
+        return reject({ message: "The service slug is disabled" });
+
       const targetUrl = serviceSlug
         ? datahubRecords[0]["target service url"]
         : datahubRecords[0]["target base url"];
@@ -90,6 +115,9 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
       // Extract request details for the target API call
       const method = req.method.toUpperCase();
       const originalUrl = req.url;
+      const isAuthFree = datahubRecords[0]["service features"]?.includes(
+        "No Authentication Token"
+      );
 
       // Extract path after moduleSlug/serviceSlug
       let targetPath = "";
@@ -115,38 +143,81 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
         }
       }
 
-      // Construct the full target URL
-      const fullTargetUrl = targetUrl.endsWith("/")
-        ? targetUrl.slice(0, -1) + targetPath
-        : targetUrl + targetPath;
+      // Construct the full target URL with proper HTML entity decoding
+      let fullTargetUrl = decodeHtmlEntities(targetUrl);
 
-      // Extract body for POST/PUT/PATCH requests
-      let requestBody = null;
-      if (["POST", "PUT", "PATCH"].includes(method) && req.body) {
-        requestBody = req.body;
+      // Ensure the URL has proper protocol
+      if (
+        !fullTargetUrl.startsWith("http://") &&
+        !fullTargetUrl.startsWith("https://")
+      ) {
+        fullTargetUrl = "https://" + fullTargetUrl;
       }
 
-      if (requestBody) {
-        console.log("Request body:", requestBody);
+      // // For Azure Logic Apps, don't append additional paths if it's a webhook URL
+      // const isLogicAppUrl =
+      //   fullTargetUrl.includes("/workflows/") &&
+      //   fullTargetUrl.includes("/triggers/");
+
+      if (targetPath) {
+        // Only append path for regular APIs, not Logic App webhooks
+        fullTargetUrl = fullTargetUrl.endsWith("/")
+          ? fullTargetUrl.slice(0, -1) + targetPath
+          : fullTargetUrl + targetPath;
+      }
+
+      // Validate the final URL
+      try {
+        new URL(fullTargetUrl);
+      } catch (urlError) {
+        return reject({
+          statusCode: 400,
+          message: "Invalid target URL format after decoding",
+          details: {
+            originalUrl: targetUrl,
+            decodedUrl: fullTargetUrl,
+            error: urlError.message,
+          },
+        });
+      }
+
+      // // Extract body for POST/PUT/PATCH requests
+      // let requestBody = null;
+      // if (["POST", "PUT", "PATCH"].includes(method) && req.body) {
+      //   requestBody = req.body;
+      // }
+
+      // Prepare headers for the target API
+      const targetHeaders = {
+        // ...req.headers,
+        "Content-Type": req.headers["content-type"] || "application/json",
+        Accept: "application/json",
+      };
+
+      // if (isAuthFree) delete targetHeaders.authorization;
+
+      // Add authentication headers based on isAuthFree flag
+      if (!isAuthFree && req.headers.authorization) {
+        targetHeaders.Authorization = req.headers.authorization;
       }
 
       // Make the API call to the target URL
-      const targetResponse = await GetResponse(
+      const targetResponse = await GetResponseWithStatusCode(
         fullTargetUrl,
         method,
-        req.headers,
+        targetHeaders,
         req.body
+          ? req.body
+          : ["POST", "PUT", "PATCH"].includes(method)
+          ? {}
+          : undefined
       );
 
+      if (targetResponse?.status >= 400)
+        return reject({ data: targetResponse?.data });
+
       // Return the response from the target API
-      resolve({
-        data: targetResponse,
-        metadata: {
-          targetUrl: fullTargetUrl,
-          method: method,
-          originalPath: targetPath,
-        },
-      });
+      resolve(targetResponse?.data);
     } catch (err) {
       reject({
         message:
