@@ -44,7 +44,9 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
 
       const { moduleSlug, serviceSlug } = req?.params;
 
-      if (serviceSlug && !process.env.DATAHUB_AMOEBA_SERVICE_ID) {
+      const isServiceSlugExist = serviceSlug && !serviceSlug.includes(":");
+
+      if (isServiceSlugExist && !process.env.DATAHUB_AMOEBA_SERVICE_ID) {
         return reject({
           statusCode: 400,
           message:
@@ -69,7 +71,7 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
         },
       ];
 
-      if (serviceSlug)
+      if (isServiceSlugExist)
         filter.push({
           fieldName: "service slug",
           value: serviceSlug,
@@ -77,7 +79,7 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
 
       const datahubRecords = await getDatahubDataById(
         wrikeToken,
-        serviceSlug
+        isServiceSlugExist
           ? process.env.DATAHUB_AMOEBA_SERVICE_ID
           : process.env.DATAHUB_AMOEBA_MODULE_ID,
         filter,
@@ -97,10 +99,19 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
           message: `Multiple amoeba module mappings found for moduleSlug: ${moduleSlug}`,
         });
 
-      if (serviceSlug && datahubRecords[0]["enabled"] === false)
+      if (isServiceSlugExist && datahubRecords[0]["enabled"] === false)
         return reject({ message: "The service slug is disabled" });
 
-      const targetUrl = serviceSlug
+      let authToken = req.headers.authorization;
+
+      if (
+        !isServiceSlugExist &&
+        datahubRecords[0]["module features"]?.includes("XPI Token Exchange")
+      ) {
+        authToken = `Bearer ${wrikeToken}`;
+      }
+
+      const targetUrl = isServiceSlugExist
         ? datahubRecords[0]["target service url"]
         : datahubRecords[0]["target base url"];
 
@@ -108,7 +119,7 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
         return reject({
           statusCode: 404,
           message: `Target URL not found for ${
-            serviceSlug ? "serviceSlug" : "moduleSlug"
+            isServiceSlugExist ? "serviceSlug" : "moduleSlug"
           }: ${serviceSlug || moduleSlug}`,
         });
 
@@ -121,7 +132,7 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
 
       // Extract path after moduleSlug/serviceSlug
       let targetPath = "";
-      if (serviceSlug) {
+      if (isServiceSlugExist) {
         // Pattern: /amoeba/moduleSlug/serviceSlug/remaining/path
         const pathPattern = `/amoeba/${moduleSlug}/${serviceSlug}`;
         const pathIndex = originalUrl.indexOf(pathPattern);
@@ -139,7 +150,17 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
           const afterModuleSlug = originalUrl.substring(
             pathIndex + pathPattern.length
           );
-          targetPath = afterModuleSlug;
+
+          // Remove route parameter placeholders like /:service_slug or /:anything
+          targetPath = afterModuleSlug.replace(/\/:[^\/]+/g, "");
+
+          // Clean up any double slashes that might result from the removal
+          targetPath = targetPath.replace(/\/+/g, "/");
+
+          // Remove leading slash if it's just a single slash
+          if (targetPath === "/") {
+            targetPath = "";
+          }
         }
       }
 
@@ -197,8 +218,8 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
       // if (isAuthFree) delete targetHeaders.authorization;
 
       // Add authentication headers based on isAuthFree flag
-      if (!isAuthFree && req.headers.authorization) {
-        targetHeaders.Authorization = req.headers.authorization;
+      if (!isAuthFree && authToken) {
+        targetHeaders.Authorization = authToken;
       }
 
       // Make the API call to the target URL
