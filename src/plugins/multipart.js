@@ -1,8 +1,9 @@
-import plugin from "fastify-plugin";
-import multipart from "@fastify/multipart";
+"use strict";
 
-export default plugin(async function (fastify, opts) {
-  await fastify.register(multipart, {
+const fp = require("fastify-plugin");
+
+module.exports = fp(async function (fastify, opts) {
+  fastify.register(require("@fastify/multipart"), {
     // Set file size limit (default is 1MB)
     limits: {
       fileSize: 50 * 1024 * 1024, // 50MB
