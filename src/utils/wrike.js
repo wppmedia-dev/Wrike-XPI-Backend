@@ -685,9 +685,9 @@ export const getDatahubDataById = async (
         : parseInt(process.env.REDIS_DEFAULT_TTL) || 3600;
 
     if (!datahubId)
-      return Promise.reject({
+      throw {
         message: "Missing datahubId",
-      });
+      };
 
     // Generate cache key
     const cacheKey = redisClient.generateKey("datahub_data_by_id", datahubId);
@@ -697,8 +697,10 @@ export const getDatahubDataById = async (
       try {
         const cachedData = await redisClient.get(cacheKey);
         if (cachedData) {
-          return Promise.resolve(cachedData);
+          // console.log(`Cache hit for datahub ${datahubId}`);
+          return cachedData;
         }
+        // console.log(`Cache miss for datahub ${datahubId}`);
       } catch (cacheError) {
         console.warn("Cache read error, proceeding without cache:", cacheError);
       }
@@ -707,10 +709,11 @@ export const getDatahubDataById = async (
     const datahubFields = await getDatahubFields(wrikeToken, datahubId);
 
     if (datahubFields?.errorDescription) {
-      return Promise.reject({
-        errorDescription: datahubFields?.errorDescription,
-      });
+      throw datahubFields;
     }
+
+    if (datahubFields?.data?.length === 0)
+      throw { message: "No datahub fields mapping data found" };
 
     let formFieldsIds = {};
     datahubFields?.data?.forEach((field) => {
@@ -730,33 +733,38 @@ export const getDatahubDataById = async (
             (key) => formFieldsIds[key] === filterItem.fieldName
           ) || null;
 
-        filterString =
-          '{"op": "' +
-          (filterItem.op || "equals") +
-          '","fld": "' +
-          fieldId +
-          '","val": "' +
-          filterItem.value +
-          '"}';
-      } else {
-        // Multiple filter conditions with AND logic
-        const conditions = filter.map((filterItem) => {
-          // finding fieldId by value
-          const fieldId =
-            Object.keys(formFieldsIds).find(
-              (key) => formFieldsIds[key] === filterItem.fieldName
-            ) || null;
-
-          return (
-            '{"op": "' +
+        filterString = fieldId
+          ? '{"op": "' +
             (filterItem.op || "equals") +
             '","fld": "' +
             fieldId +
             '","val": "' +
             filterItem.value +
             '"}'
-          );
-        });
+          : "";
+      } else {
+        // Multiple filter conditions with AND logic
+        const conditions = filter
+          .map((filterItem) => {
+            // finding fieldId by value
+            const fieldId =
+              Object.keys(formFieldsIds).find(
+                (key) => formFieldsIds[key] === filterItem.fieldName
+              ) || null;
+
+            if (!fieldId) return null;
+
+            return (
+              '{"op": "' +
+              (filterItem.op || "equals") +
+              '","fld": "' +
+              fieldId +
+              '","val": "' +
+              filterItem.value +
+              '"}'
+            );
+          })
+          .filter((condition) => condition !== null);
 
         filterString = '{"and": [' + conditions.join(", ") + "]}";
       }
@@ -767,11 +775,7 @@ export const getDatahubDataById = async (
       useCache: false,
     });
 
-    if (datahubRecords?.errorDescription) {
-      return Promise.reject({
-        errorDescription: datahubRecords?.errorDescription,
-      });
-    }
+    if (datahubRecords?.errorDescription) throw datahubRecords;
 
     let datahubData = [];
     datahubRecords?.data?.forEach((record) => {
@@ -798,9 +802,9 @@ export const getDatahubDataById = async (
       }
     }
 
-    return Promise.resolve(datahubData);
+    return datahubData;
   } catch (err) {
-    return Promise.reject(err);
+    throw err;
   }
 };
 

@@ -44,7 +44,7 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
 
       const { moduleSlug, serviceSlug } = req?.params;
 
-      const isServiceSlugExist = serviceSlug && !serviceSlug.includes(":");
+      let isServiceSlugExist = serviceSlug && !serviceSlug.includes(":");
 
       if (isServiceSlugExist && !process.env.DATAHUB_AMOEBA_SERVICE_ID) {
         return reject({
@@ -77,20 +77,33 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
           value: serviceSlug,
         });
 
-      const datahubRecords = await getDatahubDataById(
+      let datahubRecords = await getDatahubDataById(
         wrikeToken,
         isServiceSlugExist
           ? process.env.DATAHUB_AMOEBA_SERVICE_ID
           : process.env.DATAHUB_AMOEBA_MODULE_ID,
         filter,
-        false
+        true,
+        0
       );
 
       if (!datahubRecords || (datahubRecords?.length ?? 0) == 0) {
-        return reject({
-          statusCode: 404,
-          message: `Custom field mapping not found for moduleSlug: ${moduleSlug}`,
-        });
+        datahubRecords = await getDatahubDataById(
+          wrikeToken,
+          process.env.DATAHUB_AMOEBA_MODULE_ID,
+          [filter[0]],
+          true,
+          0
+        );
+
+        if (!datahubRecords || (datahubRecords?.length ?? 0) == 0) {
+          return reject({
+            statusCode: 404,
+            message: `Custom field mapping not found for moduleSlug: ${moduleSlug}`,
+          });
+        } else {
+          isServiceSlugExist = false;
+        }
       }
 
       if (datahubRecords?.length > 1)
@@ -167,24 +180,24 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
       // Construct the full target URL with proper HTML entity decoding
       let fullTargetUrl = decodeHtmlEntities(targetUrl);
 
-      // Ensure the URL has proper protocol
-      if (
-        !fullTargetUrl.startsWith("http://") &&
-        !fullTargetUrl.startsWith("https://")
-      ) {
-        fullTargetUrl = "https://" + fullTargetUrl;
-      }
-
-      // // For Azure Logic Apps, don't append additional paths if it's a webhook URL
-      // const isLogicAppUrl =
-      //   fullTargetUrl.includes("/workflows/") &&
-      //   fullTargetUrl.includes("/triggers/");
-
       if (targetPath) {
         // Only append path for regular APIs, not Logic App webhooks
-        fullTargetUrl = fullTargetUrl.endsWith("/")
-          ? fullTargetUrl.slice(0, -1) + targetPath
-          : fullTargetUrl + targetPath;
+        // Handle query parameter merging properly
+        const hasQueryInTarget = fullTargetUrl.includes("?");
+        const hasQueryInPath = targetPath.includes("?");
+
+        if (hasQueryInTarget && hasQueryInPath) {
+          // Both target URL and path have query params - merge them with &
+          const [pathPart, queryPart] = targetPath.split("?", 2);
+          fullTargetUrl = fullTargetUrl.endsWith("/")
+            ? fullTargetUrl.slice(0, -1) + pathPart + "&" + queryPart
+            : fullTargetUrl + pathPart + "&" + queryPart;
+        } else {
+          // Normal case - just append the path
+          fullTargetUrl = fullTargetUrl.endsWith("/")
+            ? fullTargetUrl.slice(0, -1) + targetPath
+            : fullTargetUrl + targetPath;
+        }
       }
 
       // Validate the final URL
@@ -218,9 +231,7 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
       // if (isAuthFree) delete targetHeaders.authorization;
 
       // Add authentication headers based on isAuthFree flag
-      if (!isAuthFree && authToken) {
-        targetHeaders.Authorization = authToken;
-      }
+      if (!isAuthFree && authToken) targetHeaders.Authorization = authToken;
 
       // Make the API call to the target URL
       const targetResponse = await GetResponseWithStatusCode(
