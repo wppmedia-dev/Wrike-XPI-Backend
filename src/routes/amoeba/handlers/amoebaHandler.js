@@ -83,17 +83,21 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
           ? process.env.DATAHUB_AMOEBA_SERVICE_ID
           : process.env.DATAHUB_AMOEBA_MODULE_ID,
         filter,
-        true,
-        0
+        false
       );
 
       if (!datahubRecords || (datahubRecords?.length ?? 0) == 0) {
+        if (!isServiceSlugExist)
+          return reject({
+            statusCode: 404,
+            message: `Custom field mapping not found for moduleSlug: ${moduleSlug}`,
+          });
+
         datahubRecords = await getDatahubDataById(
           wrikeToken,
           process.env.DATAHUB_AMOEBA_MODULE_ID,
           [filter[0]],
-          true,
-          0
+          false
         );
 
         if (!datahubRecords || (datahubRecords?.length ?? 0) == 0) {
