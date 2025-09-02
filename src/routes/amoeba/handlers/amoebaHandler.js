@@ -83,7 +83,8 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
           ? process.env.DATAHUB_AMOEBA_SERVICE_ID
           : process.env.DATAHUB_AMOEBA_MODULE_ID,
         filter,
-        false
+        true,
+        0
       );
 
       if (!datahubRecords || (datahubRecords?.length ?? 0) == 0) {
@@ -91,7 +92,8 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
           wrikeToken,
           process.env.DATAHUB_AMOEBA_MODULE_ID,
           [filter[0]],
-          false
+          true,
+          0
         );
 
         if (!datahubRecords || (datahubRecords?.length ?? 0) == 0) {

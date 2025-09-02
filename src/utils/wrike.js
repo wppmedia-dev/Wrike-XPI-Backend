@@ -690,7 +690,11 @@ export const getDatahubDataById = async (
       };
 
     // Generate cache key
-    const cacheKey = redisClient.generateKey("datahub_data_by_id", datahubId);
+    const cacheKey = redisClient.generateKey(
+      "datahub_data_by_id",
+      datahubId,
+      JSON.stringify(filter)
+    );
 
     // Try to get from cache first
     if (useCache) {
