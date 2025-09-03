@@ -1,5 +1,6 @@
 import { getDatahubDataById } from "../../../utils/wrike";
 import { GetResponseWithStatusCode } from "../../../utils/node-fetch";
+import redisClient from "../../../utils/redis";
 
 // HTML entity decoder function using browser-like approach
 function decodeHtmlEntities(text) {
@@ -77,11 +78,41 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
           value: serviceSlug,
         });
 
+      // Set default TTL if not provided (null = unlimited, otherwise use provided value or env default)
+      const ttl = parseInt(process.env.REDIS_DEFAULT_TTL) || 3600;
+
+      const datahubId = isServiceSlugExist
+        ? process.env.DATAHUB_AMOEBA_SERVICE_ID
+        : process.env.DATAHUB_AMOEBA_MODULE_ID;
+
+      if (!datahubId)
+        return reject({
+          message: "Missing datahubId",
+        });
+
+      // Generate cache key
+      const cacheKey = redisClient.generateKey(
+        "amoeba_data",
+        datahubId,
+        req.url?.replace("/api/v1/wrikexpi/amoeba", "")
+      );
+
+      // Try to get from cache first
+
+      try {
+        const cachedData = await redisClient.get(cacheKey);
+        if (cachedData) {
+          // console.log(`Cache hit for datahub ${datahubId}`);
+          return resolve(cachedData);
+        }
+        // console.log(`Cache miss for datahub ${datahubId}`);
+      } catch (cacheError) {
+        console.warn("Cache read error, proceeding without cache:", cacheError);
+      }
+
       let datahubRecords = await getDatahubDataById(
         wrikeToken,
-        isServiceSlugExist
-          ? process.env.DATAHUB_AMOEBA_SERVICE_ID
-          : process.env.DATAHUB_AMOEBA_MODULE_ID,
+        datahubId,
         filter,
         false
       );
@@ -116,21 +147,24 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
           message: `Multiple amoeba module mappings found for moduleSlug: ${moduleSlug}`,
         });
 
-      if (isServiceSlugExist && datahubRecords[0]["enabled"] === false)
-        return reject({ message: "The service slug is disabled" });
-
-      let authToken = req.headers.authorization;
-
-      if (
-        !isServiceSlugExist &&
-        datahubRecords[0]["module features"]?.includes("XPI Token Exchange")
-      ) {
-        authToken = `Bearer ${wrikeToken}`;
-      }
-
+      // Flag variables from datahub values
+      const isEnabled = datahubRecords[0]["enabled"];
+      const isWrikeToken =
+        datahubRecords[0]["module features"]?.includes("XPI Token Exchange");
       const targetUrl = isServiceSlugExist
         ? datahubRecords[0]["target service url"]
         : datahubRecords[0]["target base url"];
+      const isAuthFree =
+        datahubRecords[0]["service features"]?.includes(
+          "No Authentication Token"
+        ) ?? false;
+      const isCacheable =
+        datahubRecords[0]["service features"]?.includes("Cache Response") ??
+        false;
+
+      // Condition Validations
+      if (isServiceSlugExist && isEnabled === false)
+        return reject({ message: "The service slug is disabled" });
 
       if (!targetUrl)
         return reject({
@@ -140,12 +174,14 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
           }: ${serviceSlug || moduleSlug}`,
         });
 
+      let authToken = req.headers.authorization;
+
+      if (!isServiceSlugExist && isWrikeToken)
+        authToken = `Bearer ${wrikeToken}`;
+
       // Extract request details for the target API call
       const method = req.method.toUpperCase();
       const originalUrl = req.url;
-      const isAuthFree = datahubRecords[0]["service features"]?.includes(
-        "No Authentication Token"
-      );
 
       // Extract path after moduleSlug/serviceSlug
       let targetPath = "";
@@ -219,20 +255,12 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
         });
       }
 
-      // // Extract body for POST/PUT/PATCH requests
-      // let requestBody = null;
-      // if (["POST", "PUT", "PATCH"].includes(method) && req.body) {
-      //   requestBody = req.body;
-      // }
-
       // Prepare headers for the target API
       const targetHeaders = {
         // ...req.headers,
         "Content-Type": req.headers["content-type"] || "application/json",
         Accept: "application/json",
       };
-
-      // if (isAuthFree) delete targetHeaders.authorization;
 
       // Add authentication headers based on isAuthFree flag
       if (!isAuthFree && authToken) targetHeaders.Authorization = authToken;
@@ -251,6 +279,25 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
 
       if (targetResponse?.status >= 400)
         return reject({ data: targetResponse?.data });
+
+      // Cache the result if caching is enabled
+      if (isCacheable && targetResponse?.data) {
+        try {
+          const isSaved = await redisClient.set(
+            cacheKey,
+            targetResponse?.data,
+            ttl
+          );
+          if (isSaved)
+            console.log(
+              `Data cached for datahub data by id ${datahubId} with TTL ${
+                ttl === 0 ? "unlimited" : ttl + "s"
+              }`
+            );
+        } catch (cacheError) {
+          console.warn("Cache write error:", cacheError);
+        }
+      }
 
       // Return the response from the target API
       resolve(targetResponse?.data);
