@@ -187,23 +187,33 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
           message: `Multiple amoeba module mappings found for moduleSlug: ${moduleSlug}`,
         });
 
-      // Flag variables from datahub values
+      // -------------------- Flag variables from datahub values --------------------
       const isEnabled = datahubRecords[0]["enabled"];
-      const isWrikeToken =
-        datahubRecords[0]["module features"]?.includes("XPI Token Exchange");
+
+      const isWrikeToken = isServiceSlugExist
+        ? datahubRecords[0]["service features"]?.includes(
+            "XPI Token Exchange"
+          ) ?? false
+        : datahubRecords[0]["module features"]?.includes(
+            "XPI Token Exchange"
+          ) ?? false;
+
       const targetUrl = isServiceSlugExist
         ? datahubRecords[0]["target service url"]
         : datahubRecords[0]["target base url"];
+
       const isAuthFree =
         datahubRecords[0]["service features"]?.includes(
           "No Authentication Token"
         ) ?? false;
+
       const isCacheable =
         datahubRecords[0]["service features"]?.includes("Cache Response") ??
         false;
 
       let serviceConfig = {};
 
+      // -------------------- Condition Validations --------------------
       if (datahubRecords[0]["service config"]) {
         try {
           serviceConfig = JSON.parse(datahubRecords[0]["service config"]);
@@ -215,7 +225,6 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
         }
       }
 
-      // Condition Validations
       if (isServiceSlugExist && isEnabled === false)
         return reject({ message: "The service slug is disabled" });
 
@@ -227,15 +236,11 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
           }: ${serviceSlug || moduleSlug}`,
         });
 
-      let authToken = req.headers.authorization;
-
-      if (!isServiceSlugExist && isWrikeToken)
-        authToken = `Bearer ${wrikeToken}`;
-
       // Extract request details for the target API call
       const method = req.method.toUpperCase();
       const originalUrl = req.url;
 
+      // -------------------- Redis Caching data check --------------------
       // Generate cache key
       const cacheKey = redisClient.generateKey(
         "amoeba_data",
@@ -260,7 +265,7 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
         }
       }
 
-      // Extract path after moduleSlug/serviceSlug
+      // -------------------- Extract path after moduleSlug/serviceSlug --------------------
       let targetPath = "";
       if (isServiceSlugExist) {
         // Pattern: /amoeba/moduleSlug/serviceSlug/remaining/path
@@ -332,6 +337,7 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
         });
       }
 
+      // -------------------- Executing target API call --------------------
       // Prepare headers for the target API
       const targetHeaders = {
         // ...req.headers,
@@ -340,6 +346,10 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
       };
 
       // Add authentication headers based on isAuthFree flag
+      const authToken = isWrikeToken
+        ? `Bearer ${wrikeToken}`
+        : req.headers.authorization;
+
       if (!isAuthFree && authToken) targetHeaders.Authorization = authToken;
 
       // Make the API call to the target URL
