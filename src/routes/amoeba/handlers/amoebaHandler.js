@@ -245,7 +245,7 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
       const cacheKey = redisClient.generateKey(
         "amoeba_data",
         datahubId,
-        originalUrl?.replace("/api/v1/wrikexpi/amoeba", "")
+        originalUrl?.replace("/api/v1/wrikexpi/amoeba/", "")
       );
 
       // Try to get from cache first
