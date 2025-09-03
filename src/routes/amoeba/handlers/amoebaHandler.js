@@ -24,6 +24,69 @@ function decodeHtmlEntities(text) {
   });
 }
 
+// Function to convert ISO 8601 duration to seconds
+function parseDurationToSeconds(isoDuration) {
+  if (!isoDuration || typeof isoDuration !== "string") {
+    return null;
+  }
+
+  // Validate basic ISO 8601 duration format (must start with P)
+  if (!isoDuration.startsWith("P")) {
+    return null;
+  }
+
+  // Remove 'P' prefix and split on 'T' to separate date and time parts
+  const duration = isoDuration.replace(/^P/, "");
+  const [datePart = "", timePart = ""] = duration.split("T");
+
+  let totalSeconds = 0;
+
+  // Parse date part (years, months, days) - only if no T separator
+  if (datePart && !duration.includes("T")) {
+    const yearMatch = datePart.match(/^(\d+)Y$/);
+    const monthMatch = datePart.match(/^(\d+)M$/);
+    const dayMatch = datePart.match(/^(\d+)D$/);
+
+    if (yearMatch) totalSeconds += parseInt(yearMatch[1]) * 365 * 24 * 60 * 60;
+    else if (monthMatch)
+      totalSeconds += parseInt(monthMatch[1]) * 30 * 24 * 60 * 60;
+    // Approximate
+    else if (dayMatch) totalSeconds += parseInt(dayMatch[1]) * 24 * 60 * 60;
+    else return null; // Invalid format
+  }
+  // Parse combined date and time parts
+  else if (duration.includes("T")) {
+    // Parse date part (before T)
+    if (datePart) {
+      const yearMatch = datePart.match(/(\d+)Y/);
+      const monthMatch = datePart.match(/(\d+)M/);
+      const dayMatch = datePart.match(/(\d+)D/);
+
+      if (yearMatch)
+        totalSeconds += parseInt(yearMatch[1]) * 365 * 24 * 60 * 60;
+      if (monthMatch)
+        totalSeconds += parseInt(monthMatch[1]) * 30 * 24 * 60 * 60;
+      if (dayMatch) totalSeconds += parseInt(dayMatch[1]) * 24 * 60 * 60;
+    }
+
+    // Parse time part (after T)
+    if (timePart) {
+      const hourMatch = timePart.match(/(\d+)H/);
+      const minuteMatch = timePart.match(/(\d+)M/);
+      const secondMatch = timePart.match(/(\d+(?:\.\d+)?)S/);
+
+      if (hourMatch) totalSeconds += parseInt(hourMatch[1]) * 60 * 60;
+      if (minuteMatch) totalSeconds += parseInt(minuteMatch[1]) * 60;
+      if (secondMatch) totalSeconds += parseFloat(secondMatch[1]);
+    }
+  } else {
+    // Invalid: has neither pure date component nor T separator
+    return null;
+  }
+
+  return totalSeconds > 0 ? totalSeconds : null;
+}
+
 export const AmoebaHandler = (wrikeToken, req, fastify) => {
   return new Promise(async (resolve, reject) => {
     try {
@@ -77,9 +140,6 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
           fieldName: "service slug",
           value: serviceSlug,
         });
-
-      // Set default TTL if not provided (null = unlimited, otherwise use provided value or env default)
-      const ttl = parseInt(process.env.REDIS_DEFAULT_TTL) || 3600;
 
       const datahubId = isServiceSlugExist
         ? process.env.DATAHUB_AMOEBA_SERVICE_ID
@@ -141,6 +201,19 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
       const isCacheable =
         datahubRecords[0]["service features"]?.includes("Cache Response") ??
         false;
+
+      let serviceConfig = {};
+
+      if (datahubRecords[0]["service config"]) {
+        try {
+          serviceConfig = JSON.parse(datahubRecords[0]["service config"]);
+        } catch (parseError) {
+          return reject({
+            message:
+              "Invalid JSON: 'Service Config' data format is not a valid JSON",
+          });
+        }
+      }
 
       // Condition Validations
       if (isServiceSlugExist && isEnabled === false)
@@ -286,6 +359,23 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
 
       // Cache the result if caching is enabled
       if (isCacheable && targetResponse?.data) {
+        // Parse TTL from service config (ISO 8601 duration format like "PT1H")
+        let ttl = parseInt(process.env.REDIS_DEFAULT_TTL) || 3600; // Default fallback
+
+        const configTtl = serviceConfig?.["cacheresponse"]?.["expiryperiod"];
+        if (configTtl) {
+          const parsedTtl = parseDurationToSeconds(configTtl);
+          if (parsedTtl === null) {
+            return reject({
+              statusCode: 400,
+              message: `Invalid cache expiry duration format: '${configTtl}'. Expected ISO 8601 duration format (e.g., PT1H for 1 hour, P1D for 1 day, PT30M for 30 minutes).`,
+            });
+          }
+          if (parsedTtl > 0) {
+            ttl = parsedTtl;
+          }
+        }
+
         try {
           const isSaved = await redisClient.set(
             cacheKey,
