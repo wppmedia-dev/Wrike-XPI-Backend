@@ -90,26 +90,6 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
           message: "Missing datahubId",
         });
 
-      // Generate cache key
-      const cacheKey = redisClient.generateKey(
-        "amoeba_data",
-        datahubId,
-        req.url?.replace("/api/v1/wrikexpi/amoeba", "")
-      );
-
-      // Try to get from cache first
-
-      try {
-        const cachedData = await redisClient.get(cacheKey);
-        if (cachedData) {
-          // console.log(`Cache hit for datahub ${datahubId}`);
-          return resolve(cachedData);
-        }
-        // console.log(`Cache miss for datahub ${datahubId}`);
-      } catch (cacheError) {
-        console.warn("Cache read error, proceeding without cache:", cacheError);
-      }
-
       let datahubRecords = await getDatahubDataById(
         wrikeToken,
         datahubId,
@@ -182,6 +162,30 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
       // Extract request details for the target API call
       const method = req.method.toUpperCase();
       const originalUrl = req.url;
+
+      // Generate cache key
+      const cacheKey = redisClient.generateKey(
+        "amoeba_data",
+        datahubId,
+        originalUrl?.replace("/api/v1/wrikexpi/amoeba", "")
+      );
+
+      // Try to get from cache first
+      if (isCacheable) {
+        try {
+          const cachedData = await redisClient.get(cacheKey);
+          if (cachedData) {
+            // console.log(`Cache hit for datahub ${datahubId}`);
+            return resolve(cachedData);
+          }
+          // console.log(`Cache miss for datahub ${datahubId}`);
+        } catch (cacheError) {
+          console.warn(
+            "Cache read error, proceeding without cache:",
+            cacheError
+          );
+        }
+      }
 
       // Extract path after moduleSlug/serviceSlug
       let targetPath = "";
