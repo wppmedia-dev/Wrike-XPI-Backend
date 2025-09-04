@@ -241,6 +241,13 @@ fastify.get("/", async (req, res) => {
       </a>
     </p>
 
+    <p style="margin-top: 10px; margin-bottom: 0px !important; font-size: 0.95rem; color: #dddddd;">
+      Want to see all your tokens?
+      <a href="${process.env.BASE_PATH}api/v1/wrikexpi/token/view" class="secondary-link" style="color: #9ae6b4; font-weight: 600; text-decoration: underline; margin-left: 4px;">
+        View Tokens
+      </a>
+    </p>
+
   </div>
 
   <script>

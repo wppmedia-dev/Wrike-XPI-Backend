@@ -46,7 +46,7 @@ export const GetById = async (id) => {
     }
 
     const userTokens = await models.UserTokens.findOne({
-      attributes: ["id", "encrypted_access_token", "encrypted_refresh_token"],
+      attributes: ["id", "encrypted_access_token", "encrypted_refresh_token", "created_by"],
       where: {
         id,
         is_active: true,
@@ -57,6 +57,7 @@ export const GetById = async (id) => {
       id: userTokens?.id,
       encrypted_access_token: userTokens?.encrypted_access_token,
       encrypted_refresh_token: userTokens?.encrypted_refresh_token,
+      created_by: userTokens?.created_by,
     };
   } catch (err) {
     throw err;
@@ -80,6 +81,30 @@ export const GetByUserId = async (id) => {
       },
       order: [["created_at", "DESC"]],
       limit: 1,
+    });
+
+    return userTokens;
+  } catch (err) {
+    throw err;
+  }
+};
+
+export const GetAllByUserId = async (id) => {
+  try {
+    if (!id) {
+      throw {
+        statusCode: 420,
+        message: "Id must not be empty!",
+      };
+    }
+
+    const userTokens = await models.UserTokens.findAll({
+      attributes: ["id", "account_id", "created_at", "updated_at"],
+      where: {
+        created_by: id,
+        is_active: true,
+      },
+      order: [["created_at", "DESC"]],
     });
 
     return userTokens;
