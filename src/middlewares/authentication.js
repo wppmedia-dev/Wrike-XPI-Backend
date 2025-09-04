@@ -16,11 +16,18 @@ export const ValidateToken = async (req, reply, fastify) => {
 
     const {
       uid = null,
+      tid = null,
       encAccessTokenKey = null,
       encRefreshTokenKey = null,
     } = req?.user;
 
-    if (!uid || !encAccessTokenKey || !encRefreshTokenKey)
+    if (uid)
+      return reply.code(401).send({
+        message:
+          "Failed authorization! Your token is outdated. Please generate a new token to continue.",
+      });
+
+    if (!tid || !encAccessTokenKey || !encRefreshTokenKey)
       return reply.code(403).send({
         message:
           "Failed authorization! User is not authorized to access the service.",
@@ -30,7 +37,7 @@ export const ValidateToken = async (req, reply, fastify) => {
       id: tokenId,
       encrypted_access_token: encAccessToken,
       encrypted_refresh_token: encRefreshToken,
-    } = await Tokens.GetByUserId(uid);
+    } = await Tokens.GetById(tid);
 
     if (!encAccessToken)
       return reply.code(401).send({
@@ -86,7 +93,7 @@ export const ValidateToken = async (req, reply, fastify) => {
         encRefreshTokenKey
       );
 
-      Tokens.Update(uid, tokenId, {
+      Tokens.Update(tid, tokenId, {
         encrypted_access_token: newEncAccessToken?.encryptedData,
         encrypted_refresh_token: newEncRefreshToken?.encryptedData,
       });

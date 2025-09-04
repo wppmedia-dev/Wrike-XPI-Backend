@@ -1,10 +1,13 @@
 import { encryptWithRandomKey } from "../../../utils/crypto";
-import { GetResponse } from "../../../utils/node-fetch";
 import { Tokens, Users } from "../../../controllers";
-import { getWrikeTokens } from "../../../utils/wrike";
+import { getWrikeTokens, getUserData } from "../../../utils/wrike";
+import models from "../../../../models";
 
 export const WrikeXPICallback = ({ code }, fastify) => {
   return new Promise(async (resolve, reject) => {
+    // Start database transaction for data consistency
+    const transaction = await models.sequelize.transaction();
+
     try {
       if (!code) return reject({ message: "Access Token must not be empty" });
 
@@ -13,56 +16,82 @@ export const WrikeXPICallback = ({ code }, fastify) => {
       const encAccessToken = await encryptWithRandomKey(access_token);
       const encRefreshToken = await encryptWithRandomKey(refresh_token);
 
+      // Getting the user data from the wrike(/contacts?me) api
+      const wrikeUserData = await getUserData(access_token);
+
       const {
         id: wrikeUserId,
         firstName,
         lastName,
         primaryEmail,
-      } = await wrikeUserData(access_token);
+        profiles,
+      } = wrikeUserData?.data[0];
 
-      if (!wrikeUserId) return reject({ message: "Invalid Wrike User!" });
+      if (!wrikeUserId) {
+        await transaction.rollback();
+        return reject({ message: "Invalid Wrike User!" });
+      }
 
+      const accountId = profiles?.[0]?.accountId;
+
+      // All database operations within transaction
       const userData = await Users.GetByWrikeId(wrikeUserId);
-
       let userId = userData?.id;
 
-      if (!userId) {
-        const newUserData = await Users.Insert({
-          full_name: firstName + " " + lastName,
-          email: primaryEmail,
-          wrike_user_id: wrikeUserId,
-          is_active: true,
-        });
+      if (!userData?.id) {
+        const newUserData = await Users.Insert(
+          {
+            full_name: firstName + " " + lastName,
+            email: primaryEmail,
+            wrike_user_id: wrikeUserId,
+            is_active: true,
+          },
+          { transaction }
+        );
 
         userId = newUserData?.id;
+      }
 
-        await Tokens.Insert(newUserData?.id, {
-          encrypted_access_token: encAccessToken?.encryptedData,
-          encrypted_refresh_token: encRefreshToken?.encryptedData,
-          is_active: true,
-        });
-      } else {
-        const userTokenData = await Tokens.GetByUserId(userId);
+      const userTokenData = await Tokens.GetByUserAndAccountId(
+        userId,
+        accountId
+      );
 
-        if (userTokenData?.id) {
-          await Tokens.Update(userId, userTokenData?.id, {
+      let userTokenId = userTokenData?.id;
+
+      if (userTokenId) {
+        await Tokens.Update(
+          userId,
+          userTokenId,
+          {
             encrypted_access_token: encAccessToken?.encryptedData,
             encrypted_refresh_token: encRefreshToken?.encryptedData,
-          });
-        } else {
-          await Tokens.Insert(userId, {
+          },
+          { transaction }
+        );
+      } else {
+        const newUserTokenData = await Tokens.Insert(
+          userId,
+          {
+            account_id: accountId,
             encrypted_access_token: encAccessToken?.encryptedData,
             encrypted_refresh_token: encRefreshToken?.encryptedData,
             is_active: true,
-          });
-        }
+          },
+          { transaction }
+        );
+
+        userTokenId = newUserTokenData?.id;
       }
+
+      // Commit transaction only after all operations succeed
+      await transaction.commit();
 
       const token = fastify.jwt.sign(
         {
           encAccessTokenKey: encAccessToken?.key,
           encRefreshTokenKey: encRefreshToken?.key,
-          uid: userId,
+          tid: userTokenId,
         },
         { expiresIn: "365d" }
       );
@@ -70,30 +99,12 @@ export const WrikeXPICallback = ({ code }, fastify) => {
       // Sending final response
       resolve(token);
     } catch (err) {
-      console.log(err?.message || err);
-      reject(err);
-    }
-  });
-};
-
-const wrikeUserData = (access_token) => {
-  return new Promise(async (resolve, reject) => {
-    try {
-      const result = await GetResponse(
-        `${process.env.WRIKE_ENDPOINT}/contacts?me`,
-        "GET",
-        {
-          "content-type": "application/json",
-          authorization: "Bearer " + access_token,
-        },
-        null
+      // Rollback transaction on any error
+      await transaction.rollback();
+      console.log(
+        "Database transaction rolled back due to error:",
+        err?.message || err
       );
-      if (result?.error)
-        return reject({ message: result["error_description"] });
-
-      resolve(result?.data[0]);
-    } catch (err) {
-      console.log("Error while getting user details: ", err?.message ?? err);
       reject(err);
     }
   });

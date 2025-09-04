@@ -8,6 +8,10 @@ module.exports = {
         primaryKey: true,
         allowNull: false,
       },
+      account_id: {
+        type: Sequelize.STRING,
+        allowNull: false,
+      },
       encrypted_access_token: {
         type: Sequelize.TEXT,
         allowNull: false,

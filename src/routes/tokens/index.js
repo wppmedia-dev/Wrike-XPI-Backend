@@ -289,7 +289,9 @@ export const tokenRoute = (fastify, opts, done) => {
   <div class="card">
     <h1>Oops! Something went wrong</h1>
     <div class="message">${err?.message || "Unexpected error occurred"}</div>
-    <a class="btn" href="${process.env.BASE_PATH}">⬅ Back to Login</a>
+    <a class="btn" href="${process.env.API_URL}${
+        process.env.BASE_PATH
+      }">⬅ Back to Login</a>
   </div>
 </body>
 </html>

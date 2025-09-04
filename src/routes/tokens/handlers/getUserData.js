@@ -7,17 +7,17 @@ export const GetUserData = ({ token }, fastify) => {
     try {
       if (!token) return reject({ message: "Access Token must not be empty" });
 
-      const { uid, encAccessTokenKey, encRefreshTokenKey } =
+      const { tid, encAccessTokenKey, encRefreshTokenKey } =
         await fastify.jwt.verify(token);
 
-      if (!uid || !encAccessTokenKey || !encRefreshTokenKey) {
+      if (!tid || !encAccessTokenKey || !encRefreshTokenKey) {
         return reject({ message: "Invalid Token" });
       }
 
       const {
         encrypted_access_token: encAccessToken,
         encrypted_refresh_token: encRefreshToken,
-      } = await Tokens.GetByUserId(uid);
+      } = await Tokens.GetById(tid);
 
       if (!encAccessToken) return reject({ message: "Invalid Token!" });
 

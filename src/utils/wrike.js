@@ -65,6 +65,27 @@ export const getWrikeTokens = async ({ code, refresh_token }) => {
   }
 };
 
+export const getUserData = async (access_token) => {
+  try {
+    const userData = await GetResponse(
+      `${process.env.WRIKE_ENDPOINT}/contacts?me`,
+      "GET",
+      {
+        "content-type": "application/json",
+        authorization: "Bearer " + access_token,
+      },
+      null
+    );
+
+    if (userData?.errorDescription) throw userData;
+
+    return userData;
+  } catch (err) {
+    console.log("Error while getting user details: ", err?.message ?? err);
+    throw err;
+  }
+};
+
 // Datahub Util Functions
 export const getDatahubFields = async (wrikeToken, databaseId) => {
   try {

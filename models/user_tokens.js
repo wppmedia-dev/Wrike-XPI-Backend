@@ -32,6 +32,9 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.UUID,
         defaultValue: DataTypes.UUIDV4,
       },
+      account_id: {
+        type: DataTypes.STRING,
+      },
       encrypted_access_token: {
         type: DataTypes.TEXT,
       },

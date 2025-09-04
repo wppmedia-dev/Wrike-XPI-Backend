@@ -80,7 +80,9 @@ fastify.get("/", async (req, res) => {
     });
   }
 
-  let redirectUrl = `${WRIKE_LOGIN_ENDPOINT}/authorize/v4?client_id=${WRIKE_CLIENT_ID}&response_type=code&redirect_uri=${WRIKE_REDIRECT_URL}`;
+  const state = "";
+
+  let redirectUrl = `${WRIKE_LOGIN_ENDPOINT}/authorize/v4?client_id=${WRIKE_CLIENT_ID}&response_type=code&state=${state}&redirect_uri=${WRIKE_REDIRECT_URL}`;
 
   if (accountId) redirectUrl += `&accountId=${accountId}`;
 
