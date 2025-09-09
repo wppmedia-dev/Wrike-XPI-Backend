@@ -1042,19 +1042,53 @@ export const getTask = async (wrikeToken, folderId) => {
   }
 };
 
-export const updateTask = async (wrikeToken, taskId, taskCFUpdateData) => {
+export const updateTask = async (
+  wrikeToken,
+  taskId,
+  taskFieldsUpdateData,
+  taskMetadataUpdateData,
+  taskCFUpdateData
+) => {
   try {
     // Get folder data
-    const wrikeRequestFormData = await GetResponse(
-      `${
-        process.env.WRIKE_ENDPOINT
-      }/tasks/${taskId}?customFields=${JSON.stringify(taskCFUpdateData)}`,
-      "PUT",
-      {
-        "content-type": "application/json",
-        Authorization: `Bearer ${wrikeToken}`,
-      }
-    );
+
+    let url = `${process.env.WRIKE_ENDPOINT}/tasks/${taskId}`;
+
+    if (taskFieldsUpdateData && Object.keys(taskFieldsUpdateData).length > 0) {
+      Object.entries(taskFieldsUpdateData).map(([key, value]) => {
+        if (url.includes("?")) url += "&";
+        else url += "?";
+
+        url += `${key}=${value}`;
+      });
+    }
+
+    if (
+      taskMetadataUpdateData &&
+      Array.isArray(taskMetadataUpdateData) &&
+      taskMetadataUpdateData?.length > 0
+    ) {
+      if (url.includes("?")) url += "&";
+      else url += "?";
+
+      url += `metadata=${JSON.stringify(taskMetadataUpdateData)}`;
+    }
+
+    if (
+      taskCFUpdateData &&
+      Array.isArray(taskCFUpdateData) &&
+      taskCFUpdateData?.length > 0
+    ) {
+      if (url.includes("?")) url += "&";
+      else url += "?";
+
+      url += `customFields=${JSON.stringify(taskCFUpdateData)}`;
+    }
+
+    const wrikeRequestFormData = await GetResponse(url, "PUT", {
+      "content-type": "application/json",
+      Authorization: `Bearer ${wrikeToken}`,
+    });
 
     if (wrikeRequestFormData?.errorDescription) throw wrikeRequestFormData;
 

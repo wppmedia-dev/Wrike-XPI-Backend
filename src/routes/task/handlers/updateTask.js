@@ -23,6 +23,8 @@ export const UpdateTask = (wrikeToken, params, fastify) => {
       // }
 
       let taskCFUpdateData = [];
+      let taskFieldsUpdateData = {};
+      let taskMetadataUpdateData = [];
 
       Object.keys(formFields).forEach((field) => {
         // for (const field in formFields) {
@@ -32,17 +34,39 @@ export const UpdateTask = (wrikeToken, params, fastify) => {
             true &&
           datahubCustomFieldsData[field?.trim()?.toLowerCase()]?.isWritable ===
             true
-        )
-          taskCFUpdateData.push({
-            id: datahubCustomFieldsData[field?.trim()?.toLowerCase()]?.cfId,
-            value: formFields[field],
-          });
+        ) {
+          const xpiFieldType =
+            datahubCustomFieldsData[field?.trim()?.toLowerCase()]?.xpiFieldType;
+
+          switch (xpiFieldType) {
+            case "Wrike API Built-in Field":
+              taskFieldsUpdateData[
+                datahubCustomFieldsData[field?.trim()?.toLowerCase()]?.cfId
+              ] = formFields[field];
+              break;
+            case "Wrike API Metadata Field":
+              taskMetadataUpdateData.push({
+                key: datahubCustomFieldsData[field?.trim()?.toLowerCase()]
+                  ?.cfId,
+                value: formFields[field],
+              });
+              break;
+            case "Wrike Custom Field":
+              taskCFUpdateData.push({
+                id: datahubCustomFieldsData[field?.trim()?.toLowerCase()]?.cfId,
+                value: formFields[field],
+              });
+              break;
+          }
+        }
       });
 
       // Submit Request Form
       const updatedTaskData = await updateTask(
         wrikeToken,
         taskId,
+        taskFieldsUpdateData,
+        taskMetadataUpdateData,
         taskCFUpdateData
       );
 
