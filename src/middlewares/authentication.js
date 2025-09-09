@@ -74,7 +74,18 @@ export const ValidateToken = async (req, reply, fastify) => {
         refresh_token: wrikeRefreshToken,
       });
 
-      const { access_token = null, refresh_token = null } = result;
+      const {
+        access_token = null,
+        refresh_token = null,
+        error = null,
+        error_description = null,
+      } = result;
+
+      if (error || error_description)
+        return reply.code(401).send({
+          message:
+            "Failed authorization! The XPI token appears to be invalid or expired. Please regenerate the token and try again.",
+        });
 
       if (!access_token || !refresh_token)
         return reply.code(401).send({
