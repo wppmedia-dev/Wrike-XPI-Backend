@@ -573,7 +573,7 @@ export const getRequestFormFieldDatahub = async (
   }
 };
 
-export const getDatahubGroupedDataById = async (
+export const getDatahubCustomFields = async (
   wrikeToken,
   datahubId,
   isMaster = false,
@@ -587,15 +587,10 @@ export const getDatahubGroupedDataById = async (
     //   ? cacheTTL
     //   : parseInt(process.env.REDIS_DEFAULT_TTL) || 3600;
 
-    if (!datahubId)
-      throw {
-        message: "Missing datahubId",
-      };
-
     // Generate cache key
     const cacheKey = redisClient.generateKey(
       "datahub_grouped_data",
-      datahubId,
+      datahubId ?? process.env.DATAHUB_CUSTOM_FIELDS_ID,
       isMaster ? "master" : "regular"
     );
 
@@ -669,6 +664,7 @@ export const getDatahubGroupedDataById = async (
               "Read"
             ) ?? false,
           cfType: record.fieldValues[formFieldsIds["cf type"]],
+          xpiFieldType: record.fieldValues[formFieldsIds["xpi field type"]],
         };
     });
 

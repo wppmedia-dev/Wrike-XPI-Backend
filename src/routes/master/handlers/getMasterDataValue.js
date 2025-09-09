@@ -1,6 +1,6 @@
 import {
   getCustomFields,
-  getDatahubGroupedDataById,
+  getDatahubCustomFields,
   getDatahubRecords,
 } from "../../../utils/wrike";
 
@@ -26,7 +26,7 @@ export const GetMasterDataValue = (wrikeToken, params, fastify) => {
       }
 
       // Get mapping configuration for this customfield
-      const datahubCustomFieldsData = await getDatahubGroupedDataById(
+      const datahubCustomFieldsData = await getDatahubCustomFields(
         wrikeToken,
         process.env.DATAHUB_CUSTOM_FIELDS_ID,
         true

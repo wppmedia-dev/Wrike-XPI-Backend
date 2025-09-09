@@ -4,7 +4,7 @@ import {
   getRequestFormStatus,
   getTask,
   getFolder,
-  getDatahubGroupedDataById,
+  getDatahubCustomFields,
   findRequestFormId,
   getRequestFormFieldDatahub,
   getSpaceDatahub,
@@ -65,7 +65,7 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
         });
 
       // if (Object.keys(datahubCustomFieldsData).length === 0) {
-      const datahubCustomFieldsData = await getDatahubGroupedDataById(
+      const datahubCustomFieldsData = await getDatahubCustomFields(
         wrikeToken,
         process.env.DATAHUB_CUSTOM_FIELDS_ID
       );
@@ -248,13 +248,31 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
       const folderCustomFieldValues = {};
 
       for (const [key, value] of Object.entries(datahubCustomFieldsData)) {
-        const cfValue =
-          outputData?.data[0]?.customFields?.find(
-            (field) => field.id === value.cfId
-          )?.value ?? "";
+        if (!value.isReadable || !value.isCampaignField) continue;
 
-        if (value.isReadable && value.isCampaignField)
-          folderCustomFieldValues[key] = cfValue;
+        let cfValue;
+        switch (value.xpiFieldType) {
+          case "Wrike API Built-in Field":
+            cfValue = outputData?.data[0][value?.cfId];
+            break;
+          case "Wrike API Metadata Field":
+            cfValue =
+              outputData?.data[0]?.metadata?.find(
+                (field) => field.key === value?.cfId
+              )?.value ?? "";
+            break;
+          case "Wrike Custom Field":
+            cfValue =
+              outputData?.data[0]?.customFields?.find(
+                (field) => field.id === value.cfId
+              )?.value ?? "";
+            break;
+          default:
+            fieldValue = "";
+        }
+
+        // if (value.isReadable && value.isCampaignField)
+        folderCustomFieldValues[key] = cfValue;
       }
 
       // Sending final response
@@ -263,7 +281,7 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
           type: "Campaign",
           ...folderCustomFieldValues,
           // // customfieldlist: outputData?.data[0]?.customFields,
-          folderId: outputData?.data[0]?.id,
+          // folderId: outputData?.data[0]?.id,
           // noofcrs: folderCustomFieldValues["noofcrs"],
           // agency: folderCustomFieldValues["agency"],
           // mediabuyingtype: folderCustomFieldValues["mediabuyingtype"],

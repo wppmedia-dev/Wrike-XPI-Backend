@@ -1,6 +1,6 @@
 import { GetResponse } from "../../../utils/node-fetch";
 import { defaultParser } from "@odata/parser";
-import { getDatahubGroupedDataById } from "../../../utils/wrike";
+import { getDatahubCustomFields } from "../../../utils/wrike";
 
 // Operator mapping from OData to your custom operators
 const odataToCustomOp = {
@@ -58,7 +58,7 @@ export const GetAllChannels = (wrikeToken, params, fastify) => {
           });
 
         // if (Object.keys(datahubCustomFieldsData).length === 0)
-        datahubCustomFieldsData = await getDatahubGroupedDataById(
+        datahubCustomFieldsData = await getDatahubCustomFields(
           wrikeToken,
           process.env.DATAHUB_CUSTOM_FIELDS_ID
         );
@@ -73,7 +73,11 @@ export const GetAllChannels = (wrikeToken, params, fastify) => {
             "Missing required datahub customfield mapping field: workitemlevel",
         });
 
-      let wrikeUrl = `${process.env.WRIKE_ENDPOINT}/folders/${campaignId}/folders?fields=[customFields]&nextPageToken=${nextPageToken || ""}`;
+      let wrikeUrl = `${
+        process.env.WRIKE_ENDPOINT
+      }/folders/${campaignId}/folders?fields=[customFields]&nextPageToken=${
+        nextPageToken || ""
+      }`;
 
       if (pageSize && pageSize > 0) wrikeUrl += `&pageSize=${pageSize}`;
 
@@ -106,9 +110,24 @@ export const GetAllChannels = (wrikeToken, params, fastify) => {
         ).reduce((acc, [key, value]) => {
           if (!value.isReadable || !value.isChannelField) return acc;
 
-          const fieldValue =
-            folder?.customFields?.find((field) => field.id === value.cfId)
-              ?.value ?? "";
+          let fieldValue;
+          switch (value.xpiFieldType) {
+            case "Wrike API Built-in Field":
+              fieldValue = folder[value?.cfId];
+              break;
+            case "Wrike API Metadata Field":
+              fieldValue =
+                folder?.metadata?.find((field) => field.key === value?.cfId)
+                  ?.value ?? "";
+              break;
+            case "Wrike Custom Field":
+              fieldValue =
+                folder?.customFields?.find((field) => field.id === value?.cfId)
+                  ?.value ?? "";
+              break;
+            default:
+              fieldValue = "";
+          }
 
           // if (fieldValue) {
           acc[key] = fieldValue;
@@ -119,7 +138,7 @@ export const GetAllChannels = (wrikeToken, params, fastify) => {
 
         return {
           ...folderCustomFieldValues,
-          folderId: folder.id,
+          // folderId: folder.id,
           // // customfieldlist: folder?.customFields,
           // noofcrs: folderCustomFieldValues["noofcrs"],
           // agency: folderCustomFieldValues["agency"],

@@ -1,4 +1,4 @@
-import { getFolder, getDatahubGroupedDataById } from "../../../utils/wrike";
+import { getFolder, getDatahubCustomFields } from "../../../utils/wrike";
 
 export const GetCampaign = (wrikeToken, params, fastify) => {
   return new Promise(async (resolve, reject) => {
@@ -20,7 +20,7 @@ export const GetCampaign = (wrikeToken, params, fastify) => {
             "Missing parameter! Required parameter is missing for the requested operation.",
         });
 
-      const datahubCustomFieldsData = await getDatahubGroupedDataById(
+      const datahubCustomFieldsData = await getDatahubCustomFields(
         wrikeToken,
         process.env.DATAHUB_CUSTOM_FIELDS_ID
       );
@@ -42,13 +42,31 @@ export const GetCampaign = (wrikeToken, params, fastify) => {
       const folderCustomFieldValues = {};
 
       for (const [key, value] of Object.entries(datahubCustomFieldsData)) {
-        const cfValue =
-          wrikeFolderData?.data[0]?.customFields?.find(
-            (field) => field.id === value.cfId
-          )?.value ?? "";
+        if (!value.isReadable || !value.isCampaignField) continue;
 
-        if (value.isReadable && value.isCampaignField)
-          folderCustomFieldValues[key] = cfValue;
+        let cfValue;
+        switch (value.xpiFieldType) {
+          case "Wrike API Built-in Field":
+            cfValue = wrikeFolderData?.data[0][value?.cfId];
+            break;
+          case "Wrike API Metadata Field":
+            cfValue =
+              wrikeFolderData?.data[0]?.metadata?.find(
+                (field) => field.key === value?.cfId
+              )?.value ?? "";
+            break;
+          case "Wrike Custom Field":
+            cfValue =
+              wrikeFolderData?.data[0]?.customFields?.find(
+                (field) => field.id === value.cfId
+              )?.value ?? "";
+            break;
+          default:
+            fieldValue = "";
+        }
+
+        // if (value.isReadable && value.isCampaignField)
+        folderCustomFieldValues[key] = cfValue;
       }
 
       if (folderCustomFieldValues["workitemlevel"] != "Campaign")

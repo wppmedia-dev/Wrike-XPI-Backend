@@ -1,4 +1,4 @@
-import { getDatahubGroupedDataById, updateFolder } from "../../../utils/wrike";
+import { getDatahubCustomFields, updateFolder } from "../../../utils/wrike";
 
 export const UpdateCampaign = (wrikeToken, params, fastify) => {
   return new Promise(async (resolve, reject) => {
@@ -16,7 +16,7 @@ export const UpdateCampaign = (wrikeToken, params, fastify) => {
 
       // Getting cutom fields data from Datahub
       // if (Object.keys(datahubCustomFieldsData).length === 0) {
-      const datahubCustomFieldsData = await getDatahubGroupedDataById(
+      const datahubCustomFieldsData = await getDatahubCustomFields(
         wrikeToken,
         process.env.DATAHUB_CUSTOM_FIELDS_ID
       );
@@ -54,13 +54,31 @@ export const UpdateCampaign = (wrikeToken, params, fastify) => {
       const folderCustomFieldValues = {};
 
       for (const [key, value] of Object.entries(datahubCustomFieldsData)) {
-        const cfValue =
-          updatedFolderData?.data[0]?.customFields?.find(
-            (field) => field.id === value.cfId
-          )?.value ?? "";
+        if (!value.isReadable || !value.isCampaignField) continue;
 
-        if (value.isReadable && value.isCampaignField)
-          folderCustomFieldValues[key] = cfValue;
+        let cfValue;
+        switch (value.xpiFieldType) {
+          case "Wrike API Built-in Field":
+            cfValue = updatedFolderData?.data[0][value?.cfId];
+            break;
+          case "Wrike API Metadata Field":
+            cfValue =
+              updatedFolderData?.data[0]?.metadata?.find(
+                (field) => field.key === value?.cfId
+              )?.value ?? "";
+            break;
+          case "Wrike Custom Field":
+            cfValue =
+              updatedFolderData?.data[0]?.customFields?.find(
+                (field) => field.id === value.cfId
+              )?.value ?? "";
+            break;
+          default:
+            fieldValue = "";
+        }
+
+        // if (value.isReadable && value.isCampaignField)
+        folderCustomFieldValues[key] = cfValue;
       }
 
       // Sending final response

@@ -1,4 +1,4 @@
-import { getDatahubGroupedDataById, getTask } from "../../../utils/wrike";
+import { getDatahubCustomFields, getTask } from "../../../utils/wrike";
 
 export const GetTask = (wrikeToken, params, fastify) => {
   return new Promise(async (resolve, reject) => {
@@ -20,7 +20,7 @@ export const GetTask = (wrikeToken, params, fastify) => {
             "Missing parameter! Required parameter is missing for the requested operation.",
         });
 
-      const datahubCustomFieldsData = await getDatahubGroupedDataById(
+      const datahubCustomFieldsData = await getDatahubCustomFields(
         wrikeToken,
         process.env.DATAHUB_CUSTOM_FIELDS_ID
       );
@@ -49,13 +49,31 @@ export const GetTask = (wrikeToken, params, fastify) => {
       const taskCustomFieldValues = {};
 
       for (const [key, value] of Object.entries(datahubCustomFieldsData)) {
-        const cfValue =
-          wrikeTaskData?.data[0]?.customFields?.find(
-            (field) => field.id === value.cfId
-          )?.value ?? "";
+        if (!value.isReadable || !value.isTaskField) continue;
 
-        if (value.isReadable && value.isTaskField)
-          taskCustomFieldValues[key] = cfValue;
+        let cfValue;
+        switch (value.xpiFieldType) {
+          case "Wrike API Built-in Field":
+            cfValue = wrikeTaskData?.data[0][value?.cfId];
+            break;
+          case "Wrike API Metadata Field":
+            cfValue =
+              wrikeTaskData?.data[0]?.metadata?.find(
+                (field) => field.key === value?.cfId
+              )?.value ?? "";
+            break;
+          case "Wrike Custom Field":
+            cfValue =
+              wrikeTaskData?.data[0]?.customFields?.find(
+                (field) => field.id === value.cfId
+              )?.value ?? "";
+            break;
+          default:
+            fieldValue = "";
+        }
+
+        // if (value.isReadable && value.isTaskField)
+        taskCustomFieldValues[key] = cfValue;
       }
 
       if (taskCustomFieldValues["workitemlevel"] != "Task")
