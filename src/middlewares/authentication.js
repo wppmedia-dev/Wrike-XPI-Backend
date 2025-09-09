@@ -37,6 +37,7 @@ export const ValidateToken = async (req, reply, fastify) => {
       id: tokenId,
       encrypted_access_token: encAccessToken,
       encrypted_refresh_token: encRefreshToken,
+      created_by,
     } = await Tokens.GetById(tid);
 
     if (!encAccessToken)
@@ -93,7 +94,7 @@ export const ValidateToken = async (req, reply, fastify) => {
         encRefreshTokenKey
       );
 
-      Tokens.Update(tid, tokenId, {
+      Tokens.Update(created_by, tokenId, {
         encrypted_access_token: newEncAccessToken?.encryptedData,
         encrypted_refresh_token: newEncRefreshToken?.encryptedData,
       });
