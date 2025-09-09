@@ -956,20 +956,52 @@ export const getFolder = async (wrikeToken, folderId) => {
 export const updateFolder = async (
   wrikeToken,
   folderId,
+  folderFieldsUpdateData,
+  folderMetadataUpdateData,
   folderCFUpdateData
 ) => {
   try {
     // Get folder data
-    const wrikeRequestFormData = await GetResponse(
-      `${
-        process.env.WRIKE_ENDPOINT
-      }/folders/${folderId}?customFields=${JSON.stringify(folderCFUpdateData)}`,
-      "PUT",
-      {
-        "content-type": "application/json",
-        Authorization: `Bearer ${wrikeToken}`,
-      }
-    );
+    let url = `${process.env.WRIKE_ENDPOINT}/folders/${folderId}`;
+
+    if (
+      folderFieldsUpdateData &&
+      Object.keys(folderFieldsUpdateData).length > 0
+    ) {
+      Object.entries(folderFieldsUpdateData).map(([key, value]) => {
+        if (url.includes("?")) url += "&";
+        else url += "?";
+
+        url += `${key}=${value}`;
+      });
+    }
+
+    if (
+      folderMetadataUpdateData &&
+      Array.isArray(folderMetadataUpdateData) &&
+      folderMetadataUpdateData?.length > 0
+    ) {
+      if (url.includes("?")) url += "&";
+      else url += "?";
+
+      url += `metadata=${JSON.stringify(folderMetadataUpdateData)}`;
+    }
+
+    if (
+      folderCFUpdateData &&
+      Array.isArray(folderCFUpdateData) &&
+      folderCFUpdateData?.length > 0
+    ) {
+      if (url.includes("?")) url += "&";
+      else url += "?";
+
+      url += `customFields=${JSON.stringify(folderCFUpdateData)}`;
+    }
+
+    const wrikeRequestFormData = await GetResponse(url, "PUT", {
+      "content-type": "application/json",
+      Authorization: `Bearer ${wrikeToken}`,
+    });
 
     if (wrikeRequestFormData?.errorDescription) throw wrikeRequestFormData;
 

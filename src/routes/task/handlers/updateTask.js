@@ -22,9 +22,9 @@ export const UpdateTask = (wrikeToken, params, fastify) => {
       );
       // }
 
-      let taskCFUpdateData = [];
       let taskFieldsUpdateData = {};
       let taskMetadataUpdateData = [];
+      let taskCFUpdateData = [];
 
       Object.keys(formFields).forEach((field) => {
         // for (const field in formFields) {

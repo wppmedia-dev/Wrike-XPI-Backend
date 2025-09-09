@@ -22,6 +22,8 @@ export const UpdateCampaign = (wrikeToken, params, fastify) => {
       );
       // }
 
+      let folderFieldsUpdateData = {};
+      let folderMetadataUpdateData = [];
       let folderCFUpdateData = [];
 
       Object.keys(formFields).forEach((field) => {
@@ -32,17 +34,39 @@ export const UpdateCampaign = (wrikeToken, params, fastify) => {
             ?.isCampaignField === true &&
           datahubCustomFieldsData[field?.trim()?.toLowerCase()]?.isWritable ===
             true
-        )
-          folderCFUpdateData.push({
-            id: datahubCustomFieldsData[field?.trim()?.toLowerCase()]?.cfId,
-            value: formFields[field],
-          });
+        ) {
+          const xpiFieldType =
+            datahubCustomFieldsData[field?.trim()?.toLowerCase()]?.xpiFieldType;
+
+          switch (xpiFieldType) {
+            case "Wrike API Built-in Field":
+              folderFieldsUpdateData[
+                datahubCustomFieldsData[field?.trim()?.toLowerCase()]?.cfId
+              ] = formFields[field];
+              break;
+            case "Wrike API Metadata Field":
+              folderMetadataUpdateData.push({
+                key: datahubCustomFieldsData[field?.trim()?.toLowerCase()]
+                  ?.cfId,
+                value: formFields[field],
+              });
+              break;
+            case "Wrike Custom Field":
+              folderCFUpdateData.push({
+                id: datahubCustomFieldsData[field?.trim()?.toLowerCase()]?.cfId,
+                value: formFields[field],
+              });
+              break;
+          }
+        }
       });
 
       // Submit Request Form
       const updatedFolderData = await updateFolder(
         wrikeToken,
         folderId,
+        folderFieldsUpdateData,
+        folderMetadataUpdateData,
         folderCFUpdateData
       );
 
