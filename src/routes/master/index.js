@@ -1,63 +1,35 @@
 // Handlers
 import { GetMasterDataRecord } from "./handlers/getMasterDataRecord";
 import { GetMasterDataValue } from "./handlers/getMasterDataValue";
+import { CreateMasterDataRecord } from "./handlers/createMasterDataRecord";
 
 // Schema
 import { GetMasterDataValueSchema } from "./schema/getMasterDataValue";
 import { GetMasterDataRecordSchema } from "./schema/getMasterDataRecord";
+import { CreateMasterDataRecordSchema } from "./schema/createMasterDataRecord";
 
 export const masterRoute = (fastify, opts, done) => {
-  // Custom Field endpoint - supports both single value and list
-  fastify.get(
-    "/value/:masterSlug/:recordId",
-    GetMasterDataValueSchema,
+  // Create Dominus API
+  fastify.post(
+    "/record/:masterSlug",
+    CreateMasterDataRecordSchema,
     async (req, reply) => {
       try {
-        const result = await GetMasterDataValue(
+        const result = await CreateMasterDataRecord(
           req?.wrikeToken,
-          { ...req.params, ...req.query },
+          { masterSlug: req.params?.masterSlug, reqBody: req.body },
           fastify
         );
 
         reply.code(result.statusCode || 200).send({
-          "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.masterSlug}/${req.params.shortcode}`,
+          "@odata.context": `${process.env.API_URL}/v1.0/record/${req.params.masterSlug}`,
           // message: result.message,
           value: result?.data,
         });
       } catch (err) {
         reply.code(err?.statusCode || 500).send({
           // success: false,
-          "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.masterSlug}/${req.params.shortcode}`,
-          // details: err?.details || null,
-          message:
-            err?.message ||
-            "Fatal error: Unexpected error occurred and service is unable to complete the request.",
-        });
-      }
-    }
-  );
-
-  fastify.get(
-    "/value/:masterSlug",
-    GetMasterDataValueSchema,
-    async (req, reply) => {
-      try {
-        const result = await GetMasterDataValue(
-          req?.wrikeToken,
-          { ...req.params },
-          fastify
-        );
-
-        reply.code(result.statusCode || 200).send({
-          "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.masterSlug}`,
-          nextPageToken: result?.nextPageToken,
-          // message: result.message,
-          value: result?.data,
-        });
-      } catch (err) {
-        reply.code(err?.statusCode || 500).send({
-          // success: false,
-          "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.masterSlug}`,
+          "@odata.context": `${process.env.API_URL}/v1.0/record/${req.params.masterSlug}`,
           // details: err?.details || null,
           message:
             err?.message ||
@@ -80,14 +52,14 @@ export const masterRoute = (fastify, opts, done) => {
         );
 
         reply.code(result.statusCode || 200).send({
-          "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.masterSlug}/${req.params.recordId}`,
+          "@odata.context": `${process.env.API_URL}/v1.0/${req.params.masterSlug}/${req.params.recordId}`,
           // message: result.message,
           value: result?.data,
         });
       } catch (err) {
         reply.code(err?.statusCode || 500).send({
           // success: false,
-          "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.masterSlug}/${req.params.recordId}`,
+          "@odata.context": `${process.env.API_URL}/v1.0/${req.params.masterSlug}/${req.params.recordId}`,
           // details: err?.details || null,
           message:
             err?.message ||
@@ -109,7 +81,7 @@ export const masterRoute = (fastify, opts, done) => {
         );
 
         reply.code(result.statusCode || 200).send({
-          "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.masterSlug}`,
+          "@odata.context": `${process.env.API_URL}/v1.0/${req.params.masterSlug}`,
           // message: result.message,
           nextPageToken: result?.nextPageToken,
           value: result?.data,
@@ -117,7 +89,67 @@ export const masterRoute = (fastify, opts, done) => {
       } catch (err) {
         reply.code(err?.statusCode || 500).send({
           // success: false,
-          "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/${req.params.masterSlug}`,
+          "@odata.context": `${process.env.API_URL}/v1.0/${req.params.masterSlug}`,
+          // details: err?.details || null,
+          message:
+            err?.message ||
+            "Fatal error: Unexpected error occurred and service is unable to complete the request.",
+        });
+      }
+    }
+  );
+
+  // Fetch Values
+  fastify.get(
+    "/value/:masterSlug/:recordId",
+    GetMasterDataValueSchema,
+    async (req, reply) => {
+      try {
+        const result = await GetMasterDataValue(
+          req?.wrikeToken,
+          { ...req.params, ...req.query },
+          fastify
+        );
+
+        reply.code(result.statusCode || 200).send({
+          "@odata.context": `${process.env.API_URL}/v1.0/${req.params.masterSlug}/${req.params.shortcode}`,
+          // message: result.message,
+          value: result?.data,
+        });
+      } catch (err) {
+        reply.code(err?.statusCode || 500).send({
+          // success: false,
+          "@odata.context": `${process.env.API_URL}/v1.0/${req.params.masterSlug}/${req.params.shortcode}`,
+          // details: err?.details || null,
+          message:
+            err?.message ||
+            "Fatal error: Unexpected error occurred and service is unable to complete the request.",
+        });
+      }
+    }
+  );
+
+  fastify.get(
+    "/value/:masterSlug",
+    GetMasterDataValueSchema,
+    async (req, reply) => {
+      try {
+        const result = await GetMasterDataValue(
+          req?.wrikeToken,
+          { ...req.params },
+          fastify
+        );
+
+        reply.code(result.statusCode || 200).send({
+          "@odata.context": `${process.env.API_URL}/v1.0/${req.params.masterSlug}`,
+          nextPageToken: result?.nextPageToken,
+          // message: result.message,
+          value: result?.data,
+        });
+      } catch (err) {
+        reply.code(err?.statusCode || 500).send({
+          // success: false,
+          "@odata.context": `${process.env.API_URL}/v1.0/${req.params.masterSlug}`,
           // details: err?.details || null,
           message:
             err?.message ||

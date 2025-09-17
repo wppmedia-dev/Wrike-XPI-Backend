@@ -47,7 +47,7 @@ export const GetMasterDataRecord = (wrikeToken, params, fastify) => {
         });
       }
 
-      if (!datahubCustomFieldsData[masterSlug]?.isMasterDataFeatureReadable) {
+      if (!datahubCustomFieldsData[masterSlug]?.canReadMasterData) {
         return reject({
           statusCode: 403,
           message: `Read operation not allowed for recordId: ${recordId}`,

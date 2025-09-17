@@ -575,7 +575,7 @@ export const getRequestFormFieldDatahub = async (
 
 export const getDatahubCustomFields = async (
   wrikeToken,
-  datahubId,
+  databaseId,
   isMaster = false,
   useCache = true,
   cacheTTL = 0
@@ -590,7 +590,7 @@ export const getDatahubCustomFields = async (
     // Generate cache key
     const cacheKey = redisClient.generateKey(
       "datahub_grouped_data",
-      datahubId ?? process.env.DATAHUB_CUSTOM_FIELDS_ID,
+      databaseId ?? process.env.DATAHUB_CUSTOM_FIELDS_ID,
       isMaster ? "master" : "regular"
     );
 
@@ -599,16 +599,16 @@ export const getDatahubCustomFields = async (
       try {
         const cachedData = await redisClient.get(cacheKey);
         if (cachedData) {
-          // console.log(`Cache hit for datahub ${datahubId}`);
+          // console.log(`Cache hit for datahub ${databaseId}`);
           return cachedData;
         }
-        // console.log(`Cache miss for datahub ${datahubId}`);
+        // console.log(`Cache miss for datahub ${databaseId}`);
       } catch (cacheError) {
         console.warn("Cache read error, proceeding without cache:", cacheError);
       }
     }
 
-    const datahubFields = await getDatahubFields(wrikeToken, datahubId);
+    const datahubFields = await getDatahubFields(wrikeToken, databaseId);
 
     if (datahubFields?.errorDescription) {
       throw datahubFields;
@@ -619,7 +619,7 @@ export const getDatahubCustomFields = async (
       formFieldsIds[field.title?.trim()?.toLowerCase()] = field.id;
     });
 
-    const datahubRecords = await getDatahubRecords(wrikeToken, datahubId, {
+    const datahubRecords = await getDatahubRecords(wrikeToken, databaseId, {
       isRecursive: true,
       fieldIds: undefined,
       filter: "",
@@ -659,9 +659,21 @@ export const getDatahubCustomFields = async (
             record.fieldValues[formFieldsIds["api access"]]
               ?.toLowerCase()
               ?.includes("read") ?? false,
-          isMasterDataFeatureReadable:
+          canReadMasterData:
             record.fieldValues[formFieldsIds["master data feature"]]?.includes(
               "Read"
+            ) ?? false,
+          canCreateMasterData:
+            record.fieldValues[formFieldsIds["master data feature"]]?.includes(
+              "Create"
+            ) ?? false,
+          canUpdateMasterData:
+            record.fieldValues[formFieldsIds["master data feature"]]?.includes(
+              "Update"
+            ) ?? false,
+          canDeleteasterData:
+            record.fieldValues[formFieldsIds["master data feature"]]?.includes(
+              "Delete"
             ) ?? false,
           cfType: record.fieldValues[formFieldsIds["cf type"]],
           xpiFieldType: record.fieldValues[formFieldsIds["xpi field type"]],
@@ -674,7 +686,7 @@ export const getDatahubCustomFields = async (
         const isSaved = await redisClient.set(cacheKey, datahubData, cacheTTL);
         if (isSaved)
           console.log(
-            `Data cached for datahub ${datahubId} with TTL unlimited`
+            `Data cached for datahub ${databaseId} with TTL unlimited`
           );
       } catch (cacheError) {
         console.warn("Cache write error:", cacheError);
@@ -689,7 +701,7 @@ export const getDatahubCustomFields = async (
 
 export const getDatahubDataById = async (
   wrikeToken,
-  datahubId,
+  databaseId,
   filter = [],
   useCache = true,
   cacheTTL = null
@@ -701,15 +713,15 @@ export const getDatahubDataById = async (
         ? cacheTTL
         : parseInt(process.env.REDIS_DEFAULT_TTL) || 3600;
 
-    if (!datahubId)
+    if (!databaseId)
       throw {
-        message: "Missing datahubId",
+        message: "Missing databaseId",
       };
 
     // Generate cache key
     const cacheKey = redisClient.generateKey(
       "datahub_data_by_id",
-      datahubId,
+      databaseId,
       JSON.stringify(filter)
     );
 
@@ -718,16 +730,16 @@ export const getDatahubDataById = async (
       try {
         const cachedData = await redisClient.get(cacheKey);
         if (cachedData) {
-          // console.log(`Cache hit for datahub ${datahubId}`);
+          // console.log(`Cache hit for datahub ${databaseId}`);
           return cachedData;
         }
-        // console.log(`Cache miss for datahub ${datahubId}`);
+        // console.log(`Cache miss for datahub ${databaseId}`);
       } catch (cacheError) {
         console.warn("Cache read error, proceeding without cache:", cacheError);
       }
     }
 
-    const datahubFields = await getDatahubFields(wrikeToken, datahubId);
+    const datahubFields = await getDatahubFields(wrikeToken, databaseId);
 
     if (datahubFields?.errorDescription) {
       throw datahubFields;
@@ -791,7 +803,7 @@ export const getDatahubDataById = async (
       }
     }
 
-    const datahubRecords = await getDatahubRecords(wrikeToken, datahubId, {
+    const datahubRecords = await getDatahubRecords(wrikeToken, databaseId, {
       filter: filterString,
       useCache: false,
     });
@@ -814,7 +826,7 @@ export const getDatahubDataById = async (
         const isSaved = await redisClient.set(cacheKey, datahubData, ttl);
         if (isSaved)
           console.log(
-            `Data cached for datahub data by id ${datahubId} with TTL ${
+            `Data cached for datahub data by id ${databaseId} with TTL ${
               ttl === 0 ? "unlimited" : ttl + "s"
             }`
           );
@@ -824,6 +836,67 @@ export const getDatahubDataById = async (
     }
 
     return datahubData;
+  } catch (err) {
+    throw err;
+  }
+};
+
+export const createDatahubRecord = async (
+  wrikeToken,
+  databaseId,
+  fieldValues = {}
+) => {
+  try {
+    if (!fieldValues) throw "Field values must not be empty";
+
+    const datahubFields = await getDatahubFields(wrikeToken, databaseId);
+
+    if (datahubFields?.errorDescription) {
+      throw datahubFields;
+    }
+
+    if (datahubFields?.data?.length === 0)
+      throw { message: "No datahub fields mapping data found" };
+
+    let formFieldsIds = {};
+    datahubFields?.data?.forEach((field) => {
+      formFieldsIds[field.title?.trim()?.toLowerCase()] = field.id;
+    });
+
+    // Object.entries(data).map;
+
+    let inputRecordParams = {};
+    for (const data in fieldValues) {
+      if (data == "value") continue;
+      inputRecordParams[formFieldsIds[data?.trim()?.toLowerCase()]] =
+        fieldValues[data];
+    }
+
+    const customFieldsData = await GetResponse(
+      `${
+        process.env.WRIKE_DATAHUB_ENDPOINT
+      }/databases/${databaseId}/records?fieldIds=${Object.keys(
+        inputRecordParams
+      ).join(",")}`,
+      "POST",
+      {
+        "content-type": "application/json",
+        Authorization: `Bearer ${wrikeToken}`,
+      },
+      {
+        requestId: Math.random().toString(36).substring(2, 15),
+        data: [
+          {
+            title: fieldValues["value"],
+            fieldValues: inputRecordParams,
+          },
+        ],
+      }
+    );
+
+    if (customFieldsData?.errorDescription) throw customFieldsData;
+
+    return customFieldsData;
   } catch (err) {
     throw err;
   }
