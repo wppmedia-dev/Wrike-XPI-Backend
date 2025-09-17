@@ -953,7 +953,8 @@ export const updateDatahubRecord = async (
       }
     );
 
-    if (customFieldsData?.status == 404) throw { message: "Invalid Record ID" };
+    if (customFieldsData?.status == 404)
+      throw { statusCode: 404, message: "Invalid Record ID" };
 
     if (customFieldsData?.data?.status && customFieldsData?.data?.detail)
       throw customFieldsData;
@@ -988,6 +989,11 @@ export const deleteDatahubRecord = async (
 
     if (customFieldsData?.[0]?.failureReason)
       throw {
+        statusCode:
+          customFieldsData?.[0]?.failureReason ==
+          "Record doesn't belong to database"
+            ? 404
+            : 400,
         message:
           customFieldsData?.[0]?.failureReason ==
           "Record doesn't belong to database"
