@@ -108,6 +108,7 @@ export const UpdateMasterDataRecord = (wrikeToken, params, fastify) => {
     } catch (err) {
       console.error("Error in GetCustomField:", err);
       reject({
+        statusCode: err?.statusCode || 400,
         message:
           err?.message ||
           err?.errorDescription ||
