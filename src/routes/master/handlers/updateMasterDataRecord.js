@@ -55,7 +55,7 @@ export const UpdateMasterDataRecord = (wrikeToken, params, fastify) => {
         });
       }
 
-      if (!datahubCustomFieldsData[masterSlug]?.canDeleteMasterData) {
+      if (!datahubCustomFieldsData[masterSlug]?.canUpdateMasterData) {
         return reject({
           statusCode: 403,
           message: `Delete operation not allowed for masterSlug: ${masterSlug}`,
