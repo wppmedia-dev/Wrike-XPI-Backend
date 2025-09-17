@@ -1,10 +1,11 @@
 import {
   getCustomFields,
   getDatahubCustomFields,
-  createDatahubRecord,
+  deleteDatahubRecord,
+  updateDatahubRecord,
 } from "../../../utils/wrike";
 
-export const CreateMasterDataRecord = (wrikeToken, params, fastify) => {
+export const UpdateMasterDataRecord = (wrikeToken, params, fastify) => {
   return new Promise(async (resolve, reject) => {
     try {
       if (!wrikeToken) {
@@ -15,13 +16,21 @@ export const CreateMasterDataRecord = (wrikeToken, params, fastify) => {
         });
       }
 
-      const { masterSlug, reqBody } = params;
+      const { masterSlug, recordId, reqBody } = params;
 
-      if (!masterSlug) {
+      if (!masterSlug || masterSlug.trim().includes(":")) {
         return reject({
           statusCode: 400,
           message:
             "Missing parameter! Required parameter 'masterSlug' is missing.",
+        });
+      }
+
+      if (!recordId || recordId.trim().includes(":")) {
+        return reject({
+          statusCode: 400,
+          message:
+            "Missing parameter! Required parameter 'recordId' is missing.",
         });
       }
 
@@ -46,10 +55,10 @@ export const CreateMasterDataRecord = (wrikeToken, params, fastify) => {
         });
       }
 
-      if (!datahubCustomFieldsData[masterSlug]?.canCreateMasterData) {
+      if (!datahubCustomFieldsData[masterSlug]?.canDeleteMasterData) {
         return reject({
           statusCode: 403,
-          message: `Create operation not allowed for masterSlug: ${masterSlug}`,
+          message: `Delete operation not allowed for masterSlug: ${masterSlug}`,
         });
       }
 
@@ -78,20 +87,23 @@ export const CreateMasterDataRecord = (wrikeToken, params, fastify) => {
             "Error, the master data you've requested does not support record style API request.",
         });
 
-      const datahubRecord = await createDatahubRecord(
+      const datahubRecord = await updateDatahubRecord(
         wrikeToken,
         dataHubDatabaseId,
+        recordId,
         reqBody
       );
 
-      if (!datahubRecord?.data || datahubRecord.data.length === 0)
+      if (!datahubRecord?.id)
         return reject({
           statusCode: 400,
-          message: `Failed to create the record. Please try again`,
+          message:
+            datahubRecord?.detail ??
+            "Unable to update the datahub record. Please try again",
         });
 
       resolve({
-        data: { id: datahubRecord?.data[0]?.id, ...reqBody },
+        message: "Datahub record has been updated successfully",
       });
     } catch (err) {
       console.error("Error in GetCustomField:", err);

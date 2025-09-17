@@ -902,6 +902,69 @@ export const createDatahubRecord = async (
   }
 };
 
+export const updateDatahubRecord = async (
+  wrikeToken,
+  databaseId,
+  recordId,
+  fieldValues = {}
+) => {
+  try {
+    if (!recordId) throw "Record ID must not be empty";
+
+    if (!fieldValues) throw "Field values must not be empty";
+
+    const datahubFields = await getDatahubFields(wrikeToken, databaseId);
+
+    if (datahubFields?.errorDescription) {
+      throw datahubFields;
+    }
+
+    if (datahubFields?.data?.length === 0)
+      throw { message: "No datahub fields mapping data found" };
+
+    let formFieldsIds = {};
+    datahubFields?.data?.forEach((field) => {
+      formFieldsIds[field.title?.trim()?.toLowerCase()] = field.id;
+    });
+
+    // Object.entries(data).map;
+
+    let inputRecordParams = {};
+    for (const data in fieldValues) {
+      if (data == "value") continue;
+      inputRecordParams[formFieldsIds[data?.trim()?.toLowerCase()]] =
+        fieldValues[data];
+    }
+
+    const customFieldsData = await GetResponse(
+      `${
+        process.env.WRIKE_DATAHUB_ENDPOINT
+      }/databases/${databaseId}/records/${recordId}?fieldIds=${Object.keys(
+        inputRecordParams
+      ).join(",")}`,
+      "PATCH",
+      {
+        "content-type": "application/json",
+        Authorization: `Bearer ${wrikeToken}`,
+      },
+      {
+        title: fieldValues["value"],
+        fieldValues: inputRecordParams,
+      }
+    );
+
+    if (
+      customFieldsData?.errorDescription ||
+      (customFieldsData?.status && customFieldsData?.detail)
+    )
+      throw customFieldsData;
+
+    return customFieldsData;
+  } catch (err) {
+    throw err;
+  }
+};
+
 export const deleteDatahubRecord = async (
   wrikeToken,
   databaseId,

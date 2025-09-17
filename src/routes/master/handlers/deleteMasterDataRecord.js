@@ -1,7 +1,6 @@
 import {
   getCustomFields,
   getDatahubCustomFields,
-  createDatahubRecord,
   deleteDatahubRecord,
 } from "../../../utils/wrike";
 
@@ -86,13 +85,6 @@ export const DeleteMasterDataRecord = (wrikeToken, params, fastify) => {
           message:
             "Error, the master data you've requested does not support record style API request.",
         });
-
-      const mirrorFieldIds =
-        customFieldData?.data[0]?.settings?.linkToDatabaseInfo?.mirrorFields?.map(
-          (field) => field.dataHubFieldId
-        );
-
-      mirrorFieldIds.push("FIname");
 
       const datahubRecord = await deleteDatahubRecord(
         wrikeToken,
