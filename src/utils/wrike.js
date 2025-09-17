@@ -953,7 +953,7 @@ export const updateDatahubRecord = async (
       }
     );
 
-    if (customFieldsData?.status == 404) throw { message: "Invalid record ID" };
+    if (customFieldsData?.status == 404) throw { message: "Invalid Record ID" };
 
     if (customFieldsData?.data?.status && customFieldsData?.data?.detail)
       throw customFieldsData;
@@ -985,6 +985,15 @@ export const deleteDatahubRecord = async (
     );
 
     if (customFieldsData?.errorDescription) throw customFieldsData;
+
+    if (customFieldsData?.[0]?.failureReason)
+      throw {
+        message:
+          customFieldsData?.[0]?.failureReason ==
+          "Record doesn't belong to database"
+            ? "Invalid Record ID"
+            : "Unable to delete the datahub record. Please try again",
+      };
 
     return customFieldsData;
   } catch (err) {
