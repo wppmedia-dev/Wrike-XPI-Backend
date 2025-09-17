@@ -79,6 +79,9 @@ export const GetResponseWithStatusCode = (
         body: requestBody,
       });
 
+      if (response.status == 404)
+        return resolve({ status: 404, message: "Not Found" });
+
       if (response.status == 204) {
         resolve({});
         return;

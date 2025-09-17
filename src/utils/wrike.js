@@ -1,5 +1,5 @@
 import { getSecrets } from "./azure_vault";
-import { GetResponse } from "./node-fetch";
+import { GetResponse, GetResponseWithStatusCode } from "./node-fetch";
 import redisClient from "./redis";
 require("dotenv").config();
 
@@ -877,11 +877,7 @@ export const createDatahubRecord = async (
     }
 
     const customFieldsData = await GetResponse(
-      `${
-        process.env.WRIKE_DATAHUB_ENDPOINT
-      }/databases/${databaseId}/records?fieldIds=${Object.keys(
-        inputRecordParams
-      ).join(",")}`,
+      `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/records`,
       "POST",
       {
         "content-type": "application/json",
@@ -944,12 +940,8 @@ export const updateDatahubRecord = async (
         fieldValues[data];
     }
 
-    const customFieldsData = await GetResponse(
-      `${
-        process.env.WRIKE_DATAHUB_ENDPOINT
-      }/databases/${databaseId}/records/${recordId}?fieldIds=${Object.keys(
-        inputRecordParams
-      ).join(",")}`,
+    const customFieldsData = await GetResponseWithStatusCode(
+      `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/records/${recordId}`,
       "PATCH",
       {
         "content-type": "application/json",
@@ -961,13 +953,12 @@ export const updateDatahubRecord = async (
       }
     );
 
-    if (
-      customFieldsData?.errorDescription ||
-      (customFieldsData?.status && customFieldsData?.detail)
-    )
+    if (customFieldsData?.status == 404) throw { message: "Invalid record ID" };
+
+    if (customFieldsData?.data?.status && customFieldsData?.data?.detail)
       throw customFieldsData;
 
-    return customFieldsData;
+    return customFieldsData?.data;
   } catch (err) {
     throw err;
   }
