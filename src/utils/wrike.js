@@ -671,7 +671,7 @@ export const getDatahubCustomFields = async (
             record.fieldValues[formFieldsIds["master data feature"]]?.includes(
               "Update"
             ) ?? false,
-          canDeleteasterData:
+          canDeleteMasterData:
             record.fieldValues[formFieldsIds["master data feature"]]?.includes(
               "Delete"
             ) ?? false,
@@ -891,6 +891,34 @@ export const createDatahubRecord = async (
             fieldValues: inputRecordParams,
           },
         ],
+      }
+    );
+
+    if (customFieldsData?.errorDescription) throw customFieldsData;
+
+    return customFieldsData;
+  } catch (err) {
+    throw err;
+  }
+};
+
+export const deleteDatahubRecord = async (
+  wrikeToken,
+  databaseId,
+  recordIds = []
+) => {
+  try {
+    if (!Array.isArray(recordIds) || recordIds.length === 0)
+      throw "Record IDs must not be empty";
+
+    const customFieldsData = await GetResponse(
+      `${
+        process.env.WRIKE_DATAHUB_ENDPOINT
+      }/databases/${databaseId}/records?recordIds=${recordIds.join(",")}`,
+      "DELETE",
+      {
+        "content-type": "application/json",
+        Authorization: `Bearer ${wrikeToken}`,
       }
     );
 

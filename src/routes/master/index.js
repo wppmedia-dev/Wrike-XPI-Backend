@@ -2,11 +2,13 @@
 import { GetMasterDataRecord } from "./handlers/getMasterDataRecord";
 import { GetMasterDataValue } from "./handlers/getMasterDataValue";
 import { CreateMasterDataRecord } from "./handlers/createMasterDataRecord";
+import { DeleteMasterDataRecord } from "./handlers/deleteMasterDataRecord";
 
 // Schema
 import { GetMasterDataValueSchema } from "./schema/getMasterDataValue";
 import { GetMasterDataRecordSchema } from "./schema/getMasterDataRecord";
 import { CreateMasterDataRecordSchema } from "./schema/createMasterDataRecord";
+import { DeleteMasterDataRecordSchema } from "./schema/deleteMasterDataRecord";
 
 export const masterRoute = (fastify, opts, done) => {
   // Create Dominus API
@@ -30,6 +32,36 @@ export const masterRoute = (fastify, opts, done) => {
         reply.code(err?.statusCode || 500).send({
           // success: false,
           "@odata.context": `${process.env.API_URL}/v1.0/record/${req.params.masterSlug}`,
+          // details: err?.details || null,
+          message:
+            err?.message ||
+            "Fatal error: Unexpected error occurred and service is unable to complete the request.",
+        });
+      }
+    }
+  );
+
+  // Create Dominus API
+  fastify.delete(
+    "/record/:masterSlug/:recordId",
+    DeleteMasterDataRecordSchema,
+    async (req, reply) => {
+      try {
+        const result = await DeleteMasterDataRecord(
+          req?.wrikeToken,
+          { ...req.params, reqBody: req.body },
+          fastify
+        );
+
+        reply.code(result.statusCode || 200).send({
+          "@odata.context": `${process.env.API_URL}/v1.0/record/${req.params.masterSlug}/${req.params?.recordId}`,
+          message: result.message,
+          // value: result?.data,
+        });
+      } catch (err) {
+        reply.code(err?.statusCode || 500).send({
+          // success: false,
+          "@odata.context": `${process.env.API_URL}/v1.0/record/${req.params.masterSlug}/${req.params?.recordId}`,
           // details: err?.details || null,
           message:
             err?.message ||
