@@ -868,6 +868,10 @@ export const createDatahubRecord = async (
     let inputRecordParams = {};
     for (const data in fieldValues) {
       if (data == "value") continue;
+
+      // Skip if the value is empty or null
+      if (!formFieldsIds[data?.trim()?.toLowerCase()]) continue;
+
       inputRecordParams[formFieldsIds[data?.trim()?.toLowerCase()]] =
         fieldValues[data];
     }
@@ -932,6 +936,10 @@ export const updateDatahubRecord = async (
     let inputRecordParams = {};
     for (const data in fieldValues) {
       if (data == "value") continue;
+
+      // Skip if the value is empty or null
+      if (!formFieldsIds[data?.trim()?.toLowerCase()]) continue;
+
       inputRecordParams[formFieldsIds[data?.trim()?.toLowerCase()]] =
         fieldValues[data];
     }
