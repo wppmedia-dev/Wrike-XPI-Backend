@@ -290,9 +290,7 @@ export const tokenRoute = (fastify, opts, done) => {
   <div class="card">
     <h1>Oops! Something went wrong</h1>
     <div class="message">${err?.message || "Unexpected error occurred"}</div>
-    <a class="btn" href="${process.env.API_URL}${
-        process.env.BASE_PATH
-      }">⬅ Back to Login</a>
+    <a class="btn" href="${process.env.API_URL}">⬅ Back to Login</a>
   </div>
 </body>
 </html>
@@ -538,7 +536,7 @@ export const tokenRoute = (fastify, opts, done) => {
         verifyBtn.disabled = true;
 
         try {
-          const res = await fetch('${process.env.BASE_PATH}/api/v1/wrikexpi/token/profile', {
+          const res = await fetch('${process.env.API_URL}/wrikexpi/token/profile', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ token }),
@@ -891,7 +889,7 @@ export const tokenRoute = (fastify, opts, done) => {
         viewBtn.disabled = true;
 
         try {
-          const res = await fetch('${process.env.BASE_PATH}/api/v1/wrikexpi/token/view-tokens', {
+          const res = await fetch('${process.env.API_URL}/wrikexpi/token/view-tokens', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ token }),
