@@ -41,6 +41,21 @@ module.exports = (sequelize, DataTypes) => {
       encrypted_refresh_token: {
         type: DataTypes.TEXT,
       },
+      wrapped_access_token_dek: {
+        type: DataTypes.TEXT,
+      },
+      wrapped_refresh_token_dek: {
+        type: DataTypes.TEXT,
+      },
+      key_id: {
+        type: DataTypes.STRING,
+      },
+      username: {
+        type: DataTypes.STRING,
+      },
+      password_hash: {
+        type: DataTypes.STRING,
+      },
       is_active: {
         type: DataTypes.BOOLEAN,
       },

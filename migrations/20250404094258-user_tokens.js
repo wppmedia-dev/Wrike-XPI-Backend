@@ -1,6 +1,7 @@
 "use strict";
 module.exports = {
   up: async (queryInterface, Sequelize) => {
+    // Create the table
     await queryInterface.createTable("user_tokens", {
       id: {
         type: Sequelize.UUID,
@@ -12,6 +13,14 @@ module.exports = {
         type: Sequelize.STRING,
         allowNull: false,
       },
+      username: {
+        type: Sequelize.STRING,
+        allowNull: true,
+      },
+      password_hash: {
+        type: Sequelize.STRING,
+        allowNull: true,
+      },
       encrypted_access_token: {
         type: Sequelize.TEXT,
         allowNull: false,
@@ -19,6 +28,18 @@ module.exports = {
       encrypted_refresh_token: {
         type: Sequelize.TEXT,
         allowNull: false,
+      },
+      wrapped_access_token_dek: {
+        type: Sequelize.TEXT,
+        allowNull: true,
+      },
+      wrapped_refresh_token_dek: {
+        type: Sequelize.TEXT,
+        allowNull: true,
+      },
+      key_id: {
+        type: Sequelize.STRING,
+        allowNull: true,
       },
       is_active: {
         defaultValue: false,
@@ -63,8 +84,23 @@ module.exports = {
         },
       },
     });
+
+    // Add unique index for username
+    await queryInterface.addIndex("user_tokens", ["username"], {
+      unique: true,
+      where: {
+        is_active: true,
+      },
+      name: "user_tokens_username_unique_active_idx",
+    });
   },
   down: async (queryInterface, Sequelize) => {
+    // Remove index first
+    await queryInterface.removeIndex(
+      "user_tokens",
+      "user_tokens_username_unique_active_idx"
+    );
+    // Then drop the table
     await queryInterface.dropTable("user_tokens");
   },
 };

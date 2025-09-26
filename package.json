@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@azure/identity": "^4.8.0",
+    "@azure/keyvault-keys": "^4.10.0",
     "@azure/keyvault-secrets": "^4.9.0",
     "@babel/cli": "^7.27.0",
     "@babel/core": "^7.26.10",

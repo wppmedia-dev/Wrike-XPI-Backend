@@ -26,15 +26,32 @@ export const tokenRoute = (fastify, opts, done) => {
 
   fastify.get("/callback", WrikeXPICallbackSchema, async (req, reply) => {
     try {
-      const token = await WrikeXPICallback(req.query, fastify);
+      const result = await WrikeXPICallback(req.query, fastify);
 
-      if (!token) {
-        return reply.code(200).send({
-          success: true,
-          message: result?.message,
-          data: result?.data,
+      if (!result) {
+        return reply.code(400).send({
+          success: false,
+          message: "Failed to process callback",
         });
       }
+
+      // Handle the case where new credentials were generated
+      const credentialsHtml = result.credentials
+        ? `
+        <div class="credentials-box">
+          <h3>Your API Access Credentials</h3>
+          <p class="warning">${result.credentials.message}</p>
+          <div class="credential-item">
+            <label>Username:</label>
+            <code>${result.credentials.username}</code>
+          </div>
+          <div class="credential-item">
+            <label>Password:</label>
+            <code>${result.credentials.password}</code>
+          </div>
+        </div>
+      `
+        : "";
 
       const html = `
 <!DOCTYPE html>
@@ -50,6 +67,38 @@ export const tokenRoute = (fastify, opts, done) => {
       --bg-blur: rgba(255, 255, 255, 0.06);
       --border-light: rgba(255, 255, 255, 0.15);
       --text-subtle: #cccccc;
+      --warning: #ff9800;
+    }
+    
+    .credentials-box {
+      background: var(--bg-blur);
+      border: 1px solid var(--border-light);
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+
+    .warning {
+      color: var(--warning);
+      font-weight: bold;
+    }
+
+    .credential-item {
+      margin: 10px 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .credential-item label {
+      font-weight: bold;
+      min-width: 100px;
+    }
+
+    .credential-item code {
+      background: rgba(0,0,0,0.2);
+      padding: 4px 8px;
+      border-radius: 4px;
     }
 
     * {
@@ -88,6 +137,79 @@ export const tokenRoute = (fastify, opts, done) => {
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
       animation: popIn 0.7s ease-out;
       transform-origin: center;
+    }
+
+    .credentials-section {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--border-light);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 30px;
+      text-align: left;
+    }
+
+    .credentials-section h3,
+    .token-section h3 {
+      margin-bottom: 15px;
+      color: #fff;
+      font-size: 1.2rem;
+      opacity: 0.9;
+    }
+
+    .warning {
+      color: #ff9800;
+      margin-bottom: 15px;
+      font-weight: bold;
+    }
+
+    .credential-item {
+      display: flex;
+      align-items: center;
+      margin: 10px 0;
+      gap: 10px;
+    }
+
+    .credential-item label {
+      min-width: 100px;
+      font-weight: bold;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .code-with-copy {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+    }
+
+    .credential-item code {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-family: monospace;
+      flex: 1;
+    }
+
+    .copy-icon {
+      background: transparent;
+      border: none;
+      padding: 4px;
+      cursor: pointer;
+      color: rgba(255, 255, 255, 0.6);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .copy-icon:hover {
+      color: white;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .token-section {
+      margin-top: 20px;
     }
 
     @keyframes popIn {
@@ -162,14 +284,45 @@ export const tokenRoute = (fastify, opts, done) => {
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>WrikeXPI Secure Token</h1>
-    <div class="token-box" id="tokenBox">${token}</div>
-    <button class="copy-btn" onclick="copyToken()">Copy to Clipboard</button>
-    <div class="success-msg" id="successMsg">Token copied to clipboard ✅</div>
-  </div>
+    <div class="card">
+      <h1>WrikeXPI Secure Token</h1>
+      
+      <div class="credentials-section">
+        <h3>Your API Access Credentials</h3>
+        <p class="warning">${result.credentials.message}</p>
+        <div class="credential-item">
+          <label>Username:</label>
+          <div class="code-with-copy">
+            <code>${result.credentials.username}</code>
+            <button class="copy-icon" onclick="copyCredential('${result.credentials.username}', 'username')">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="credential-item">
+          <label>Password:</label>
+          <div class="code-with-copy">
+            <code>${result.credentials.password}</code>
+            <button class="copy-icon" onclick="copyCredential('${result.credentials.password}', 'password')">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
 
-  <script>
+      <div class="token-section">
+        <h3>JWT Token</h3>
+        <div class="token-box" id="tokenBox">${result.token}</div>
+        <button class="copy-btn" onclick="copyToken()">Copy Token to Clipboard</button>
+        <div class="success-msg" id="successMsg">Token copied to clipboard ✅</div>
+      </div>
+    </div>  <script>
     function copyToken() {
       const token = document.getElementById("tokenBox").innerText;
       navigator.clipboard.writeText(token).then(() => {
@@ -177,6 +330,18 @@ export const tokenRoute = (fastify, opts, done) => {
         msg.style.display = "block";
         setTimeout(() => {
           msg.style.display = "none";
+        }, 2500);
+      });
+    }
+
+    function copyCredential(text, type) {
+      navigator.clipboard.writeText(text).then(() => {
+        const msg = document.getElementById("successMsg");
+        msg.textContent = \`\${type.charAt(0).toUpperCase() + type.slice(1)} copied to clipboard ✅\`;
+        msg.style.display = "block";
+        setTimeout(() => {
+          msg.style.display = "none";
+          msg.textContent = "Token copied to clipboard ✅";
         }, 2500);
       });
     }

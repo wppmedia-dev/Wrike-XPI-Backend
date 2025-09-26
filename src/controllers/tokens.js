@@ -46,7 +46,15 @@ export const GetById = async (id) => {
     }
 
     const userTokens = await models.UserTokens.findOne({
-      attributes: ["id", "encrypted_access_token", "encrypted_refresh_token", "created_by"],
+      attributes: [
+        "id",
+        "encrypted_access_token",
+        "encrypted_refresh_token",
+        "wrapped_access_token_dek",
+        "wrapped_refresh_token_dek",
+        "key_id",
+        "created_by",
+      ],
       where: {
         id,
         is_active: true,
@@ -57,6 +65,9 @@ export const GetById = async (id) => {
       id: userTokens?.id,
       encrypted_access_token: userTokens?.encrypted_access_token,
       encrypted_refresh_token: userTokens?.encrypted_refresh_token,
+      wrapped_access_token_dek: userTokens?.wrapped_access_token_dek,
+      wrapped_refresh_token_dek: userTokens?.wrapped_refresh_token_dek,
+      key_id: userTokens?.key_id,
       created_by: userTokens?.created_by,
     };
   } catch (err) {
@@ -74,7 +85,15 @@ export const GetByUserId = async (id) => {
     }
 
     const userTokens = await models.UserTokens.findAll({
-      attributes: ["id", "encrypted_access_token", "encrypted_refresh_token"],
+      attributes: [
+        "id",
+        "encrypted_access_token",
+        "encrypted_refresh_token",
+        "wrapped_access_token_dek",
+        "wrapped_refresh_token_dek",
+        "key_id",
+        "created_by",
+      ],
       where: {
         created_by: id,
         is_active: true,
@@ -83,7 +102,56 @@ export const GetByUserId = async (id) => {
       limit: 1,
     });
 
-    return userTokens;
+    return {
+      id: userTokens?.id,
+      encrypted_access_token: userTokens?.encrypted_access_token,
+      encrypted_refresh_token: userTokens?.encrypted_refresh_token,
+      wrapped_access_token_dek: userTokens?.wrapped_access_token_dek,
+      wrapped_refresh_token_dek: userTokens?.wrapped_refresh_token_dek,
+      key_id: userTokens?.key_id,
+      created_by: userTokens?.created_by,
+    };
+  } catch (err) {
+    throw err;
+  }
+};
+
+export const GetTokenByUsername = async (username) => {
+  try {
+    if (!username) {
+      throw {
+        statusCode: 420,
+        message: "Username must not be empty!",
+      };
+    }
+
+    const userToken = await models.UserTokens.findOne({
+      attributes: [
+        "id",
+        "password_hash",
+        "encrypted_access_token",
+        "encrypted_refresh_token",
+        "wrapped_access_token_dek",
+        "wrapped_refresh_token_dek",
+        "key_id",
+        "created_by",
+      ],
+      where: {
+        username,
+        is_active: true,
+      },
+    });
+
+    return {
+      id: userToken?.id,
+      password_hash: userToken?.password_hash,
+      encrypted_access_token: userToken?.encrypted_access_token,
+      encrypted_refresh_token: userToken?.encrypted_refresh_token,
+      wrapped_access_token_dek: userToken?.wrapped_access_token_dek,
+      wrapped_refresh_token_dek: userToken?.wrapped_refresh_token_dek,
+      key_id: userToken?.key_id,
+      created_by: userToken?.created_by,
+    };
   } catch (err) {
     throw err;
   }

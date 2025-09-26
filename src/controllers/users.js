@@ -20,3 +20,15 @@ export const GetByWrikeId = async (id) => {
     throw err;
   }
 };
+
+export const GetById = async (id) => {
+  try {
+    const userData = await models.Users.findOne({
+      attributes: ["id"],
+      where: { id },
+    });
+    return userData;
+  } catch (err) {
+    throw err;
+  }
+};

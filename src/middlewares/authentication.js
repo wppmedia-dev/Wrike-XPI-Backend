@@ -1,59 +1,38 @@
 import { Tokens } from "../controllers";
-import { decryptWithKey, encryptWithRandomKey } from "../utils/crypto";
+import {
+  decryptWithDEK,
+  unwrapDEK,
+  generateDEK,
+  encryptWithDEK,
+  wrapDEK,
+} from "../utils/crypto";
 import { getWrikeTokens } from "../utils/wrike";
+import { getAuthenticatedUser } from "../utils/auth";
 
 export const ValidateToken = async (req, reply, fastify) => {
   try {
-    const token = req?.headers?.authorization?.split(" ")[1];
-
-    if (!token) {
-      return reply.code(401).send({
-        message: "Failed authentication! Unable to authenticate user or token.",
-      });
-    }
-
-    await req.jwtVerify();
-
-    const {
-      uid = null,
-      tid = null,
-      encAccessTokenKey = null,
-      encRefreshTokenKey = null,
-    } = req?.user;
-
-    if (uid)
-      return reply.code(401).send({
-        message:
-          "Failed authorization! Your token is outdated. Please generate a new token to continue.",
-      });
-
-    if (!tid || !encAccessTokenKey || !encRefreshTokenKey)
-      return reply.code(403).send({
-        message:
-          "Failed authorization! User is not authorized to access the service.",
-      });
-
+    // Authenticate user using either JWT or Basic Auth
     const {
       encrypted_access_token: encAccessToken,
       encrypted_refresh_token: encRefreshToken,
-      created_by,
-    } = await Tokens.GetById(tid);
+      wrapped_access_token_dek: wrappedAccessTokenDEK,
+      wrapped_refresh_token_dek: wrappedRefreshTokenDEK,
+      key_id: keyId,
+      created_by: createdBy,
+    } = await getAuthenticatedUser(req, reply, fastify);
 
-    if (!encAccessToken)
+    if (!encAccessToken || !wrappedAccessTokenDEK || !keyId)
       return reply.code(401).send({
         message:
           "Failed authorization! The token is invalid or does not exist.",
       });
 
-    let wrikeAccessToken = await decryptWithKey(
-      encAccessToken,
-      encAccessTokenKey
-    );
+    // Unwrap DEKs using Azure Key Vault
+    const accessTokenDEK = await unwrapDEK(wrappedAccessTokenDEK, keyId);
+    const refreshTokenDEK = await unwrapDEK(wrappedRefreshTokenDEK, keyId);
 
-    const wrikeRefreshToken = await decryptWithKey(
-      encRefreshToken,
-      encRefreshTokenKey
-    );
+    let wrikeAccessToken = decryptWithDEK(encAccessToken, accessTokenDEK);
+    const wrikeRefreshToken = decryptWithDEK(encRefreshToken, refreshTokenDEK);
 
     if (!wrikeAccessToken || !wrikeRefreshToken)
       return reply.code(401).send({
@@ -95,18 +74,30 @@ export const ValidateToken = async (req, reply, fastify) => {
 
       wrikeAccessToken = access_token;
 
-      const newEncAccessToken = await encryptWithRandomKey(
+      // Generate new DEKs for the new tokens
+      const newAccessTokenDEK = generateDEK();
+      const newRefreshTokenDEK = generateDEK();
+
+      // Encrypt tokens with new DEKs
+      const encryptedAccessToken = encryptWithDEK(
         access_token,
-        encAccessTokenKey
+        newAccessTokenDEK
       );
-      const newEncRefreshToken = await encryptWithRandomKey(
+      const encryptedRefreshToken = encryptWithDEK(
         refresh_token,
-        encRefreshTokenKey
+        newRefreshTokenDEK
       );
 
-      await Tokens.Update(created_by, tid, {
-        encrypted_access_token: newEncAccessToken?.encryptedData,
-        encrypted_refresh_token: newEncRefreshToken?.encryptedData,
+      // Wrap new DEKs
+      const wrappedAccessTokenDEK = await wrapDEK(newAccessTokenDEK, keyId);
+      const wrappedRefreshTokenDEK = await wrapDEK(newRefreshTokenDEK, keyId);
+
+      await Tokens.Update(createdBy, tid, {
+        encrypted_access_token: encryptedAccessToken,
+        encrypted_refresh_token: encryptedRefreshToken,
+        wrapped_access_token_dek: wrappedAccessTokenDEK,
+        wrapped_refresh_token_dek: wrappedRefreshTokenDEK,
+        key_id: keyId,
       });
     }
 
