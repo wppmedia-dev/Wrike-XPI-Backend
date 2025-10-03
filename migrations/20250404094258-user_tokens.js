@@ -29,16 +29,12 @@ module.exports = {
         type: Sequelize.TEXT,
         allowNull: false,
       },
-      wrapped_access_token_dek: {
-        type: Sequelize.TEXT,
+      salt: {
+        type: Sequelize.STRING(32),
         allowNull: true,
       },
-      wrapped_refresh_token_dek: {
+      wrapped_dek: {
         type: Sequelize.TEXT,
-        allowNull: true,
-      },
-      key_id: {
-        type: Sequelize.STRING,
         allowNull: true,
       },
       is_active: {
