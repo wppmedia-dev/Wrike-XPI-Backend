@@ -2,65 +2,64 @@
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
-  class UserTokens extends Model {
+  class UserCredentials extends Model {
     static associate(models) {
-      UserTokens.belongsTo(models.Users, {
+      UserCredentials.belongsTo(models.UserTokens, {
+        foreignKey: "user_token_id",
+        as: "userToken",
+      });
+      UserCredentials.belongsTo(models.Users, {
         as: "creator",
         foreignKey: "created_by",
         onUpdate: "CASCADE",
         onDelete: "RESTRICT",
       });
-      UserTokens.belongsTo(models.Users, {
+      UserCredentials.belongsTo(models.Users, {
         as: "updater",
         foreignKey: "updated_by",
         onUpdate: "CASCADE",
         onDelete: "RESTRICT",
       });
-      UserTokens.belongsTo(models.Users, {
+      UserCredentials.belongsTo(models.Users, {
         as: "deleter",
         foreignKey: "deleted_by",
         onUpdate: "CASCADE",
         onDelete: "RESTRICT",
       });
-      UserTokens.hasMany(models.UserCredentials, {
-        as: "credentials",
-        foreignKey: "user_token_id",
-        onUpdate: "CASCADE",
-        onDelete: "CASCADE",
-      });
     }
   }
 
-  UserTokens.init(
+  UserCredentials.init(
     {
       id: {
         primaryKey: true,
         type: DataTypes.UUID,
         defaultValue: DataTypes.UUIDV4,
       },
-      account_id: {
-        type: DataTypes.STRING,
-      },
-      encrypted_access_token: {
-        type: DataTypes.TEXT,
-      },
-      encrypted_refresh_token: {
-        type: DataTypes.TEXT,
+      user_token_id: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        references: {
+          model: "user_tokens",
+          key: "id",
+        },
       },
       username: {
         type: DataTypes.STRING,
+        allowNull: false,
+        unique: true,
       },
       password_hash: {
         type: DataTypes.STRING,
+        allowNull: false,
       },
       salt: {
-        type: DataTypes.STRING(32),
-      },
-      wrapped_dek: {
-        type: DataTypes.TEXT,
+        type: DataTypes.STRING,
+        allowNull: false,
       },
       is_active: {
         type: DataTypes.BOOLEAN,
+        defaultValue: true,
       },
       created_at: {
         type: DataTypes.DATE,
@@ -74,8 +73,8 @@ module.exports = (sequelize, DataTypes) => {
     },
     {
       sequelize,
-      modelName: "UserTokens",
-      tableName: "user_tokens",
+      modelName: "UserCredentials",
+      tableName: "user_credentials",
       underscored: true,
       createdAt: false,
       updatedAt: false,
@@ -84,36 +83,37 @@ module.exports = (sequelize, DataTypes) => {
     }
   );
 
-  UserTokens.beforeCreate((data, options) => {
+  // Create Hook
+  UserCredentials.beforeCreate((data, options) => {
     try {
       data.created_at = new Date();
       data.created_by = options?.profile_id;
     } catch (err) {
-      console.log("Error while creating a user token", err?.message || err);
+      console.log("Error while creating user credentials", err?.message || err);
     }
   });
 
   // Update Hook
-  UserTokens.beforeUpdate(async (data, options) => {
+  UserCredentials.beforeUpdate(async (data, options) => {
     try {
       data.updated_at = new Date();
       data.updated_by = options?.profile_id;
     } catch (err) {
-      console.log("Error while updating a user token", err?.message || err);
+      console.log("Error while updating user credentials", err?.message || err);
     }
   });
 
   // Delete Hook
-  UserTokens.afterDestroy(async (data, options) => {
+  UserCredentials.beforeDestroy(async (data, options) => {
     try {
-      // data.deleted_by = options?.user_id;
+      data.deleted_at = new Date();
+      data.deleted_by = options?.profile_id;
       data.is_active = false;
-
       await data.save({ profile_id: options.profile_id });
     } catch (err) {
-      console.log("Error while deleting a user token", err?.message || err);
+      console.log("Error while deleting user credentials", err?.message || err);
     }
   });
 
-  return UserTokens;
+  return UserCredentials;
 };

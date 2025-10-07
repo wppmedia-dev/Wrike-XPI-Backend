@@ -13,14 +13,6 @@ module.exports = {
         type: Sequelize.STRING,
         allowNull: false,
       },
-      username: {
-        type: Sequelize.STRING,
-        allowNull: true,
-      },
-      password_hash: {
-        type: Sequelize.STRING,
-        allowNull: true,
-      },
       encrypted_access_token: {
         type: Sequelize.TEXT,
         allowNull: false,
@@ -28,10 +20,6 @@ module.exports = {
       encrypted_refresh_token: {
         type: Sequelize.TEXT,
         allowNull: false,
-      },
-      salt: {
-        type: Sequelize.STRING(32),
-        allowNull: true,
       },
       wrapped_dek: {
         type: Sequelize.TEXT,
@@ -80,22 +68,8 @@ module.exports = {
         },
       },
     });
-
-    // Add unique index for username
-    await queryInterface.addIndex("user_tokens", ["username"], {
-      unique: true,
-      where: {
-        is_active: true,
-      },
-      name: "user_tokens_username_unique_active_idx",
-    });
   },
   down: async (queryInterface, Sequelize) => {
-    // Remove index first
-    await queryInterface.removeIndex(
-      "user_tokens",
-      "user_tokens_username_unique_active_idx"
-    );
     // Then drop the table
     await queryInterface.dropTable("user_tokens");
   },

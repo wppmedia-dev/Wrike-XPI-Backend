@@ -1,12 +1,9 @@
-import { Tokens } from "../controllers";
+import { Tokens, UserCredentials } from "../controllers";
 import { getWrikeTokens } from "../utils/wrike";
 import * as crypto from "../utils/crypto";
 import jwt from "jsonwebtoken";
 
-/**
- * Verify Basic Auth credentials and return unwrapped DEK
- * @param {string} credentials Base64 encoded username:password
- */
+// Verify Basic Auth credentials and return unwrapped DEK
 const verifyBasicAuth = async (credentials) => {
   const [username, password] = Buffer.from(credentials, "base64")
     .toString()
@@ -16,20 +13,29 @@ const verifyBasicAuth = async (credentials) => {
     throw new Error("Invalid credentials format");
   }
 
-  // Get user token details
-  const token = await Tokens.GetTokenByUsername(username);
-  if (!token?.id || !token?.password_hash) {
+  // Get user credentials and associated token
+  const userCreds = await UserCredentials.GetByUsername(username);
+  if (!userCreds?.id || !userCreds?.password_hash) {
     throw new Error("Invalid credentials");
   }
 
   // Verify password
-  const isValid = await crypto.verifyPassword(token.password_hash, password);
+  const isValid = await crypto.verifyPassword(
+    userCreds.password_hash,
+    password
+  );
   if (!isValid) {
     throw new Error("Invalid password");
   }
 
+  // Get the associated token
+  const token = userCreds.userToken;
+  if (!token?.id || !token?.wrapped_dek) {
+    throw new Error("Token not found");
+  }
+
   // Derive KEK and unwrap DEK
-  const salt = Buffer.from(token.salt, "base64");
+  const salt = Buffer.from(userCreds.salt, "base64");
   const kek = await crypto.deriveKEK(password, salt);
   const wrappedDEK = Buffer.from(token.wrapped_dek, "base64");
   const dek = crypto.unwrapDEK(wrappedDEK, kek);
@@ -37,9 +43,7 @@ const verifyBasicAuth = async (credentials) => {
   return { token, dek };
 };
 
-/**
- * Verify JWE token and extract DEK
- */
+// Verify JWE token and extract DEK
 const verifyJWE = async (jweToken) => {
   const { tid, enc: encryptedDEK } = jwt.verify(
     jweToken,
@@ -62,9 +66,7 @@ const verifyJWE = async (jweToken) => {
   return { token, dek };
 };
 
-/**
- * Handle token refresh using DEK
- */
+// Handle token refresh using DEK
 const refreshTokens = async (encRefreshToken, dek, createdBy, tid) => {
   // Ensure DEK is a Buffer before decryption
   const dekBuffer = Buffer.isBuffer(dek) ? dek : Buffer.from(dek, "base64");

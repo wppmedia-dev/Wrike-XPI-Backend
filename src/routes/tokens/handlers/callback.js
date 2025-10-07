@@ -1,5 +1,5 @@
 import * as crypto from "../../../utils/crypto";
-import { Tokens, Users } from "../../../controllers";
+import { Tokens, Users, UserCredentials } from "../../../controllers";
 import { getWrikeTokens, getUserData } from "../../../utils/wrike";
 import models from "../../../../models";
 
@@ -48,8 +48,9 @@ export const WrikeXPICallback = ({ code }, fastify) => {
         userId = newUserData?.id;
       }
 
-      // Generate username from email + account_id
-      const username = `${accountId}-${primaryEmail}`;
+      // Generate username from email + random_number + account_id
+      const uniqueNumber = Math.floor(10000000 + Math.random() * 90000000); // Generate a 8-digit random number
+      const username = `${accountId}-${uniqueNumber}-${primaryEmail}`;
 
       // Generate random strong password
       const password = crypto.generateSecurePassword();
@@ -86,9 +87,6 @@ export const WrikeXPICallback = ({ code }, fastify) => {
           {
             encrypted_access_token: encryptedAccessToken,
             encrypted_refresh_token: encryptedRefreshToken,
-            username,
-            password_hash: passwordHash,
-            salt: salt.toString("base64"),
             wrapped_dek: wrappedDEK.toString("base64"),
           },
           { transaction }
@@ -100,15 +98,25 @@ export const WrikeXPICallback = ({ code }, fastify) => {
             account_id: accountId,
             encrypted_access_token: encryptedAccessToken,
             encrypted_refresh_token: encryptedRefreshToken,
-            username,
-            password_hash: passwordHash,
-            salt: salt.toString("base64"),
             wrapped_dek: wrappedDEK.toString("base64"),
             is_active: true,
           },
           { transaction }
         );
         userTokenId = newUserTokenData?.id;
+
+        // Create separate credentials
+        await UserCredentials.Insert(
+          userId,
+          {
+            user_token_id: userTokenId,
+            username,
+            password_hash: passwordHash,
+            salt: salt.toString("base64"),
+            is_active: true,
+          },
+          { transaction }
+        );
       }
 
       // Create JWE token containing the DEK
