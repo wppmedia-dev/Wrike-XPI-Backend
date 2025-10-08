@@ -3,5 +3,5 @@
 const fp = require("fastify-plugin");
 
 module.exports = fp(async function (fastify, opts) {
-  // fastify.register(require("@fastify/middie"));
+  fastify.register(require("@fastify/express"));
 });

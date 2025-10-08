@@ -7,86 +7,93 @@ import Fastify from "fastify";
 import dotenv from "dotenv";
 dotenv.config();
 
+import odataRouter from "./odata/router.js";
+
 // Importing Routes
 import { PrivateRouters, PublicRouters } from "./routes";
 import { getSecrets } from "./utils/azure_vault";
 
-// Configure the framework and instantiate it
-const fastify = Fastify({
-  logger: true,
-});
+(async () => {
+  // Configure the framework and instantiate it
+  const fastify = Fastify({
+    logger: true,
+  });
 
-// app.use(express.static("public"));
-// app.set("view engine", "ejs");
+  // app.use(express.static("public"));
+  // app.set("view engine", "ejs");
 
-// This loads all plugins defined in plugins those should be support plugins that are reused through your application
-fastify.register(AutoLoad, {
-  dir: path.join(process.cwd(), "/src/plugins"),
-});
+  // This loads all plugins defined in plugins those should be support plugins that are reused through your application
+  await fastify.register(AutoLoad, {
+    dir: path.join(process.cwd(), "/src/plugins"),
+  });
 
-// fastify.get("/", (req, res) => {
-//   res.code(200).send({ message: "Server is running..." });
-// });
+  // fastify.get("/", (req, res) => {
+  //   res.code(200).send({ message: "Server is running..." });
+  // });
 
-//routes
-fastify.register(PublicRouters, { prefix: "/api/v1" });
-fastify.register(PrivateRouters, { prefix: "/api/v1" });
+  //routes
+  fastify.register(PublicRouters, { prefix: "/api/v1" });
+  fastify.register(PrivateRouters, { prefix: "/api/v1" });
 
-// Run the server!
-fastify.listen(
-  { port: process.env.PORT, host: "0.0.0.0" },
-  function (err, address) {
-    if (err) {
-      fastify.log.error(err);
+  fastify.use("/api/v2/wrikexpi", odataRouter);
+
+  // Run the server!
+  fastify.listen(
+    { port: process.env.PORT, host: "0.0.0.0" },
+    function (err, address) {
+      if (err) {
+        fastify.log.error(err);
+      }
+      fastify.log.info(`Server listening on ${address}`);
     }
-    fastify.log.info(`Server listening on ${address}`);
-  }
-);
+  );
 
-// Hooks
+  // Hooks
 
-fastify.addHook("onError", async (request, reply, error) => {
-  console.log(new Date() + " : " + error?.message || error);
-  reply.code(500).send({ success: false, message: error?.message || error });
-});
+  fastify.addHook("onError", async (request, reply, error) => {
+    console.log(new Date() + " : " + error?.message || error);
+    reply.code(500).send({ success: false, message: error?.message || error });
+  });
 
-fastify.addHook("onSend", function (request, reply, payload, done) {
-  try {
-    if (!reply.sent && payload) {
-      done(null, payload);
+  fastify.addHook("onSend", function (request, reply, payload, done) {
+    try {
+      if (!reply.sent && payload) {
+        done(null, payload);
+      }
+    } catch (err) {
+      console.error(new Date().toISOString() + " : " + err?.message || err);
     }
-  } catch (err) {
-    console.error(new Date().toISOString() + " : " + err?.message || err);
-  }
-});
+  });
 
-// View Handlers
-fastify.get("/", async (req, res) => {
-  const { WRIKE_LOGIN_ENDPOINT, WRIKE_REDIRECT_URL } = process.env;
+  // View Handlers
+  fastify.get("/", async (req, res) => {
+    const { WRIKE_LOGIN_ENDPOINT, WRIKE_REDIRECT_URL } = process.env;
 
-  const { accountId } = req.query;
+    const { accountId } = req.query;
 
-  if (!WRIKE_LOGIN_ENDPOINT) {
-    throw new Error("Missing WRIKE_LOGIN_ENDPOINT! Please contact your admin");
-  }
+    if (!WRIKE_LOGIN_ENDPOINT) {
+      throw new Error(
+        "Missing WRIKE_LOGIN_ENDPOINT! Please contact your admin"
+      );
+    }
 
-  const secretValues = await getSecrets(["XPI-API-ClientId"]);
+    const secretValues = await getSecrets(["XPI-API-ClientId"]);
 
-  const WRIKE_CLIENT_ID = secretValues["XPI-API-ClientId"];
+    const WRIKE_CLIENT_ID = secretValues["XPI-API-ClientId"];
 
-  if (!WRIKE_CLIENT_ID) {
-    return res.status(400).send({
-      message: "Missing WRIKE_CLIENT_ID. Please contact your admin",
-    });
-  }
+    if (!WRIKE_CLIENT_ID) {
+      return res.status(400).send({
+        message: "Missing WRIKE_CLIENT_ID. Please contact your admin",
+      });
+    }
 
-  const state = "";
+    const state = "";
 
-  let redirectUrl = `${WRIKE_LOGIN_ENDPOINT}/authorize/v4?client_id=${WRIKE_CLIENT_ID}&response_type=code&state=${state}&redirect_uri=${WRIKE_REDIRECT_URL}`;
+    let redirectUrl = `${WRIKE_LOGIN_ENDPOINT}/authorize/v4?client_id=${WRIKE_CLIENT_ID}&response_type=code&state=${state}&redirect_uri=${WRIKE_REDIRECT_URL}`;
 
-  if (accountId) redirectUrl += `&accountId=${accountId}`;
+    if (accountId) redirectUrl += `&accountId=${accountId}`;
 
-  const html = `
+    const html = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -281,7 +288,8 @@ fastify.get("/", async (req, res) => {
 </html>
 `;
 
-  res.type("text/html").send(html);
+    res.type("text/html").send(html);
 
-  // res.send({ message: "WrikeXPI Token Service server is running..." });
-});
+    // res.send({ message: "WrikeXPI Token Service server is running..." });
+  });
+})();
