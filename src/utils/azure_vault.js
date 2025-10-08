@@ -1,6 +1,5 @@
 const { DefaultAzureCredential } = require("@azure/identity");
 const { SecretClient } = require("@azure/keyvault-secrets");
-const { KeyClient, CryptographyClient } = require("@azure/keyvault-keys");
 require("dotenv").config();
 
 const credential = new DefaultAzureCredential();
@@ -11,24 +10,6 @@ if (!vaultUrl) {
 }
 
 const secretClient = new SecretClient(vaultUrl, credential);
-const keyClient = new KeyClient(vaultUrl, credential);
-
-// Get a CryptographyClient for a specific key
-export const getKeyVaultClient = async (keyId) => {
-  try {
-    // If no keyId is provided, use the auth key ID from env
-    const keyIdentifier = keyId || process.env.AZURE_KEY_VAULT_AUTH_KEY_ID;
-    if (!keyIdentifier) {
-      throw new Error("No key identifier provided");
-    }
-
-    // Create a CryptographyClient for the specific key
-    return new CryptographyClient(keyIdentifier, credential);
-  } catch (error) {
-    console.error("Error getting key vault client:", error.message);
-    throw error;
-  }
-};
 
 export const getSecrets = async (secretNames) => {
   try {

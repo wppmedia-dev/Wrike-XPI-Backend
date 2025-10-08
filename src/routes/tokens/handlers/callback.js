@@ -1,9 +1,7 @@
-import { generateDEK, encryptWithDEK, wrapDEK } from "../../../utils/crypto";
+import * as crypto from "../../../utils/crypto";
 import { Tokens, Users } from "../../../controllers";
 import { getWrikeTokens, getUserData } from "../../../utils/wrike";
 import models from "../../../../models";
-import crypto from "crypto";
-import bcrypt from "bcrypt";
 
 export const WrikeXPICallback = ({ code }, fastify) => {
   return new Promise(async (resolve, reject) => {
@@ -13,27 +11,11 @@ export const WrikeXPICallback = ({ code }, fastify) => {
     try {
       if (!code) return reject({ message: "Access Token must not be empty" });
 
+      // Get Wrike tokens from OAuth code
       const { access_token, refresh_token } = await getWrikeTokens({ code });
 
-      // Generate two random DEKs
-      const accessTokenDEK = generateDEK();
-      const refreshTokenDEK = generateDEK();
-
-      // Encrypt tokens with their respective DEKs
-      const encryptedAccessToken = encryptWithDEK(access_token, accessTokenDEK);
-      const encryptedRefreshToken = encryptWithDEK(
-        refresh_token,
-        refreshTokenDEK
-      );
-
-      // Wrap DEKs with Azure Key Vault's KEK
-      const keyId = process.env.AZURE_KEY_VAULT_AUTH_KEY_ID;
-      const wrappedAccessTokenDEK = await wrapDEK(accessTokenDEK, keyId);
-      const wrappedRefreshTokenDEK = await wrapDEK(refreshTokenDEK, keyId);
-
-      // Getting the user data from the wrike(/contacts?me) api
+      // Get user data from Wrike API
       const wrikeUserData = await getUserData(access_token);
-
       const {
         id: wrikeUserId,
         firstName,
@@ -49,7 +31,7 @@ export const WrikeXPICallback = ({ code }, fastify) => {
 
       const accountId = profiles?.[0]?.accountId;
 
-      // All database operations within transaction
+      // Create or get user
       const userData = await Users.GetByWrikeId(wrikeUserId);
       let userId = userData?.id;
 
@@ -63,22 +45,40 @@ export const WrikeXPICallback = ({ code }, fastify) => {
           },
           { transaction }
         );
-
         userId = newUserData?.id;
       }
 
+      // Generate username from email + account_id
+      const username = `${accountId}-${primaryEmail}`;
+
+      // Generate random strong password
+      const password = crypto.generateSecurePassword();
+
+      // Generate salt and derive password hash and KEK
+      const salt = crypto.generateSalt();
+      const passwordHash = await crypto.hashPassword(password);
+      const kek = await crypto.deriveKEK(password, salt);
+
+      // Generate and wrap DEK
+      const dek = crypto.generateDEK();
+      const wrappedDEK = crypto.wrapDEK(dek, kek);
+
+      // Encrypt Wrike tokens with DEK
+      const encryptedAccessToken = crypto
+        .encrypt(Buffer.from(access_token), dek)
+        .toString("base64");
+      const encryptedRefreshToken = crypto
+        .encrypt(Buffer.from(refresh_token), dek)
+        .toString("base64");
+
+      // Get existing user token if any
       const userTokenData = await Tokens.GetByUserAndAccountId(
         userId,
         accountId
       );
-
       let userTokenId = userTokenData?.id;
 
-      // Generate username based on email and account_id
-      const username = `${accountId}-${primaryEmail}`;
-      const password = generatePassword();
-      const passwordHash = await bcrypt.hash(password, 10);
-
+      // Update or create token record
       if (userTokenId) {
         await Tokens.Update(
           userId,
@@ -86,11 +86,10 @@ export const WrikeXPICallback = ({ code }, fastify) => {
           {
             encrypted_access_token: encryptedAccessToken,
             encrypted_refresh_token: encryptedRefreshToken,
-            wrapped_access_token_dek: wrappedAccessTokenDEK,
-            wrapped_refresh_token_dek: wrappedRefreshTokenDEK,
-            key_id: keyId,
-            username: username,
+            username,
             password_hash: passwordHash,
+            salt: salt.toString("base64"),
+            wrapped_dek: wrappedDEK.toString("base64"),
           },
           { transaction }
         );
@@ -101,32 +100,36 @@ export const WrikeXPICallback = ({ code }, fastify) => {
             account_id: accountId,
             encrypted_access_token: encryptedAccessToken,
             encrypted_refresh_token: encryptedRefreshToken,
-            wrapped_access_token_dek: wrappedAccessTokenDEK,
-            wrapped_refresh_token_dek: wrappedRefreshTokenDEK,
-            key_id: keyId,
-            username: username,
+            username,
             password_hash: passwordHash,
+            salt: salt.toString("base64"),
+            wrapped_dek: wrappedDEK.toString("base64"),
             is_active: true,
           },
           { transaction }
         );
-
         userTokenId = newUserTokenData?.id;
       }
 
-      // Commit transaction only after all operations succeed
-      await transaction.commit();
-
-      const token = fastify.jwt.sign(
-        {
-          tid: userTokenId,
-        },
-        { expiresIn: "365d" }
+      // Create JWE token containing the DEK
+      const encryptedDEK = fastify.jwt.sign(
+        { dek: dek.toString("base64") },
+        { expiresIn: "24h" }
       );
 
-      // Sending final response with credentials if they were just generated
+      const jweToken = fastify.jwt.sign(
+        {
+          tid: userTokenId,
+          enc: encryptedDEK,
+        },
+        { expiresIn: "24h" }
+      );
+
+      await transaction.commit();
+
+      // Return credentials and JWE token
       resolve({
-        token,
+        token: jweToken,
         credentials: {
           username,
           password,
@@ -144,17 +147,4 @@ export const WrikeXPICallback = ({ code }, fastify) => {
       reject(err);
     }
   });
-};
-
-// Generate a random password for this account integration
-const generatePassword = () => {
-  const charset =
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
-  const length = 16;
-  let password = "";
-  for (let i = 0; i < length; i++) {
-    const randomIndex = crypto.randomInt(0, charset.length);
-    password += charset[randomIndex];
-  }
-  return password;
 };

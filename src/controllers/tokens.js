@@ -50,9 +50,8 @@ export const GetById = async (id) => {
         "id",
         "encrypted_access_token",
         "encrypted_refresh_token",
-        "wrapped_access_token_dek",
-        "wrapped_refresh_token_dek",
-        "key_id",
+        "salt",
+        "wrapped_dek",
         "created_by",
       ],
       where: {
@@ -65,9 +64,8 @@ export const GetById = async (id) => {
       id: userTokens?.id,
       encrypted_access_token: userTokens?.encrypted_access_token,
       encrypted_refresh_token: userTokens?.encrypted_refresh_token,
-      wrapped_access_token_dek: userTokens?.wrapped_access_token_dek,
-      wrapped_refresh_token_dek: userTokens?.wrapped_refresh_token_dek,
-      key_id: userTokens?.key_id,
+      salt: userTokens?.salt,
+      wrapped_dek: userTokens?.wrapped_dek,
       created_by: userTokens?.created_by,
     };
   } catch (err) {
@@ -89,9 +87,8 @@ export const GetByUserId = async (id) => {
         "id",
         "encrypted_access_token",
         "encrypted_refresh_token",
-        "wrapped_access_token_dek",
-        "wrapped_refresh_token_dek",
-        "key_id",
+        "salt",
+        "wrapped_dek",
         "created_by",
       ],
       where: {
@@ -106,9 +103,8 @@ export const GetByUserId = async (id) => {
       id: userTokens?.id,
       encrypted_access_token: userTokens?.encrypted_access_token,
       encrypted_refresh_token: userTokens?.encrypted_refresh_token,
-      wrapped_access_token_dek: userTokens?.wrapped_access_token_dek,
-      wrapped_refresh_token_dek: userTokens?.wrapped_refresh_token_dek,
-      key_id: userTokens?.key_id,
+      salt: userTokens?.salt,
+      wrapped_dek: userTokens?.wrapped_dek,
       created_by: userTokens?.created_by,
     };
   } catch (err) {
@@ -131,9 +127,8 @@ export const GetTokenByUsername = async (username) => {
         "password_hash",
         "encrypted_access_token",
         "encrypted_refresh_token",
-        "wrapped_access_token_dek",
-        "wrapped_refresh_token_dek",
-        "key_id",
+        "salt",
+        "wrapped_dek",
         "created_by",
       ],
       where: {
@@ -147,9 +142,8 @@ export const GetTokenByUsername = async (username) => {
       password_hash: userToken?.password_hash,
       encrypted_access_token: userToken?.encrypted_access_token,
       encrypted_refresh_token: userToken?.encrypted_refresh_token,
-      wrapped_access_token_dek: userToken?.wrapped_access_token_dek,
-      wrapped_refresh_token_dek: userToken?.wrapped_refresh_token_dek,
-      key_id: userToken?.key_id,
+      salt: userToken?.salt,
+      wrapped_dek: userToken?.wrapped_dek,
       created_by: userToken?.created_by,
     };
   } catch (err) {
