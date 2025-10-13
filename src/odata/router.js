@@ -47,15 +47,15 @@ odataRouter.post("/$batch", async (req, res) => {
 });
 
 // Catch-all for all other OData requests
-// odataRouter.all("*", async (req, res) => {
-//   try {
-//     await WrikeODataServer.execute(req, res, {
-//       context: { wrikeToken: req.wrikeToken },
-//     });
-//   } catch (err) {
-//     console.error("OData Error:", err);
-//     res.status(500).json({ error: err.message });
-//   }
-// });
+odataRouter.use(async (req, res) => {
+  try {
+    await WrikeODataServer.execute(req, res, {
+      context: { wrikeToken: req.wrikeToken },
+    });
+  } catch (err) {
+    console.error("OData Error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 export default odataRouter;
