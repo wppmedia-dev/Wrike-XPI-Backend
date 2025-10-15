@@ -87,6 +87,33 @@ export const GetMasterDataRecord = (wrikeToken, params, fastify) => {
           (field) => field.dataHubFieldId
         );
 
+      const mirrorCustomfieldIds =
+        customFieldData?.data[0]?.settings?.linkToDatabaseInfo?.mirrorFields?.map(
+          (field) => field.customFieldId
+        );
+
+      let mirrorCustomFieldsData = {};
+      if (
+        mirrorCustomfieldIds &&
+        Array.isArray(mirrorCustomfieldIds) &&
+        mirrorCustomfieldIds.length > 0
+      ) {
+        // Get mapping configuration for this customfield
+        const result = await getCustomFields(
+          wrikeToken,
+          mirrorCustomfieldIds.join(",")
+        );
+
+        for (const cf of result?.data || []) {
+          const datahubId =
+            customFieldData?.data[0]?.settings?.linkToDatabaseInfo?.mirrorFields?.find(
+              (field) => field.customFieldId === cf.id
+            );
+
+          mirrorCustomFieldsData[datahubId?.dataHubFieldId] = cf.title;
+        }
+      }
+
       mirrorFieldIds.push("FIname");
 
       const datahubRecords = await getDatahubRecords(
@@ -112,31 +139,15 @@ export const GetMasterDataRecord = (wrikeToken, params, fastify) => {
 
       newNextPageToken = datahubRecords?.nextPageToken;
 
-      // Get Datahub Fields
-      const datahubFields = await getDatahubFields(
-        wrikeToken,
-        dataHubDatabaseId
-      );
-
-      if (!datahubFields?.data || datahubFields.data.length === 0)
-        return reject({
-          statusCode: 404,
-          message: "Datahub fields not found",
-        });
-
-      let formFieldsIds = {};
-      datahubFields?.data?.forEach((field) => {
-        formFieldsIds[field.id] = field.title?.trim()?.toLowerCase();
-      });
-
       if (recordId && recordId?.length > 0 && recordId.trim()[0] != ":") {
         outputValues = {};
 
         const record = datahubRecords?.data[0];
         outputValues = { id: record?.id || record.fieldValues?.FIid };
         for (const field in record.fieldValues) {
-          outputValues[field == "FIname" ? "value" : formFieldsIds[field]] =
-            record.fieldValues[field];
+          outputValues[
+            field == "FIname" ? "value" : mirrorCustomFieldsData[field]
+          ] = record.fieldValues[field];
         }
 
         if (!outputValues) {
@@ -150,8 +161,9 @@ export const GetMasterDataRecord = (wrikeToken, params, fastify) => {
         datahubRecords?.data?.forEach((record) => {
           let fields = { id: record?.id || record.fieldValues?.FIid };
           for (const field in record.fieldValues) {
-            fields[field == "FIname" ? "value" : formFieldsIds[field]] =
-              record.fieldValues[field];
+            fields[
+              field == "FIname" ? "value" : mirrorCustomFieldsData[field]
+            ] = record.fieldValues[field];
           }
 
           outputValues.push(fields);
