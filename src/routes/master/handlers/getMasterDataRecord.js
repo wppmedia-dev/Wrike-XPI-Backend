@@ -1,6 +1,5 @@
 import {
   getCustomFields,
-  getDatahubFields,
   getDatahubCustomFields,
   getDatahubRecords,
 } from "../../../utils/wrike";
@@ -16,7 +15,7 @@ export const GetMasterDataRecord = (wrikeToken, params, fastify) => {
         });
       }
 
-      const { masterSlug, recordId, nextPageToken } = params;
+      const { masterSlug, recordId, limit, nextPageToken } = params;
 
       if (!masterSlug) {
         return reject({
@@ -127,6 +126,7 @@ export const GetMasterDataRecord = (wrikeToken, params, fastify) => {
               ? '{"op": "equals","fld": "FIid","val": "' + recordId + '"}'
               : "",
           pageToken: nextPageToken ?? null,
+          limit,
           useCache: false,
         }
       );

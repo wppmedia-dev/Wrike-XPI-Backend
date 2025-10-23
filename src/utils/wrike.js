@@ -119,6 +119,7 @@ export const getDatahubRecords = async (
       fieldIds,
       filter = "",
       pageToken = null,
+      limit,
       accumulatedData = [],
       useCache = true,
       cacheTTL = null,
@@ -157,17 +158,11 @@ export const getDatahubRecords = async (
       }
     }
 
-    let url = pageToken
-      ? `${
-          process.env.WRIKE_DATAHUB_ENDPOINT
-        }/databases/${databaseId}/records?limit=${
-          process.env.WRIKE_DATAHUB_RECORDS_LIMIT ?? "300"
-        }&nextPageToken=${pageToken}`
-      : `${
-          process.env.WRIKE_DATAHUB_ENDPOINT
-        }/databases/${databaseId}/records?limit=${
-          process.env.WRIKE_DATAHUB_RECORDS_LIMIT ?? "300"
-        }`;
+    let url = `${
+      process.env.WRIKE_DATAHUB_ENDPOINT
+    }/databases/${databaseId}/records?limit=${
+      limit ?? process.env.WRIKE_DATAHUB_RECORDS_LIMIT ?? "300"
+    }&nextPageToken=${pageToken ?? ""}`;
 
     if (filter) {
       url += `&filter=${filter}`;
