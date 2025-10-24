@@ -50,13 +50,30 @@ fastify.addHook("onError", async (request, reply, error) => {
   reply.code(500).send({ success: false, message: error?.message || error });
 });
 
-fastify.addHook("onSend", function (request, reply, payload, done) {
+// fastify.addHook("onSend", function (request, reply, payload, done) {
+//   try {
+//     if (!reply.sent && payload) {
+//       done(null, payload);
+//     }
+//   } catch (err) {
+//     console.error(new Date().toISOString() + " : " + err?.message || err);
+//   }
+// });
+
+// Health check endpoint
+fastify.all("/health", async (request, reply) => {
+  const healthcheck = {
+    uptime: process.uptime(),
+    message: "OK",
+    timestamp: Date.now(),
+    memoryUsage: process.memoryUsage(),
+    version: process.version,
+  };
   try {
-    if (!reply.sent && payload) {
-      done(null, payload);
-    }
-  } catch (err) {
-    console.error(new Date().toISOString() + " : " + err?.message || err);
+    reply.code(200).send(healthcheck);
+  } catch (error) {
+    healthcheck.message = error;
+    reply.code(503).send(healthcheck);
   }
 });
 
