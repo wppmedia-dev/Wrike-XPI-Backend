@@ -36,7 +36,7 @@ export const tokenRoute = (fastify, opts, done) => {
 
       return reply.code(200).send({
         success: true,
-        data: result.credentials,
+        data: result,
       });
     } catch (err) {
       console.error("Error processing /exchange:", err);
