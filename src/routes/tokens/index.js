@@ -1,8 +1,8 @@
-import { WrikeXPICallback } from "./handlers/callback";
+import { WrikeTokenExchange } from "./handlers/wrikeTokenExchange";
 import { GetUserData } from "./handlers/getUserData";
 import { Tokens } from "../../controllers";
 
-import { WrikeXPICallbackSchema } from "./schema/callback";
+import { WrikeTokenExchangeSchema } from "./schema/wrikeTokenExchange";
 import { GetUserDataSchema } from "./schema/getUserData";
 
 export const tokenRoute = (fastify, opts, done) => {
@@ -24,9 +24,44 @@ export const tokenRoute = (fastify, opts, done) => {
     }
   });
 
-  fastify.get("/callback", WrikeXPICallbackSchema, async (req, reply) => {
+  fastify.get("/exchange", WrikeTokenExchangeSchema, async (req, reply) => {
     try {
-      const result = await WrikeXPICallback(req.query, fastify);
+      const result = await WrikeTokenExchange(req.query, fastify);
+
+      if (!result)
+        return reply.code(400).send({
+          success: false,
+          message: "Failed to process callback",
+        });
+
+      return reply.code(200).send({
+        success: true,
+        data: result.credentials,
+      });
+    } catch (err) {
+      console.error("Error processing /exchange:", err);
+      return reply.code(400).send({
+        success: false,
+        message: err?.message || err,
+      });
+    }
+  });
+
+  fastify.get("/callback", WrikeTokenExchangeSchema, async (req, reply) => {
+    try {
+      if (req.query.state) {
+        const decodedData = fastify.jwt.verify(req.query.state);
+
+        if (decodedData.redirectUri) {
+          // Construct the final redirect URL
+          const redirectUrl = `${decodedData.redirectUri}?code=${req.query.code}`;
+
+          // Redirect the user
+          return reply.redirect(redirectUrl);
+        }
+      }
+
+      const result = await WrikeTokenExchange(req.query, fastify);
 
       if (!result) {
         return reply.code(400).send({
@@ -34,24 +69,6 @@ export const tokenRoute = (fastify, opts, done) => {
           message: "Failed to process callback",
         });
       }
-
-      // Handle the case where new credentials were generated
-      const credentialsHtml = result.credentials
-        ? `
-        <div class="credentials-box">
-          <h3>Your API Access Credentials</h3>
-          <p class="warning">${result.credentials.message}</p>
-          <div class="credential-item">
-            <label>Username:</label>
-            <code>${result.credentials.username}</code>
-          </div>
-          <div class="credential-item">
-            <label>Password:</label>
-            <code>${result.credentials.password}</code>
-          </div>
-        </div>
-      `
-        : "";
 
       const html = `
 <!DOCTYPE html>

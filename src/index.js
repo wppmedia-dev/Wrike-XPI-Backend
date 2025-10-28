@@ -97,11 +97,12 @@ fastify.get("/", async (req, res) => {
     });
   }
 
-  const state = "";
+  let state = "";
+  if (redirectUri) {
+    state = fastify.jwt.sign({ redirectUri });
+  }
 
-  let redirectUrl = `${WRIKE_LOGIN_ENDPOINT}/authorize/v4?client_id=${WRIKE_CLIENT_ID}&response_type=code&state=${state}&redirect_uri=${
-    redirectUri ?? WRIKE_REDIRECT_URL
-  }`;
+  let redirectUrl = `${WRIKE_LOGIN_ENDPOINT}/authorize/v4?client_id=${WRIKE_CLIENT_ID}&response_type=code&state=${state}&redirect_uri=${WRIKE_REDIRECT_URL}`;
 
   if (accountId) redirectUrl += `&accountId=${accountId}`;
 
