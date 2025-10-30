@@ -55,13 +55,30 @@ import { getSecrets } from "./utils/azure_vault";
     reply.code(500).send({ success: false, message: error?.message || error });
   });
 
-  fastify.addHook("onSend", function (request, reply, payload, done) {
+  // fastify.addHook("onSend", function (request, reply, payload, done) {
+  //   try {
+  //     if (!reply.sent && payload) {
+  //       done(null, payload);
+  //     }
+  //   } catch (err) {
+  //     console.error(new Date().toISOString() + " : " + err?.message || err);
+  //   }
+  // });
+
+  // Health check endpoint
+  fastify.all("/health", async (request, reply) => {
+    const healthcheck = {
+      uptime: process.uptime(),
+      message: "OK",
+      timestamp: Date.now(),
+      memoryUsage: process.memoryUsage(),
+      version: process.version,
+    };
     try {
-      if (!reply.sent && payload) {
-        done(null, payload);
-      }
-    } catch (err) {
-      console.error(new Date().toISOString() + " : " + err?.message || err);
+      reply.code(200).send(healthcheck);
+    } catch (error) {
+      healthcheck.message = error;
+      reply.code(503).send(healthcheck);
     }
   });
 
@@ -69,7 +86,7 @@ import { getSecrets } from "./utils/azure_vault";
   fastify.get("/", async (req, res) => {
     const { WRIKE_LOGIN_ENDPOINT, WRIKE_REDIRECT_URL } = process.env;
 
-    const { accountId } = req.query;
+    const { accountId, redirectUri } = req.query;
 
     if (!WRIKE_LOGIN_ENDPOINT) {
       throw new Error(
@@ -87,7 +104,10 @@ import { getSecrets } from "./utils/azure_vault";
       });
     }
 
-    const state = "";
+    let state = "";
+    if (redirectUri) {
+      state = fastify.jwt.sign({ redirectUri });
+    }
 
     let redirectUrl = `${WRIKE_LOGIN_ENDPOINT}/authorize/v4?client_id=${WRIKE_CLIENT_ID}&response_type=code&state=${state}&redirect_uri=${WRIKE_REDIRECT_URL}`;
 

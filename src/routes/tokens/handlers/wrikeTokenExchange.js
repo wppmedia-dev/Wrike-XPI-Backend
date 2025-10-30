@@ -3,7 +3,7 @@ import { Tokens, Users } from "../../../controllers";
 import { getWrikeTokens, getUserData } from "../../../utils/wrike";
 import models from "../../../../models";
 
-export const WrikeXPICallback = ({ code }, fastify) => {
+export const WrikeTokenExchange = ({ code }, fastify) => {
   return new Promise(async (resolve, reject) => {
     // Start database transaction for data consistency
     const transaction = await models.sequelize.transaction();
@@ -13,6 +13,9 @@ export const WrikeXPICallback = ({ code }, fastify) => {
 
       // Get Wrike tokens from OAuth code
       const { access_token, refresh_token } = await getWrikeTokens({ code });
+
+      if (!access_token || !refresh_token)
+        return reject({ message: "Invalid authorization code!" });
 
       // Get user data from Wrike API
       const wrikeUserData = await getUserData(access_token);

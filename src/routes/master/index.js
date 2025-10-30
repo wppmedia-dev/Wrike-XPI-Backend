@@ -140,7 +140,7 @@ export const masterRoute = (fastify, opts, done) => {
       try {
         const result = await GetMasterDataRecord(
           req?.wrikeToken,
-          { ...req.params },
+          { ...req.params, ...req.query },
           fastify
         );
 
