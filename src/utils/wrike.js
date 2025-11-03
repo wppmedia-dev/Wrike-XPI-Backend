@@ -29,9 +29,9 @@ export const getWrikeTokens = async ({ code, refresh_token }) => {
     const WRIKE_CLIENT_SECRET = secretValues["XPI-API-ClientSecret"];
 
     if (!WRIKE_LOGIN_ENDPOINT || !WRIKE_CLIENT_ID || !WRIKE_CLIENT_SECRET) {
-      return reject({
+      throw {
         message: "Unable to fetch token! Please try after sometimes",
-      });
+      };
     }
 
     const url = `${WRIKE_LOGIN_ENDPOINT}/token`;

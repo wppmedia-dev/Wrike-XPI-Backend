@@ -7,11 +7,12 @@ import Fastify from "fastify";
 import dotenv from "dotenv";
 dotenv.config();
 
-import odataRouter from "./odata/router.js";
-
 // Importing Routes
 import { PrivateRouters, PublicRouters } from "./routes";
 import { getSecrets } from "./utils/azure_vault";
+import { OdataRouters } from "./odata/routes/index.js";
+
+const metadata = require("./odata/metadata/campaignMetadata.js");
 
 (async () => {
   // Configure the framework and instantiate it
@@ -31,11 +32,17 @@ import { getSecrets } from "./utils/azure_vault";
   //   res.code(200).send({ message: "Server is running..." });
   // });
 
+  fastify.get("/odata/$metadata", async (req, reply) => {
+    reply.header("Content-Type", "application/xml");
+    return metadata;
+  });
+
   //routes
   fastify.register(PublicRouters, { prefix: "/api/v1" });
   fastify.register(PrivateRouters, { prefix: "/api/v1" });
 
-  fastify.use("/api/v2/wrikexpi", odataRouter);
+  // Odata Route
+  fastify.register(OdataRouters, { prefix: "/api/v2" });
 
   // Run the server!
   fastify.listen(
