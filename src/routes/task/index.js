@@ -58,7 +58,7 @@ export const taskRoute = (fastify, opts, done) => {
   //   }
   // });
 
-  fastify.put("/:taskId", UpdateTaskSchema, async (req, reply) => {
+  fastify.patch("/:taskId", UpdateTaskSchema, async (req, reply) => {
     try {
       const result = await UpdateTask(
         req?.wrikeToken,

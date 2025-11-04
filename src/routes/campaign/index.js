@@ -83,7 +83,7 @@ export const campaignRoute = (fastify, opts, done) => {
     }
   });
 
-  fastify.put("/:campaignId", UpdateCampaignSchema, async (req, reply) => {
+  fastify.patch("/:campaignId", UpdateCampaignSchema, async (req, reply) => {
     try {
       const result = await UpdateCampaign(
         req?.wrikeToken,

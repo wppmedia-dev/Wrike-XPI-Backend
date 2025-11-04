@@ -58,7 +58,7 @@ export const channelRoute = (fastify, opts, done) => {
   //   }
   // });
 
-  fastify.put("/:channelId", UpdateChannelSchema, async (req, reply) => {
+  fastify.patch("/:channelId", UpdateChannelSchema, async (req, reply) => {
     try {
       const result = await UpdateChannel(
         req?.wrikeToken,
