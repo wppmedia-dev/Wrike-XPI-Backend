@@ -117,7 +117,7 @@ export const WrikeTokenExchange = ({ code }, fastify) => {
       // Create JWE token containing the DEK
       const encryptedDEK = fastify.jwt.sign(
         { dek: dek.toString("base64") },
-        { expiresIn: "24h" }
+        { expiresIn: "30d" }
       );
 
       const jweToken = fastify.jwt.sign(
@@ -125,7 +125,7 @@ export const WrikeTokenExchange = ({ code }, fastify) => {
           tid: userTokenId,
           enc: encryptedDEK,
         },
-        { expiresIn: "24h" }
+        { expiresIn: "30d" }
       );
 
       await transaction.commit();
