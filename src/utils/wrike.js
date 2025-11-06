@@ -15,23 +15,20 @@ const requiredDatahubRequestFormIds = [
 export const getWrikeTokens = async ({ code, refresh_token }) => {
   try {
     if (!code && !refresh_token)
-      return reject({
+      throw {
         message:
           "Missing parameter! Either code or refresh_token must not be empty",
-      });
+      };
 
-    const secretValues = await getSecrets([
-      "XPI-API-ClientId",
-      "XPI-API-ClientSecret",
-    ]);
+    const secretValues = getSecrets();
 
     const WRIKE_CLIENT_ID = secretValues["XPI-API-ClientId"];
     const WRIKE_CLIENT_SECRET = secretValues["XPI-API-ClientSecret"];
 
     if (!WRIKE_LOGIN_ENDPOINT || !WRIKE_CLIENT_ID || !WRIKE_CLIENT_SECRET) {
-      return reject({
+      throw {
         message: "Unable to fetch token! Please try after sometimes",
-      });
+      };
     }
 
     const url = `${WRIKE_LOGIN_ENDPOINT}/token`;

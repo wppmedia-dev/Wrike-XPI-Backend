@@ -87,7 +87,7 @@ fastify.get("/", async (req, res) => {
     throw new Error("Missing WRIKE_LOGIN_ENDPOINT! Please contact your admin");
   }
 
-  await syncSecrets(["XPI-API-ClientId"]);
+  await syncSecrets(["XPI-API-ClientId", "XPI-API-ClientSecret"]);
 
   const secretValues = getSecrets();
 
