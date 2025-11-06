@@ -4,6 +4,7 @@ require("dotenv").config();
 
 const credential = new DefaultAzureCredential();
 const vaultUrl = process.env.AZURE_VAULT_URL;
+let secretValues = {};
 
 if (!vaultUrl) {
   throw new Error("AZURE_VAULT_URL environment variable is not set.");
@@ -11,9 +12,9 @@ if (!vaultUrl) {
 
 const secretClient = new SecretClient(vaultUrl, credential);
 
-export const getSecrets = async (secretNames) => {
+export const syncSecrets = async (secretNames) => {
   try {
-    const secretValues = {};
+    secretValues = {};
 
     for (const name of secretNames) {
       try {
@@ -30,6 +31,8 @@ export const getSecrets = async (secretNames) => {
     return {};
   }
 };
+
+export const getSecrets = () => Object.freeze({ ...secretValues });
 
 export const listAllSecrets = async () => {
   try {

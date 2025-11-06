@@ -9,7 +9,7 @@ dotenv.config();
 
 // Importing Routes
 import { PrivateRouters, PublicRouters } from "./routes";
-import { getSecrets } from "./utils/azure_vault";
+import { syncSecrets, getSecrets } from "./utils/azure_vault";
 
 // Configure the framework and instantiate it
 const fastify = Fastify({
@@ -87,7 +87,9 @@ fastify.get("/", async (req, res) => {
     throw new Error("Missing WRIKE_LOGIN_ENDPOINT! Please contact your admin");
   }
 
-  const secretValues = await getSecrets(["XPI-API-ClientId"]);
+  await syncSecrets(["XPI-API-ClientId"]);
+
+  const secretValues = getSecrets();
 
   const WRIKE_CLIENT_ID = secretValues["XPI-API-ClientId"];
 
