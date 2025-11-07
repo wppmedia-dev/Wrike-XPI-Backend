@@ -15,15 +15,12 @@ const requiredDatahubRequestFormIds = [
 export const getWrikeTokens = async ({ code, refresh_token }) => {
   try {
     if (!code && !refresh_token)
-      return reject({
+      throw {
         message:
           "Missing parameter! Either code or refresh_token must not be empty",
-      });
+      };
 
-    const secretValues = await getSecrets([
-      "XPI-API-ClientId",
-      "XPI-API-ClientSecret",
-    ]);
+    const secretValues = getSecrets();
 
     const WRIKE_CLIENT_ID = secretValues["XPI-API-ClientId"];
     const WRIKE_CLIENT_SECRET = secretValues["XPI-API-ClientSecret"];
@@ -89,6 +86,10 @@ export const getUserData = async (access_token) => {
 // Datahub Util Functions
 export const getDatahubFields = async (wrikeToken, databaseId) => {
   try {
+    // Pass Service Account Token
+    const secretValues = getSecrets();
+    wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
+
     // Get folder data
     const datahubFields = await GetResponse(
       `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/fields`,
@@ -171,6 +172,11 @@ export const getDatahubRecords = async (
     if (fieldIds) {
       url += `&fieldIds=${fieldIds.join(",")}`;
     }
+
+    // Pass Service Account Token
+    const secretValues = getSecrets();
+    wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
+
     const response = await GetResponse(url, "GET", {
       "content-type": "application/json",
       Authorization: `Bearer ${wrikeToken}`,
@@ -250,6 +256,10 @@ export const getSpaceDatahub = async (
       }
     }
 
+    // Pass Service Account Token
+    const secretValues = getSecrets();
+    wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
+
     const datahubRecords = await getDatahubRecords(
       wrikeToken,
       process.env.DATAHUB_SPACE_ID,
@@ -314,6 +324,10 @@ export const getEntityDatahub = async (
         console.warn("Cache read error, proceeding without cache:", cacheError);
       }
     }
+
+    // Pass Service Account Token
+    const secretValues = getSecrets();
+    wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
 
     const datahubRecords = await getDatahubRecords(
       wrikeToken,
@@ -871,6 +885,10 @@ export const createDatahubRecord = async (
         fieldValues[data];
     }
 
+    // Pass Service Account Token
+    const secretValues = getSecrets();
+    wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
+
     const customFieldsData = await GetResponse(
       `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/records`,
       "POST",
@@ -935,6 +953,10 @@ export const updateDatahubRecord = async (
         fieldValues[data];
     }
 
+    // Pass Service Account Token
+    const secretValues = getSecrets();
+    wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
+
     const customFieldsData = await GetResponseWithStatusCode(
       `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/records/${recordId}`,
       "PATCH",
@@ -968,6 +990,10 @@ export const deleteDatahubRecord = async (
   try {
     if (!Array.isArray(recordIds) || recordIds.length === 0)
       throw "Record IDs must not be empty";
+
+    // Pass Service Account Token
+    const secretValues = getSecrets();
+    wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
 
     const customFieldsData = await GetResponse(
       `${

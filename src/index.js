@@ -44,19 +44,7 @@ const metadata = require("./odata/metadata/campaignMetadata.js");
   // Odata Route
   fastify.register(OdataRouters, { prefix: "/api/v2" });
 
-  // Run the server!
-  fastify.listen(
-    { port: process.env.PORT, host: "0.0.0.0" },
-    function (err, address) {
-      if (err) {
-        fastify.log.error(err);
-      }
-      fastify.log.info(`Server listening on ${address}`);
-    }
-  );
-
   // Hooks
-
   fastify.addHook("onError", async (request, reply, error) => {
     console.log(new Date() + " : " + error?.message || error);
     reply.code(500).send({ success: false, message: error?.message || error });
@@ -319,4 +307,15 @@ const metadata = require("./odata/metadata/campaignMetadata.js");
 
     // res.send({ message: "WrikeXPI Token Service server is running..." });
   });
+
+  // Run the server!
+  fastify.listen(
+    { port: process.env.PORT, host: "0.0.0.0" },
+    function (err, address) {
+      if (err) {
+        fastify.log.error(err);
+      }
+      fastify.log.info(`Server listening on ${address}`);
+    }
+  );
 })();
