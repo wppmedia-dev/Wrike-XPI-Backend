@@ -88,9 +88,8 @@ export const getDatahubFields = async (wrikeToken, databaseId) => {
   try {
     // Pass Service Account Token
     const secretValues = getSecrets();
-    wrikeToken = secretValues["XPI-API-Token"];
+    wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
 
-    console.log(`-------wrikeToken: ${JSON.stringify(secretValues, null, 4)}`);
     // Get folder data
     const datahubFields = await GetResponse(
       `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/fields`,
@@ -176,7 +175,7 @@ export const getDatahubRecords = async (
 
     // Pass Service Account Token
     const secretValues = getSecrets();
-    wrikeToken = secretValues["XPI-API-Token"];
+    wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
 
     const response = await GetResponse(url, "GET", {
       "content-type": "application/json",
@@ -259,7 +258,7 @@ export const getSpaceDatahub = async (
 
     // Pass Service Account Token
     const secretValues = getSecrets();
-    wrikeToken = secretValues["XPI-API-Token"];
+    wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
 
     const datahubRecords = await getDatahubRecords(
       wrikeToken,
@@ -328,7 +327,7 @@ export const getEntityDatahub = async (
 
     // Pass Service Account Token
     const secretValues = getSecrets();
-    wrikeToken = secretValues["XPI-API-Token"];
+    wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
 
     const datahubRecords = await getDatahubRecords(
       wrikeToken,
@@ -888,7 +887,7 @@ export const createDatahubRecord = async (
 
     // Pass Service Account Token
     const secretValues = getSecrets();
-    wrikeToken = secretValues["XPI-API-Token"];
+    wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
 
     const customFieldsData = await GetResponse(
       `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/records`,
@@ -956,7 +955,7 @@ export const updateDatahubRecord = async (
 
     // Pass Service Account Token
     const secretValues = getSecrets();
-    wrikeToken = secretValues["XPI-API-Token"];
+    wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
 
     const customFieldsData = await GetResponseWithStatusCode(
       `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/records/${recordId}`,
@@ -994,7 +993,7 @@ export const deleteDatahubRecord = async (
 
     // Pass Service Account Token
     const secretValues = getSecrets();
-    wrikeToken = secretValues["XPI-API-Token"];
+    wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
 
     const customFieldsData = await GetResponse(
       `${
