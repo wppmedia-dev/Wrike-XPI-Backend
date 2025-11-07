@@ -78,11 +78,7 @@ fastify.all("/health", async (request, reply) => {
 });
 
 // Sync Secrets from Azure Vault at Startup
-await syncSecrets([
-  "XPI-API-ClientId",
-  "XPI-API-ClientSecret",
-  "XPI-API-Token",
-]);
+syncSecrets(["XPI-API-ClientId", "XPI-API-ClientSecret", "XPI-API-Token"]);
 
 // View Handlers
 fastify.get("/", async (req, res) => {
