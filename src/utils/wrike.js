@@ -90,7 +90,7 @@ export const getDatahubFields = async (wrikeToken, databaseId) => {
     const secretValues = getSecrets();
     wrikeToken = secretValues["XPI-API-Token"];
 
-    console.log(`-------wrikeToken: ${wrikeToken}`);
+    console.log(`-------wrikeToken: ${JSON.stringify(secretValues, null, 4)}`);
     // Get folder data
     const datahubFields = await GetResponse(
       `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/fields`,
