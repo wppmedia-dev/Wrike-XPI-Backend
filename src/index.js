@@ -77,6 +77,13 @@ fastify.all("/health", async (request, reply) => {
   }
 });
 
+// Sync Secrets from Azure Vault at Startup
+await syncSecrets([
+  "XPI-API-ClientId",
+  "XPI-API-ClientSecret",
+  "XPI-API-Token",
+]);
+
 // View Handlers
 fastify.get("/", async (req, res) => {
   const { WRIKE_LOGIN_ENDPOINT, WRIKE_REDIRECT_URL } = process.env;
@@ -86,12 +93,6 @@ fastify.get("/", async (req, res) => {
   if (!WRIKE_LOGIN_ENDPOINT) {
     throw new Error("Missing WRIKE_LOGIN_ENDPOINT! Please contact your admin");
   }
-
-  await syncSecrets([
-    "XPI-API-ClientId",
-    "XPI-API-ClientSecret",
-    "XPI-API-Token",
-  ]);
 
   const secretValues = getSecrets();
 
