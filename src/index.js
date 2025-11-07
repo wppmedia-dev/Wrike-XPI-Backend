@@ -33,19 +33,7 @@ import { syncSecrets, getSecrets } from "./utils/azure_vault";
   fastify.register(PublicRouters, { prefix: "/api/v1" });
   fastify.register(PrivateRouters, { prefix: "/api/v1" });
 
-  // Run the server!
-  fastify.listen(
-    { port: process.env.PORT, host: "0.0.0.0" },
-    function (err, address) {
-      if (err) {
-        fastify.log.error(err);
-      }
-      fastify.log.info(`Server listening on ${address}`);
-    }
-  );
-
   // Hooks
-
   fastify.addHook("onError", async (request, reply, error) => {
     console.log(new Date() + " : " + error?.message || error);
     reply.code(500).send({ success: false, message: error?.message || error });
@@ -315,4 +303,15 @@ import { syncSecrets, getSecrets } from "./utils/azure_vault";
 
     // res.send({ message: "WrikeXPI Token Service server is running..." });
   });
+
+  // Run the server!
+  fastify.listen(
+    { port: process.env.PORT, host: "0.0.0.0" },
+    function (err, address) {
+      if (err) {
+        fastify.log.error(err);
+      }
+      fastify.log.info(`Server listening on ${address}`);
+    }
+  );
 })();
