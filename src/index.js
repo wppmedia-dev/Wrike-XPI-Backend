@@ -110,7 +110,7 @@ const metadata = require("./odata/metadata/campaignMetadata.js");
       );
     }
 
-    const secretValues = await getSecrets(["XPI-API-ClientId"]);
+    const secretValues = getSecrets(["XPI-API-ClientId"]);
 
     const WRIKE_CLIENT_ID = secretValues["XPI-API-ClientId"];
 
