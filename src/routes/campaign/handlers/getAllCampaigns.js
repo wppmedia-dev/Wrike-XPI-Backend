@@ -28,10 +28,10 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
         });
 
       // Variable Declaration
-      const { filter: filterParams, pageSize, nextPageToken } = params;
+      const { filter: filterParams, pageSize = 10, nextPageToken } = params;
 
       let filters;
-      let customFieldsParam = undefined;
+      let customFieldsParam = [];
 
       if (filterParams) {
         filters = defaultParser.filter(filterParams);
@@ -42,16 +42,23 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
             message: "Request is not supported!",
           });
 
-        // if (Object.keys(datahubCustomFieldsData).length === 0)
-        datahubCustomFieldsData = await getDatahubCustomFields(
-          wrikeToken,
-          process.env.DATAHUB_CUSTOM_FIELDS_ID
-        );
-
         customFieldsParam = extractFilters(filters);
       }
 
-      if (!datahubCustomFieldsData["workitemlevel"]["cfId"])
+      datahubCustomFieldsData = await getDatahubCustomFields(
+        wrikeToken,
+        process.env.DATAHUB_CUSTOM_FIELDS_ID
+      );
+
+      if (Object.keys(datahubCustomFieldsData).length === 0) {
+        return reject({
+          statusCode: 500,
+          message:
+            "Failed to retrieve datahub custom fields mapping configuration.",
+        });
+      }
+
+      if (!datahubCustomFieldsData?.workitemlevel?.cfId)
         return reject({
           statusCode: 400,
           message:
@@ -67,14 +74,13 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
       if (pageSize && pageSize > 0) wrikeUrl += `&pageSize=${pageSize}`;
 
       customFieldsParam.push({
-        id: datahubCustomFieldsData["workitemlevel"]["cfId"],
+        id: datahubCustomFieldsData?.workitemlevel?.cfId,
         comparator: "EqualTo",
         value: "Campaign",
       });
 
-      if (customFieldsParam && customFieldsParam.length > 0) {
+      if (customFieldsParam && customFieldsParam.length > 0)
         wrikeUrl += `&customFields=${JSON.stringify(customFieldsParam)}`;
-      }
 
       // Get folder data
       const wrikeFolderData = await GetResponse(wrikeUrl, "GET", {
