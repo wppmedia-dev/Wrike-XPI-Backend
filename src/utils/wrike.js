@@ -430,20 +430,22 @@ export const findRequestFormId = async (
 
     const datahubMatchedRecord = datahubRecords?.data?.find(
       (record) =>
-        record.fieldValues[formFieldsIds["Space"]]?.[0] ===
+        record?.fieldValues[formFieldsIds["Space"]]?.[0] ===
           datahubSpaceData[space?.trim()?.toLowerCase()] &&
-        record.fieldValues[formFieldsIds["XPI Entity"]]?.[0] ===
+        record?.fieldValues[formFieldsIds["XPI Entity"]]?.[0] ===
           datahubEntityData[entity?.trim()?.toLowerCase()] &&
-        record.fieldValues[formFieldsIds["Variant Id"]] === varientId
+        record?.fieldValues[formFieldsIds["Variant Id"]] === varientId
     );
 
+    const requiredFormId =
+      datahubMatchedRecord?.fieldValues[formFieldsIds["RF v4Id"]] || null;
+
     const result = {
-      requiredFormId:
-        datahubMatchedRecord.fieldValues[formFieldsIds["RF v4Id"]] || null,
+      requiredFormId,
     };
 
     // Cache the result if caching is enabled
-    if (useCache) {
+    if (useCache && requiredFormId) {
       try {
         const isSaved = await redisClient.set(cacheKey, result, ttl);
         if (isSaved)
