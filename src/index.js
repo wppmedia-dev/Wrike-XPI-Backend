@@ -77,6 +77,27 @@ const metadata = require("./odata/metadata/campaignMetadata.js");
     }
   });
 
+  // Sync Secrets from Azure Vault at Startup
+  await syncSecrets([
+    "XPI-API-ClientId",
+    "XPI-API-ClientSecret",
+    "XPI-API-Token",
+  ]);
+
+  fastify.get("/sync-secrets", async (req, res) => {
+    try {
+      await syncSecrets([
+        "XPI-API-ClientId",
+        "XPI-API-ClientSecret",
+        "XPI-API-Token",
+      ]);
+      console.log("Secrets synchronized successfully");
+      res.send({ success: true, message: "Secrets synchronized successfully" });
+    } catch (err) {
+      res.status(500).send({ success: false, message: err.message || err });
+    }
+  });
+
   // View Handlers
   fastify.get("/", async (req, res) => {
     const { WRIKE_LOGIN_ENDPOINT, WRIKE_REDIRECT_URL } = process.env;
