@@ -2,12 +2,12 @@ export const CreateCampaignSchema = {
   schema: {
     body: {
       type: "object",
-      required: ["type", "space", "entity", "varientId", "fields"],
+      required: ["type", "space", "entity", "variantId", "fields"],
       properties: {
         type: { type: "string" },
         space: { type: "string" },
         entity: { type: "string" },
-        varientId: { type: "integer" },
+        variantId: { type: "integer" },
         fields: { type: "object" },
       },
     },
