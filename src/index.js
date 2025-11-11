@@ -9,7 +9,7 @@ dotenv.config();
 
 // Importing Routes
 import { PrivateRouters, PublicRouters } from "./routes";
-import { getSecrets } from "./utils/azure_vault";
+import { getSecrets, syncSecrets } from "./utils/azure_vault";
 import { OdataRouters } from "./odata/routes/index.js";
 
 const metadata = require("./odata/metadata/campaignMetadata.js");
