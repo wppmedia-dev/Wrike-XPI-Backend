@@ -33,6 +33,11 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
       let filters;
       let customFieldsParam = [];
 
+      datahubCustomFieldsData = await getDatahubCustomFields(
+        wrikeToken,
+        process.env.DATAHUB_CUSTOM_FIELDS_ID
+      );
+
       if (filterParams) {
         filters = defaultParser.filter(filterParams);
 
@@ -44,11 +49,6 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
 
         customFieldsParam = extractFilters(filters);
       }
-
-      datahubCustomFieldsData = await getDatahubCustomFields(
-        wrikeToken,
-        process.env.DATAHUB_CUSTOM_FIELDS_ID
-      );
 
       if (Object.keys(datahubCustomFieldsData).length === 0) {
         return reject({
