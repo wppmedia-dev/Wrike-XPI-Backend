@@ -6,8 +6,9 @@ import { AmoebaSchema } from "./schema/amoebaSchema";
 
 export const amoebaRoute = (fastify, opts, done) => {
   // Custom Field endpoint - supports both single value and list
-  fastify.all("/:moduleSlug/:serviceSlug", AmoebaSchema, async (req, reply) => {
+  fastify.all("/:moduleSlug/*", AmoebaSchema, async (req, reply) => {
     try {
+      console.log("Amoeba Request Received:", req.params, req.query, req.body);
       const result = await AmoebaHandler(req?.wrikeToken, req, fastify);
 
       reply.code(result.statusCode || 200).send({ success: true, ...result });

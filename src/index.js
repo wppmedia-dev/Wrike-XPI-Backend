@@ -102,7 +102,30 @@ const metadata = require("./odata/metadata/campaignMetadata.js");
   fastify.get("/", async (req, res) => {
     const { WRIKE_LOGIN_ENDPOINT, WRIKE_REDIRECT_URL } = process.env;
 
-    const { accountId, redirectUri } = req.query;
+    const { accountId, redirectUri, autoRedirect } = req.query;
+
+    if (autoRedirect == "true" || autoRedirect == "1") {
+      const secretValues = getSecrets();
+
+      const WRIKE_CLIENT_ID = secretValues["XPI-API-ClientId"];
+
+      if (!WRIKE_CLIENT_ID) {
+        return res.status(400).send({
+          message: "Missing WRIKE_CLIENT_ID. Please contact your admin",
+        });
+      }
+
+      let state = "";
+      if (redirectUri) {
+        state = fastify.jwt.sign({ redirectUri });
+      }
+
+      let redirectUrl = `${WRIKE_LOGIN_ENDPOINT}/authorize/v4?client_id=${WRIKE_CLIENT_ID}&response_type=code&state=${state}&redirect_uri=${WRIKE_REDIRECT_URL}`;
+
+      if (accountId) redirectUrl += `&accountId=${accountId}`;
+
+      return res.redirect(redirectUrl);
+    }
 
     if (!WRIKE_LOGIN_ENDPOINT) {
       throw new Error(

@@ -371,7 +371,7 @@ export const findRequestFormId = async (
   wrikeToken,
   space,
   entity,
-  varientId,
+  variantId,
   datahubSpaceData,
   datahubEntityData,
   useCache = true,
@@ -389,7 +389,7 @@ export const findRequestFormId = async (
       "find_request_form_id",
       space,
       entity,
-      varientId
+      variantId
     );
 
     // Try to get from cache first
@@ -430,25 +430,27 @@ export const findRequestFormId = async (
 
     const datahubMatchedRecord = datahubRecords?.data?.find(
       (record) =>
-        record.fieldValues[formFieldsIds["Space"]]?.[0] ===
+        record?.fieldValues[formFieldsIds["Space"]]?.[0] ===
           datahubSpaceData[space?.trim()?.toLowerCase()] &&
-        record.fieldValues[formFieldsIds["XPI Entity"]]?.[0] ===
+        record?.fieldValues[formFieldsIds["XPI Entity"]]?.[0] ===
           datahubEntityData[entity?.trim()?.toLowerCase()] &&
-        record.fieldValues[formFieldsIds["Variant Id"]] === varientId
+        record?.fieldValues[formFieldsIds["Variant Id"]] === variantId
     );
 
+    const requiredFormId =
+      datahubMatchedRecord?.fieldValues[formFieldsIds["RF v4Id"]] || null;
+
     const result = {
-      requiredFormId:
-        datahubMatchedRecord.fieldValues[formFieldsIds["RF v4Id"]] || null,
+      requiredFormId,
     };
 
     // Cache the result if caching is enabled
-    if (useCache) {
+    if (useCache && requiredFormId) {
       try {
         const isSaved = await redisClient.set(cacheKey, result, ttl);
         if (isSaved)
           console.log(
-            `Data cached for find request form id ${space}-${entity}-${varientId} with TTL ${
+            `Data cached for find request form id ${space}-${entity}-${variantId} with TTL ${
               ttl === 0 ? "unlimited" : ttl + "s"
             }`
           );
@@ -466,7 +468,7 @@ export const findRequestFormId = async (
 export const getRequestFormFieldDatahub = async (
   wrikeToken,
   space,
-  varientId,
+  variantId,
   datahubCustomFieldsData,
   datahubSpaceData,
   useCache = true,
@@ -483,7 +485,7 @@ export const getRequestFormFieldDatahub = async (
     const cacheKey = redisClient.generateKey(
       "request_form_field_datahub",
       space,
-      varientId
+      variantId
     );
 
     // Try to get from cache first
@@ -529,7 +531,7 @@ export const getRequestFormFieldDatahub = async (
       if (
         record.fieldValues[formFieldsIds["space"]]?.[0] ===
           datahubSpaceData[space?.trim()?.toLowerCase()] &&
-        record.fieldValues[formFieldsIds["variant id"]] === varientId
+        record.fieldValues[formFieldsIds["variant id"]] === variantId
       ) {
         let customFieldCode = "";
         for (const cf in datahubCustomFieldsData) {
@@ -567,7 +569,7 @@ export const getRequestFormFieldDatahub = async (
         );
         if (isSaved)
           console.log(
-            `Data cached for request form field datahub ${space}-${varientId} with TTL ${
+            `Data cached for request form field datahub ${space}-${variantId} with TTL ${
               ttl === 0 ? "unlimited" : ttl + "s"
             }`
           );

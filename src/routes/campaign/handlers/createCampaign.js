@@ -23,7 +23,7 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
 
       // Variable Declaration
 
-      const { space, entity, varientId, fields: formFields } = params;
+      const { space, entity, variantId, fields: formFields } = params;
 
       // if (Object.keys(datahubSpaceData).length == 0) {
       const datahubSpaceData = await getSpaceDatahub(wrikeToken, true, 0);
@@ -40,24 +40,24 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
       // }
 
       // Find Request Form ID
-      const requetForm = await findRequestFormId(
+      const requestForm = await findRequestFormId(
         wrikeToken,
         space,
         entity,
-        varientId,
+        variantId,
         datahubSpaceData,
         datahubEntityData,
         true,
         0
       );
       // Sending submit request form error response
-      if (requetForm?.errorDescription) {
-        return reject({ message: requetForm?.errorDescription });
+      if (requestForm?.errorDescription) {
+        return reject({ message: requestForm?.errorDescription });
       }
 
-      const requetFormId = requetForm?.requiredFormId;
+      const requestFormId = requestForm?.requiredFormId;
 
-      if (!requetFormId)
+      if (!requestFormId)
         return reject({
           statusCode: 403,
           message:
@@ -78,7 +78,7 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
       const datahubRequestFormFieldsData = await getRequestFormFieldDatahub(
         wrikeToken,
         space,
-        varientId,
+        variantId,
         datahubCustomFieldsData,
         datahubSpaceData,
         true,
@@ -100,12 +100,12 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
       }
 
       const { pages: requestFormPages = null } = requestFormData?.data?.find(
-        (form) => form.id === requetFormId
+        (form) => form.id === requestFormId
       );
 
       if (!requestFormPages)
         return reject({
-          message: `Request form with ID "${requetFormId}" does not exist. Please use a valid request form ID.`,
+          message: `Request form with ID "${requestFormId}" does not exist. Please use a valid request form ID.`,
         });
 
       let submitRequestFieldsPayload = [];
@@ -213,7 +213,7 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
       // Submit Request Form
       const submittedRequestFormData = await submitRequestForm(
         wrikeToken,
-        requetFormId,
+        requestFormId,
         submitRequestFieldsPayload
       );
 
