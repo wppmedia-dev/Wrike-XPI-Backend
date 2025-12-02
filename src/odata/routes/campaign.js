@@ -3,20 +3,22 @@ import { GetAllCampaigns } from "../../routes/campaign/handlers/getAllCampaigns"
 import { GetCampaign } from "../../routes/campaign/handlers/getCampaign";
 
 // Schema
-import { GetCampaignSchema } from "../../routes/campaign/schema/getCampaign";
 import { GetAllCampaignsSchema } from "../../routes/campaign/schema/getAllCampaigns";
 
 export const odataCampaignRoute = (fastify, opts, done) => {
-  fastify.get("/*", GetCampaignSchema, async (req, reply) => {
+  fastify.get("*", async (req, reply) => {
     try {
-      const match = req.url.match(/Products\((\d+)\)/);
-      if (!match) return; // Let other routes handle if not this pattern
+      const path = req.params["*"]; // everything after /Campaigns/
 
-      const id = Number(match[1]);
+      // Check if it's OData entity format: Something(abc)
+      const match = path.match(/^\((.+)\)$/);
+      if (!match) return reply.callNotFound(); // let other routes handle
+
+      const campaignId = match[1].replace(/^'|'$/g, ""); // remove quotes
 
       const result = await GetCampaign(
         req?.wrikeToken,
-        { ...req.params, ...req.query, id },
+        { ...req.query, campaignId },
         fastify
       );
 
@@ -24,13 +26,12 @@ export const odataCampaignRoute = (fastify, opts, done) => {
 
       return {
         "@odata.context": `${baseUrl}/api/v2/wrikexpi/$metadata#Campaigns`,
-        value: result,
+        ...result?.data,
       };
     } catch (err) {
       const baseUrl = getBaseUrl(req);
       return {
         "@odata.context": `${baseUrl}/api/v2/wrikexpi/$metadata#Campaigns`,
-        value: {},
       };
     }
   });
@@ -39,16 +40,28 @@ export const odataCampaignRoute = (fastify, opts, done) => {
     try {
       const result = await GetAllCampaigns(
         req?.wrikeToken,
-        { ...req.params, ...req.query },
+        { ...req.params, ...req.query, isOdata: true },
         fastify
       );
 
       const baseUrl = getBaseUrl(req);
 
-      return {
+      let response = {
         "@odata.context": `${baseUrl}/api/v2/wrikexpi/$metadata#Campaigns`,
-        value: result,
+        value: result?.data || [],
       };
+
+      if (result?.nextPageToken) {
+        let nextUrl = `${baseUrl}/api/v2/wrikexpi/Campaigns?$skiptoken=${result.nextPageToken}`;
+
+        // Append $top ONLY if user sent it
+        if (req.query["$top"]) {
+          nextUrl += `&$top=${req.query["$top"]}`;
+        }
+
+        response["@odata.nextLink"] = nextUrl;
+      }
+      return response;
     } catch (err) {
       const baseUrl = getBaseUrl(req);
 

@@ -4,8 +4,8 @@ export const GetAllCampaignsSchema = {
       type: "object",
       required: [],
       properties: {
-        filter: { type: "string" },
-        pageSize: { type: "integer" },
+        $skiptoken: { type: "string" },
+        $top: { type: "integer" },
       },
     },
   },

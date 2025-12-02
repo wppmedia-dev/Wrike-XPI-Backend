@@ -5,10 +5,10 @@ module.exports = `<?xml version="1.0" encoding="utf-8"?>
   <Schema Namespace="UntypedNS"
    xmlns="http://docs.oasis-open.org/odata/ns/edm">
 
-    <EntityType Name="UntypedEntity">
+    <!-- Allow dynamic properties -->
+    <EntityType Name="UntypedEntity" OpenType="true">
       <Key><PropertyRef Name="id"/></Key>
       <Property Name="id" Type="Edm.String"/>
-      <Property Name="data" Type="Edm.Untyped"/>
     </EntityType>
 
     <EntityContainer Name="Container">

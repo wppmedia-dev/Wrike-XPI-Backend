@@ -28,10 +28,20 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
         });
 
       // Variable Declaration
-      const { filter: filterParams, pageSize = 10, nextPageToken } = params;
+      let {
+        filter: filterParams,
+        pageSize = 10,
+        nextPageToken,
+        isOdata = false,
+        $skiptoken,
+        $top = 10,
+      } = params;
 
       let filters;
       let customFieldsParam = [];
+
+      if ($skiptoken) nextPageToken = $skiptoken;
+      if ($top) pageSize = $top;
 
       datahubCustomFieldsData = await getDatahubCustomFields(
         wrikeToken,
@@ -92,76 +102,62 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
       if (wrikeFolderData?.errorDescription)
         return reject({ message: wrikeFolderData?.errorDescription });
 
-      // Optimize the for loop by using map instead of manual for...of and push
-      const campaigns = wrikeFolderData?.data.map((folder) => {
-        if (folder?.scope == "RbFolder") return;
+      // Build campaigns array: filter out non-campaign folders and wrap each
+      // item as { id, data } where data contains the mapped fields.
+      const campaigns = (wrikeFolderData?.data || [])
+        .filter((folder) => folder && folder?.scope !== "RbFolder")
+        .map((folder) => {
+          const folderCustomFieldValues = Object.entries(
+            datahubCustomFieldsData
+          ).reduce((acc, [key, value]) => {
+            if (!value.isReadable || !value.isCampaignField) return acc;
 
-        const folderCustomFieldValues = Object.entries(
-          datahubCustomFieldsData
-        ).reduce((acc, [key, value]) => {
-          if (!value.isReadable || !value.isCampaignField) return acc;
+            let fieldValue;
+            switch (value.xpiFieldType) {
+              case "Wrike API Built-in Field":
+                fieldValue = folder[value?.cfId];
+                break;
+              case "Wrike API Metadata Field":
+                fieldValue =
+                  folder?.metadata?.find((field) => field.key === value?.cfId)
+                    ?.value ?? "";
+                break;
+              case "Wrike Custom Field":
+                fieldValue =
+                  folder?.customFields?.find(
+                    (field) => field.id === value?.cfId
+                  )?.value ?? "";
+                break;
+              default:
+                fieldValue = "";
+            }
 
-          let fieldValue;
-          switch (value.xpiFieldType) {
-            case "Wrike API Built-in Field":
-              fieldValue = folder[value?.cfId];
-              break;
-            case "Wrike API Metadata Field":
-              fieldValue =
-                folder?.metadata?.find((field) => field.key === value?.cfId)
-                  ?.value ?? "";
-              break;
-            case "Wrike Custom Field":
-              fieldValue =
-                folder?.customFields?.find((field) => field.id === value?.cfId)
-                  ?.value ?? "";
-              break;
-            default:
-              fieldValue = "";
+            acc[key] = fieldValue;
+
+            return acc;
+          }, {});
+
+          const { id: _removedId, ...dataObj } = folderCustomFieldValues;
+
+          // Add the OData type marker to every returned item in the array
+          if (isOdata) dataObj["@odata.type"] = "#UntypedNS.UntypedEntity";
+
+          /*
+          // OData-specific response (commented out for now)
+          if (isOdata) {
+            dataObj["@odata.type"] = "#UntypedNS.UntypedEntity";
+            return {
+              id: folder.id,
+              data: dataObj,
+            };
           }
+          */
 
-          // if (fieldValue) {
-          acc[key] = fieldValue;
-          // }
-
-          return acc;
-        }, {});
-
-        return {
-          ...folderCustomFieldValues,
-          // // customfieldlist: folder?.customFields,
-          // folderId: folder.id,
-          // noofcrs: folderCustomFieldValues["noofcrs"],
-          // agency: folderCustomFieldValues["agency"],
-          // mediabuyingtype: folderCustomFieldValues["mediabuyingtype"],
-          // brand: folderCustomFieldValues["brand"],
-          // briefeddate: folderCustomFieldValues["briefeddate"],
-          // campaignbudget: folderCustomFieldValues["campaignbudget"],
-          // campaignenddate: folderCustomFieldValues["campaignenddate"],
-          // campaignid: folderCustomFieldValues["campaignid"],
-          // campaignname: folderCustomFieldValues["campaignname"],
-          // campaignobjective: folderCustomFieldValues["campaignobjective"],
-          // campaignstartdate: folderCustomFieldValues["campaignstartdate"],
-          // campaignfeedbackstatus:
-          //   folderCustomFieldValues["campaignfeedbackstatus"],
-          // ccuid: folderCustomFieldValues["ccuid"],
-          // mediachannelpractice: folderCustomFieldValues["mediachannelpractice"],
-          // client: folderCustomFieldValues["client"],
-          // comments: folderCustomFieldValues["comments"],
-          // cssid: folderCustomFieldValues["cssid"],
-          // currency: folderCustomFieldValues["currency"],
-          // customerponumber: folderCustomFieldValues["customerponumber"],
-          // debtor: folderCustomFieldValues["debtor"],
-          // kpiobjective: folderCustomFieldValues["kpiobjective"],
-          // originalagency: folderCustomFieldValues["originalagency"],
-          // readyforarchive: folderCustomFieldValues["readyforarchive"],
-          // region: folderCustomFieldValues["region"],
-          // requestedstartdate: folderCustomFieldValues["requestedstartdate"],
-          // requestormarket: folderCustomFieldValues["requestormarket"],
-          // spacename: folderCustomFieldValues["spacename"],
-          // workitemlevel: folderCustomFieldValues["workitemlevel"],
-        };
-      });
+          return {
+            id: folder.id,
+            ...dataObj,
+          };
+        });
 
       // Sending final response
       resolve({
