@@ -121,12 +121,21 @@ const syncCampaignMetaData = async () => {
 
     const outPath = path.join(__dirname, "../metadata/campaignMetadata.js");
     const fileContent = `module.exports = \`${xml}\`;\n`;
-    await fs.promises.writeFile(outPath, fileContent, "utf8");
 
-    console.log(
-      "Campaign Metadata has been synced successfully.",
-      JSON.stringify(folderCustomFieldValues)
-    );
+    // To avoid triggering file-watchers (e.g. nodemon) repeatedly,
+    // only overwrite the metadata file when its content actually changed.
+
+    const existing = await fs.promises.readFile(outPath, "utf8");
+
+    if (existing === fileContent) {
+      console.log("Campaign metadata unchanged; skipping write.");
+    } else {
+      await fs.promises.writeFile(outPath, fileContent, "utf8");
+      console.log(
+        "Campaign Metadata has been synced successfully (file updated).",
+        JSON.stringify(folderCustomFieldValues)
+      );
+    }
   } catch (err) {
     console.log("Failed to sync campaign metadata", err.message || err);
   }
