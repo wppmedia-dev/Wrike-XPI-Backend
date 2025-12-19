@@ -4,4 +4,4 @@ dist
 .env
 
 logs/*.log
-src/odata/metadata/campaignMetadata.js
+src/odata/metadata/*.js
