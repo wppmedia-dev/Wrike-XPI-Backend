@@ -140,7 +140,7 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
           const { id: _removedId, ...dataObj } = folderCustomFieldValues;
 
           // Add the OData type marker to every returned item in the array
-          if (isOdata) dataObj["@odata.type"] = "#UntypedNS.UntypedEntity";
+          // if (isOdata) dataObj["@odata.type"] = "#UntypedNS.UntypedEntity";
 
           /*
           // OData-specific response (commented out for now)

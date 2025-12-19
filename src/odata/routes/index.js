@@ -1,10 +1,12 @@
 "use strict";
 
 import { odataCampaignRoute } from "./campaign";
-const metadata = require("../metadata/campaignMetadata.js");
+import fs from "fs";
+import path from "path";
 
 // Auth Middleware
 import { ValidateToken } from "../../middlewares/authentication";
+import { getDatahubCustomFields } from "../../utils/wrike.js";
 
 //Public Routes
 export const OdataRouters = (fastify, opts, done) => {
@@ -46,7 +48,17 @@ export const OdataRouters = (fastify, opts, done) => {
 
   fastify.get("/wrikexpi/$metadata", async (req, reply) => {
     reply.header("Content-Type", "application/xml");
-    return metadata;
+    // Load the metadata module fresh so any dynamic updates are reflected
+    try {
+      const metaPath = path.join(__dirname, "../metadata/campaignMetadata.js");
+      delete require.cache[require.resolve(metaPath)];
+      const metadata = require(metaPath);
+      return metadata;
+    } catch (err) {
+      // Fallback: return static XML header if metadata file is missing or invalid
+      reply.code(500);
+      return `<?xml version="1.0" encoding="utf-8"?><edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx"><edmx:DataServices/></edmx:Edmx>`;
+    }
   });
 
   // Validating Token
@@ -55,6 +67,8 @@ export const OdataRouters = (fastify, opts, done) => {
   );
 
   fastify.register(odataCampaignRoute, { prefix: "/wrikexpi/Campaigns" });
+
+  syncCampaignMetaData().catch(console.log);
 
   done();
 };
@@ -65,3 +79,57 @@ function getBaseUrl(req) {
 
   return `${req.protocol}://${req.hostname}${isDefaultPort ? "" : ":" + port}`;
 }
+
+const syncCampaignMetaData = async () => {
+  const datahubCustomFieldsData = await getDatahubCustomFields(
+    null,
+    process.env.DATAHUB_CUSTOM_FIELDS_ID
+  );
+
+  const folderCustomFieldValues = Object.entries(datahubCustomFieldsData)
+    .filter(([_, value]) => value.isCampaignField === true)
+    .map(([key, value]) => ({
+      key: key,
+      type: value.cfType,
+    }));
+
+  // now construct the campaignMetadata.js file content dynamically based on the folderCustomFieldValues
+  try {
+    const typeMap = {
+      Text: "Edm.String",
+      DropDown: "Edm.String",
+      Multiple: "Collection(Edm.String)",
+      Numeric: "Edm.Double",
+      Date: "Edm.DateTimeOffset",
+    };
+
+    // Always include id as string
+    const props = [{ name: "id", type: "Edm.String" }].concat(
+      folderCustomFieldValues.map((f) => ({
+        name: f.key,
+        type: typeMap[f.type] || "Edm.String",
+      }))
+    );
+
+    const propertiesXml = props
+      .map((p) => {
+        return `      <Property Name="${p.name}" Type="${p.type}"/>`;
+      })
+      .join("\n");
+
+    const xml = `<?xml version="1.0" encoding="utf-8"?>\n<edmx:Edmx Version="4.0"\n xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">\n <edmx:DataServices>\n  <Schema Namespace="UntypedNS"\n   xmlns="http://docs.oasis-open.org/odata/ns/edm">\n\n    <!-- Allow dynamic properties -->\n    <EntityType Name="UntypedEntity" OpenType="true">\n      <Key><PropertyRef Name="id"/></Key>\n${propertiesXml}\n    </EntityType>\n\n    <EntityContainer Name="Container">\n      <EntitySet Name="Campaigns" EntityType="UntypedNS.UntypedEntity"/>\n    </EntityContainer>\n\n  </Schema>\n </edmx:DataServices>\n</edmx:Edmx>`;
+
+    const outPath = path.join(__dirname, "../metadata/campaignMetadata.js");
+    const fileContent = `module.exports = \`${xml}\`;\n`;
+    await fs.promises.writeFile(outPath, fileContent, "utf8");
+
+    console.log(
+      "Campaign Metadata has been synced successfully.",
+      JSON.stringify(folderCustomFieldValues)
+    );
+  } catch (err) {
+    console.log("Failed to sync campaign metadata", err.message || err);
+  }
+
+  console.log("Campaign Metadata has been synced successfully.");
+};
