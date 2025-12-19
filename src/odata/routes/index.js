@@ -117,7 +117,7 @@ const syncCampaignMetaData = async () => {
       })
       .join("\n");
 
-    const xml = `<?xml version="1.0" encoding="utf-8"?>\n<edmx:Edmx Version="4.0"\n xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">\n <edmx:DataServices>\n  <Schema Namespace="UntypedNS"\n   xmlns="http://docs.oasis-open.org/odata/ns/edm">\n\n    <!-- Allow dynamic properties -->\n    <EntityType Name="UntypedEntity" OpenType="true">\n      <Key><PropertyRef Name="id"/></Key>\n${propertiesXml}\n    </EntityType>\n\n    <EntityContainer Name="Container">\n      <EntitySet Name="Campaigns" EntityType="UntypedNS.UntypedEntity"/>\n    </EntityContainer>\n\n  </Schema>\n </edmx:DataServices>\n</edmx:Edmx>`;
+    const xml = `<?xml version="1.0" encoding="utf-8"?>\n<edmx:Edmx Version="4.0"\n xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">\n <edmx:DataServices>\n  <Schema Namespace="UntypedNS"\n   xmlns="http://docs.oasis-open.org/odata/ns/edm">\n\n    <!-- Allow dynamic properties -->\n    <EntityType Name="Campaign">\n      <Key><PropertyRef Name="id"/></Key>\n${propertiesXml}\n    </EntityType>\n\n    <EntityContainer Name="Container">\n      <EntitySet Name="Campaigns" EntityType="UntypedNS.Campaign"/>\n    </EntityContainer>\n\n  </Schema>\n </edmx:DataServices>\n</edmx:Edmx>`;
 
     const outPath = path.join(__dirname, "../metadata/campaignMetadata.js");
     const fileContent = `module.exports = \`${xml}\`;\n`;
