@@ -57,9 +57,9 @@ export const odataCampaignRoute = (fastify, opts, done) => {
         // Append $top ONLY if user sent it
         if (req.query["$top"]) {
           nextUrl += `&$top=${req.query["$top"]}`;
+        } else {
+          response["@odata.nextLink"] = nextUrl;
         }
-
-        response["@odata.nextLink"] = nextUrl;
       }
       return response;
     } catch (err) {

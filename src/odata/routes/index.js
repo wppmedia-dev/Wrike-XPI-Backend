@@ -68,7 +68,8 @@ export const OdataRouters = (fastify, opts, done) => {
 
   fastify.register(odataCampaignRoute, { prefix: "/wrikexpi/Campaigns" });
 
-  syncCampaignMetaData().catch(console.log);
+  if (process.env.AutoCamapaignMetadataGenerate === "true")
+    syncCampaignMetaData().catch(console.log);
 
   done();
 };
@@ -98,18 +99,28 @@ const syncCampaignMetaData = async () => {
     const typeMap = {
       Text: "Edm.String",
       DropDown: "Edm.String",
-      Multiple: "Collection(Edm.String)",
-      Numeric: "Edm.Double",
-      Date: "Edm.DateTimeOffset",
+      Multiple: "Edm.String",
+      Numeric: "Edm.String",
+      Date: "Edm.String",
     };
 
-    // Always include id as string
-    const props = [{ name: "id", type: "Edm.String" }].concat(
-      folderCustomFieldValues.map((f) => ({
-        name: f.key,
-        type: typeMap[f.type] || "Edm.String",
-      }))
-    );
+    // Build props array: always put id first, but only add it manually if not in folderCustomFieldValues
+    const mappedFields = folderCustomFieldValues.map((f) => ({
+      name: f.key,
+      type: typeMap[f.type] || "Edm.String",
+    }));
+
+    const hasId = mappedFields.some((p) => p.name === "id");
+    let props;
+    if (hasId) {
+      // id already exists; move it to the front and remove from mappedFields
+      const idProp = mappedFields.find((p) => p.name === "id");
+      const otherProps = mappedFields.filter((p) => p.name !== "id");
+      props = [idProp].concat(otherProps);
+    } else {
+      // id doesn't exist; prepend it manually
+      props = [{ name: "id", type: "Edm.String" }].concat(mappedFields);
+    }
 
     const propertiesXml = props
       .map((p) => {
@@ -132,8 +143,7 @@ const syncCampaignMetaData = async () => {
     } else {
       await fs.promises.writeFile(outPath, fileContent, "utf8");
       console.log(
-        "Campaign Metadata has been synced successfully (file updated).",
-        JSON.stringify(folderCustomFieldValues)
+        "Campaign Metadata has been synced successfully (file updated)."
       );
     }
   } catch (err) {
