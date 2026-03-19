@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Login - WrikeXPI</title>
+  <link rel="icon" href="https://cdn.wrike.com/static/branding/wrike/favicons/favicon.ico" />
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      height: 100vh;
+      background: linear-gradient(-45deg, #1f1c2c, #928dab, #2e2e52, #515175);
+      background-size: 400% 400%;
+      animation: gradient 15s ease infinite;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+    }
+
+    @keyframes gradient {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .container {
+      backdrop-filter: blur(16px);
+      background-color: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 24px;
+      padding: 50px 40px;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+      max-width: 400px;
+      width: 90%;
+      animation: fadeIn 1s ease-out forwards;
+      opacity: 0;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .logo {
+      width: 60px;
+      height: 60px;
+      background: #ffffff22;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+    }
+
+    .logo span {
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+
+    .subtitle {
+      font-size: 0.95rem;
+      color: #cccccc;
+      margin-bottom: 30px;
+      text-align: center;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.9rem;
+      margin-bottom: 8px;
+      color: #e0e0e0;
+      font-weight: 500;
+    }
+
+    input[type="text"],
+    input[type="password"] {
+      width: 100%;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      color: white;
+      font-size: 0.95rem;
+      transition: all 0.3s ease;
+      font-family: inherit;
+    }
+
+    input[type="text"]:focus,
+    input[type="password"]:focus {
+      outline: none;
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(76, 175, 80, 0.5);
+      box-shadow: 0 0 12px rgba(76, 175, 80, 0.2);
+    }
+
+    input::placeholder {
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .button {
+      width: 100%;
+      padding: 12px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-top: 10px;
+    }
+
+    .button:hover {
+      background: #45a049;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(76, 175, 80, 0.3);
+    }
+
+    .button:active {
+      transform: translateY(0);
+    }
+
+    .button:disabled {
+      background: #666;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .error {
+      background: rgba(244, 67, 54, 0.1);
+      border: 1px solid rgba(244, 67, 54, 0.3);
+      color: #ff7675;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 0.9rem;
+      display: none;
+    }
+
+    .error.show {
+      display: block;
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .loader {
+      border: 3px solid rgba(255, 255, 255, 0.2);
+      border-top: 3px solid white;
+      border-radius: 50%;
+      width: 18px;
+      height: 18px;
+      animation: spin 1s linear infinite;
+      display: none;
+      margin: 0 auto;
+    }
+
+    .loader.show {
+      display: block;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .info {
+      font-size: 0.85rem;
+      color: #b0b0b0;
+      text-align: center;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">
+      <span>W</span>
+    </div>
+    <h1>Admin Access</h1>
+    <p class="subtitle">Enter your credentials to manage Wrike credentials</p>
+
+    <div class="error" id="errorMessage"></div>
+
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input
+          type="text"
+          id="username"
+          name="username"
+          placeholder="Enter username"
+          required
+          autocomplete="off"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input
+          type="password"
+          id="password"
+          name="password"
+          placeholder="Enter password"
+          required
+          autocomplete="off"
+        />
+      </div>
+
+      <button type="submit" class="button" id="loginBtn">
+        <span id="btnText">Sign In</span>
+        <div id="btnLoader" class="loader"></div>
+      </button>
+    </form>
+
+    <div class="info">
+      Secure admin portal • 2FA enabled
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById("loginForm");
+    const errorDiv = document.getElementById("errorMessage");
+    const loginBtn = document.getElementById("loginBtn");
+    const btnText = document.getElementById("btnText");
+    const btnLoader = document.getElementById("btnLoader");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errorDiv.classList.remove("show");
+
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value;
+
+      if (!username || !password) {
+        showError("Please enter username and password");
+        return;
+      }
+
+      loginBtn.disabled = true;
+      btnText.style.display = "none";
+      btnLoader.classList.add("show");
+
+      try {
+        const response = await fetch("/api/v1/admin/login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ username, password }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || "Login failed");
+        }
+
+        // Store session token
+        sessionStorage.setItem("session_token", data.data.session_token);
+
+        if (data.data.totp_required) {
+          // Redirect to TOTP verification
+          window.location.href = "/admin/totp";
+        } else {
+          // Redirect to dashboard
+          window.location.href = "/admin/dashboard";
+        }
+      } catch (err) {
+        showError(err.message);
+        loginBtn.disabled = false;
+        btnText.style.display = "inline";
+        btnLoader.classList.remove("show");
+      }
+    });
+
+    function showError(message) {
+      errorDiv.textContent = message;
+      errorDiv.classList.add("show");
+    }
+  </script>
+</body>
+</html>

@@ -6,6 +6,8 @@ import { channelRoute } from "./channel";
 import { taskRoute } from "./task";
 import { masterRoute } from "./master";
 import { amoebaRoute } from "./amoeba";
+import { credentialsRoute } from "./credentials";
+import { adminApiRoute } from "./admin";
 
 // Auth Middleware
 import { ValidateToken } from "../middlewares/authentication";
@@ -21,6 +23,7 @@ import { GetAllTasksSchema } from "./task/schema/getAllTasks";
 //Public Routes
 export const PublicRouters = (fastify, opts, done) => {
   fastify.register(tokenRoute, { prefix: "/wrikexpi/token" });
+  fastify.register(adminApiRoute, { prefix: "/admin" });
 
   done();
 };
@@ -29,7 +32,7 @@ export const PublicRouters = (fastify, opts, done) => {
 export const PrivateRouters = (fastify, opts, done) => {
   // Validating Token
   fastify.addHook("onRequest", (req, reply) =>
-    ValidateToken(req, reply, fastify)
+    ValidateToken(req, reply, fastify),
   );
 
   fastify.register(campaignRoute, { prefix: "/wrikexpi/campaign" });
@@ -47,7 +50,7 @@ export const PrivateRouters = (fastify, opts, done) => {
         const result = await GetAllChannels(
           req?.wrikeToken,
           { ...req.params, ...req.query },
-          fastify
+          fastify,
         );
 
         reply.code(result.statusCode || 200).send({
@@ -65,7 +68,7 @@ export const PrivateRouters = (fastify, opts, done) => {
             "Fatal error Unexpected error occurred and service is unable complete the request.",
         });
       }
-    }
+    },
   );
 
   // Task REST route
@@ -77,7 +80,7 @@ export const PrivateRouters = (fastify, opts, done) => {
         const result = await GetAllTasks(
           req?.wrikeToken,
           { ...req.params, ...req.query },
-          fastify
+          fastify,
         );
 
         reply.code(result.statusCode || 200).send({
@@ -95,8 +98,10 @@ export const PrivateRouters = (fastify, opts, done) => {
             "Fatal error Unexpected error occurred and service is unable complete the request.",
         });
       }
-    }
+    },
   );
+
+  fastify.register(credentialsRoute, { prefix: "/wrikexpi/credentials" });
 
   done();
 };

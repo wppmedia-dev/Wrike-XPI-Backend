@@ -1,4 +1,4 @@
-import { getSecrets } from "./azure_vault";
+import { getCachedWrikeCredentials } from "./wrikeCredentials";
 import { GetResponse, GetResponseWithStatusCode } from "./node-fetch";
 import redisClient from "./redis";
 require("dotenv").config();
@@ -20,10 +20,9 @@ export const getWrikeTokens = async ({ code, refresh_token }) => {
           "Missing parameter! Either code or refresh_token must not be empty",
       };
 
-    const secretValues = getSecrets();
-
-    const WRIKE_CLIENT_ID = secretValues["XPI-API-ClientId"];
-    const WRIKE_CLIENT_SECRET = secretValues["XPI-API-ClientSecret"];
+    const apiCreds = getCachedWrikeCredentials("API");
+    const WRIKE_CLIENT_ID = apiCreds?.clientId;
+    const WRIKE_CLIENT_SECRET = apiCreds?.clientSecret;
 
     if (!WRIKE_LOGIN_ENDPOINT || !WRIKE_CLIENT_ID || !WRIKE_CLIENT_SECRET) {
       throw {
@@ -50,7 +49,7 @@ export const getWrikeTokens = async ({ code, refresh_token }) => {
       {
         "content-type": "application/x-www-form-urlencoded",
       },
-      payload
+      payload,
     );
 
     if (result?.errorDescription) throw result;
@@ -71,7 +70,7 @@ export const getUserData = async (access_token) => {
         "content-type": "application/json",
         authorization: "Bearer " + access_token,
       },
-      null
+      null,
     );
 
     if (userData?.errorDescription) throw userData;
@@ -87,8 +86,8 @@ export const getUserData = async (access_token) => {
 export const getDatahubFields = async (wrikeToken, databaseId) => {
   try {
     // Pass Service Account Token
-    const secretValues = getSecrets();
-    wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
+    const apiCreds = getCachedWrikeCredentials("API");
+    wrikeToken = apiCreds?.token ?? wrikeToken;
 
     // Get folder data
     const datahubFields = await GetResponse(
@@ -97,7 +96,7 @@ export const getDatahubFields = async (wrikeToken, databaseId) => {
       {
         "content-type": "application/json",
         Authorization: `Bearer ${wrikeToken}`,
-      }
+      },
     );
 
     if (datahubFields?.errorDescription) throw datahubFields;
@@ -111,7 +110,7 @@ export const getDatahubFields = async (wrikeToken, databaseId) => {
 export const getDatahubRecords = async (
   wrikeToken,
   databaseId,
-  options = {}
+  options = {},
 ) => {
   try {
     // Extract options with defaults
@@ -174,8 +173,8 @@ export const getDatahubRecords = async (
     }
 
     // Pass Service Account Token
-    const secretValues = getSecrets();
-    wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
+    const apiCreds = getCachedWrikeCredentials("API");
+    wrikeToken = apiCreds?.token ?? wrikeToken;
 
     const response = await GetResponse(url, "GET", {
       "content-type": "application/json",
@@ -216,7 +215,7 @@ export const getDatahubRecords = async (
           console.log(
             `Data cached for datahub records ${databaseId} with TTL ${
               ttl === 0 ? "unlimited" : ttl + "s"
-            }`
+            }`,
           );
       } catch (cacheError) {
         console.warn("Cache write error:", cacheError);
@@ -232,7 +231,7 @@ export const getDatahubRecords = async (
 export const getSpaceDatahub = async (
   wrikeToken,
   useCache = true,
-  cacheTTL = null
+  cacheTTL = null,
 ) => {
   try {
     // Set default TTL if not provided (null = unlimited, otherwise use provided value or env default)
@@ -257,15 +256,15 @@ export const getSpaceDatahub = async (
     }
 
     // Pass Service Account Token
-    const secretValues = getSecrets();
-    wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
+    const apiCreds = getCachedWrikeCredentials("API");
+    wrikeToken = apiCreds?.token ?? wrikeToken;
 
     const datahubRecords = await getDatahubRecords(
       wrikeToken,
       process.env.DATAHUB_SPACE_ID,
       {
         useCache: false,
-      }
+      },
     );
 
     if (datahubRecords?.errorDescription) {
@@ -285,7 +284,7 @@ export const getSpaceDatahub = async (
           console.log(
             `Data cached for space datahub with TTL ${
               ttl === 0 ? "unlimited" : ttl + "s"
-            }`
+            }`,
           );
       } catch (cacheError) {
         console.warn("Cache write error:", cacheError);
@@ -301,7 +300,7 @@ export const getSpaceDatahub = async (
 export const getEntityDatahub = async (
   wrikeToken,
   useCache = true,
-  cacheTTL = null
+  cacheTTL = null,
 ) => {
   try {
     // Set default TTL if not provided (null = unlimited, otherwise use provided value or env default)
@@ -326,15 +325,15 @@ export const getEntityDatahub = async (
     }
 
     // Pass Service Account Token
-    const secretValues = getSecrets();
-    wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
+    const apiCreds = getCachedWrikeCredentials("API");
+    wrikeToken = apiCreds?.token ?? wrikeToken;
 
     const datahubRecords = await getDatahubRecords(
       wrikeToken,
       process.env.DATAHUB_ENTITY_ID,
       {
         useCache: false,
-      }
+      },
     );
 
     if (datahubRecords?.errorDescription) {
@@ -354,7 +353,7 @@ export const getEntityDatahub = async (
           console.log(
             `Data cached for entity datahub with TTL ${
               ttl === 0 ? "unlimited" : ttl + "s"
-            }`
+            }`,
           );
       } catch (cacheError) {
         console.warn("Cache write error:", cacheError);
@@ -375,7 +374,7 @@ export const findRequestFormId = async (
   datahubSpaceData,
   datahubEntityData,
   useCache = true,
-  cacheTTL = null
+  cacheTTL = null,
 ) => {
   try {
     // Set default TTL if not provided (null = unlimited, otherwise use provided value or env default)
@@ -389,7 +388,7 @@ export const findRequestFormId = async (
       "find_request_form_id",
       space,
       entity,
-      variantId
+      variantId,
     );
 
     // Try to get from cache first
@@ -406,7 +405,7 @@ export const findRequestFormId = async (
 
     const formFields = await getDatahubFields(
       wrikeToken,
-      process.env.DATAHUB_REQUEST_FORM_ID
+      process.env.DATAHUB_REQUEST_FORM_ID,
     );
 
     if (formFields?.errorDescription) {
@@ -425,7 +424,7 @@ export const findRequestFormId = async (
       process.env.DATAHUB_REQUEST_FORM_ID,
       {
         useCache: false,
-      }
+      },
     );
 
     const datahubMatchedRecord = datahubRecords?.data?.find(
@@ -434,7 +433,7 @@ export const findRequestFormId = async (
           datahubSpaceData[space?.trim()?.toLowerCase()] &&
         record?.fieldValues[formFieldsIds["XPI Entity"]]?.[0] ===
           datahubEntityData[entity?.trim()?.toLowerCase()] &&
-        record?.fieldValues[formFieldsIds["Variant Id"]] === variantId
+        record?.fieldValues[formFieldsIds["Variant Id"]] === variantId,
     );
 
     const requiredFormId =
@@ -452,7 +451,7 @@ export const findRequestFormId = async (
           console.log(
             `Data cached for find request form id ${space}-${entity}-${variantId} with TTL ${
               ttl === 0 ? "unlimited" : ttl + "s"
-            }`
+            }`,
           );
       } catch (cacheError) {
         console.warn("Cache write error:", cacheError);
@@ -472,7 +471,7 @@ export const getRequestFormFieldDatahub = async (
   datahubCustomFieldsData,
   datahubSpaceData,
   useCache = true,
-  cacheTTL = null
+  cacheTTL = null,
 ) => {
   try {
     // Set default TTL if not provided (null = unlimited, otherwise use provided value or env default)
@@ -485,7 +484,7 @@ export const getRequestFormFieldDatahub = async (
     const cacheKey = redisClient.generateKey(
       "request_form_field_datahub",
       space,
-      variantId
+      variantId,
     );
 
     // Try to get from cache first
@@ -502,7 +501,7 @@ export const getRequestFormFieldDatahub = async (
 
     const datahubFields = await getDatahubFields(
       wrikeToken,
-      process.env.DATAHUB_REQUEST_FORM_FIELDS_ID
+      process.env.DATAHUB_REQUEST_FORM_FIELDS_ID,
     );
 
     if (datahubFields?.errorDescription) {
@@ -519,7 +518,7 @@ export const getRequestFormFieldDatahub = async (
       process.env.DATAHUB_REQUEST_FORM_FIELDS_ID,
       {
         useCache: false,
-      }
+      },
     );
 
     if (datahubRecords?.errorDescription) {
@@ -565,13 +564,13 @@ export const getRequestFormFieldDatahub = async (
         const isSaved = await redisClient.set(
           cacheKey,
           datahubRequestFormFieldsData,
-          ttl
+          ttl,
         );
         if (isSaved)
           console.log(
             `Data cached for request form field datahub ${space}-${variantId} with TTL ${
               ttl === 0 ? "unlimited" : ttl + "s"
-            }`
+            }`,
           );
       } catch (cacheError) {
         console.warn("Cache write error:", cacheError);
@@ -589,7 +588,7 @@ export const getDatahubCustomFields = async (
   databaseId,
   isMaster = false,
   useCache = true,
-  cacheTTL = 0
+  cacheTTL = 0,
 ) => {
   try {
     // Set default TTL if not provided (null = unlimited, otherwise use provided value or env default)
@@ -602,7 +601,7 @@ export const getDatahubCustomFields = async (
     const cacheKey = redisClient.generateKey(
       "datahub_grouped_data",
       databaseId ?? process.env.DATAHUB_CUSTOM_FIELDS_ID,
-      isMaster ? "master" : "regular"
+      isMaster ? "master" : "regular",
     );
 
     // Try to get from cache first
@@ -672,19 +671,19 @@ export const getDatahubCustomFields = async (
               ?.includes("read") ?? false,
           canReadMasterData:
             record.fieldValues[formFieldsIds["master data feature"]]?.includes(
-              "Read"
+              "Read",
             ) ?? false,
           canCreateMasterData:
             record.fieldValues[formFieldsIds["master data feature"]]?.includes(
-              "Create"
+              "Create",
             ) ?? false,
           canUpdateMasterData:
             record.fieldValues[formFieldsIds["master data feature"]]?.includes(
-              "Update"
+              "Update",
             ) ?? false,
           canDeleteMasterData:
             record.fieldValues[formFieldsIds["master data feature"]]?.includes(
-              "Delete"
+              "Delete",
             ) ?? false,
           cfType: record.fieldValues[formFieldsIds["cf type"]],
           xpiFieldType: record.fieldValues[formFieldsIds["xpi field type"]],
@@ -697,7 +696,7 @@ export const getDatahubCustomFields = async (
         const isSaved = await redisClient.set(cacheKey, datahubData, cacheTTL);
         if (isSaved)
           console.log(
-            `Data cached for datahub ${databaseId} with TTL unlimited`
+            `Data cached for datahub ${databaseId} with TTL unlimited`,
           );
       } catch (cacheError) {
         console.warn("Cache write error:", cacheError);
@@ -715,7 +714,7 @@ export const getDatahubDataById = async (
   databaseId,
   filter = [],
   useCache = true,
-  cacheTTL = null
+  cacheTTL = null,
 ) => {
   try {
     // Set default TTL if not provided (null = unlimited, otherwise use provided value or env default)
@@ -733,7 +732,7 @@ export const getDatahubDataById = async (
     const cacheKey = redisClient.generateKey(
       "datahub_data_by_id",
       databaseId,
-      JSON.stringify(filter)
+      JSON.stringify(filter),
     );
 
     // Try to get from cache first
@@ -774,7 +773,7 @@ export const getDatahubDataById = async (
         // finding fieldId by value
         const fieldId =
           Object.keys(formFieldsIds).find(
-            (key) => formFieldsIds[key] === filterItem.fieldName
+            (key) => formFieldsIds[key] === filterItem.fieldName,
           ) || null;
 
         filterString = fieldId
@@ -793,7 +792,7 @@ export const getDatahubDataById = async (
             // finding fieldId by value
             const fieldId =
               Object.keys(formFieldsIds).find(
-                (key) => formFieldsIds[key] === filterItem.fieldName
+                (key) => formFieldsIds[key] === filterItem.fieldName,
               ) || null;
 
             if (!fieldId) return null;
@@ -839,7 +838,7 @@ export const getDatahubDataById = async (
           console.log(
             `Data cached for datahub data by id ${databaseId} with TTL ${
               ttl === 0 ? "unlimited" : ttl + "s"
-            }`
+            }`,
           );
       } catch (cacheError) {
         console.warn("Cache write error:", cacheError);
@@ -855,7 +854,7 @@ export const getDatahubDataById = async (
 export const createDatahubRecord = async (
   wrikeToken,
   databaseId,
-  fieldValues = {}
+  fieldValues = {},
 ) => {
   try {
     if (!fieldValues) throw "Field values must not be empty";
@@ -888,8 +887,9 @@ export const createDatahubRecord = async (
     }
 
     // Pass Service Account Token
-    const secretValues = getSecrets();
-    wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
+    // Pass Service Account Token
+    const apiCreds = getCachedWrikeCredentials("API");
+    wrikeToken = apiCreds?.token ?? wrikeToken;
 
     const customFieldsData = await GetResponse(
       `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/records`,
@@ -906,7 +906,7 @@ export const createDatahubRecord = async (
             fieldValues: inputRecordParams,
           },
         ],
-      }
+      },
     );
 
     if (customFieldsData?.errorDescription) throw customFieldsData;
@@ -921,7 +921,7 @@ export const updateDatahubRecord = async (
   wrikeToken,
   databaseId,
   recordId,
-  fieldValues = {}
+  fieldValues = {},
 ) => {
   try {
     if (!recordId) throw "Record ID must not be empty";
@@ -956,8 +956,8 @@ export const updateDatahubRecord = async (
     }
 
     // Pass Service Account Token
-    const secretValues = getSecrets();
-    wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
+    const apiCreds = getCachedWrikeCredentials("API");
+    wrikeToken = apiCreds?.token ?? wrikeToken;
 
     const customFieldsData = await GetResponseWithStatusCode(
       `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/records/${recordId}`,
@@ -969,7 +969,7 @@ export const updateDatahubRecord = async (
       {
         title: fieldValues["value"],
         fieldValues: inputRecordParams,
-      }
+      },
     );
 
     if (customFieldsData?.status == 404)
@@ -987,15 +987,15 @@ export const updateDatahubRecord = async (
 export const deleteDatahubRecord = async (
   wrikeToken,
   databaseId,
-  recordIds = []
+  recordIds = [],
 ) => {
   try {
     if (!Array.isArray(recordIds) || recordIds.length === 0)
       throw "Record IDs must not be empty";
 
     // Pass Service Account Token
-    const secretValues = getSecrets();
-    wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
+    const apiCreds = getCachedWrikeCredentials("API");
+    wrikeToken = apiCreds?.token ?? wrikeToken;
 
     const customFieldsData = await GetResponse(
       `${
@@ -1005,7 +1005,7 @@ export const deleteDatahubRecord = async (
       {
         "content-type": "application/json",
         Authorization: `Bearer ${wrikeToken}`,
-      }
+      },
     );
 
     if (customFieldsData?.errorDescription) throw customFieldsData;
@@ -1061,7 +1061,7 @@ export const getRequestForm = async (wrikeToken) => {
       {
         "content-type": "application/json",
         Authorization: `Bearer ${wrikeToken}`,
-      }
+      },
     );
 
     if (wrikeRequestFormData?.errorDescription) throw wrikeRequestFormData;
@@ -1075,7 +1075,7 @@ export const getRequestForm = async (wrikeToken) => {
 export const submitRequestForm = async (
   wrikeToken,
   requetFormId,
-  formFields
+  formFields,
 ) => {
   try {
     // Get folder data
@@ -1088,7 +1088,7 @@ export const submitRequestForm = async (
       },
       {
         formFields,
-      }
+      },
     );
 
     if (wrikeRequestFormData?.errorDescription) throw wrikeRequestFormData;
@@ -1102,7 +1102,7 @@ export const submitRequestForm = async (
 export const getRequestFormStatus = async (
   wrikeToken,
   asyncJobId,
-  retryCount = 0
+  retryCount = 0,
 ) => {
   try {
     // Get async job status (should be GET, not POST)
@@ -1112,7 +1112,7 @@ export const getRequestFormStatus = async (
       {
         "content-type": "application/json",
         Authorization: `Bearer ${wrikeToken}`,
-      }
+      },
     );
 
     if (wrikeRequestFormData?.errorDescription) throw wrikeRequestFormData;
@@ -1143,7 +1143,7 @@ export const getFolder = async (wrikeToken, folderId) => {
       {
         "content-type": "application/json",
         Authorization: `Bearer ${wrikeToken}`,
-      }
+      },
     );
 
     if (wrikeRequestFormData?.errorDescription) throw wrikeRequestFormData;
@@ -1159,7 +1159,7 @@ export const updateFolder = async (
   folderId,
   folderFieldsUpdateData,
   folderMetadataUpdateData,
-  folderCFUpdateData
+  folderCFUpdateData,
 ) => {
   try {
     // Get folder data
@@ -1221,7 +1221,7 @@ export const deleteFolder = async (wrikeToken, folderId) => {
       {
         "content-type": "application/json",
         Authorization: `Bearer ${wrikeToken}`,
-      }
+      },
     );
 
     if (wrikeRequestFormData?.errorDescription) throw wrikeRequestFormData;
@@ -1264,7 +1264,7 @@ export const getTask = async (wrikeToken, folderId) => {
       {
         "content-type": "application/json",
         Authorization: `Bearer ${wrikeToken}`,
-      }
+      },
     );
 
     if (wrikeRequestFormData?.errorDescription) throw wrikeRequestFormData;
@@ -1280,7 +1280,7 @@ export const updateTask = async (
   taskId,
   taskFieldsUpdateData,
   taskMetadataUpdateData,
-  taskCFUpdateData
+  taskCFUpdateData,
 ) => {
   try {
     // Get folder data
@@ -1340,7 +1340,7 @@ export const deleteTask = async (wrikeToken, taskId) => {
       {
         "content-type": "application/json",
         Authorization: `Bearer ${wrikeToken}`,
-      }
+      },
     );
 
     if (wrikeRequestFormData?.errorDescription) throw wrikeRequestFormData;

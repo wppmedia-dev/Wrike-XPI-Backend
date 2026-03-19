@@ -144,3 +144,69 @@ export const decrypt = (encryptedData, dek) => {
 
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
 };
+
+/**
+ * Encrypt a string using AES-256-GCM with master key from env
+ * @param {string} plaintext The data to encrypt
+ * @returns {string} Encrypted data as base64 (IV || Auth Tag || Ciphertext)
+ */
+export const encryptField = (plaintext) => {
+  const masterKey = process.env.ENCRYPTION_MASTER_KEY;
+  if (!masterKey) {
+    throw new Error("ENCRYPTION_MASTER_KEY not set in environment");
+  }
+
+  // Convert master key from hex string to buffer (should be 32 bytes for AES-256)
+  const key = Buffer.from(masterKey, "hex");
+  if (key.length !== 32) {
+    throw new Error(
+      "ENCRYPTION_MASTER_KEY must be 64 hex characters (32 bytes)",
+    );
+  }
+
+  const iv = crypto.randomBytes(IV_LENGTH);
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+
+  const encrypted = Buffer.concat([
+    cipher.update(plaintext, "utf8"),
+    cipher.final(),
+  ]);
+
+  const authTag = cipher.getAuthTag();
+
+  // Format: IV || Auth Tag || Ciphertext, encoded as base64
+  return Buffer.concat([iv, authTag, encrypted]).toString("base64");
+};
+
+/**
+ * Decrypt a string using AES-256-GCM with master key from env
+ * @param {string} encryptedData Encrypted data as base64 (IV || Auth Tag || Ciphertext)
+ * @returns {string} Decrypted plaintext
+ */
+export const decryptField = (encryptedData) => {
+  const masterKey = process.env.ENCRYPTION_MASTER_KEY;
+  if (!masterKey) {
+    throw new Error("ENCRYPTION_MASTER_KEY not set in environment");
+  }
+
+  // Convert master key from hex string to buffer
+  const key = Buffer.from(masterKey, "hex");
+  if (key.length !== 32) {
+    throw new Error(
+      "ENCRYPTION_MASTER_KEY must be 64 hex characters (32 bytes)",
+    );
+  }
+
+  const buffer = Buffer.from(encryptedData, "base64");
+  const iv = buffer.slice(0, IV_LENGTH);
+  const authTag = buffer.slice(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH);
+  const ciphertext = buffer.slice(IV_LENGTH + AUTH_TAG_LENGTH);
+
+  const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+  decipher.setAuthTag(authTag);
+
+  return Buffer.concat([
+    decipher.update(ciphertext),
+    decipher.final(),
+  ]).toString("utf8");
+};

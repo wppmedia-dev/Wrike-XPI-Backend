@@ -1,0 +1,78 @@
+"use strict";
+module.exports = {
+  up: async (queryInterface, Sequelize) => {
+    // Create the table
+    await queryInterface.createTable("wrike_credentials", {
+      id: {
+        type: Sequelize.UUID,
+        defaultValue: Sequelize.UUIDV4,
+        primaryKey: true,
+        allowNull: false,
+      },
+      environment_name: {
+        type: Sequelize.STRING(255),
+        allowNull: false,
+        comment: "Unique environment name",
+      },
+      api_client_id: {
+        type: Sequelize.TEXT,
+        allowNull: true,
+        comment: "Encrypted API Client ID",
+      },
+      api_client_secret: {
+        type: Sequelize.TEXT,
+        allowNull: true,
+        comment: "Encrypted API Client Secret",
+      },
+      automation_client_id: {
+        type: Sequelize.TEXT,
+        allowNull: true,
+        comment: "Encrypted Automation Client ID",
+      },
+      automation_client_secret: {
+        type: Sequelize.TEXT,
+        allowNull: true,
+        comment: "Encrypted Automation Client Secret",
+      },
+      is_active: {
+        type: Sequelize.BOOLEAN,
+        defaultValue: true,
+        allowNull: false,
+      },
+      created_at: {
+        type: Sequelize.DATE,
+        defaultValue: Sequelize.fn("now"),
+        allowNull: false,
+      },
+      updated_at: {
+        type: Sequelize.DATE,
+        allowNull: true,
+      },
+      deleted_at: {
+        type: Sequelize.DATE,
+        allowNull: true,
+      },
+      created_by: {
+        type: Sequelize.UUID,
+        allowNull: true,
+      },
+      updated_by: {
+        type: Sequelize.UUID,
+        allowNull: true,
+      },
+    });
+
+    // Create unique index on environment_name excluding soft deleted records
+    // This allows reusing names after soft delete
+    await queryInterface.addIndex("wrike_credentials", {
+      fields: ["environment_name"],
+      where: { deleted_at: null },
+      unique: true,
+      name: "unique_environment_name_active",
+    });
+  },
+
+  down: async (queryInterface, Sequelize) => {
+    await queryInterface.dropTable("wrike_credentials");
+  },
+};

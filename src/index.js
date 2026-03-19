@@ -9,7 +9,12 @@ dotenv.config();
 
 // Importing Routes
 import { PrivateRouters, PublicRouters } from "./routes";
+import { adminPagesRoute } from "./routes/admin/pages-router";
 import { syncSecrets, getSecrets } from "./utils/azure_vault";
+import {
+  syncWrikeCredentialsFromDB,
+  getCachedWrikeCredentials,
+} from "./utils/wrikeCredentials";
 
 (async () => {
   // Configure the framework and instantiate it
@@ -32,6 +37,9 @@ import { syncSecrets, getSecrets } from "./utils/azure_vault";
   //routes
   fastify.register(PublicRouters, { prefix: "/api/v1" });
   fastify.register(PrivateRouters, { prefix: "/api/v1" });
+
+  // Admin pages (outside /api/v1)
+  fastify.register(adminPagesRoute, { prefix: "/admin" });
 
   // Hooks
   fastify.addHook("onError", async (request, reply, error) => {
@@ -73,6 +81,16 @@ import { syncSecrets, getSecrets } from "./utils/azure_vault";
     "XPI-API-Token",
   ]);
 
+  // Sync Wrike Credentials from Database at Startup
+  try {
+    await syncWrikeCredentialsFromDB();
+  } catch (err) {
+    console.error(
+      "Error syncing Wrike credentials from DB at startup:",
+      err.message,
+    );
+  }
+
   fastify.get("/sync-secrets", async (req, res) => {
     try {
       await syncSecrets([
@@ -82,6 +100,20 @@ import { syncSecrets, getSecrets } from "./utils/azure_vault";
       ]);
       console.log("Secrets synchronized successfully");
       res.send({ success: true, message: "Secrets synchronized successfully" });
+    } catch (err) {
+      res.status(500).send({ success: false, message: err.message || err });
+    }
+  });
+
+  // Sync Wrike Credentials from Database
+  fastify.get("/sync-db-credentials", async (req, res) => {
+    try {
+      await syncWrikeCredentialsFromDB();
+      console.log("Database credentials synchronized successfully");
+      res.send({
+        success: true,
+        message: "Database credentials synchronized successfully",
+      });
     } catch (err) {
       res.status(500).send({ success: false, message: err.message || err });
     }
@@ -99,9 +131,9 @@ import { syncSecrets, getSecrets } from "./utils/azure_vault";
       );
     }
 
-    const secretValues = getSecrets();
-
-    const WRIKE_CLIENT_ID = secretValues["XPI-API-ClientId"];
+    // Get credentials from cached DB values (API type)
+    const cachedCreds = getCachedWrikeCredentials("API");
+    const WRIKE_CLIENT_ID = cachedCreds?.clientId;
 
     if (!WRIKE_CLIENT_ID) {
       return res.status(400).send({
@@ -121,16 +153,6 @@ import { syncSecrets, getSecrets } from "./utils/azure_vault";
 
       return res.redirect(redirectUrl);
     }
-
-    // const secretValues = getSecrets(["XPI-API-ClientId"]);
-
-    // const WRIKE_CLIENT_ID = secretValues["XPI-API-ClientId"];
-
-    // if (!WRIKE_CLIENT_ID) {
-    //   return res.status(400).send({
-    //     message: "Missing WRIKE_CLIENT_ID. Please contact your admin",
-    //   });
-    // }
 
     let state = "";
     if (redirectUri) {

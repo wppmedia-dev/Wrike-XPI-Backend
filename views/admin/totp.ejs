@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TOTP Verification - WrikeXPI Admin</title>
+  <link rel="icon" href="https://cdn.wrike.com/static/branding/wrike/favicons/favicon.ico" />
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      height: 100vh;
+      background: linear-gradient(-45deg, #1f1c2c, #928dab, #2e2e52, #515175);
+      background-size: 400% 400%;
+      animation: gradient 15s ease infinite;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+    }
+
+    @keyframes gradient {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .container {
+      backdrop-filter: blur(16px);
+      background-color: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 24px;
+      padding: 50px 40px;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+      max-width: 400px;
+      width: 90%;
+      animation: fadeIn 1s ease-out forwards;
+      opacity: 0;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .icon {
+      width: 60px;
+      height: 60px;
+      background: rgba(76, 175, 80, 0.2);
+      border: 2px solid rgba(76, 175, 80, 0.5);
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      font-size: 32px;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+
+    .subtitle {
+      font-size: 0.95rem;
+      color: #cccccc;
+      margin-bottom: 30px;
+      text-align: center;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.9rem;
+      margin-bottom: 8px;
+      color: #e0e0e0;
+      font-weight: 500;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      color: white;
+      font-size: 1rem;
+      transition: all 0.3s ease;
+      letter-spacing: 2px;
+      text-align: center;
+      font-weight: 600;
+      font-family: 'Courier New', monospace;
+    }
+
+    input[type="text"]:focus {
+      outline: none;
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(76, 175, 80, 0.5);
+      box-shadow: 0 0 12px rgba(76, 175, 80, 0.2);
+    }
+
+    input::placeholder {
+      color: rgba(255, 255, 255, 0.3);
+      letter-spacing: 2px;
+    }
+
+    /* Limit input to 6 characters visually */
+    input[type="text"]::-webkit-outer-spin-button,
+    input[type="text"]::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    .button {
+      width: 100%;
+      padding: 12px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-top: 10px;
+    }
+
+    .button:hover {
+      background: #45a049;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(76, 175, 80, 0.3);
+    }
+
+    .button:disabled {
+      background: #666;
+      cursor: not-allowed;
+    }
+
+    .secondary-btn {
+      width: 100%;
+      padding: 12px;
+      background: transparent;
+      color: #9ae6b4;
+      border: 1px solid rgba(154, 230, 180, 0.3);
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-top: 8px;
+    }
+
+    .secondary-btn:hover {
+      background: rgba(154, 230, 180, 0.1);
+      border-color: rgba(154, 230, 180, 0.6);
+    }
+
+    .error {
+      background: rgba(244, 67, 54, 0.1);
+      border: 1px solid rgba(244, 67, 54, 0.3);
+      color: #ff7675;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 0.9rem;
+      display: none;
+    }
+
+    .error.show {
+      display: block;
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .loader {
+      border: 3px solid rgba(255, 255, 255, 0.2);
+      border-top: 3px solid white;
+      border-radius: 50%;
+      width: 18px;
+      height: 18px;
+      animation: spin 1s linear infinite;
+      display: none;
+      margin: 0 auto;
+    }
+
+    .loader.show {
+      display: block;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .info {
+      font-size: 0.85rem;
+      color: #b0b0b0;
+      text-align: center;
+      margin-top: 20px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">🔐</div>
+    <h1>Two-Factor Auth</h1>
+    <p class="subtitle">Enter the 6-digit code from your authenticator app</p>
+
+    <div class="error" id="errorMessage"></div>
+
+    <form id="totpForm">
+      <div class="form-group">
+        <label for="totpCode">Authentication Code</label>
+        <input
+          type="text"
+          id="totpCode"
+          name="totpCode"
+          placeholder="000000"
+          maxlength="6"
+          inputmode="numeric"
+          pattern="[0-9]{6}"
+          required
+          autocomplete="off"
+        />
+      </div>
+
+      <button type="submit" class="button" id="verifyBtn">
+        <span id="btnText">Verify</span>
+        <div id="btnLoader" class="loader"></div>
+      </button>
+
+      <button type="button" class="secondary-btn" id="backBtn">← Back to Login</button>
+    </form>
+
+    <div class="info">
+      Using Google Authenticator, Authy, or Microsoft Authenticator?<br />
+      Enter the 6-digit code shown in your app.
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById("totpForm");
+    const errorDiv = document.getElementById("errorMessage");
+    const verifyBtn = document.getElementById("verifyBtn");
+    const btnText = document.getElementById("btnText");
+    const btnLoader = document.getElementById("btnLoader");
+    const backBtn = document.getElementById("backBtn");
+    const totpInput = document.getElementById("totpCode");
+
+    // Only allow numeric input
+    totpInput.addEventListener("input", (e) => {
+      e.target.value = e.target.value.replace(/[^0-9]/g, "").slice(0, 6);
+    });
+
+    // Auto-submit when 6 digits are entered
+    totpInput.addEventListener("input", () => {
+      if (totpInput.value.length === 6) {
+        form.dispatchEvent(new Event("submit"));
+      }
+    });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errorDiv.classList.remove("show");
+
+      const totpCode = totpInput.value.trim();
+
+      if (!totpCode || totpCode.length !== 6 || !/^\d{6}$/.test(totpCode)) {
+        showError("Please enter a valid 6-digit code");
+        return;
+      }
+
+      const sessionToken = sessionStorage.getItem("session_token");
+      if (!sessionToken) {
+        showError("Session expired. Please login again.");
+        window.location.href = "/admin/login";
+        return;
+      }
+
+      verifyBtn.disabled = true;
+      btnText.style.display = "none";
+      btnLoader.classList.add("show");
+
+      try {
+        const response = await fetch("/admin/api/totp/verify", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            session_token: sessionToken,
+            totp_code: totpCode,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || "TOTP verification failed");
+        }
+
+        // Redirect to dashboard
+        window.location.href = "/admin/dashboard";
+      } catch (err) {
+        showError(err.message);
+        verifyBtn.disabled = false;
+        btnText.style.display = "inline";
+        btnLoader.classList.remove("show");
+        totpInput.value = "";
+        totpInput.focus();
+      }
+    });
+
+    backBtn.addEventListener("click", () => {
+      sessionStorage.removeItem("session_token");
+      window.location.href = "/admin/login";
+    });
+
+    function showError(message) {
+      errorDiv.textContent = message;
+      errorDiv.classList.add("show");
+    }
+
+    // Check session on load
+    window.addEventListener("load", () => {
+      if (!sessionStorage.getItem("session_token")) {
+        window.location.href = "/admin/login";
+      }
+      // Focus on input
+      totpInput.focus();
+    });
+  </script>
+</body>
+</html>
