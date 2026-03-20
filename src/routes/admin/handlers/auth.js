@@ -1,255 +1,176 @@
-import {
-  VerifyAdminPassword,
-  CreateAdminSession,
-  VerifyAdminSession,
-  GenerateTOTPSecret,
-  VerifyAndEnableTOTP,
-  VerifyTOTPForSession,
-  RevokeAdminSessionById,
-  CreateAdmin,
-  GenerateAdminJWT,
-} from "../../../controllers/adminAuth";
-import models from "../../../../models";
+import jwt from "jsonwebtoken";
+import * as CryptoUtils from "../../../utils/crypto";
+import { generateTOTPSecret, verifyTOTP } from "../../../utils/totp";
+import { AdminAuth } from "../../../controllers";
 
-/**
- * Handle admin login
- */
-export const AdminLogin = (body, fastify) => {
+export const Register = (body) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const { username, password, setup_key } = body;
+
+      if (!username || !password)
+        return reject({ statusCode: 400, message: "Username and password are required" });
+
+      const adminCount = await AdminAuth.Count();
+
+      if (adminCount > 0) {
+        const setupKey = process.env.ADMIN_SETUP_KEY;
+        if (!setupKey || setup_key !== setupKey)
+          return reject({ statusCode: 403, message: "Admin registration requires a valid setup key" });
+      }
+
+      const existingAdmin = await AdminAuth.GetByUsername(username);
+      if (existingAdmin?.id)
+        return reject({ statusCode: 400, message: "Username already exists" });
+
+      const passwordHash = await CryptoUtils.hashPassword(password);
+      const admin = await AdminAuth.Insert(username, passwordHash);
+
+      return resolve({ statusCode: 201, message: "Admin registered successfully", data: admin });
+    } catch (err) {
+      console.log(err?.message || err);
+      reject(err);
+    }
+  });
+};
+
+export const Login = (body) => {
   return new Promise(async (resolve, reject) => {
     try {
       const { username, password } = body;
 
-      if (!username || !password) {
-        return reject({
-          statusCode: 400,
-          message: "Username and password are required",
-        });
-      }
+      if (!username || !password)
+        return reject({ statusCode: 400, message: "Username and password are required" });
 
-      // Verify credentials
-      const admin = await VerifyAdminPassword(username, password);
+      const admin = await AdminAuth.GetByUsername(username);
 
-      // Create session
-      const session = await CreateAdminSession(admin.id);
+      if (!admin?.id)
+        return reject({ statusCode: 401, message: "Invalid credentials" });
 
-      // If TOTP is required, return only the temporary session token
-      // so the TOTP page can complete the second factor.
+      const isValid = await CryptoUtils.verifyPassword(admin.password_hash, password);
+      if (!isValid)
+        return reject({ statusCode: 401, message: "Invalid credentials" });
+
+      const session = await AdminAuth.CreateSession(admin.id);
+
       if (admin.totp_enabled) {
         return resolve({
           statusCode: 200,
           message: "TOTP verification required",
           data: {
             session_token: session.session_token,
-            admin_id: admin.id,
-            username: admin.username,
             totp_required: true,
           },
         });
       }
 
-      // No TOTP — issue JWT immediately
-      const accessToken = GenerateAdminJWT(
-        admin.id,
-        admin.username,
-        session.session_id,
+      const accessToken = jwt.sign(
+        { sub: admin.id, username: admin.username, session_id: session.session_id },
+        process.env.JWT_SECRET,
+        { expiresIn: "24h" }
       );
 
       return resolve({
         statusCode: 200,
         message: "Login successful",
-        data: {
-          access_token: accessToken,
-          admin_id: admin.id,
-          username: admin.username,
-          totp_required: false,
-        },
+        data: { access_token: accessToken },
       });
     } catch (err) {
-      console.error("Error during admin login:", err);
-      return reject({
-        statusCode: err?.statusCode || 500,
-        message: err?.message || err,
-      });
+      console.log(err?.message || err);
+      reject(err);
     }
   });
 };
 
-/**
- * Generate TOTP setup secret (requires valid JWT via middleware)
- */
-export const GenerateTOTPSetup = (adminUser, fastify) => {
-  return new Promise(async (resolve, reject) => {
-    try {
-      // Generate TOTP secret using identity from verified JWT
-      const totpSecret = await GenerateTOTPSecret(
-        adminUser.id,
-        adminUser.username,
-      );
-
-      return resolve({
-        statusCode: 200,
-        message: "TOTP secret generated",
-        data: totpSecret,
-      });
-    } catch (err) {
-      console.error("Error generating TOTP secret:", err);
-      return reject({
-        statusCode: err?.statusCode || 500,
-        message: err?.message || err,
-      });
-    }
-  });
-};
-
-/**
- * Verify TOTP setup and enable (requires valid JWT via middleware)
- */
-export const SetupTOTP = (body, adminUser, fastify) => {
-  return new Promise(async (resolve, reject) => {
-    try {
-      const { totp_secret, totp_code } = body;
-
-      if (!totp_secret || !totp_code) {
-        return reject({
-          statusCode: 400,
-          message: "TOTP secret and code are required",
-        });
-      }
-
-      // Verify and enable TOTP using identity from verified JWT
-      const result = await VerifyAndEnableTOTP(
-        adminUser.id,
-        totp_secret,
-        totp_code,
-      );
-
-      return resolve({
-        statusCode: 200,
-        message: result.message,
-        data: result,
-      });
-    } catch (err) {
-      console.error("Error setting up TOTP:", err);
-      return reject({
-        statusCode: err?.statusCode || 500,
-        message: err?.message || err,
-      });
-    }
-  });
-};
-
-/**
- * Verify TOTP code for session (temporary session_token from login step)
- */
-export const VerifyTOTP = (body, fastify) => {
+export const VerifyTOTP = (body) => {
   return new Promise(async (resolve, reject) => {
     try {
       const { session_token, totp_code } = body;
 
-      if (!session_token || !totp_code) {
-        return reject({
-          statusCode: 400,
-          message: "Session token and TOTP code are required",
-        });
-      }
+      if (!session_token || !totp_code)
+        return reject({ statusCode: 400, message: "Session token and TOTP code are required" });
 
-      // Verify TOTP — marks session totp_verified=true
-      const result = await VerifyTOTPForSession(session_token, totp_code);
+      const session = await AdminAuth.GetSession(session_token);
 
-      // Issue JWT now that TOTP has passed
-      const accessToken = GenerateAdminJWT(
-        result.admin_id,
-        result.admin_username,
-        result.session_id,
+      if (!session?.id)
+        return reject({ statusCode: 401, message: "Invalid session token" });
+
+      if (new Date(session.expires_at) < new Date())
+        return reject({ statusCode: 401, message: "Session expired" });
+
+      const isValid = verifyTOTP(session.totp_secret, totp_code);
+      if (!isValid)
+        return reject({ statusCode: 400, message: "Invalid TOTP code" });
+
+      await AdminAuth.MarkSessionTOTPVerified(session.id);
+      await AdminAuth.UpdateLastLogin(session.admin_id);
+
+      const accessToken = jwt.sign(
+        { sub: session.admin_id, username: session.admin_username, session_id: session.id },
+        process.env.JWT_SECRET,
+        { expiresIn: "24h" }
       );
 
       return resolve({
         statusCode: 200,
-        message: result.message,
+        message: "TOTP verified successfully",
         data: { access_token: accessToken },
       });
     } catch (err) {
-      console.error("Error verifying TOTP:", err);
-      return reject({
-        statusCode: err?.statusCode || 500,
-        message: err?.message || err,
-      });
+      console.log(err?.message || err);
+      reject(err);
     }
   });
 };
 
-/**
- * Logout (revoke session identified by JWT — requires middleware)
- */
-export const AdminLogout = (adminUser, fastify) => {
+export const GenerateTOTPSetup = (adminUser) => {
   return new Promise(async (resolve, reject) => {
     try {
-      await RevokeAdminSessionById(adminUser.session_id);
+      const { secret, qr_code_url } = generateTOTPSecret(adminUser.username);
 
       return resolve({
         statusCode: 200,
-        message: "Logged out successfully",
+        message: "TOTP secret generated. Scan with Google Authenticator",
+        data: { secret, qr_code_url },
       });
     } catch (err) {
-      console.error("Error during logout:", err);
-      return reject({
-        statusCode: err?.statusCode || 500,
-        message: err?.message || err,
-      });
+      console.log(err?.message || err);
+      reject(err);
     }
   });
 };
 
-/**
- * Register admin user
- * Allows registration only if no admins exist (first-come-first-served)
- * If admins exist, requires ADMIN_SETUP_KEY environment variable
- */
-export const AdminRegister = (body, fastify) => {
+export const EnableTOTP = (body, adminUser) => {
   return new Promise(async (resolve, reject) => {
     try {
-      const { username, password, setup_key } = body;
+      const { totp_secret, totp_code } = body;
 
-      // Check if any admins already exist
-      const adminCount = await models.AdminUsers.count();
+      if (!totp_secret || !totp_code)
+        return reject({ statusCode: 400, message: "TOTP secret and code are required" });
 
-      if (adminCount > 0) {
-        // If admins exist, require a setup key from environment
-        const setupKey = process.env.ADMIN_SETUP_KEY;
+      const isValid = verifyTOTP(totp_secret, totp_code);
+      if (!isValid)
+        return reject({ statusCode: 400, message: "Invalid TOTP code" });
 
-        if (!setupKey || setup_key !== setupKey) {
-          return reject({
-            statusCode: 403,
-            message:
-              "Admin registration requires setup key. Set ADMIN_SETUP_KEY env variable to enable.",
-          });
-        }
-      }
+      await AdminAuth.EnableTOTP(adminUser.id, totp_secret);
 
-      if (!username || !password) {
-        return reject({
-          statusCode: 400,
-          message: "Username and password are required",
-        });
-      }
-
-      // Create admin
-      const admin = await CreateAdmin(username, password);
-
-      return resolve({
-        statusCode: 201,
-        message: admin.message,
-        data: {
-          id: admin.id,
-          username: admin.username,
-        },
-      });
+      return resolve({ statusCode: 200, message: "TOTP enabled successfully" });
     } catch (err) {
-      console.error("Error during admin registration:", err);
-      return reject({
-        statusCode: err?.statusCode || 500,
-        message: err?.message || err,
-      });
+      console.log(err?.message || err);
+      reject(err);
+    }
+  });
+};
+
+export const Logout = (adminUser) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      await AdminAuth.RevokeSession(adminUser.session_id);
+
+      return resolve({ statusCode: 200, message: "Logged out successfully" });
+    } catch (err) {
+      console.log(err?.message || err);
+      reject(err);
     }
   });
 };

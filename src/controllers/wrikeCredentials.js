@@ -107,26 +107,85 @@ export const Deactivate = async (environmentName) => {
   }
 };
 
-// Delete credentials (soft delete) by environment name
-export const Delete = async (environmentName) => {
+// Soft delete credentials by UUID primary key
+export const Delete = async (id) => {
   try {
-    if (!environmentName || typeof environmentName !== "string") {
+    if (!id) {
       throw {
-        statusCode: 400,
-        message: "Invalid environment name",
+        statusCode: 420,
+        message: "Id must not be empty!",
       };
     }
 
-    const credential = await models.WrikeCredentials.findOne({
-      where: {
-        environment_name: environmentName,
-      },
-    });
+    const credential = await models.WrikeCredentials.findByPk(id);
 
     if (credential) {
       await credential.destroy();
     }
 
+    return credential;
+  } catch (err) {
+    throw err;
+  }
+};
+
+// Get credentials by UUID primary key
+export const GetById = async (id) => {
+  try {
+    if (!id) {
+      throw {
+        statusCode: 420,
+        message: "Id must not be empty!",
+      };
+    }
+
+    const credential = await models.WrikeCredentials.findOne({
+      where: { id, deleted_at: null },
+    });
+
+    return credential;
+  } catch (err) {
+    throw err;
+  }
+};
+
+// Update credentials by UUID primary key
+export const Update = async (id, data) => {
+  try {
+    if (!id) {
+      throw {
+        statusCode: 420,
+        message: "Id must not be empty!",
+      };
+    }
+
+    await models.WrikeCredentials.update(data, {
+      where: { id },
+      individualHooks: true,
+    });
+  } catch (err) {
+    throw err;
+  }
+};
+
+// Get all credentials regardless of status (for admin listing)
+export const GetAllWithDeleted = async () => {
+  try {
+    const credentials = await models.WrikeCredentials.findAll({
+      where: { deleted_at: null },
+      order: [["created_at", "DESC"]],
+    });
+
+    return credentials;
+  } catch (err) {
+    throw err;
+  }
+};
+
+// Create a new credential record
+export const Create = async (data) => {
+  try {
+    const credential = await models.WrikeCredentials.create(data);
     return credential;
   } catch (err) {
     throw err;

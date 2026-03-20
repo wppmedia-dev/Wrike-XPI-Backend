@@ -1,20 +1,13 @@
-import { syncWrikeCredentialsFromDB } from "../../../utils/wrikeCredentials";
-import { WrikeCredentials } from "../../../../models";
 import { encryptField, decryptField } from "../../../utils/crypto";
-import { Op } from "sequelize";
+import { syncWrikeCredentialsFromDB } from "../../../utils/wrikeCredentials";
+import { WrikeCredentials } from "../../../controllers";
 
-// Get all credentials (authentication handled by verifyAdminJWT middleware)
-export const GetAllCredentials = (fastify) => {
+export const GetAll = () => {
   return new Promise(async (resolve, reject) => {
     try {
-      // Get all credentials (non-soft-deleted only)
-      const credentials = await WrikeCredentials.findAll({
-        where: { deleted_at: null },
-        order: [["created_at", "DESC"]],
-      });
+      const credentials = await WrikeCredentials.GetAllWithDeleted();
 
-      // Decrypt only the two ID fields, leave secrets encrypted in response.
-      const decryptedCredentials = credentials.map((cred) => ({
+      const data = credentials.map((cred) => ({
         id: cred.id,
         environment_name: cred.environment_name,
         api_client_id: cred.api_client_id
@@ -33,20 +26,16 @@ export const GetAllCredentials = (fastify) => {
       return resolve({
         statusCode: 200,
         message: "Credentials retrieved",
-        data: decryptedCredentials,
+        data,
       });
     } catch (err) {
-      console.error("Error getting credentials:", err);
-      return reject({
-        statusCode: err?.statusCode || 500,
-        message: err?.message || err,
-      });
+      console.log(err?.message || err);
+      reject(err);
     }
   });
 };
 
-// Save credential with all 5 fields (encrypted, authentication handled by middleware)
-export const SaveCredential = (body, fastify) => {
+export const Save = (body) => {
   return new Promise(async (resolve, reject) => {
     try {
       const {
@@ -57,83 +46,60 @@ export const SaveCredential = (body, fastify) => {
         automation_client_id,
         automation_client_secret,
       } = body;
-      if (!environment_name) {
+
+      if (!environment_name)
         return reject({
           statusCode: 400,
           message: "environment_name is required",
         });
-      }
 
-      // At least one credential type must be provided
       if (
         !api_client_id &&
         !api_client_secret &&
         !automation_client_id &&
         !automation_client_secret
-      ) {
+      )
         return reject({
           statusCode: 400,
-          message:
-            "At least one of api_client_id, api_client_secret, automation_client_id, or automation_client_secret is required",
+          message: "At least one credential field is required",
         });
-      }
 
       let credential;
 
       if (id) {
-        // Update existing credential
-        credential = await WrikeCredentials.findByPk(id);
-        if (!credential) {
-          return reject({
-            statusCode: 404,
-            message: "Credential not found",
-          });
-        }
+        credential = await WrikeCredentials.GetById(id);
+        if (!credential)
+          return reject({ statusCode: 404, message: "Credential not found" });
 
-        // Check if environment_name already exists (excluding current record)
-        const existing = await WrikeCredentials.findOne({
-          where: {
-            environment_name: environment_name,
-            id: { [Op.ne]: id },
-            deleted_at: null,
-          },
-        });
-
-        if (existing) {
+        const existing = await WrikeCredentials.GetByType(environment_name);
+        if (existing && existing.id !== id)
           return reject({
             statusCode: 400,
             message: "Environment name already exists",
           });
-        }
 
-        // Encrypt and update fields
-        credential.environment_name = environment_name;
-        if (api_client_id)
-          credential.api_client_id = encryptField(api_client_id);
+        const updates = { environment_name };
+        if (api_client_id) updates.api_client_id = encryptField(api_client_id);
         if (api_client_secret)
-          credential.api_client_secret = encryptField(api_client_secret);
+          updates.api_client_secret = encryptField(api_client_secret);
         if (automation_client_id)
-          credential.automation_client_id = encryptField(automation_client_id);
+          updates.automation_client_id = encryptField(automation_client_id);
         if (automation_client_secret)
-          credential.automation_client_secret = encryptField(
+          updates.automation_client_secret = encryptField(
             automation_client_secret,
           );
-        await credential.save();
-      } else {
-        // Create new credential
-        // Check if environment_name already exists
-        const existing = await WrikeCredentials.findOne({
-          where: { environment_name, deleted_at: null },
-        });
 
-        if (existing) {
+        await WrikeCredentials.Update(id, updates);
+        credential = await WrikeCredentials.GetById(id);
+      } else {
+        const existing = await WrikeCredentials.GetByType(environment_name);
+        if (existing)
           return reject({
             statusCode: 400,
             message: "Environment name already exists",
           });
-        }
 
-        credential = await WrikeCredentials.create({
+        credential = await WrikeCredentials.Create({
           environment_name,
           api_client_id: api_client_id ? encryptField(api_client_id) : null,
           api_client_secret: api_client_secret
@@ -148,11 +114,9 @@ export const SaveCredential = (body, fastify) => {
         });
       }
 
-      // Re-sync cache
       await syncWrikeCredentialsFromDB();
 
-      // Return decrypted credential
-      const decrypted = {
+      const data = {
         id: credential.id,
         environment_name: credential.environment_name,
         api_client_id: credential.api_client_id
@@ -173,37 +137,29 @@ export const SaveCredential = (body, fastify) => {
       return resolve({
         statusCode: 200,
         message: `Credential ${id ? "updated" : "saved"} successfully`,
-        data: decrypted,
+        data,
       });
     } catch (err) {
-      console.error("Error saving credentials:", err);
-      return reject({
-        statusCode: err?.statusCode || 500,
-        message: err?.message || err,
-      });
+      console.log(err?.message || err);
+      reject(err);
     }
   });
 };
 
-/**
- * Delete credential (soft delete, authentication handled by middleware)
- */
-export const DeleteCredential = (params, fastify) => {
+export const Delete = ({ id }) => {
   return new Promise(async (resolve, reject) => {
     try {
-      const { id } = params;
-      const credential = await WrikeCredentials.findByPk(id);
-      if (!credential) {
+      if (!id)
         return reject({
-          statusCode: 404,
-          message: "Credential not found",
+          statusCode: 400,
+          message: "Credential id is required",
         });
-      }
 
-      // Perform soft delete
-      await credential.destroy();
+      const credential = await WrikeCredentials.GetById(id);
+      if (!credential)
+        return reject({ statusCode: 404, message: "Credential not found" });
 
-      // Re-sync cache
+      await WrikeCredentials.Delete(id);
       await syncWrikeCredentialsFromDB();
 
       return resolve({
@@ -211,11 +167,8 @@ export const DeleteCredential = (params, fastify) => {
         message: "Credential deleted successfully",
       });
     } catch (err) {
-      console.error("Error deleting credential:", err);
-      return reject({
-        statusCode: err?.statusCode || 500,
-        message: err?.message || err,
-      });
+      console.log(err?.message || err);
+      reject(err);
     }
   });
 };

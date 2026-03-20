@@ -1,23 +1,19 @@
 import {
-  AdminLogin,
+  Register,
+  Login,
   GenerateTOTPSetup,
-  SetupTOTP,
+  EnableTOTP,
   VerifyTOTP,
-  AdminLogout,
-  AdminRegister,
+  Logout,
 } from "./handlers/auth";
-import {
-  GetAllCredentials,
-  SaveCredential,
-  DeleteCredential,
-} from "./handlers/credentials";
+import { GetAll, Save, Delete } from "./handlers/credentials";
 import { verifyAdminJWT } from "../../middlewares/adminAuth";
 
 export const adminApiRoute = (fastify, opts, done) => {
   // POST /admin/register
   fastify.post("/register", async (req, reply) => {
     try {
-      const result = await AdminRegister(req.body, fastify);
+      const result = await Register(req.body);
 
       return reply.code(result?.statusCode || 200).send({
         success: true,
@@ -35,7 +31,7 @@ export const adminApiRoute = (fastify, opts, done) => {
   // POST /admin/login
   fastify.post("/login", async (req, reply) => {
     try {
-      const result = await AdminLogin(req.body, fastify);
+      const result = await Login(req.body);
 
       return reply.code(result?.statusCode || 200).send({
         success: true,
@@ -56,7 +52,7 @@ export const adminApiRoute = (fastify, opts, done) => {
     { preHandler: [verifyAdminJWT] },
     async (req, reply) => {
       try {
-        const result = await GenerateTOTPSetup(req.adminUser, fastify);
+        const result = await GenerateTOTPSetup(req.adminUser);
 
         return reply.code(result?.statusCode || 200).send({
           success: true,
@@ -78,7 +74,7 @@ export const adminApiRoute = (fastify, opts, done) => {
     { preHandler: [verifyAdminJWT] },
     async (req, reply) => {
       try {
-        const result = await SetupTOTP(req.body, req.adminUser, fastify);
+        const result = await EnableTOTP(req.body, req.adminUser);
 
         return reply.code(result?.statusCode || 200).send({
           success: true,
@@ -97,7 +93,7 @@ export const adminApiRoute = (fastify, opts, done) => {
   // POST /admin/totp/verify
   fastify.post("/totp/verify", async (req, reply) => {
     try {
-      const result = await VerifyTOTP(req.body, fastify);
+      const result = await VerifyTOTP(req.body);
 
       return reply.code(result?.statusCode || 200).send({
         success: true,
@@ -118,7 +114,7 @@ export const adminApiRoute = (fastify, opts, done) => {
     { preHandler: [verifyAdminJWT] },
     async (req, reply) => {
       try {
-        const result = await AdminLogout(req.adminUser, fastify);
+        const result = await Logout(req.adminUser);
 
         return reply.code(result?.statusCode || 200).send({
           success: true,
@@ -139,7 +135,7 @@ export const adminApiRoute = (fastify, opts, done) => {
     { preHandler: [verifyAdminJWT] },
     async (req, reply) => {
       try {
-        const result = await GetAllCredentials(fastify);
+        const result = await GetAll();
 
         return reply.code(result?.statusCode || 200).send({
           success: true,
@@ -161,7 +157,7 @@ export const adminApiRoute = (fastify, opts, done) => {
     { preHandler: [verifyAdminJWT] },
     async (req, reply) => {
       try {
-        const result = await SaveCredential(req.body, fastify);
+        const result = await Save(req.body);
 
         return reply.code(result?.statusCode || 200).send({
           success: true,
@@ -183,7 +179,7 @@ export const adminApiRoute = (fastify, opts, done) => {
     { preHandler: [verifyAdminJWT] },
     async (req, reply) => {
       try {
-        const result = await DeleteCredential(req.params, fastify);
+        const result = await Delete(req.params);
 
         return reply.code(result?.statusCode || 200).send({
           success: true,

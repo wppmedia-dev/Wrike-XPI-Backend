@@ -6,7 +6,6 @@ import { channelRoute } from "./channel";
 import { taskRoute } from "./task";
 import { masterRoute } from "./master";
 import { amoebaRoute } from "./amoeba";
-import { credentialsRoute } from "./credentials";
 import { adminApiRoute } from "./admin";
 
 // Auth Middleware
@@ -100,8 +99,6 @@ export const PrivateRouters = (fastify, opts, done) => {
       }
     },
   );
-
-  fastify.register(credentialsRoute, { prefix: "/wrikexpi/credentials" });
 
   done();
 };
