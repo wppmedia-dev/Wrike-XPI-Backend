@@ -11,11 +11,10 @@ export const getWrikeCredentials = async (environmentName) => {
   try {
     const credential = await WrikeCredentials.GetByType(environmentName);
 
-    if (!credential) {
-      return null;
-    }
+    if (!credential) return null;
 
     return {
+      id: credential?.id,
       environmentName: credential.environment_name,
       apiClientId: credential.api_client_id
         ? decryptField(credential.api_client_id)

@@ -53,6 +53,13 @@ export const GetById = async (id) => {
         "salt",
         "wrapped_dek",
         "created_by",
+        "env_id",
+      ],
+      include: [
+        {
+          association: "environment",
+          attributes: ["environment_name"],
+        },
       ],
       where: {
         id,
@@ -67,45 +74,8 @@ export const GetById = async (id) => {
       salt: userTokens?.salt,
       wrapped_dek: userTokens?.wrapped_dek,
       created_by: userTokens?.created_by,
-    };
-  } catch (err) {
-    throw err;
-  }
-};
-
-export const GetByUserId = async (id) => {
-  try {
-    if (!id) {
-      throw {
-        statusCode: 420,
-        message: "Id must not be empty!",
-      };
-    }
-
-    const userTokens = await models.UserTokens.findAll({
-      attributes: [
-        "id",
-        "encrypted_access_token",
-        "encrypted_refresh_token",
-        "salt",
-        "wrapped_dek",
-        "created_by",
-      ],
-      where: {
-        created_by: id,
-        is_active: true,
-      },
-      order: [["created_at", "DESC"]],
-      limit: 1,
-    });
-
-    return {
-      id: userTokens?.id,
-      encrypted_access_token: userTokens?.encrypted_access_token,
-      encrypted_refresh_token: userTokens?.encrypted_refresh_token,
-      salt: userTokens?.salt,
-      wrapped_dek: userTokens?.wrapped_dek,
-      created_by: userTokens?.created_by,
+      env_id: userTokens?.env_id,
+      environment_name: userTokens?.environment?.environment_name,
     };
   } catch (err) {
     throw err;
@@ -130,6 +100,13 @@ export const GetTokenByUsername = async (username) => {
         "salt",
         "wrapped_dek",
         "created_by",
+        "env_id",
+      ],
+      include: [
+        {
+          association: "environment",
+          attributes: ["environment_name"],
+        },
       ],
       where: {
         username,
@@ -145,6 +122,8 @@ export const GetTokenByUsername = async (username) => {
       salt: userToken?.salt,
       wrapped_dek: userToken?.wrapped_dek,
       created_by: userToken?.created_by,
+      env_id: userToken?.env_id,
+      environment_name: userToken?.environment?.environment_name,
     };
   } catch (err) {
     throw err;
@@ -161,7 +140,13 @@ export const GetAllByUserId = async (id) => {
     }
 
     const userTokens = await models.UserTokens.findAll({
-      attributes: ["id", "account_id", "created_at", "updated_at"],
+      attributes: ["id", "account_id", "created_at", "updated_at", "env_id"],
+      include: [
+        {
+          association: "environment",
+          attributes: ["environment_name"],
+        },
+      ],
       where: {
         created_by: id,
         is_active: true,
@@ -169,7 +154,14 @@ export const GetAllByUserId = async (id) => {
       order: [["created_at", "DESC"]],
     });
 
-    return userTokens;
+    return userTokens.map((token) => ({
+      id: token?.id,
+      account_id: token?.account_id,
+      created_at: token?.created_at,
+      updated_at: token?.updated_at,
+      env_id: token?.env_id,
+      environment_name: token?.environment?.environment_name,
+    }));
   } catch (err) {
     throw err;
   }
@@ -199,7 +191,18 @@ export const GetByUserAndAccountId = async (id, accountId) => {
     if (accountId) where["account_id"] = accountId;
 
     const userTokens = await models.UserTokens.findOne({
-      attributes: ["id", "encrypted_access_token", "encrypted_refresh_token"],
+      attributes: [
+        "id",
+        "encrypted_access_token",
+        "encrypted_refresh_token",
+        "env_id",
+      ],
+      include: [
+        {
+          association: "environment",
+          attributes: ["environment_name"],
+        },
+      ],
       where: {
         created_by: id,
         account_id: accountId,
@@ -212,6 +215,8 @@ export const GetByUserAndAccountId = async (id, accountId) => {
       id: userTokens?.id,
       encrypted_access_token: userTokens?.encrypted_access_token,
       encrypted_refresh_token: userTokens?.encrypted_refresh_token,
+      env_id: userTokens?.env_id,
+      environment_name: userTokens?.environment?.environment_name,
     };
   } catch (err) {
     throw err;
@@ -220,11 +225,26 @@ export const GetByUserAndAccountId = async (id, accountId) => {
 
 export const GetAll = async ({ limit = 10, offset = 0 }) => {
   try {
-    const userTokens = await models.UserTokensTokens.findAll({
+    const userTokens = await models.UserTokens.findAll({
+      attributes: ["id", "account_id", "created_at", "updated_at", "env_id"],
+      include: [
+        {
+          association: "environment",
+          attributes: ["environment_name"],
+        },
+      ],
       limit,
       offset,
+      order: [["created_at", "DESC"]],
     });
-    return userTokens;
+    return userTokens.map((token) => ({
+      id: token?.id,
+      account_id: token?.account_id,
+      created_at: token?.created_at,
+      updated_at: token?.updated_at,
+      env_id: token?.env_id,
+      environment_name: token?.environment?.environment_name,
+    }));
   } catch (err) {
     throw err;
   }

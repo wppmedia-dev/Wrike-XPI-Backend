@@ -10,9 +10,8 @@ export const GetUserData = ({ token }, fastify) => {
       const { tid, encAccessTokenKey, encRefreshTokenKey } =
         await fastify.jwt.verify(token);
 
-      if (!tid || !encAccessTokenKey || !encRefreshTokenKey) {
+      if (!tid || !encAccessTokenKey || !encRefreshTokenKey)
         return reject({ message: "Invalid Token" });
-      }
 
       const {
         encrypted_access_token: encAccessToken,
@@ -23,12 +22,12 @@ export const GetUserData = ({ token }, fastify) => {
 
       const wrikeAccessToken = await decryptWithKey(
         encAccessToken,
-        encAccessTokenKey
+        encAccessTokenKey,
       );
 
       const wrikeRefreshToken = await decryptWithKey(
         encRefreshToken,
-        encRefreshTokenKey
+        encRefreshTokenKey,
       );
 
       const wrikeData = await wrikeUserData(wrikeAccessToken);
@@ -52,7 +51,7 @@ const wrikeUserData = (access_token) => {
           "content-type": "application/json",
           authorization: "Bearer " + access_token,
         },
-        null
+        null,
       );
       if (result?.error)
         return reject({ message: result["error_description"] });

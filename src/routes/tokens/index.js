@@ -49,8 +49,9 @@ export const tokenRoute = (fastify, opts, done) => {
 
   fastify.get("/callback", WrikeTokenExchangeSchema, async (req, reply) => {
     try {
+      let decodedData;
       if (req.query.state) {
-        const decodedData = fastify.jwt.verify(req.query.state);
+        decodedData = fastify.jwt.verify(req.query.state);
 
         if (decodedData.redirectUri) {
           // Construct the final redirect URL
@@ -61,7 +62,10 @@ export const tokenRoute = (fastify, opts, done) => {
         }
       }
 
-      const result = await WrikeTokenExchange(req.query, fastify);
+      const result = await WrikeTokenExchange(
+        { ...req.query, ...decodedData },
+        fastify,
+      );
 
       if (!result) {
         return reply.code(400).send({

@@ -43,7 +43,7 @@ const verifyBasicAuth = async (credentials) => {
 const verifyJWE = async (jweToken) => {
   const { tid, enc: encryptedDEK } = jwt.verify(
     jweToken,
-    process.env.JWT_SECRET
+    process.env.JWT_SECRET,
   );
 
   if (!encryptedDEK) {
@@ -65,14 +65,14 @@ const verifyJWE = async (jweToken) => {
 /**
  * Handle token refresh using DEK
  */
-const refreshTokens = async (encRefreshToken, dek, createdBy, tid) => {
+const refreshTokens = async (encRefreshToken, dek, createdBy, tid, env) => {
   // Ensure DEK is a Buffer before decryption
   const dekBuffer = Buffer.isBuffer(dek) ? dek : Buffer.from(dek, "base64");
   const refreshToken = crypto
     .decrypt(Buffer.from(encRefreshToken, "base64"), dekBuffer)
     .toString();
 
-  const result = await getWrikeTokens({ refresh_token: refreshToken });
+  const result = await getWrikeTokens({ env, refresh_token: refreshToken });
   if (!result.access_token || !result.refresh_token) {
     throw new Error("Token refresh failed");
   }
@@ -139,13 +139,14 @@ export const ValidateToken = async (req, reply, fastify) => {
       // 30 minutes
       const refreshTokenBuf = Buffer.from(
         token.encrypted_refresh_token,
-        "base64"
+        "base64",
       );
       accessToken = await refreshTokens(
         refreshTokenBuf,
         dek,
         token.created_by,
-        token.id
+        token.id,
+        token.environment_name,
       );
     }
 

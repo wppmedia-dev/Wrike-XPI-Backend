@@ -5,7 +5,12 @@ const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
   class WrikeCredentials extends Model {
     static associate(models) {
-      // Define associations here if needed in the future
+      WrikeCredentials.hasMany(models.UserTokens, {
+        as: "tokens",
+        foreignKey: "env_id",
+        onUpdate: "CASCADE",
+        onDelete: "RESTRICT",
+      });
     }
   }
 

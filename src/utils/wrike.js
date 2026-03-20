@@ -12,7 +12,7 @@ const requiredDatahubRequestFormIds = [
   "Variant Id",
 ];
 
-export const getWrikeTokens = async ({ code, refresh_token }) => {
+export const getWrikeTokens = async ({ code, env, refresh_token }) => {
   try {
     if (!code && !refresh_token)
       throw {
@@ -20,7 +20,7 @@ export const getWrikeTokens = async ({ code, refresh_token }) => {
           "Missing parameter! Either code or refresh_token must not be empty",
       };
 
-    const apiCreds = getCachedWrikeCredentials(process.env.WRIKE_DEFAULT_ENVIRONMENT);
+    const apiCreds = getCachedWrikeCredentials(env);
     const WRIKE_CLIENT_ID = apiCreds?.apiClientId;
     const WRIKE_CLIENT_SECRET = apiCreds?.apiClientSecret;
 
@@ -85,7 +85,6 @@ export const getUserData = async (access_token) => {
 // Datahub Util Functions
 export const getDatahubFields = async (wrikeToken, databaseId) => {
   try {
-
     // Get folder data
     const datahubFields = await GetResponse(
       `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/fields`,
@@ -169,7 +168,6 @@ export const getDatahubRecords = async (
       url += `&fieldIds=${fieldIds.join(",")}`;
     }
 
-
     const response = await GetResponse(url, "GET", {
       "content-type": "application/json",
       Authorization: `Bearer ${wrikeToken}`,
@@ -249,7 +247,6 @@ export const getSpaceDatahub = async (
       }
     }
 
-
     const datahubRecords = await getDatahubRecords(
       wrikeToken,
       process.env.DATAHUB_SPACE_ID,
@@ -314,7 +311,6 @@ export const getEntityDatahub = async (
         console.warn("Cache read error, proceeding without cache:", cacheError);
       }
     }
-
 
     const datahubRecords = await getDatahubRecords(
       wrikeToken,
@@ -940,7 +936,6 @@ export const updateDatahubRecord = async (
         fieldValues[data];
     }
 
-
     const customFieldsData = await GetResponseWithStatusCode(
       `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/records/${recordId}`,
       "PATCH",
@@ -974,7 +969,6 @@ export const deleteDatahubRecord = async (
   try {
     if (!Array.isArray(recordIds) || recordIds.length === 0)
       throw "Record IDs must not be empty";
-
 
     const customFieldsData = await GetResponse(
       `${

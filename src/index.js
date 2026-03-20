@@ -117,6 +117,54 @@ import {
     }
   });
 
+  // Generate redirect URL dynamically based on environment selection
+  fastify.get("/get-redirect-url", async (req, res) => {
+    const { environment, redirectUri, accountId } = req.query;
+    const { WRIKE_LOGIN_ENDPOINT, WRIKE_REDIRECT_URL } = process.env;
+
+    if (!WRIKE_LOGIN_ENDPOINT || !WRIKE_REDIRECT_URL) {
+      return res.status(400).send({
+        success: false,
+        message: "Missing WRIKE_LOGIN_ENDPOINT or WRIKE_REDIRECT_URL",
+      });
+    }
+
+    const allCreds = getCachedWrikeCredentials();
+    const selectedCred = environment ? allCreds?.[environment] : null;
+    const WRIKE_CLIENT_ID =
+      selectedCred?.apiClientId || process.env.WRIKE_CLIENT_ID;
+
+    if (!WRIKE_CLIENT_ID) {
+      return res.status(400).send({
+        success: false,
+        message: "Missing WRIKE_CLIENT_ID",
+      });
+    }
+
+    // Generate state JWT with environment and redirectUri context
+    let state = "";
+    if (redirectUri) {
+      state = fastify.jwt.sign({
+        redirectUri,
+        env: selectedCred ? environment : "",
+        envId: selectedCred?.id,
+      });
+    } else {
+      state = fastify.jwt.sign({
+        env: selectedCred ? environment : "",
+        envId: selectedCred?.id,
+      });
+    }
+
+    let redirectUrl = `${WRIKE_LOGIN_ENDPOINT}/authorize/v4?client_id=${WRIKE_CLIENT_ID}&response_type=code&state=${state}&redirect_uri=${WRIKE_REDIRECT_URL}`;
+
+    if (accountId) {
+      redirectUrl += `&accountId=${accountId}`;
+    }
+
+    res.send({ success: true, redirectUrl });
+  });
+
   // View Handlers
   fastify.get("/", async (req, res) => {
     const { WRIKE_LOGIN_ENDPOINT, WRIKE_REDIRECT_URL } = process.env;
@@ -147,7 +195,14 @@ import {
     if (autoRedirect == "true" || autoRedirect == "1") {
       let state = "";
       if (redirectUri) {
-        state = fastify.jwt.sign({ redirectUri });
+        state = fastify.jwt.sign({
+          redirectUri,
+          env: selectedCred ? selectedEnvironment : "",
+        });
+      } else {
+        state = fastify.jwt.sign({
+          env: selectedCred ? selectedEnvironment : "",
+        });
       }
 
       let redirectUrl = `${WRIKE_LOGIN_ENDPOINT}/authorize/v4?client_id=${WRIKE_CLIENT_ID}&response_type=code&state=${state}&redirect_uri=${WRIKE_REDIRECT_URL}`;
@@ -159,7 +214,14 @@ import {
 
     let state = "";
     if (redirectUri) {
-      state = fastify.jwt.sign({ redirectUri });
+      state = fastify.jwt.sign({
+        redirectUri,
+        env: selectedCred ? selectedEnvironment : "",
+      });
+    } else {
+      state = fastify.jwt.sign({
+        env: selectedCred ? selectedEnvironment : "",
+      });
     }
 
     let redirectUrl = `${WRIKE_LOGIN_ENDPOINT}/authorize/v4?client_id=${WRIKE_CLIENT_ID}&response_type=code&state=${state}&redirect_uri=${WRIKE_REDIRECT_URL}`;
@@ -386,20 +448,31 @@ import {
   <script>
     const loginBtn = document.getElementById("login-btn");
     const envSelect = document.getElementById("envSelect");
-    const envCredentials = ${JSON.stringify(allCreds || {})};
     const initialRedirectUrl = "${redirectUrl}";
+    const initialRedirectUri = "${redirectUri || ""}";
+    const initialAccountId = "${accountId || ""}";
+    const initialEnvironment = "${selectedEnvironment}";
 
-    const getRedirectUrl = () => {
+    const getRedirectUrl = async () => {
       const selectedEnv = envSelect?.value;
-      const selectedCred = selectedEnv ? envCredentials[selectedEnv] : null;
-      const selectedClientId =
-        selectedCred?.apiClientId || "${process.env.WRIKE_CLIENT_ID}";
-
+      
       try {
-        const url = new URL(initialRedirectUrl);
-        url.searchParams.set("client_id", selectedClientId);
-        return url.toString();
+        const params = new URLSearchParams();
+        if (selectedEnv) params.append("environment", selectedEnv);
+        if (initialRedirectUri) params.append("redirectUri", initialRedirectUri);
+        if (initialAccountId) params.append("accountId", initialAccountId);
+
+        const response = await fetch("/get-redirect-url?" + params.toString());
+        const data = await response.json();
+        
+        if (data.success && data.redirectUrl) {
+          return data.redirectUrl;
+        } else {
+          console.error("Failed to get redirect URL:", data);
+          return initialRedirectUrl;
+        }
       } catch (err) {
+        console.error("Error fetching redirect URL:", err);
         return initialRedirectUrl;
       }
     };
@@ -415,17 +488,29 @@ import {
       loginBtn.style.pointerEvents = "auto";
     });
 
-    loginBtn.addEventListener("click", function (e) {
+    loginBtn.addEventListener("click", async function (e) {
       e.preventDefault();
       
       // Show loader
       loginBtn.innerHTML = '<div class="loader"></div>';
       loginBtn.style.pointerEvents = "none";
 
-      // Redirect after delay
-      setTimeout(() => {
-        window.location.href = getRedirectUrl();
-      }, 600);
+      // Get redirect URL (with state, env, and accountId) and redirect after delay
+      try {
+        const redirectUrl = await getRedirectUrl();
+        setTimeout(() => {
+          window.location.href = redirectUrl;
+        }, 600);
+      } catch (err) {
+        console.error("Error during redirect:", err);
+        loginBtn.innerHTML = \`
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M10 17l5-5-5-5v10z" />
+          </svg>
+          <span>Login with Wrike</span>
+        \`;
+        loginBtn.style.pointerEvents = "auto";
+      }
     });
   </script>
 </body>

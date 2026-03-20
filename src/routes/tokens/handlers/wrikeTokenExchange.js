@@ -3,16 +3,20 @@ import { Tokens, Users } from "../../../controllers";
 import { getWrikeTokens, getUserData } from "../../../utils/wrike";
 import models from "../../../../models";
 
-export const WrikeTokenExchange = ({ code }, fastify) => {
+export const WrikeTokenExchange = ({ code, env, envId }, fastify) => {
   return new Promise(async (resolve, reject) => {
     // Start database transaction for data consistency
     const transaction = await models.sequelize.transaction();
 
     try {
       if (!code) return reject({ message: "Access Token must not be empty" });
+      if (!env) return reject({ message: "Environment must not be empty" });
 
       // Get Wrike tokens from OAuth code
-      const { access_token, refresh_token } = await getWrikeTokens({ code });
+      const { access_token, refresh_token } = await getWrikeTokens({
+        code,
+        env,
+      });
 
       if (!access_token || !refresh_token)
         return reject({ message: "Invalid authorization code!" });
@@ -46,7 +50,7 @@ export const WrikeTokenExchange = ({ code }, fastify) => {
             wrike_user_id: wrikeUserId,
             is_active: true,
           },
-          { transaction }
+          { transaction },
         );
         userId = newUserData?.id;
       }
@@ -77,7 +81,7 @@ export const WrikeTokenExchange = ({ code }, fastify) => {
       // Get existing user token if any
       const userTokenData = await Tokens.GetByUserAndAccountId(
         userId,
-        accountId
+        accountId,
       );
       let userTokenId = userTokenData?.id;
 
@@ -94,13 +98,14 @@ export const WrikeTokenExchange = ({ code }, fastify) => {
             salt: salt.toString("base64"),
             wrapped_dek: wrappedDEK.toString("base64"),
           },
-          { transaction }
+          { transaction },
         );
       } else {
         const newUserTokenData = await Tokens.Insert(
           userId,
           {
             account_id: accountId,
+            env_id: envId,
             encrypted_access_token: encryptedAccessToken,
             encrypted_refresh_token: encryptedRefreshToken,
             username,
@@ -109,7 +114,7 @@ export const WrikeTokenExchange = ({ code }, fastify) => {
             wrapped_dek: wrappedDEK.toString("base64"),
             is_active: true,
           },
-          { transaction }
+          { transaction },
         );
         userTokenId = newUserTokenData?.id;
       }
@@ -117,15 +122,16 @@ export const WrikeTokenExchange = ({ code }, fastify) => {
       // Create JWE token containing the DEK
       const encryptedDEK = fastify.jwt.sign(
         { dek: dek.toString("base64") },
-        { expiresIn: "30d" }
+        { expiresIn: "30d" },
       );
 
       const jweToken = fastify.jwt.sign(
         {
           tid: userTokenId,
+          env,
           enc: encryptedDEK,
         },
-        { expiresIn: "30d" }
+        { expiresIn: "30d" },
       );
 
       await transaction.commit();
@@ -145,7 +151,7 @@ export const WrikeTokenExchange = ({ code }, fastify) => {
       await transaction.rollback();
       console.log(
         "Database transaction rolled back due to error:",
-        err?.message || err
+        err?.message || err,
       );
       reject(err);
     }

@@ -22,6 +22,12 @@ module.exports = (sequelize, DataTypes) => {
         onUpdate: "CASCADE",
         onDelete: "RESTRICT",
       });
+      UserTokens.belongsTo(models.WrikeCredentials, {
+        as: "environment",
+        foreignKey: "env_id",
+        onUpdate: "CASCADE",
+        onDelete: "RESTRICT",
+      });
     }
   }
 
@@ -75,7 +81,7 @@ module.exports = (sequelize, DataTypes) => {
       updatedAt: false,
       paranoid: true,
       deletedAt: "deleted_at",
-    }
+    },
   );
 
   UserTokens.beforeCreate((data, options) => {
