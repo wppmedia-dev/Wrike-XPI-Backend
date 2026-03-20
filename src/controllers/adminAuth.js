@@ -2,7 +2,31 @@ import models from "../../models";
 import * as CryptoUtils from "../utils/crypto";
 import { generateTOTPSecret, verifyTOTP } from "../utils/totp";
 import crypto from "crypto";
+import jwt from "jsonwebtoken";
 require("dotenv").config();
+
+/**
+ * Generate a signed JWT for an admin session
+ */
+export const GenerateAdminJWT = (adminId, username, sessionId) => {
+  return jwt.sign(
+    { sub: adminId, username, session_id: sessionId },
+    process.env.JWT_SECRET,
+    { expiresIn: "24h" },
+  );
+};
+
+/**
+ * Revoke admin session by primary key (session id)
+ */
+export const RevokeAdminSessionById = async (sessionId) => {
+  try {
+    await models.AdminSessions.destroy({ where: { id: sessionId } });
+    return { message: "Session revoked successfully" };
+  } catch (err) {
+    throw err;
+  }
+};
 
 /**
  * Create admin user
@@ -283,6 +307,9 @@ export const VerifyTOTPForSession = async (sessionToken, totpCode) => {
     return {
       message: "TOTP verified successfully",
       session_verified: true,
+      session_id: session.id,
+      admin_id: session.admin_id,
+      admin_username: session.admin?.username,
     };
   } catch (err) {
     throw err;

@@ -1,11 +1,6 @@
 import models from "../../models";
 
-/**
- * Save or update Wrike credentials by environment name
- * @param {string} environmentName - unique environment name
- * @param {object} data - encrypted credentials data
- * @returns {Promise}
- */
+// Save or update Wrike credentials by environment name
 export const Upsert = async (environmentName, data) => {
   try {
     if (!environmentName || typeof environmentName !== "string") {
@@ -45,11 +40,7 @@ export const Upsert = async (environmentName, data) => {
   }
 };
 
-/**
- * Get credentials by environment name
- * @param {string} environmentName - environment name
- * @returns {Promise}
- */
+// Get credentials by environment name
 export const GetByType = async (environmentName) => {
   try {
     if (!environmentName || typeof environmentName !== "string") {
@@ -73,10 +64,7 @@ export const GetByType = async (environmentName) => {
   }
 };
 
-/**
- * Get all active credentials
- * @returns {Promise}
- */
+// Get all active credentials
 export const GetAll = async () => {
   try {
     const credentials = await models.WrikeCredentials.findAll({
@@ -93,11 +81,7 @@ export const GetAll = async () => {
   }
 };
 
-/**
- * Deactivate credentials by environment name
- * @param {string} environmentName
- * @returns {Promise}
- */
+// Deactivate credentials by environment name
 export const Deactivate = async (environmentName) => {
   try {
     if (!environmentName || typeof environmentName !== "string") {
@@ -123,11 +107,7 @@ export const Deactivate = async (environmentName) => {
   }
 };
 
-/**
- * Delete credentials (soft delete) by environment name
- * @param {string} environmentName
- * @returns {Promise}
- */
+// Delete credentials (soft delete) by environment name
 export const Delete = async (environmentName) => {
   try {
     if (!environmentName || typeof environmentName !== "string") {

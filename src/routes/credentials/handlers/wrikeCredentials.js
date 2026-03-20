@@ -26,12 +26,24 @@ export const SaveWrikeCredentials = (body, fastify) => {
         });
       }
 
-      const result = await saveWrikeCredentials(environmentName, {
-        apiClientId,
-        apiClientSecret,
-        automationClientId,
-        automationClientSecret,
-      });
+      const credentialData = {
+        api_client_id: apiClientId ? encryptField(apiClientId) : null,
+        api_client_secret: apiClientSecret
+          ? encryptField(apiClientSecret)
+          : null,
+        automation_client_id: automationClientId
+          ? encryptField(automationClientId)
+          : null,
+        automation_client_secret: automationClientSecret
+          ? encryptField(automationClientSecret)
+          : null,
+        is_active: true,
+      };
+
+      const result = await WrikeCredentials.Upsert(
+        environmentName,
+        credentialData,
+      );
 
       // Sync credentials after saving
       await syncWrikeCredentialsFromDB();

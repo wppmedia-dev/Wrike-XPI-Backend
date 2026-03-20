@@ -3,44 +3,6 @@ import { WrikeCredentials } from "../controllers";
 require("dotenv").config();
 
 /**
- * Save Wrike credentials for an environment (upsert by environment name)
- * @param {string} environmentName - unique environment name
- * @param {object} credentials - { apiClientId, apiClientSecret, automationClientId, automationClientSecret }
- * @returns {Promise<object>} Saved credential record
- */
-export const saveWrikeCredentials = async (
-  environmentName,
-  { apiClientId, apiClientSecret, automationClientId, automationClientSecret },
-) => {
-  try {
-    if (!environmentName) {
-      throw new Error("environmentName is required");
-    }
-
-    const credentialData = {
-      api_client_id: apiClientId ? encryptField(apiClientId) : null,
-      api_client_secret: apiClientSecret ? encryptField(apiClientSecret) : null,
-      automation_client_id: automationClientId
-        ? encryptField(automationClientId)
-        : null,
-      automation_client_secret: automationClientSecret
-        ? encryptField(automationClientSecret)
-        : null,
-      is_active: true,
-    };
-
-    const result = await WrikeCredentials.Upsert(
-      environmentName,
-      credentialData,
-    );
-
-    return result;
-  } catch (err) {
-    throw err;
-  }
-};
-
-/**
  * Fetch and decrypt Wrike credentials for an environment
  * @param {string} environmentName - environment name
  * @returns {Promise<object|null>} Decrypted credentials or null if not found

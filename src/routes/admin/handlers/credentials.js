@@ -1,32 +1,12 @@
-import { VerifyAdminSession } from "../../../controllers/adminAuth";
 import { syncWrikeCredentialsFromDB } from "../../../utils/wrikeCredentials";
 import { WrikeCredentials } from "../../../../models";
 import { encryptField, decryptField } from "../../../utils/crypto";
 import { Op } from "sequelize";
 
-// Get all credentials (requires verified session)
-export const GetAllCredentials = (query, fastify) => {
+// Get all credentials (authentication handled by verifyAdminJWT middleware)
+export const GetAllCredentials = (fastify) => {
   return new Promise(async (resolve, reject) => {
     try {
-      const { session_token } = query;
-
-      if (!session_token) {
-        return reject({
-          statusCode: 401,
-          message: "Session token required",
-        });
-      }
-
-      // Verify session and TOTP
-      const sessionData = await VerifyAdminSession(session_token);
-
-      if (sessionData.totp_required) {
-        return reject({
-          statusCode: 403,
-          message: "TOTP verification required",
-        });
-      }
-
       // Get all credentials (non-soft-deleted only)
       const credentials = await WrikeCredentials.findAll({
         where: { deleted_at: null },
@@ -65,12 +45,11 @@ export const GetAllCredentials = (query, fastify) => {
   });
 };
 
-// Save credential with all 5 fields (encrypted)
+// Save credential with all 5 fields (encrypted, authentication handled by middleware)
 export const SaveCredential = (body, fastify) => {
   return new Promise(async (resolve, reject) => {
     try {
       const {
-        session_token,
         id,
         environment_name,
         api_client_id,
@@ -78,14 +57,6 @@ export const SaveCredential = (body, fastify) => {
         automation_client_id,
         automation_client_secret,
       } = body;
-
-      if (!session_token) {
-        return reject({
-          statusCode: 401,
-          message: "Session token required",
-        });
-      }
-
       if (!environment_name) {
         return reject({
           statusCode: 400,
@@ -104,16 +75,6 @@ export const SaveCredential = (body, fastify) => {
           statusCode: 400,
           message:
             "At least one of api_client_id, api_client_secret, automation_client_id, or automation_client_secret is required",
-        });
-      }
-
-      // Verify session and TOTP
-      const sessionData = await VerifyAdminSession(session_token);
-
-      if (sessionData.totp_required) {
-        return reject({
-          statusCode: 403,
-          message: "TOTP verification required",
         });
       }
 
@@ -225,31 +186,12 @@ export const SaveCredential = (body, fastify) => {
 };
 
 /**
- * Delete credential (soft delete)
+ * Delete credential (soft delete, authentication handled by middleware)
  */
-export const DeleteCredential = (params, query, fastify) => {
+export const DeleteCredential = (params, fastify) => {
   return new Promise(async (resolve, reject) => {
     try {
       const { id } = params;
-      const { session_token } = query;
-
-      if (!session_token) {
-        return reject({
-          statusCode: 401,
-          message: "Session token required",
-        });
-      }
-
-      // Verify session and TOTP
-      const sessionData = await VerifyAdminSession(session_token);
-
-      if (sessionData.totp_required) {
-        return reject({
-          statusCode: 403,
-          message: "TOTP verification required",
-        });
-      }
-
       const credential = await WrikeCredentials.findByPk(id);
       if (!credential) {
         return reject({

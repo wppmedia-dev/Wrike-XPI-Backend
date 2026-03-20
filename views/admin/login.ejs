@@ -370,6 +370,11 @@
     </div>
 
     <script>
+      // If already authenticated, skip the login page
+      if (localStorage.getItem("access_token")) {
+        window.location.replace("/admin/dashboard");
+      }
+
       const form = document.getElementById("loginForm");
       const errDiv = document.getElementById("errorMessage");
       const errText = document.getElementById("errorText");
@@ -411,11 +416,13 @@
           const data = await res.json();
           if (!res.ok) throw new Error(data.message || "Login failed");
 
-          sessionStorage.setItem("session_token", data.data.session_token);
-
           if (data.data.totp_required) {
+            // Store temporary session_token only for the TOTP step
+            sessionStorage.setItem("session_token", data.data.session_token);
             window.location.href = "/admin/totp";
           } else {
+            // No TOTP — JWT issued immediately
+            localStorage.setItem("access_token", data.data.access_token);
             window.location.href = "/admin/dashboard";
           }
         } catch (err) {

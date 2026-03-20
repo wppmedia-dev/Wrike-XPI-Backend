@@ -5,8 +5,9 @@ import {
   GenerateTOTPSecret,
   VerifyAndEnableTOTP,
   VerifyTOTPForSession,
-  RevokeAdminSession,
+  RevokeAdminSessionById,
   CreateAdmin,
+  GenerateAdminJWT,
 } from "../../../controllers/adminAuth";
 import models from "../../../../models";
 
@@ -31,14 +32,36 @@ export const AdminLogin = (body, fastify) => {
       // Create session
       const session = await CreateAdminSession(admin.id);
 
+      // If TOTP is required, return only the temporary session token
+      // so the TOTP page can complete the second factor.
+      if (admin.totp_enabled) {
+        return resolve({
+          statusCode: 200,
+          message: "TOTP verification required",
+          data: {
+            session_token: session.session_token,
+            admin_id: admin.id,
+            username: admin.username,
+            totp_required: true,
+          },
+        });
+      }
+
+      // No TOTP — issue JWT immediately
+      const accessToken = GenerateAdminJWT(
+        admin.id,
+        admin.username,
+        session.session_id,
+      );
+
       return resolve({
         statusCode: 200,
         message: "Login successful",
         data: {
-          session_token: session.session_token,
+          access_token: accessToken,
           admin_id: admin.id,
           username: admin.username,
-          totp_required: admin.totp_enabled,
+          totp_required: false,
         },
       });
     } catch (err) {
@@ -52,27 +75,15 @@ export const AdminLogin = (body, fastify) => {
 };
 
 /**
- * Generate TOTP setup secret
+ * Generate TOTP setup secret (requires valid JWT via middleware)
  */
-export const GenerateTOTPSetup = (query, fastify) => {
+export const GenerateTOTPSetup = (adminUser, fastify) => {
   return new Promise(async (resolve, reject) => {
     try {
-      const { session_token } = query;
-
-      if (!session_token) {
-        return reject({
-          statusCode: 400,
-          message: "Session token required",
-        });
-      }
-
-      // Verify session
-      const sessionData = await VerifyAdminSession(session_token);
-
-      // Generate TOTP secret
+      // Generate TOTP secret using identity from verified JWT
       const totpSecret = await GenerateTOTPSecret(
-        sessionData.admin_id,
-        sessionData.admin_username,
+        adminUser.id,
+        adminUser.username,
       );
 
       return resolve({
@@ -91,26 +102,23 @@ export const GenerateTOTPSetup = (query, fastify) => {
 };
 
 /**
- * Verify TOTP setup and enable
+ * Verify TOTP setup and enable (requires valid JWT via middleware)
  */
-export const SetupTOTP = (body, fastify) => {
+export const SetupTOTP = (body, adminUser, fastify) => {
   return new Promise(async (resolve, reject) => {
     try {
-      const { session_token, totp_secret, totp_code } = body;
+      const { totp_secret, totp_code } = body;
 
-      if (!session_token || !totp_secret || !totp_code) {
+      if (!totp_secret || !totp_code) {
         return reject({
           statusCode: 400,
-          message: "Session token, TOTP secret, and code are required",
+          message: "TOTP secret and code are required",
         });
       }
 
-      // Verify session
-      const sessionData = await VerifyAdminSession(session_token);
-
-      // Verify and enable TOTP
+      // Verify and enable TOTP using identity from verified JWT
       const result = await VerifyAndEnableTOTP(
-        sessionData.admin_id,
+        adminUser.id,
         totp_secret,
         totp_code,
       );
@@ -131,7 +139,7 @@ export const SetupTOTP = (body, fastify) => {
 };
 
 /**
- * Verify TOTP code for session
+ * Verify TOTP code for session (temporary session_token from login step)
  */
 export const VerifyTOTP = (body, fastify) => {
   return new Promise(async (resolve, reject) => {
@@ -145,13 +153,20 @@ export const VerifyTOTP = (body, fastify) => {
         });
       }
 
-      // Verify TOTP
+      // Verify TOTP — marks session totp_verified=true
       const result = await VerifyTOTPForSession(session_token, totp_code);
+
+      // Issue JWT now that TOTP has passed
+      const accessToken = GenerateAdminJWT(
+        result.admin_id,
+        result.admin_username,
+        result.session_id,
+      );
 
       return resolve({
         statusCode: 200,
         message: result.message,
-        data: result,
+        data: { access_token: accessToken },
       });
     } catch (err) {
       console.error("Error verifying TOTP:", err);
@@ -164,21 +179,12 @@ export const VerifyTOTP = (body, fastify) => {
 };
 
 /**
- * Logout (revoke session)
+ * Logout (revoke session identified by JWT — requires middleware)
  */
-export const AdminLogout = (body, fastify) => {
+export const AdminLogout = (adminUser, fastify) => {
   return new Promise(async (resolve, reject) => {
     try {
-      const { session_token } = body;
-
-      if (!session_token) {
-        return reject({
-          statusCode: 400,
-          message: "Session token required",
-        });
-      }
-
-      await RevokeAdminSession(session_token);
+      await RevokeAdminSessionById(adminUser.session_id);
 
       return resolve({
         statusCode: 200,

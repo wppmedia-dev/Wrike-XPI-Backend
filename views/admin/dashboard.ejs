@@ -1812,8 +1812,13 @@
 
     <script>
       /* ── Session guard ──────────────────────────────────────── */
-      const sessionToken = sessionStorage.getItem("session_token");
-      if (!sessionToken) window.location.href = "/admin/login";
+      const accessToken = localStorage.getItem("access_token");
+      if (!accessToken) window.location.href = "/admin/login";
+
+      /* helper — returns headers with Bearer token */
+      function authHeaders(extra) {
+        return Object.assign({ Authorization: "Bearer " + accessToken }, extra);
+      }
 
       /* ── State ──────────────────────────────────────────────── */
       let environments = [];
@@ -1912,9 +1917,9 @@
       async function loadEnvironments() {
         NProgress.start();
         try {
-          const res = await fetch(
-            `/api/v1/admin/credentials?session_token=${encodeURIComponent(sessionToken)}`,
-          );
+          const res = await fetch(`/api/v1/admin/credentials`, {
+            headers: authHeaders(),
+          });
           const data = await res.json();
 
           environments = [];
@@ -2204,7 +2209,6 @@
 
         try {
           var payload = {
-            session_token: sessionToken,
             environment_name: envName,
             api_client_id: apiClientId || undefined,
             api_client_secret: apiClientSecret || undefined,
@@ -2217,7 +2221,7 @@
 
           var res = await fetch("/api/v1/admin/credentials", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: authHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify(payload),
           });
 
@@ -2266,15 +2270,10 @@
 
         NProgress.start();
         try {
-          var res = await fetch(
-            "/api/v1/admin/credentials/" +
-              id +
-              "?session_token=" +
-              encodeURIComponent(sessionToken),
-            {
-              method: "DELETE",
-            },
-          );
+          var res = await fetch("/api/v1/admin/credentials/" + id, {
+            method: "DELETE",
+            headers: authHeaders(),
+          });
           var data = await res.json();
           if (!res.ok) throw new Error(data.message || "Delete failed");
 
@@ -2311,11 +2310,10 @@
         try {
           await fetch("/api/v1/admin/logout", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ session_token: sessionToken }),
+            headers: authHeaders(),
           });
         } finally {
-          sessionStorage.removeItem("session_token");
+          localStorage.removeItem("access_token");
           window.location.href = "/admin/login";
         }
       });
