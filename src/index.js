@@ -418,7 +418,6 @@ import {
     <div class="env-select-wrapper">
       <label for="envSelect" class="env-select-label">Choose Environment</label>
       <select id="envSelect" class="env-select">
-        <option value="">Default</option>
         ${environmentOptionsHtml}
       </select>
     </div>
@@ -452,6 +451,7 @@ import {
     const initialRedirectUri = "${redirectUri || ""}";
     const initialAccountId = "${accountId || ""}";
     const initialEnvironment = "${selectedEnvironment}";
+    const environmentsAvailable = ${Object.keys(allCreds || {}).length};
 
     const getRedirectUrl = async () => {
       const selectedEnv = envSelect?.value;
@@ -490,6 +490,18 @@ import {
 
     loginBtn.addEventListener("click", async function (e) {
       e.preventDefault();
+
+      // Validation: Check if environments are configured
+      if (environmentsAvailable === 0) {
+        alert("No environments configured. Please contact your administrator to configure Wrike environments.");
+        return;
+      }
+
+      // Validation: Check if an environment is selected
+      if (envSelect && !envSelect.value) {
+        alert("Please select an environment from the dropdown to proceed.");
+        return;
+      }
       
       // Show loader
       loginBtn.innerHTML = '<div class="loader"></div>';
@@ -503,6 +515,7 @@ import {
         }, 600);
       } catch (err) {
         console.error("Error during redirect:", err);
+        alert("An error occurred. Please try again.");
         loginBtn.innerHTML = \`
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
             <path d="M10 17l5-5-5-5v10z" />
