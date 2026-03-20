@@ -2217,10 +2217,15 @@
             is_active: isActive,
           };
 
-          if (editingId) payload.id = editingId;
+          var url = "/api/v1/admin/credentials";
+          var method = "POST";
+          if (editingId) {
+            url = "/api/v1/admin/credentials/" + editingId;
+            method = "PUT";
+          }
 
-          var res = await fetch("/api/v1/admin/credentials", {
-            method: "POST",
+          var res = await fetch(url, {
+            method: method,
             headers: authHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify(payload),
           });
