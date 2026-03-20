@@ -15,7 +15,7 @@ export const GetUserData = ({ token }, fastify) => {
 
       const {
         encrypted_access_token: encAccessToken,
-        encrypted_refresh_token: encRefreshToken,
+        // encrypted_refresh_token: encRefreshToken,
       } = await Tokens.GetById(tid);
 
       if (!encAccessToken) return reject({ message: "Invalid Token!" });
@@ -25,10 +25,10 @@ export const GetUserData = ({ token }, fastify) => {
         encAccessTokenKey,
       );
 
-      const wrikeRefreshToken = await decryptWithKey(
-        encRefreshToken,
-        encRefreshTokenKey,
-      );
+      // const wrikeRefreshToken = await decryptWithKey(
+      //   encRefreshToken,
+      //   encRefreshTokenKey,
+      // );
 
       const wrikeData = await wrikeUserData(wrikeAccessToken);
 
