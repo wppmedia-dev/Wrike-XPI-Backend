@@ -130,8 +130,13 @@ import {
     }
 
     // Get credentials from cached DB values (API type)
-    const cachedCreds = getCachedWrikeCredentials(environment);
-    const WRIKE_CLIENT_ID = cachedCreds?.apiClientId;
+    const allCreds = getCachedWrikeCredentials();
+    const selectedEnvironment = environment || "";
+    const selectedCred = selectedEnvironment
+      ? allCreds?.[selectedEnvironment]
+      : null;
+    const WRIKE_CLIENT_ID =
+      selectedCred?.apiClientId || process.env.WRIKE_CLIENT_ID;
 
     if (!WRIKE_CLIENT_ID) {
       return res.status(400).send({
@@ -160,6 +165,13 @@ import {
     let redirectUrl = `${WRIKE_LOGIN_ENDPOINT}/authorize/v4?client_id=${WRIKE_CLIENT_ID}&response_type=code&state=${state}&redirect_uri=${WRIKE_REDIRECT_URL}`;
 
     if (accountId) redirectUrl += `&accountId=${accountId}`;
+
+    const environmentOptionsHtml = Object.keys(allCreds || {})
+      .map(
+        (env) =>
+          `<option value="${env}"${env === selectedEnvironment ? " selected" : ""}>${env}</option>`,
+      )
+      .join("");
 
     const html = `
 <!DOCTYPE html>
@@ -303,6 +315,52 @@ import {
   <div class="card">
     <div class="logo"><span>W</span></div>
     <h1>Connect Your Wrike Account</h1>
+
+    <style>
+      .env-select-wrapper {
+        width: 100%;
+        margin-bottom: 16px;
+        text-align: left;
+      }
+      .env-select-label {
+        display: block;
+        margin-bottom: 8px;
+        color: #e2e8f0;
+        font-size: 0.95rem;
+        font-weight: 600;
+      }
+      .env-select {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        background: rgba(255, 255, 255, 0.15);
+        color: #e2e8f0;
+        font-size: 0.95rem;
+        outline: none;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.17);
+      }
+      .env-select option {
+        color: #0f172a;
+        background: rgba(255,255,255,0.95);
+      }
+      .env-select:focus {
+        border-color: #34d399;
+        box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+      }
+    </style>
+
+    <div class="env-select-wrapper">
+      <label for="envSelect" class="env-select-label">Choose Environment</label>
+      <select id="envSelect" class="env-select">
+        <option value="">Default</option>
+        ${environmentOptionsHtml}
+      </select>
+    </div>
+
     <p>To continue, please log in using your Wrike credentials.</p>
     <a href="${redirectUrl}" class="button" id="login-btn">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 17l5-5-5-5v10z"/></svg>
@@ -327,6 +385,24 @@ import {
 
   <script>
     const loginBtn = document.getElementById("login-btn");
+    const envSelect = document.getElementById("envSelect");
+    const envCredentials = ${JSON.stringify(allCreds || {})};
+    const initialRedirectUrl = "${redirectUrl}";
+
+    const getRedirectUrl = () => {
+      const selectedEnv = envSelect?.value;
+      const selectedCred = selectedEnv ? envCredentials[selectedEnv] : null;
+      const selectedClientId =
+        selectedCred?.apiClientId || "${process.env.WRIKE_CLIENT_ID}";
+
+      try {
+        const url = new URL(initialRedirectUrl);
+        url.searchParams.set("client_id", selectedClientId);
+        return url.toString();
+      } catch (err) {
+        return initialRedirectUrl;
+      }
+    };
 
     // Reset button if coming back from redirect
     window.addEventListener("pageshow", () => {
@@ -348,7 +424,7 @@ import {
 
       // Redirect after delay
       setTimeout(() => {
-        window.location.href = "${redirectUrl}";
+        window.location.href = getRedirectUrl();
       }, 600);
     });
   </script>
