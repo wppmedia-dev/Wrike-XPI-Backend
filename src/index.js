@@ -123,7 +123,7 @@ import {
   fastify.get("/", async (req, res) => {
     const { WRIKE_LOGIN_ENDPOINT, WRIKE_REDIRECT_URL } = process.env;
 
-    const { accountId, redirectUri, autoRedirect } = req.query;
+    const { accountId, redirectUri, autoRedirect, environment } = req.query;
 
     if (!WRIKE_LOGIN_ENDPOINT) {
       throw new Error(
@@ -132,8 +132,8 @@ import {
     }
 
     // Get credentials from cached DB values (API type)
-    const cachedCreds = getCachedWrikeCredentials("API");
-    const WRIKE_CLIENT_ID = cachedCreds?.clientId;
+    const cachedCreds = getCachedWrikeCredentials(environment);
+    const WRIKE_CLIENT_ID = cachedCreds?.apiClientId;
 
     if (!WRIKE_CLIENT_ID) {
       return res.status(400).send({

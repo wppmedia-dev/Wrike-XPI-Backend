@@ -1,354 +1,422 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TOTP Verification - WrikeXPI Admin</title>
-  <link rel="icon" href="https://cdn.wrike.com/static/branding/wrike/favicons/favicon.ico" />
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      height: 100vh;
-      background: linear-gradient(-45deg, #1f1c2c, #928dab, #2e2e52, #515175);
-      background-size: 400% 400%;
-      animation: gradient 15s ease infinite;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
-    }
-
-    @keyframes gradient {
-      0% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-      100% { background-position: 0% 50%; }
-    }
-
-    .container {
-      backdrop-filter: blur(16px);
-      background-color: rgba(255, 255, 255, 0.06);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 24px;
-      padding: 50px 40px;
-      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
-      max-width: 400px;
-      width: 90%;
-      animation: fadeIn 1s ease-out forwards;
-      opacity: 0;
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    .icon {
-      width: 60px;
-      height: 60px;
-      background: rgba(76, 175, 80, 0.2);
-      border: 2px solid rgba(76, 175, 80, 0.5);
-      border-radius: 50%;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto 20px;
-      font-size: 32px;
-    }
-
-    h1 {
-      font-size: 1.8rem;
-      margin-bottom: 12px;
-      text-align: center;
-    }
-
-    .subtitle {
-      font-size: 0.95rem;
-      color: #cccccc;
-      margin-bottom: 30px;
-      text-align: center;
-    }
-
-    .form-group {
-      margin-bottom: 20px;
-    }
-
-    label {
-      display: block;
-      font-size: 0.9rem;
-      margin-bottom: 8px;
-      color: #e0e0e0;
-      font-weight: 500;
-    }
-
-    input[type="text"] {
-      width: 100%;
-      padding: 12px 16px;
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 8px;
-      color: white;
-      font-size: 1rem;
-      transition: all 0.3s ease;
-      letter-spacing: 2px;
-      text-align: center;
-      font-weight: 600;
-      font-family: 'Courier New', monospace;
-    }
-
-    input[type="text"]:focus {
-      outline: none;
-      background: rgba(255, 255, 255, 0.12);
-      border-color: rgba(76, 175, 80, 0.5);
-      box-shadow: 0 0 12px rgba(76, 175, 80, 0.2);
-    }
-
-    input::placeholder {
-      color: rgba(255, 255, 255, 0.3);
-      letter-spacing: 2px;
-    }
-
-    /* Limit input to 6 characters visually */
-    input[type="text"]::-webkit-outer-spin-button,
-    input[type="text"]::-webkit-inner-spin-button {
-      -webkit-appearance: none;
-      margin: 0;
-    }
-
-    .button {
-      width: 100%;
-      padding: 12px;
-      background: #4CAF50;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      margin-top: 10px;
-    }
-
-    .button:hover {
-      background: #45a049;
-      transform: translateY(-2px);
-      box-shadow: 0 8px 16px rgba(76, 175, 80, 0.3);
-    }
-
-    .button:disabled {
-      background: #666;
-      cursor: not-allowed;
-    }
-
-    .secondary-btn {
-      width: 100%;
-      padding: 12px;
-      background: transparent;
-      color: #9ae6b4;
-      border: 1px solid rgba(154, 230, 180, 0.3);
-      border-radius: 8px;
-      font-size: 0.95rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      margin-top: 8px;
-    }
-
-    .secondary-btn:hover {
-      background: rgba(154, 230, 180, 0.1);
-      border-color: rgba(154, 230, 180, 0.6);
-    }
-
-    .error {
-      background: rgba(244, 67, 54, 0.1);
-      border: 1px solid rgba(244, 67, 54, 0.3);
-      color: #ff7675;
-      padding: 12px 16px;
-      border-radius: 8px;
-      margin-bottom: 20px;
-      font-size: 0.9rem;
-      display: none;
-    }
-
-    .error.show {
-      display: block;
-      animation: slideIn 0.3s ease;
-    }
-
-    @keyframes slideIn {
-      from {
-        opacity: 0;
-        transform: translateY(-10px);
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Two-Factor Auth — WrikeXPI Admin</title>
+    <link
+      rel="icon"
+      href="https://cdn.wrike.com/static/branding/wrike/favicons/favicon.ico"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    />
+    <style>
+      :root {
+        --bg-body: #f0f4f8;
+        --bg-card: #ffffff;
+        --bg-surface: #f5f7fa;
+        --bg-surface-2: #eaeff5;
+        --border: #e2e8f0;
+        --text-primary: #0f172a;
+        --text-secondary: #475569;
+        --text-muted: #94a3b8;
+        --accent: #008262;
+        --accent-hover: #006d52;
+        --danger: #ef4444;
+        --danger-soft: rgba(239, 68, 68, 0.1);
+        --radius-sm: 6px;
       }
-      to {
-        opacity: 1;
-        transform: translateY(0);
+
+      *,
+      *::before,
+      *::after {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
       }
-    }
 
-    .loader {
-      border: 3px solid rgba(255, 255, 255, 0.2);
-      border-top: 3px solid white;
-      border-radius: 50%;
-      width: 18px;
-      height: 18px;
-      animation: spin 1s linear infinite;
-      display: none;
-      margin: 0 auto;
-    }
+      body {
+        font-family:
+          "Inter",
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        background: var(--bg-body);
+        color: var(--text-primary);
+        font-size: 14px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: 24px;
+      }
 
-    .loader.show {
-      display: block;
-    }
+      .totp-card {
+        width: 100%;
+        max-width: 400px;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+        padding: 40px 36px 32px;
+      }
 
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
+      .card-brand {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 28px;
+      }
 
-    .info {
-      font-size: 0.85rem;
-      color: #b0b0b0;
-      text-align: center;
-      margin-top: 20px;
-      line-height: 1.5;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="icon">🔐</div>
-    <h1>Two-Factor Auth</h1>
-    <p class="subtitle">Enter the 6-digit code from your authenticator app</p>
+      .card-brand svg.wrike-logo {
+        width: 160px;
+        height: auto;
+        fill: #008262;
+      }
 
-    <div class="error" id="errorMessage"></div>
+      .brand-sub {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
 
-    <form id="totpForm">
-      <div class="form-group">
-        <label for="totpCode">Authentication Code</label>
-        <input
-          type="text"
-          id="totpCode"
-          name="totpCode"
-          placeholder="000000"
-          maxlength="6"
-          inputmode="numeric"
-          pattern="[0-9]{6}"
-          required
-          autocomplete="off"
-        />
+      .shield-icon {
+        width: 54px;
+        height: 54px;
+        background: rgba(0, 130, 98, 0.08);
+        border: 1.5px solid rgba(0, 130, 98, 0.3);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 0 18px 0;
+        color: var(--accent);
+        font-size: 22px;
+      }
+
+      .card-title {
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--text-primary);
+        letter-spacing: -0.4px;
+        margin-bottom: 4px;
+      }
+
+      .card-sub {
+        font-size: 13px;
+        color: var(--text-muted);
+        margin-bottom: 26px;
+      }
+
+      .alert-error {
+        display: none;
+        align-items: flex-start;
+        gap: 9px;
+        padding: 10px 13px;
+        background: var(--danger-soft);
+        border: 1px solid rgba(239, 68, 68, 0.25);
+        border-radius: var(--radius-sm);
+        color: var(--danger);
+        font-size: 13px;
+        margin-bottom: 18px;
+        line-height: 1.5;
+      }
+
+      .alert-error.show {
+        display: flex;
+      }
+      .alert-error i {
+        margin-top: 2px;
+        flex-shrink: 0;
+      }
+
+      .form-group {
+        margin-bottom: 16px;
+      }
+
+      .form-label {
+        display: block;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      .otp-input {
+        width: 100%;
+        padding: 14px 16px;
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        color: var(--text-primary);
+        font-size: 24px;
+        font-family: "Courier New", "Consolas", monospace;
+        font-weight: 700;
+        letter-spacing: 10px;
+        text-align: center;
+        transition:
+          border-color 0.15s,
+          box-shadow 0.15s;
+        outline: none;
+      }
+
+      .otp-input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(0, 224, 92, 0.15);
+      }
+
+      .otp-input::placeholder {
+        color: var(--text-muted);
+        letter-spacing: 8px;
+        font-size: 18px;
+      }
+
+      .btn-verify {
+        width: 100%;
+        padding: 11px 16px;
+        margin-top: 4px;
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        border-radius: var(--radius-sm);
+        font-size: 14px;
+        font-weight: 600;
+        font-family: inherit;
+        cursor: pointer;
+        transition: background 0.15s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        position: relative;
+      }
+
+      .btn-verify:hover:not(:disabled) {
+        background: var(--accent-hover);
+      }
+      .btn-verify:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .btn-verify.loading {
+        color: transparent;
+        pointer-events: none;
+      }
+      .btn-verify.loading::after {
+        content: "";
+        position: absolute;
+        width: 16px;
+        height: 16px;
+        top: 50%;
+        left: 50%;
+        margin: -8px 0 0 -8px;
+        border: 2px solid rgba(255, 255, 255, 0.4);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.65s linear infinite;
+      }
+
+      .btn-back {
+        width: 100%;
+        padding: 10px 16px;
+        margin-top: 8px;
+        background: transparent;
+        color: var(--text-secondary);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        font-size: 13.5px;
+        font-weight: 500;
+        font-family: inherit;
+        cursor: pointer;
+        transition:
+          background 0.15s,
+          border-color 0.15s,
+          color 0.15s;
+      }
+
+      .btn-back:hover {
+        background: var(--bg-surface);
+        border-color: var(--text-muted);
+        color: var(--text-primary);
+      }
+
+      .info-row {
+        margin-top: 20px;
+        font-size: 12px;
+        color: var(--text-muted);
+        text-align: center;
+        line-height: 1.6;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="totp-card">
+      <div class="card-brand">
+        <svg
+          class="wrike-logo"
+          viewBox="0 0 100 20"
+          role="img"
+          aria-label="Wrike logo"
+        >
+          <path
+            d="M20.78 1.404C21.885.298 22.587 0 24.113 0h6.878c.561 0 .684.509.35.842l-11.49 11.491c-.176.176-.246.21-.352.246-.035.018-.087.018-.122.018s-.088 0-.123-.018c-.106-.035-.176-.07-.351-.246L14.85 8.281c-.175-.176-.21-.246-.245-.351-.018-.035-.018-.088-.018-.123s0-.088.018-.123c.035-.105.07-.175.245-.35l5.93-5.93zM10.745 8.649C9.64 7.544 8.92 7.263 7.395 7.263H.534c-.562 0-.685.509-.351.842l11.49 11.492c.176.175.246.21.352.245a.299.299 0 00.123.018c.035 0 .087 0 .122-.018.105-.035.176-.07.351-.245l4.053-4.07c.175-.176.21-.246.245-.351a.3.3 0 00.018-.123c0-.035 0-.088-.018-.123-.035-.105-.07-.175-.245-.351l-5.93-5.93z"
+          />
+          <path
+            d="M71.064 4.72a1.965 1.965 0 100-3.93 1.965 1.965 0 000 3.93zm1.579 1.578h-3.158v11.035h3.158V6.298zm-9.877 11.035V12.37c0-3 2.649-2.948 4.035-2.72V6.263c-2.21-.193-3.526.421-4.123 1.614h-.07l.017-1.561h-3.07v11.018h3.21zm-22.685 0h2.474l3.79-7.087 3.666 7.087h2.509l5.632-11.035h-3.737l-3.456 7.035-3.281-7.035h-2.684l-3.456 7.07-3.281-7.07H34.52l5.561 11.035zm36.053 0h2l3.298-4.158 2.79 4.158h3.72l-4.387-6.386 3.842-4.649h-3.701l-4.386 5.544h-.07L79.275.79h-3.14v16.544zm18.228-2.368c1.351 0 2.158-.72 2.544-1.298l2.421 1.667c-.982 1.28-2.509 2.28-5.035 2.28-3.386 0-5.912-2.544-5.912-5.754 0-3.228 2.579-5.755 5.912-5.755 3.403 0 5.702 2.562 5.702 5.755v.877h-8.58c.246 1.316 1.37 2.228 2.948 2.228zm2.58-4.421c-.352-1.158-1.37-1.965-2.825-1.965-1.492 0-2.492.807-2.843 1.965h5.667z"
+          />
+        </svg>
+        <span class="brand-sub">XPI &middot; Admin Portal</span>
       </div>
 
-      <button type="submit" class="button" id="verifyBtn">
-        <span id="btnText">Verify</span>
-        <div id="btnLoader" class="loader"></div>
-      </button>
+      <div class="shield-icon"><i class="fa-solid fa-shield-halved"></i></div>
+      <div class="card-title">Two-Factor Auth</div>
+      <div class="card-sub">
+        Enter the 6-digit code from your authenticator app
+      </div>
 
-      <button type="button" class="secondary-btn" id="backBtn">← Back to Login</button>
-    </form>
+      <div class="alert-error" id="errorMessage">
+        <i class="fa-solid fa-circle-exclamation"></i>
+        <span id="errorText"></span>
+      </div>
 
-    <div class="info">
-      Using Google Authenticator, Authy, or Microsoft Authenticator?<br />
-      Enter the 6-digit code shown in your app.
+      <form id="totpForm" onsubmit="return false;">
+        <div class="form-group">
+          <label class="form-label" for="totpCode">Authentication Code</label>
+          <input
+            class="otp-input"
+            type="text"
+            id="totpCode"
+            name="totpCode"
+            placeholder="••••••"
+            maxlength="6"
+            inputmode="numeric"
+            pattern="[0-9]{6}"
+            required
+            autocomplete="one-time-code"
+          />
+        </div>
+
+        <button type="submit" class="btn-verify" id="verifyBtn">
+          <i class="fa-solid fa-check"></i>
+          <span id="btnText">Verify Code</span>
+        </button>
+
+        <button type="button" class="btn-back" id="backBtn">
+          <i class="fa-solid fa-arrow-left" style="font-size: 11px"></i>
+          Back to Login
+        </button>
+      </form>
+
+      <div class="info-row">
+        Open Google Authenticator, Authy, or Microsoft Authenticator<br />and
+        enter the 6-digit code shown for this account.
+      </div>
     </div>
-  </div>
 
-  <script>
-    const form = document.getElementById("totpForm");
-    const errorDiv = document.getElementById("errorMessage");
-    const verifyBtn = document.getElementById("verifyBtn");
-    const btnText = document.getElementById("btnText");
-    const btnLoader = document.getElementById("btnLoader");
-    const backBtn = document.getElementById("backBtn");
-    const totpInput = document.getElementById("totpCode");
+    <script>
+      const form = document.getElementById("totpForm");
+      const errorDiv = document.getElementById("errorMessage");
+      const errorText = document.getElementById("errorText");
+      const verifyBtn = document.getElementById("verifyBtn");
+      const btnText = document.getElementById("btnText");
+      const backBtn = document.getElementById("backBtn");
+      const totpInput = document.getElementById("totpCode");
 
-    // Only allow numeric input
-    totpInput.addEventListener("input", (e) => {
-      e.target.value = e.target.value.replace(/[^0-9]/g, "").slice(0, 6);
-    });
+      // Only allow numeric input
+      totpInput.addEventListener("input", (e) => {
+        e.target.value = e.target.value.replace(/[^0-9]/g, "").slice(0, 6);
+        // Auto-submit when 6 digits are entered
+        if (totpInput.value.length === 6) {
+          form.dispatchEvent(new Event("submit"));
+        }
+      });
 
-    // Auto-submit when 6 digits are entered
-    totpInput.addEventListener("input", () => {
-      if (totpInput.value.length === 6) {
-        form.dispatchEvent(new Event("submit"));
-      }
-    });
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        errorDiv.classList.remove("show");
 
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      errorDiv.classList.remove("show");
+        const totpCode = totpInput.value.trim();
 
-      const totpCode = totpInput.value.trim();
-
-      if (!totpCode || totpCode.length !== 6 || !/^\d{6}$/.test(totpCode)) {
-        showError("Please enter a valid 6-digit code");
-        return;
-      }
-
-      const sessionToken = sessionStorage.getItem("session_token");
-      if (!sessionToken) {
-        showError("Session expired. Please login again.");
-        window.location.href = "/admin/login";
-        return;
-      }
-
-      verifyBtn.disabled = true;
-      btnText.style.display = "none";
-      btnLoader.classList.add("show");
-
-      try {
-        const response = await fetch("/admin/api/totp/verify", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            session_token: sessionToken,
-            totp_code: totpCode,
-          }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.message || "TOTP verification failed");
+        if (!totpCode || totpCode.length !== 6 || !/^\d{6}$/.test(totpCode)) {
+          showError("Please enter a valid 6-digit code.");
+          return;
         }
 
-        // Redirect to dashboard
-        window.location.href = "/admin/dashboard";
-      } catch (err) {
-        showError(err.message);
-        verifyBtn.disabled = false;
-        btnText.style.display = "inline";
-        btnLoader.classList.remove("show");
-        totpInput.value = "";
-        totpInput.focus();
-      }
-    });
+        const sessionToken = sessionStorage.getItem("session_token");
+        if (!sessionToken) {
+          showError("Session expired. Please login again.");
+          window.location.href = "/admin/login";
+          return;
+        }
 
-    backBtn.addEventListener("click", () => {
-      sessionStorage.removeItem("session_token");
-      window.location.href = "/admin/login";
-    });
+        verifyBtn.classList.add("loading");
+        verifyBtn.disabled = true;
 
-    function showError(message) {
-      errorDiv.textContent = message;
-      errorDiv.classList.add("show");
-    }
+        try {
+          const response = await fetch("/admin/api/totp/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              session_token: sessionToken,
+              totp_code: totpCode,
+            }),
+          });
 
-    // Check session on load
-    window.addEventListener("load", () => {
-      if (!sessionStorage.getItem("session_token")) {
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.message || "TOTP verification failed");
+          }
+
+          window.location.href = "/admin/dashboard";
+        } catch (err) {
+          showError(err.message);
+          verifyBtn.classList.remove("loading");
+          verifyBtn.disabled = false;
+          totpInput.value = "";
+          totpInput.focus();
+        }
+      });
+
+      backBtn.addEventListener("click", () => {
+        sessionStorage.removeItem("session_token");
         window.location.href = "/admin/login";
+      });
+
+      function showError(message) {
+        errorText.textContent = message;
+        errorDiv.classList.add("show");
       }
-      // Focus on input
-      totpInput.focus();
-    });
-  </script>
-</body>
+
+      // Check session on load
+      window.addEventListener("load", () => {
+        if (!sessionStorage.getItem("session_token")) {
+          window.location.href = "/admin/login";
+        }
+        totpInput.focus();
+      });
+    </script>
+  </body>
 </html>

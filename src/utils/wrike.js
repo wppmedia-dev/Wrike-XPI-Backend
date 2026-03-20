@@ -20,9 +20,9 @@ export const getWrikeTokens = async ({ code, refresh_token }) => {
           "Missing parameter! Either code or refresh_token must not be empty",
       };
 
-    const apiCreds = getCachedWrikeCredentials("API");
-    const WRIKE_CLIENT_ID = apiCreds?.clientId;
-    const WRIKE_CLIENT_SECRET = apiCreds?.clientSecret;
+    const apiCreds = getCachedWrikeCredentials(process.env.WRIKE_DEFAULT_ENVIRONMENT);
+    const WRIKE_CLIENT_ID = apiCreds?.apiClientId;
+    const WRIKE_CLIENT_SECRET = apiCreds?.apiClientSecret;
 
     if (!WRIKE_LOGIN_ENDPOINT || !WRIKE_CLIENT_ID || !WRIKE_CLIENT_SECRET) {
       throw {
@@ -85,9 +85,6 @@ export const getUserData = async (access_token) => {
 // Datahub Util Functions
 export const getDatahubFields = async (wrikeToken, databaseId) => {
   try {
-    // Pass Service Account Token
-    const apiCreds = getCachedWrikeCredentials("API");
-    wrikeToken = apiCreds?.token ?? wrikeToken;
 
     // Get folder data
     const datahubFields = await GetResponse(
@@ -172,9 +169,6 @@ export const getDatahubRecords = async (
       url += `&fieldIds=${fieldIds.join(",")}`;
     }
 
-    // Pass Service Account Token
-    const apiCreds = getCachedWrikeCredentials("API");
-    wrikeToken = apiCreds?.token ?? wrikeToken;
 
     const response = await GetResponse(url, "GET", {
       "content-type": "application/json",
@@ -255,9 +249,6 @@ export const getSpaceDatahub = async (
       }
     }
 
-    // Pass Service Account Token
-    const apiCreds = getCachedWrikeCredentials("API");
-    wrikeToken = apiCreds?.token ?? wrikeToken;
 
     const datahubRecords = await getDatahubRecords(
       wrikeToken,
@@ -324,9 +315,6 @@ export const getEntityDatahub = async (
       }
     }
 
-    // Pass Service Account Token
-    const apiCreds = getCachedWrikeCredentials("API");
-    wrikeToken = apiCreds?.token ?? wrikeToken;
 
     const datahubRecords = await getDatahubRecords(
       wrikeToken,
@@ -887,9 +875,6 @@ export const createDatahubRecord = async (
     }
 
     // Pass Service Account Token
-    // Pass Service Account Token
-    const apiCreds = getCachedWrikeCredentials("API");
-    wrikeToken = apiCreds?.token ?? wrikeToken;
 
     const customFieldsData = await GetResponse(
       `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/records`,
@@ -955,9 +940,6 @@ export const updateDatahubRecord = async (
         fieldValues[data];
     }
 
-    // Pass Service Account Token
-    const apiCreds = getCachedWrikeCredentials("API");
-    wrikeToken = apiCreds?.token ?? wrikeToken;
 
     const customFieldsData = await GetResponseWithStatusCode(
       `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/records/${recordId}`,
@@ -993,9 +975,6 @@ export const deleteDatahubRecord = async (
     if (!Array.isArray(recordIds) || recordIds.length === 0)
       throw "Record IDs must not be empty";
 
-    // Pass Service Account Token
-    const apiCreds = getCachedWrikeCredentials("API");
-    wrikeToken = apiCreds?.token ?? wrikeToken;
 
     const customFieldsData = await GetResponse(
       `${

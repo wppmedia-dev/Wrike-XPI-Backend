@@ -1,24 +1,27 @@
 export const SaveWrikeCredentialsSchema = {
   body: {
     type: "object",
-    required: ["credentialType", "clientId", "clientSecret"],
+    required: ["environmentName", "apiClientId", "apiClientSecret"],
     properties: {
-      credentialType: {
+      environmentName: {
         type: "string",
-        enum: ["API", "AUTOMATION"],
-        description: "Type of credential - API or AUTOMATION",
+        description: "Unique environment name (e.g. production, staging)",
       },
-      clientId: {
+      apiClientId: {
         type: "string",
-        description: "Wrike Client ID",
+        description: "Wrike API Client ID",
       },
-      clientSecret: {
+      apiClientSecret: {
         type: "string",
-        description: "Wrike Client Secret",
+        description: "Wrike API Client Secret",
       },
-      token: {
+      automationClientId: {
         type: "string",
-        description: "Optional Wrike Token (for service accounts)",
+        description: "Wrike Automation Client ID (optional)",
+      },
+      automationClientSecret: {
+        type: "string",
+        description: "Wrike Automation Client Secret (optional)",
       },
     },
   },

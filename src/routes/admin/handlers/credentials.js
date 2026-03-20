@@ -33,22 +33,18 @@ export const GetAllCredentials = (query, fastify) => {
         order: [["created_at", "DESC"]],
       });
 
-      // Decrypt fields for response
+      // Decrypt only the two ID fields, leave secrets encrypted in response.
       const decryptedCredentials = credentials.map((cred) => ({
         id: cred.id,
         environment_name: cred.environment_name,
         api_client_id: cred.api_client_id
           ? decryptField(cred.api_client_id)
           : null,
-        api_client_secret: cred.api_client_secret
-          ? decryptField(cred.api_client_secret)
-          : null,
+        api_client_secret: cred.api_client_secret || null,
         automation_client_id: cred.automation_client_id
           ? decryptField(cred.automation_client_id)
           : null,
-        automation_client_secret: cred.automation_client_secret
-          ? decryptField(cred.automation_client_secret)
-          : null,
+        automation_client_secret: cred.automation_client_secret || null,
         is_active: cred.is_active,
         created_at: cred.created_at,
         updated_at: cred.updated_at,

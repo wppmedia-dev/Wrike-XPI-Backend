@@ -13,9 +13,7 @@ import {
 } from "./handlers/credentials";
 
 export const adminApiRoute = (fastify, opts, done) => {
-  /**
-   * POST /admin/api/register
-   */
+  // POST /admin/register
   fastify.post("/register", async (req, reply) => {
     try {
       const result = await AdminRegister(req.body, fastify);
@@ -33,9 +31,7 @@ export const adminApiRoute = (fastify, opts, done) => {
     }
   });
 
-  /**
-   * POST /admin/api/login
-   */
+  // POST /admin/login
   fastify.post("/login", async (req, reply) => {
     try {
       const result = await AdminLogin(req.body, fastify);
@@ -53,9 +49,7 @@ export const adminApiRoute = (fastify, opts, done) => {
     }
   });
 
-  /**
-   * GET /api/v1/admin/totp/setup?session_token=...
-   */
+  // GET /admin/totp/setup?session_token=...
   fastify.get("/totp/setup", async (req, reply) => {
     try {
       const result = await GenerateTOTPSetup(req.query, fastify);
@@ -73,9 +67,7 @@ export const adminApiRoute = (fastify, opts, done) => {
     }
   });
 
-  /**
-   * POST /api/v1/admin/totp/setup
-   */
+  // POST /admin/totp/setup
   fastify.post("/totp/setup", async (req, reply) => {
     try {
       const result = await SetupTOTP(req.body, fastify);
@@ -93,9 +85,7 @@ export const adminApiRoute = (fastify, opts, done) => {
     }
   });
 
-  /**
-   * POST /api/v1/admin/totp/verify
-   */
+  // POST /admin/totp/verify
   fastify.post("/totp/verify", async (req, reply) => {
     try {
       const result = await VerifyTOTP(req.body, fastify);
@@ -113,9 +103,7 @@ export const adminApiRoute = (fastify, opts, done) => {
     }
   });
 
-  /**
-   * POST /api/v1/admin/logout
-   */
+  // POST /admin/logout
   fastify.post("/logout", async (req, reply) => {
     try {
       const result = await AdminLogout(req.body, fastify);
@@ -132,9 +120,7 @@ export const adminApiRoute = (fastify, opts, done) => {
     }
   });
 
-  /**
-   * GET /api/v1/admin/credentials?session_token=...
-   */
+  // GET /admin/credentials?session_token=...
   fastify.get("/credentials", async (req, reply) => {
     try {
       const result = await GetAllCredentials(req.query, fastify);
@@ -152,9 +138,7 @@ export const adminApiRoute = (fastify, opts, done) => {
     }
   });
 
-  /**
-   * POST /api/v1/admin/credentials
-   */
+  // POST /admin/credentials
   fastify.post("/credentials", async (req, reply) => {
     try {
       const result = await SaveCredential(req.body, fastify);
@@ -172,9 +156,7 @@ export const adminApiRoute = (fastify, opts, done) => {
     }
   });
 
-  /**
-   * DELETE /api/v1/admin/credentials/:id?session_token=...
-   */
+  // DELETE /admin/credentials/:id?session_token=...
   fastify.delete("/credentials/:id", async (req, reply) => {
     try {
       const result = await DeleteCredential(req.params, req.query, fastify);
