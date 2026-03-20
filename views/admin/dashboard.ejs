@@ -2140,7 +2140,7 @@
 
         editingId = id;
         $("#modalTitle").text("Edit — " + env.environment_name);
-        $("#envName").val(env.environment_name).prop("disabled", true);
+        $("#envName").val(env.environment_name).prop("disabled", false);
         $("#apiClientId").val(env.api_client_id);
         $("#apiClientSecret").val(env.api_client_secret);
         $("#automationClientId").val(env.automation_client_id);
