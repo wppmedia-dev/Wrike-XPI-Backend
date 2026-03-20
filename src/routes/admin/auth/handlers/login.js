@@ -25,14 +25,20 @@ export const Login = (body) => {
       if (!isValid)
         return reject({ statusCode: 401, message: "Invalid credentials" });
 
-      const session = await AdminAuth.CreateSession(admin.id);
-
       if (admin.totp_enabled) {
+        const totpToken = jwt.sign(
+          { sub: admin.id, username: admin.username },
+          process.env.JWT_SECRET,
+          {
+            expiresIn: "10m",
+          },
+        );
+
         return resolve({
           statusCode: 200,
           message: "TOTP verification required",
           data: {
-            session_token: session.session_token,
+            totp_token: totpToken,
             totp_required: true,
           },
         });
@@ -42,7 +48,6 @@ export const Login = (body) => {
         {
           sub: admin.id,
           username: admin.username,
-          session_id: session.session_id,
         },
         process.env.JWT_SECRET,
         { expiresIn: "24h" },

@@ -364,8 +364,8 @@
           return;
         }
 
-        const sessionToken = sessionStorage.getItem("session_token");
-        if (!sessionToken) {
+        const totpToken = sessionStorage.getItem("totp_token");
+        if (!totpToken) {
           showError("Session expired. Please login again.");
           window.location.href = "/admin/login";
           return;
@@ -379,7 +379,7 @@
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              session_token: sessionToken,
+              totp_token: totpToken,
               totp_code: totpCode,
             }),
           });
@@ -390,9 +390,9 @@
             throw new Error(data.message || "TOTP verification failed");
           }
 
-          // TOTP passed — server issues a JWT; store it and clear temp session
+          // TOTP passed — server issues a JWT; store it and clear temp auth token
           localStorage.setItem("access_token", data.data.access_token);
-          sessionStorage.removeItem("session_token");
+          sessionStorage.removeItem("totp_token");
           window.location.href = "/admin/dashboard";
         } catch (err) {
           showError(err.message);
@@ -404,7 +404,7 @@
       });
 
       backBtn.addEventListener("click", () => {
-        sessionStorage.removeItem("session_token");
+        sessionStorage.removeItem("totp_token");
         window.location.href = "/admin/login";
       });
 
@@ -415,7 +415,7 @@
 
       // Check session on load
       window.addEventListener("load", () => {
-        if (!sessionStorage.getItem("session_token")) {
+        if (!sessionStorage.getItem("totp_token")) {
           window.location.href = "/admin/login";
         }
         totpInput.focus();

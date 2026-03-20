@@ -417,8 +417,8 @@
           if (!res.ok) throw new Error(data.message || "Login failed");
 
           if (data.data.totp_required) {
-            // Store temporary session_token only for the TOTP step
-            sessionStorage.setItem("session_token", data.data.session_token);
+            // Store temporary totp token only for the TOTP step
+            sessionStorage.setItem("totp_token", data.data.totp_token);
             window.location.href = "/admin/totp";
           } else {
             // No TOTP — JWT issued immediately

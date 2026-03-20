@@ -332,7 +332,7 @@ import {
       .env-select {
         width: 100%;
         padding: 10px 12px;
-        border-radius: 10px;
+        border-radius: 6px;
         border: 1px solid rgba(255, 255, 255, 0.35);
         background: rgba(255, 255, 255, 0.15);
         color: #e2e8f0;
