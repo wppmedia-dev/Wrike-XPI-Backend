@@ -1815,6 +1815,23 @@
       const accessToken = localStorage.getItem("access_token");
       if (!accessToken) window.location.href = "/admin/login";
 
+      /* ── Global API Response Interceptor ────────────────────── */
+      const originalFetch = window.fetch;
+      window.fetch = function(...args) {
+        return originalFetch.apply(this, args).then(response => {
+          // Check for 401 (Unauthorized) or 403 (Forbidden)
+          if (response.status === 401 || response.status === 403) {
+            // Clear localStorage
+            localStorage.clear();
+            // Redirect to login with replace to prevent going back
+            window.location.replace("/admin/login");
+            // Return a rejected promise to prevent further execution
+            return Promise.reject(new Error('Session expired or unauthorized'));
+          }
+          return response;
+        });
+      };
+
       /* helper — returns headers with Bearer token */
       function authHeaders(extra) {
         return Object.assign({ Authorization: "Bearer " + accessToken }, extra);

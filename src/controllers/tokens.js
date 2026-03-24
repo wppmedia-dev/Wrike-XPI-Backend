@@ -38,12 +38,11 @@ export const Update = async (profile_id, id, user_token_data, options = {}) => {
 
 export const GetById = async (id) => {
   try {
-    if (!id) {
-      return reject({
+    if (!id)
+      throw {
         statusCode: 420,
         message: "Id must not be empty!",
-      });
-    }
+      };
 
     const userTokens = await models.UserTokens.findOne({
       attributes: [
