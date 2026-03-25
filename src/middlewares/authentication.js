@@ -3,10 +3,7 @@ import { getWrikeTokens } from "../utils/wrike";
 import * as crypto from "../utils/crypto";
 import jwt from "jsonwebtoken";
 
-/**
- * Verify Basic Auth credentials and return unwrapped DEK
- * @param {string} credentials Base64 encoded username:password
- */
+// Verify Basic Auth credentials and return unwrapped DEK
 const verifyBasicAuth = async (credentials) => {
   const [username, password] = Buffer.from(credentials, "base64")
     .toString()
@@ -37,9 +34,7 @@ const verifyBasicAuth = async (credentials) => {
   return { token, dek };
 };
 
-/**
- * Verify JWE token and extract DEK
- */
+// Verify JWE token and extract DEK
 const verifyJWE = async (jweToken) => {
   const { tid, enc: encryptedDEK } = jwt.verify(
     jweToken,
@@ -161,6 +156,7 @@ export const ValidateToken = async (req, reply, fastify) => {
   }
 };
 
+// Individual JWT Token validation
 export const ValidateJWT = async (jwtToken) => {
   try {
     if (!jwtToken) throw new Error("No authorization header");
