@@ -10,7 +10,7 @@ dotenv.config();
 // Importing Routes
 import { PrivateRouters, PublicRouters } from "./routes";
 import { adminRoute } from "./routes/admin";
-import { syncSecrets, getSecrets } from "./utils/azure_vault";
+import { syncSecrets } from "./utils/azure_vault";
 import {
   syncWrikeCredentialsFromDB,
   getCachedWrikeCredentials,

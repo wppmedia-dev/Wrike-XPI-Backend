@@ -166,7 +166,7 @@ export const GetAllByUserId = async (id) => {
   }
 };
 
-export const GetByUserAndAccountId = async (id, accountId) => {
+export const GetByUserAccountEnvId = async (id, accountId, envId) => {
   try {
     if (!id) {
       throw {
@@ -182,12 +182,19 @@ export const GetByUserAndAccountId = async (id, accountId) => {
       };
     }
 
+    if (!envId)
+      throw {
+        statusCode: 420,
+        message: "Env Id must not be empty!",
+      };
+
     let where = {
       created_by: id,
       is_active: true,
     };
 
     if (accountId) where["account_id"] = accountId;
+    if (envId) where["env_id"] = envId;
 
     const userTokens = await models.UserTokens.findOne({
       attributes: [
@@ -202,11 +209,7 @@ export const GetByUserAndAccountId = async (id, accountId) => {
           attributes: ["environment_name"],
         },
       ],
-      where: {
-        created_by: id,
-        account_id: accountId,
-        is_active: true,
-      },
+      where,
       order: [["created_at", "DESC"]],
     });
 

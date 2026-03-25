@@ -4,11 +4,18 @@ import { Tokens } from "../../controllers";
 
 import { WrikeTokenExchangeSchema } from "./schema/wrikeTokenExchange";
 import { GetUserDataSchema } from "./schema/getUserData";
+import { ValidateJWT } from "../../middlewares/authentication";
 
 export const tokenRoute = (fastify, opts, done) => {
   fastify.post("/profile", GetUserDataSchema, async (req, reply) => {
     try {
-      const result = await GetUserData(req.body, fastify);
+      const token = req.body?.token;
+
+      if (!token) return reject({ message: "Access Token must not be empty" });
+
+      const wrikeToken = await ValidateJWT(token);
+
+      const result = await GetUserData(wrikeToken, fastify);
 
       return reply.code(200).send({
         success: true,

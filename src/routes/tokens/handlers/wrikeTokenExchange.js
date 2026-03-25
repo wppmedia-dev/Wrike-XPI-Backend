@@ -56,7 +56,7 @@ export const WrikeTokenExchange = ({ code, env, envId }, fastify) => {
       }
 
       // Generate username from email + account_id
-      const username = `${accountId}-${primaryEmail}`;
+      const username = `${accountId}-${envId}-${primaryEmail}`;
 
       // Generate random strong password
       const password = crypto.generateSecurePassword();
@@ -79,9 +79,10 @@ export const WrikeTokenExchange = ({ code, env, envId }, fastify) => {
         .toString("base64");
 
       // Get existing user token if any
-      const userTokenData = await Tokens.GetByUserAndAccountId(
+      const userTokenData = await Tokens.GetByUserAccountEnvId(
         userId,
         accountId,
+        envId,
       );
       let userTokenId = userTokenData?.id;
 
