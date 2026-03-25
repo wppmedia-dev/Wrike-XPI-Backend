@@ -39,7 +39,10 @@ export const adminCredentialsRoute = (fastify, opts, done) => {
     { ...SaveSchema, preHandler: [verifyAdminJWT] },
     async (req, reply) => {
       try {
-        const result = await Save(req.body);
+        const result = await Save({
+          profile_id: req.adminUser?.id,
+          ...req.body,
+        });
 
         return reply.code(result?.statusCode || 200).send({
           success: true,
@@ -61,7 +64,7 @@ export const adminCredentialsRoute = (fastify, opts, done) => {
     { ...UpdateSchema, preHandler: [verifyAdminJWT] },
     async (req, reply) => {
       try {
-        const result = await Update(req.params, req.body);
+        const result = await Update(req.adminUser?.id, req.params, req.body);
 
         return reply.code(result?.statusCode || 200).send({
           success: true,

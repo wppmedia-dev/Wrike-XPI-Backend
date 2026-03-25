@@ -4,13 +4,7 @@ const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
   class AdminUsers extends Model {
-    static associate(models) {
-      AdminUsers.hasMany(models.AdminSessions, {
-        as: "sessions",
-        foreignKey: "admin_id",
-        onDelete: "CASCADE",
-      });
-    }
+    static associate(models) {}
   }
 
   AdminUsers.init(

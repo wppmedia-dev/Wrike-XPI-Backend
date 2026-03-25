@@ -55,10 +55,22 @@ module.exports = {
       created_by: {
         type: Sequelize.UUID,
         allowNull: true,
+        references: {
+          model: { schema: "public", tableName: "admin_users" },
+          key: "id",
+        },
+        onDelete: "SET NULL",
+        onUpdate: "CASCADE",
       },
       updated_by: {
         type: Sequelize.UUID,
         allowNull: true,
+        references: {
+          model: { schema: "public", tableName: "admin_users" },
+          key: "id",
+        },
+        onDelete: "SET NULL",
+        onUpdate: "CASCADE",
       },
     });
 

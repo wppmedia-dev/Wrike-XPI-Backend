@@ -1,8 +1,8 @@
-import { encryptField, decryptField } from "../../../../utils/crypto";
+import { encryptField } from "../../../../utils/crypto";
 import { syncWrikeCredentialsFromDB } from "../../../../utils/wrikeCredentials";
 import { WrikeCredentials } from "../../../../controllers";
 
-export const Update = ({ id }, body) => {
+export const Update = (profile_id, { id }, body) => {
   return new Promise(async (resolve, reject) => {
     try {
       const {
@@ -52,31 +52,21 @@ export const Update = ({ id }, body) => {
           automation_client_secret,
         );
 
-      await WrikeCredentials.Update(id, updates);
-      const updated = await WrikeCredentials.GetById(id);
+      const updated = await WrikeCredentials.Update(profile_id, id, updates);
 
       await syncWrikeCredentialsFromDB();
 
+      let message = "Credential updated successfully";
+      let statusCode = 200;
+
+      if (updated[0] <= 0) {
+        message = "Credentials updated failed! Please try after sometimes";
+        statusCode = 400;
+      }
+
       return resolve({
-        statusCode: 200,
-        message: "Credential updated successfully",
-        data: {
-          id: updated.id,
-          environment_name: updated.environment_name,
-          api_client_id: updated.api_client_id
-            ? decryptField(updated.api_client_id)
-            : null,
-          api_client_secret: updated.api_client_secret
-            ? decryptField(updated.api_client_secret)
-            : null,
-          automation_client_id: updated.automation_client_id
-            ? decryptField(updated.automation_client_id)
-            : null,
-          automation_client_secret: updated.automation_client_secret
-            ? decryptField(updated.automation_client_secret)
-            : null,
-          is_active: updated.is_active,
-        },
+        statusCode,
+        message,
       });
     } catch (err) {
       console.log(err?.message || err);

@@ -11,6 +11,18 @@ module.exports = (sequelize, DataTypes) => {
         onUpdate: "CASCADE",
         onDelete: "RESTRICT",
       });
+      WrikeCredentials.belongsTo(models.AdminUsers, {
+        as: "creator",
+        foreignKey: "created_by",
+        onUpdate: "CASCADE",
+        onDelete: "SET NULL",
+      });
+      WrikeCredentials.belongsTo(models.AdminUsers, {
+        as: "updater",
+        foreignKey: "updated_by",
+        onUpdate: "CASCADE",
+        onDelete: "SET NULL",
+      });
     }
   }
 
@@ -77,6 +89,37 @@ module.exports = (sequelize, DataTypes) => {
       deletedAt: "deleted_at",
     },
   );
+
+  WrikeCredentials.beforeCreate((data, options) => {
+    try {
+      data.created_at = new Date();
+      data.created_by = options?.profile_id;
+    } catch (err) {
+      console.log("Error while creating an user", err?.message || err);
+    }
+  });
+
+  // Update Hook
+  WrikeCredentials.beforeUpdate(async (data, options) => {
+    try {
+      data.updated_at = new Date();
+      data.updated_by = options.profile_id;
+    } catch (err) {
+      console.log("Error while updating an user", err?.message || err);
+    }
+  });
+
+  // Delete Hook
+  WrikeCredentials.afterDestroy(async (data, options) => {
+    try {
+      // data.deleted_by = options?.user_id;
+      data.is_active = false;
+
+      await data.save({ profile_id: options.profile_id });
+    } catch (err) {
+      console.log("Error while deleting a user token", err?.message || err);
+    }
+  });
 
   return WrikeCredentials;
 };
