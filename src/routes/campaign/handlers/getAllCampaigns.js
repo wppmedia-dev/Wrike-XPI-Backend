@@ -1,6 +1,7 @@
 import { GetResponse } from "../../../utils/node-fetch";
 import { defaultParser } from "@odata/parser";
-import { getDatahubCustomFields } from "../../../utils/wrike";
+import { getCustomFields, getDatahubCustomFields } from "../../../utils/wrike";
+import { translateDatahubRecordId } from "../utils/datahubRecordTranslator";
 
 // Operator mapping from OData to your custom operators
 const odataToCustomOp = {
@@ -35,7 +36,7 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
 
       datahubCustomFieldsData = await getDatahubCustomFields(
         wrikeToken,
-        process.env.DATAHUB_CUSTOM_FIELDS_ID
+        process.env.DATAHUB_CUSTOM_FIELDS_ID,
       );
 
       if (filterParams) {
@@ -92,76 +93,80 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
       if (wrikeFolderData?.errorDescription)
         return reject({ message: wrikeFolderData?.errorDescription });
 
+      const customFieldsMaster = await getCustomFields(wrikeToken);
+
+      if (customFieldsMaster?.errorDescription) {
+        throw { message: customFieldsMaster.errorDescription };
+      }
+
+      // map of custom fields for quick lookup
+      const cfMap = new Map(
+        (customFieldsMaster?.data || []).map((cf) => [cf.id, cf]),
+      );
+
       // Optimize the for loop by using map instead of manual for...of and push
-      const campaigns = wrikeFolderData?.data.map((folder) => {
-        if (folder?.scope == "RbFolder") return;
+      const campaigns = await Promise.all(
+        wrikeFolderData?.data.map(async (folder) => {
+          if (folder?.scope === "RbFolder") return;
 
-        const folderCustomFieldValues = Object.entries(
-          datahubCustomFieldsData
-        ).reduce((acc, [key, value]) => {
-          if (!value.isReadable || !value.isCampaignField) return acc;
+          const entries = await Promise.all(
+            Object.entries(datahubCustomFieldsData).map(
+              async ([key, value]) => {
+                if (!value.isReadable || !value.isCampaignField)
+                  return [key, undefined];
 
-          let fieldValue;
-          switch (value.xpiFieldType) {
-            case "Wrike API Built-in Field":
-              fieldValue = folder[value?.cfId];
-              break;
-            case "Wrike API Metadata Field":
-              fieldValue =
-                folder?.metadata?.find((field) => field.key === value?.cfId)
-                  ?.value ?? "";
-              break;
-            case "Wrike Custom Field":
-              fieldValue =
-                folder?.customFields?.find((field) => field.id === value?.cfId)
-                  ?.value ?? "";
-              break;
-            default:
-              fieldValue = "";
-          }
+                let fieldValue, cfData;
 
-          // if (fieldValue) {
-          acc[key] = fieldValue;
-          // }
+                switch (value.xpiFieldType) {
+                  case "Wrike API Built-in Field":
+                    fieldValue = folder[value?.cfId];
+                    break;
 
-          return acc;
-        }, {});
+                  case "Wrike API Metadata Field":
+                    fieldValue =
+                      folder?.metadata?.find(
+                        (field) => field.key === value?.cfId,
+                      )?.value ?? "";
+                    break;
 
-        return {
-          ...folderCustomFieldValues,
-          // // customfieldlist: folder?.customFields,
-          // folderId: folder.id,
-          // noofcrs: folderCustomFieldValues["noofcrs"],
-          // agency: folderCustomFieldValues["agency"],
-          // mediabuyingtype: folderCustomFieldValues["mediabuyingtype"],
-          // brand: folderCustomFieldValues["brand"],
-          // briefeddate: folderCustomFieldValues["briefeddate"],
-          // campaignbudget: folderCustomFieldValues["campaignbudget"],
-          // campaignenddate: folderCustomFieldValues["campaignenddate"],
-          // campaignid: folderCustomFieldValues["campaignid"],
-          // campaignname: folderCustomFieldValues["campaignname"],
-          // campaignobjective: folderCustomFieldValues["campaignobjective"],
-          // campaignstartdate: folderCustomFieldValues["campaignstartdate"],
-          // campaignfeedbackstatus:
-          //   folderCustomFieldValues["campaignfeedbackstatus"],
-          // ccuid: folderCustomFieldValues["ccuid"],
-          // mediachannelpractice: folderCustomFieldValues["mediachannelpractice"],
-          // client: folderCustomFieldValues["client"],
-          // comments: folderCustomFieldValues["comments"],
-          // cssid: folderCustomFieldValues["cssid"],
-          // currency: folderCustomFieldValues["currency"],
-          // customerponumber: folderCustomFieldValues["customerponumber"],
-          // debtor: folderCustomFieldValues["debtor"],
-          // kpiobjective: folderCustomFieldValues["kpiobjective"],
-          // originalagency: folderCustomFieldValues["originalagency"],
-          // readyforarchive: folderCustomFieldValues["readyforarchive"],
-          // region: folderCustomFieldValues["region"],
-          // requestedstartdate: folderCustomFieldValues["requestedstartdate"],
-          // requestormarket: folderCustomFieldValues["requestormarket"],
-          // spacename: folderCustomFieldValues["spacename"],
-          // workitemlevel: folderCustomFieldValues["workitemlevel"],
-        };
-      });
+                  case "Wrike Custom Field":
+                    cfData =
+                      folder?.customFields?.find(
+                        (field) => field.id === value?.cfId,
+                      ) ?? "";
+                    fieldValue = cfData?.value ?? "";
+                    break;
+
+                  default:
+                    fieldValue = "";
+                }
+
+                if (
+                  fieldValue &&
+                  fieldValue.startsWith("[") &&
+                  fieldValue.endsWith("]")
+                ) {
+                  const cfMetaData = cfMap.get(cfData?.id);
+                  const databaseId =
+                    cfMetaData?.settings?.linkToDatabaseInfo?.dataHubDatabaseId;
+
+                  if (databaseId) {
+                    fieldValue = await translateDatahubRecordId(
+                      wrikeToken,
+                      databaseId,
+                      fieldValue,
+                    );
+                  }
+                }
+
+                return [key, fieldValue];
+              },
+            ),
+          );
+
+          return Object.fromEntries(entries);
+        }),
+      );
 
       // Sending final response
       resolve({
@@ -274,8 +279,8 @@ function extractFilters(node, result = []) {
         getValues(
           node?.value?.method,
           node.value.parameters[0],
-          node.value.parameters[1]
-        )
+          node.value.parameters[1],
+        ),
       );
       return result;
     } else
