@@ -22,7 +22,7 @@ export const GetCampaign = (wrikeToken, params, fastify) => {
 
       const datahubCustomFieldsData = await getDatahubCustomFields(
         wrikeToken,
-        process.env.DATAHUB_CUSTOM_FIELDS_ID
+        process.env.DATAHUB_CUSTOM_FIELDS_ID,
       );
 
       const wrikeFolderData = await getFolder(wrikeToken, folderId);
@@ -52,17 +52,17 @@ export const GetCampaign = (wrikeToken, params, fastify) => {
           case "Wrike API Metadata Field":
             cfValue =
               wrikeFolderData?.data[0]?.metadata?.find(
-                (field) => field.key === value?.cfId
+                (field) => field.key === value?.cfId,
               )?.value ?? "";
             break;
           case "Wrike Custom Field":
             cfValue =
               wrikeFolderData?.data[0]?.customFields?.find(
-                (field) => field.id === value.cfId
+                (field) => field.id === value.cfId,
               )?.value ?? "";
             break;
           default:
-            fieldValue = "";
+            cfValue = "";
         }
 
         // if (value.isReadable && value.isCampaignField)
