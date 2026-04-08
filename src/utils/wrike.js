@@ -103,6 +103,29 @@ export const getDatahubFields = async (wrikeToken, databaseId) => {
   }
 };
 
+export const getDatahubRecord = async (wrikeToken, databaseId, recordId) => {
+  try {
+    if (!databaseId || !recordId) {
+      throw { message: "Database ID and Record ID are required" };
+    }
+
+    let url = `${
+      process.env.WRIKE_DATAHUB_ENDPOINT
+    }/databases/${databaseId}/records/${recordId}`;
+
+    const datahubRecord = await GetResponse(url, "GET", {
+      "content-type": "application/json",
+      Authorization: `Bearer ${wrikeToken}`,
+    });
+
+    if (datahubRecord?.errorDescription) throw datahubRecord;
+
+    return datahubRecord;
+  } catch (err) {
+    throw err;
+  }
+};
+
 export const getDatahubRecords = async (
   wrikeToken,
   databaseId,

@@ -1,6 +1,13 @@
-import { getFolder, getDatahubCustomFields } from "../../../utils/wrike";
+import { normalizeString } from "../../../utils/json-conversion";
+import {
+  getFolder,
+  getDatahubCustomFields,
+  getDatahubRecords,
+  getCustomFields,
+  getDatahubRecord,
+} from "../../../utils/wrike";
 
-export const GetCampaign = (wrikeToken, params, fastify) => {
+export const GetCampaign = (wrikeToken, params) => {
   return new Promise(async (resolve, reject) => {
     try {
       if (!wrikeToken)
@@ -41,10 +48,21 @@ export const GetCampaign = (wrikeToken, params, fastify) => {
 
       const folderCustomFieldValues = {};
 
+      const customFieldsMaster = await getCustomFields(wrikeToken);
+
+      if (customFieldsMaster?.errorDescription) {
+        throw { message: customFieldsMaster.errorDescription };
+      }
+
+      // map of custom fields for quick lookup
+      const cfMap = new Map(
+        (customFieldsMaster?.data || []).map((cf) => [cf.id, cf]),
+      );
+
       for (const [key, value] of Object.entries(datahubCustomFieldsData)) {
         if (!value.isReadable || !value.isCampaignField) continue;
 
-        let cfValue;
+        let cfValue, cfData;
         switch (value.xpiFieldType) {
           case "Wrike API Built-in Field":
             cfValue = wrikeFolderData?.data[0][value?.cfId];
@@ -56,13 +74,28 @@ export const GetCampaign = (wrikeToken, params, fastify) => {
               )?.value ?? "";
             break;
           case "Wrike Custom Field":
-            cfValue =
+            cfData =
               wrikeFolderData?.data[0]?.customFields?.find(
                 (field) => field.id === value.cfId,
-              )?.value ?? "";
+              ) ?? "";
+            cfValue = cfData?.value ?? "";
             break;
           default:
             cfValue = "";
+        }
+
+        if (cfValue && cfValue?.startsWith("[") && cfValue?.endsWith("]")) {
+          const cfMetaData = cfMap.get(cfData?.id);
+
+          const databaseId =
+            cfMetaData?.settings?.linkToDatabaseInfo?.dataHubDatabaseId;
+
+          if (databaseId && cfValue)
+            cfValue = await translateDatahubRecordId(
+              wrikeToken,
+              databaseId,
+              cfValue,
+            );
         }
 
         // if (value.isReadable && value.isCampaignField)
@@ -120,4 +153,36 @@ export const GetCampaign = (wrikeToken, params, fastify) => {
       });
     }
   });
+};
+
+const translateDatahubRecordId = async (
+  wrikeToken,
+  databaseId,
+  originalValue,
+) => {
+  try {
+    if (!originalValue) return originalValue;
+
+    const recordId =
+      typeof originalValue === "string"
+        ? normalizeString(originalValue)
+        : originalValue;
+
+    if (recordId.length === 0) return null;
+
+    let finalValue = originalValue || "";
+
+    // If source database ID is available and target database ID is not, fetch the record title from the source database
+
+    const datahubRecords = await getDatahubRecord(
+      wrikeToken,
+      databaseId,
+      Array.isArray(recordId) && recordId[0],
+    );
+    finalValue = datahubRecords?.title || "";
+
+    return finalValue;
+  } catch (error) {
+    throw error;
+  }
 };
