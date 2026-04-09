@@ -5,13 +5,7 @@ import { WrikeCredentials } from "../../../../controllers";
 export const Update = (profile_id, { id }, body) => {
   return new Promise(async (resolve, reject) => {
     try {
-      const {
-        environment_name,
-        api_client_id,
-        api_client_secret,
-        automation_client_id,
-        automation_client_secret,
-      } = body;
+      const { environment_name, client_id, client_secret } = body;
 
       if (!environment_name)
         return reject({
@@ -19,12 +13,7 @@ export const Update = (profile_id, { id }, body) => {
           message: "environment_name is required",
         });
 
-      if (
-        !api_client_id &&
-        !api_client_secret &&
-        !automation_client_id &&
-        !automation_client_secret
-      )
+      if (!client_id && !client_secret)
         return reject({
           statusCode: 400,
           message: "At least one credential field is required",
@@ -42,15 +31,8 @@ export const Update = (profile_id, { id }, body) => {
         });
 
       const updates = { environment_name };
-      if (api_client_id) updates.api_client_id = encryptField(api_client_id);
-      if (api_client_secret)
-        updates.api_client_secret = encryptField(api_client_secret);
-      if (automation_client_id)
-        updates.automation_client_id = encryptField(automation_client_id);
-      if (automation_client_secret)
-        updates.automation_client_secret = encryptField(
-          automation_client_secret,
-        );
+      if (client_id) updates.client_id = encryptField(client_id);
+      if (client_secret) updates.client_secret = encryptField(client_secret);
 
       const updated = await WrikeCredentials.Update(profile_id, id, updates);
 

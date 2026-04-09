@@ -1627,8 +1627,7 @@
                     <thead>
                       <tr>
                         <th>Environment</th>
-                        <th>API Client ID</th>
-                        <th>Automation ID</th>
+                        <th>Client ID</th>
                         <th>Created</th>
                         <th>Last Updated</th>
                         <th>Status</th>
@@ -1726,53 +1725,26 @@
 
             <!-- <hr class="form-divider" /> -->
 
-            <div class="form-section-label">API Credentials</div>
+            <div class="form-section-label">Credentials</div>
 
             <div class="form-group">
-              <label class="form-label" for="apiClientId">API Client ID</label>
+              <label class="form-label" for="clientId">Client ID</label>
               <input
                 class="form-control"
                 type="text"
-                id="apiClientId"
-                placeholder="Enter API Client ID"
+                id="clientId"
+                placeholder="Enter Client ID"
               />
             </div>
             <div class="form-group">
-              <label class="form-label" for="apiClientSecret"
-                >API Client Secret</label
+              <label class="form-label" for="clientSecret"
+                >Client Secret</label
               >
               <input
                 class="form-control"
                 type="password"
-                id="apiClientSecret"
-                placeholder="Enter API Client Secret"
-              />
-            </div>
-
-            <!-- <hr class="form-divider" /> -->
-
-            <div class="form-section-label">Automation Credentials</div>
-
-            <div class="form-group">
-              <label class="form-label" for="automationClientId"
-                >Automation Client ID</label
-              >
-              <input
-                class="form-control"
-                type="text"
-                id="automationClientId"
-                placeholder="Enter Automation Client ID"
-              />
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="automationClientSecret"
-                >Automation Client Secret</label
-              >
-              <input
-                class="form-control"
-                type="password"
-                id="automationClientSecret"
-                placeholder="Enter Automation Client Secret"
+                id="clientSecret"
+                placeholder="Enter Client Secret"
               />
             </div>
 
@@ -1950,10 +1922,8 @@
               return {
                 id: c.id,
                 environment_name: c.environment_name || "",
-                api_client_id: c.api_client_id || "",
-                api_client_secret: c.api_client_secret || "",
-                automation_client_id: c.automation_client_id || "",
-                automation_client_secret: c.automation_client_secret || "",
+                client_id: c.client_id || "",
+                client_secret: c.client_secret || "",
                 is_active: !!c.is_active,
                 created_at: c.created_at,
                 updated_at: c.updated_at
@@ -1978,14 +1948,14 @@
         var active = environments.filter(function (e) {
           return e.is_active;
         }).length;
-        var withApi = environments.filter(function (e) {
-          return !!e.api_client_id;
+        var withCreds = environments.filter(function (e) {
+          return !!e.client_id;
         }).length;
 
         $("#statTotal").text(total);
         $("#statActive").text(active);
         $("#statInactive").text(total - active);
-        $("#statWithApi").text(withApi);
+        $("#statWithApi").text(withCreds);
         $("#envCount").text(total);
       }
 
@@ -2042,7 +2012,7 @@
         if (environments.length === 0) {
           $tbody.html(
             "<tr>" +
-              '<td colspan="7">' +
+              '<td colspan="6">' +
               '<div class="empty-state">' +
               '<div class="empty-state-icon"><i class="fa-regular fa-folder-open"></i></div>' +
               "<h3>No environments found</h3>" +
@@ -2065,10 +2035,7 @@
               escHtml(env.environment_name) +
               "</strong></td>" +
               "<td>" +
-              escHtml(env.api_client_id) +
-              "</td>" +
-              "<td>" +
-              escHtml(env.automation_client_id) +
+              escHtml(env.client_id) +
               "</td>" +
               "<td>" +
               formatLocalDate(env.created_at) +
@@ -2103,7 +2070,7 @@
           pageLength: 10,
           lengthMenu: [5, 10, 25, 50],
           order: [],
-          columnDefs: [{ targets: 6, orderable: false, searchable: false }],
+          columnDefs: [{ targets: 5, orderable: false, searchable: false }],
           language: {
             emptyTable: "No environments found",
             zeroRecords: "No matching environments",
@@ -2133,7 +2100,7 @@
 
         var recent = environments.slice(0, 5);
         var html =
-          '<table class="dt"><thead><tr><th>Name</th><th>API Client ID</th><th>Created</th><th>Status</th><th></th></tr></thead><tbody>';
+          '<table class="dt"><thead><tr><th>Name</th><th>Client ID</th><th>Created</th><th>Status</th><th></th></tr></thead><tbody>';
 
         recent.forEach(function (env) {
           console.log(env)
@@ -2147,7 +2114,7 @@
             escHtml(env.environment_name) +
             "</strong></td>" +
             "<td>" +
-            mask(env.api_client_id) +
+            mask(env.client_id) +
             "</td>" +
             "<td>" +
             formatLocalDate(env?.created_at) +
@@ -2189,14 +2156,12 @@
         editingId = id;
         $("#modalTitle").text("Edit — " + env.environment_name);
         $("#envName").val(env.environment_name).prop("disabled", false);
-        $("#apiClientId").val(env.api_client_id);
-        $("#apiClientSecret").val(env.api_client_secret);
-        $("#automationClientId").val(env.automation_client_id);
-        $("#automationClientSecret").val(env.automation_client_secret);
+        $("#clientId").val(env.client_id);
+        $("#clientSecret").val(env.client_secret);
         $("#isActive").prop("checked", env.is_active);
         $("#envModalBackdrop").addClass("show");
         setTimeout(function () {
-          $("#apiClientId").focus();
+          $("#clientId").focus();
         }, 120);
       }
 
@@ -2229,10 +2194,8 @@
       /* ── Save environment ───────────────────────────────────── */
       $("#saveEnvBtn").on("click", async function () {
         var envName = $("#envName").val().trim();
-        var apiClientId = $("#apiClientId").val().trim();
-        var apiClientSecret = $("#apiClientSecret").val().trim();
-        var automationClientId = $("#automationClientId").val().trim();
-        var automationClientSecret = $("#automationClientSecret").val().trim();
+        var clientId = $("#clientId").val().trim();
+        var clientSecret = $("#clientSecret").val().trim();
         var isActive = $("#isActive").is(":checked");
 
         if (!envName) {
@@ -2241,13 +2204,11 @@
         }
 
         if (
-          !apiClientId &&
-          !apiClientSecret &&
-          !automationClientId &&
-          !automationClientSecret
+          !clientId &&
+          !clientSecret
         ) {
           toast(
-            "Please provide at least one credential (API or Automation)",
+            "Please provide at least one credential",
             "error",
           );
           return;
@@ -2258,10 +2219,8 @@
         try {
           var payload = {
             environment_name: envName,
-            api_client_id: apiClientId || undefined,
-            api_client_secret: apiClientSecret || undefined,
-            automation_client_id: automationClientId || undefined,
-            automation_client_secret: automationClientSecret || undefined,
+            client_id: clientId || undefined,
+            client_secret: clientSecret || undefined,
             is_active: isActive,
           };
 

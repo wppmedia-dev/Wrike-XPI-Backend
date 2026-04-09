@@ -21,8 +21,8 @@ export const getWrikeTokens = async ({ code, env, refresh_token }) => {
       };
 
     const apiCreds = getCachedWrikeCredentials(env);
-    const WRIKE_CLIENT_ID = apiCreds?.apiClientId;
-    const WRIKE_CLIENT_SECRET = apiCreds?.apiClientSecret;
+    const WRIKE_CLIENT_ID = apiCreds?.clientId;
+    const WRIKE_CLIENT_SECRET = apiCreds?.clientSecret;
 
     if (!WRIKE_LOGIN_ENDPOINT || !WRIKE_CLIENT_ID || !WRIKE_CLIENT_SECRET) {
       throw {

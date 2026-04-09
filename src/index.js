@@ -132,7 +132,7 @@ import {
     const allCreds = getCachedWrikeCredentials();
     const selectedCred = environment ? allCreds?.[environment] : null;
     const WRIKE_CLIENT_ID =
-      selectedCred?.apiClientId || process.env.WRIKE_CLIENT_ID;
+      selectedCred?.clientId || process.env.WRIKE_CLIENT_ID;
 
     if (!WRIKE_CLIENT_ID) {
       return res.status(400).send({
@@ -184,7 +184,7 @@ import {
       ? allCreds?.[selectedEnvironment]
       : null;
     const WRIKE_CLIENT_ID =
-      selectedCred?.apiClientId || process.env.WRIKE_CLIENT_ID;
+      selectedCred?.clientId || process.env.WRIKE_CLIENT_ID;
 
     if (!WRIKE_CLIENT_ID) {
       return res.status(400).send({

@@ -5,14 +5,7 @@ import { WrikeCredentials } from "../../../../controllers";
 export const Save = (body) => {
   return new Promise(async (resolve, reject) => {
     try {
-      const {
-        profile_id,
-        environment_name,
-        api_client_id,
-        api_client_secret,
-        automation_client_id,
-        automation_client_secret,
-      } = body;
+      const { profile_id, environment_name, client_id, client_secret } = body;
 
       if (!environment_name)
         return reject({
@@ -20,12 +13,7 @@ export const Save = (body) => {
           message: "environment_name is required",
         });
 
-      if (
-        !api_client_id &&
-        !api_client_secret &&
-        !automation_client_id &&
-        !automation_client_secret
-      )
+      if (!client_id && !client_secret)
         return reject({
           statusCode: 400,
           message: "At least one credential field is required",
@@ -40,16 +28,8 @@ export const Save = (body) => {
 
       const credential = await WrikeCredentials.Insert(profile_id, {
         environment_name,
-        api_client_id: api_client_id ? encryptField(api_client_id) : null,
-        api_client_secret: api_client_secret
-          ? encryptField(api_client_secret)
-          : null,
-        automation_client_id: automation_client_id
-          ? encryptField(automation_client_id)
-          : null,
-        automation_client_secret: automation_client_secret
-          ? encryptField(automation_client_secret)
-          : null,
+        client_id: client_id ? encryptField(client_id) : null,
+        client_secret: client_secret ? encryptField(client_secret) : null,
       });
 
       await syncWrikeCredentialsFromDB();
@@ -69,15 +49,7 @@ export const Save = (body) => {
 const formatCredential = (cred) => ({
   id: cred.id,
   environment_name: cred.environment_name,
-  api_client_id: cred.api_client_id ? decryptField(cred.api_client_id) : null,
-  api_client_secret: cred.api_client_secret
-    ? decryptField(cred.api_client_secret)
-    : null,
-  automation_client_id: cred.automation_client_id
-    ? decryptField(cred.automation_client_id)
-    : null,
-  automation_client_secret: cred.automation_client_secret
-    ? decryptField(cred.automation_client_secret)
-    : null,
+  client_id: cred.client_id ? decryptField(cred.client_id) : null,
+  client_secret: cred.client_secret ? decryptField(cred.client_secret) : null,
   is_active: cred.is_active,
 });

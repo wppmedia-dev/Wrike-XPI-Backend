@@ -16,17 +16,11 @@ export const getWrikeCredentials = async (environmentName) => {
     return {
       id: credential?.id,
       environmentName: credential.environment_name,
-      apiClientId: credential.api_client_id
-        ? decryptField(credential.api_client_id)
+      clientId: credential.client_id
+        ? decryptField(credential.client_id)
         : null,
-      apiClientSecret: credential.api_client_secret
-        ? decryptField(credential.api_client_secret)
-        : null,
-      automationClientId: credential.automation_client_id
-        ? decryptField(credential.automation_client_id)
-        : null,
-      automationClientSecret: credential.automation_client_secret
-        ? decryptField(credential.automation_client_secret)
+      clientSecret: credential.client_secret
+        ? decryptField(credential.client_secret)
         : null,
     };
   } catch (err) {

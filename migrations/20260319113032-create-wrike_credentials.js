@@ -14,25 +14,15 @@ module.exports = {
         allowNull: false,
         comment: "Unique environment name",
       },
-      api_client_id: {
+      client_id: {
         type: Sequelize.TEXT,
         allowNull: true,
-        comment: "Encrypted API Client ID",
+        comment: "Encrypted Client ID",
       },
-      api_client_secret: {
+      client_secret: {
         type: Sequelize.TEXT,
         allowNull: true,
-        comment: "Encrypted API Client Secret",
-      },
-      automation_client_id: {
-        type: Sequelize.TEXT,
-        allowNull: true,
-        comment: "Encrypted Automation Client ID",
-      },
-      automation_client_secret: {
-        type: Sequelize.TEXT,
-        allowNull: true,
-        comment: "Encrypted Automation Client Secret",
+        comment: "Encrypted Client Secret",
       },
       is_active: {
         type: Sequelize.BOOLEAN,
