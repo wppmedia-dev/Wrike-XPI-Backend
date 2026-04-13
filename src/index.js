@@ -119,7 +119,7 @@ import {
 
   // Generate redirect URL dynamically based on environment selection
   fastify.get("/get-redirect-url", async (req, res) => {
-    const { environment, redirectUri, accountId } = req.query;
+    const { environment, environmentId, redirectUri, accountId } = req.query;
     const { WRIKE_LOGIN_ENDPOINT, WRIKE_REDIRECT_URL } = process.env;
 
     if (!WRIKE_LOGIN_ENDPOINT || !WRIKE_REDIRECT_URL) {
@@ -130,7 +130,24 @@ import {
     }
 
     const allCreds = getCachedWrikeCredentials();
-    const selectedCred = environment ? allCreds?.[environment] : null;
+
+    // Resolve environment: prioritize environmentId parameter, then environment parameter
+    let resolvedEnvironment = "";
+    if (environmentId) {
+      // Find environment by ID
+      for (const [envName, envData] of Object.entries(allCreds || {})) {
+        if (envData?.id == environmentId) {
+          resolvedEnvironment = envName;
+          break;
+        }
+      }
+    } else if (environment) {
+      resolvedEnvironment = environment;
+    }
+
+    const selectedCred = resolvedEnvironment
+      ? allCreds?.[resolvedEnvironment]
+      : null;
     const WRIKE_CLIENT_ID =
       selectedCred?.clientId || process.env.WRIKE_CLIENT_ID;
 
@@ -146,12 +163,12 @@ import {
     if (redirectUri) {
       state = fastify.jwt.sign({
         redirectUri,
-        env: selectedCred ? environment : "",
+        env: selectedCred ? resolvedEnvironment : "",
         envId: selectedCred?.id,
       });
     } else {
       state = fastify.jwt.sign({
-        env: selectedCred ? environment : "",
+        env: selectedCred ? resolvedEnvironment : "",
         envId: selectedCred?.id,
       });
     }
@@ -170,7 +187,8 @@ import {
   fastify.get("/", async (req, res) => {
     const { WRIKE_LOGIN_ENDPOINT, WRIKE_REDIRECT_URL } = process.env;
 
-    const { accountId, redirectUri, autoRedirect, environment } = req.query;
+    const { accountId, redirectUri, autoRedirect, environment, environmentId } =
+      req.query;
 
     if (!WRIKE_LOGIN_ENDPOINT) {
       throw new Error(
@@ -180,7 +198,21 @@ import {
 
     // Get credentials from cached DB values (API type)
     const allCreds = getCachedWrikeCredentials();
-    const selectedEnvironment = environment || "";
+
+    // Resolve environment: prioritize environmentId parameter, then environment parameter
+    let selectedEnvironment = "";
+    if (environmentId) {
+      // Find environment by ID
+      for (const [envName, envData] of Object.entries(allCreds || {})) {
+        if (envData?.id == environmentId) {
+          selectedEnvironment = envName;
+          break;
+        }
+      }
+    } else if (environment) {
+      selectedEnvironment = environment;
+    }
+
     const selectedCred = selectedEnvironment
       ? allCreds?.[selectedEnvironment]
       : null;
@@ -455,6 +487,12 @@ import {
     const initialAccountId = "${accountId || ""}";
     const initialEnvironment = "${selectedEnvironment}";
     const environmentsAvailable = ${Object.keys(allCreds || {}).length};
+
+    // Handle environmentId query parameter (extract from URL for client-side lookup)
+    function getEnvironmentIdFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('environmentId');
+    }
 
     const getRedirectUrl = async () => {
       const selectedEnv = envSelect?.value;

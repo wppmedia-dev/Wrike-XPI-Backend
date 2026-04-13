@@ -1017,6 +1017,34 @@
         gap: 8px;
       }
 
+      /* Icon button for copy */
+      .icon-btn {
+        width: 24px;
+        height: 24px;
+        min-width: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: 1px solid transparent;
+        border-radius: var(--radius-sm);
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 12px;
+        transition: var(--transition);
+        padding: 0;
+      }
+
+      .icon-btn:hover {
+        background: var(--bg-surface);
+        color: var(--accent);
+        border-color: var(--border);
+      }
+
+      .icon-btn.copied {
+        color: var(--success);
+      }
+
       /* ─── Empty state ─────────────────────────────────────── */
       .empty-state {
         display: flex;
@@ -1660,6 +1688,7 @@
                     <thead>
                       <tr>
                         <th>Environment</th>
+                        <th>Env ID</th>
                         <th>Client ID</th>
                         <th>Created</th>
                         <th>Last Updated</th>
@@ -1721,6 +1750,59 @@
       <!-- /#main -->
     </div>
     <!-- /#app -->
+
+    <!-- ═══════════ REDIRECT URL SUCCESS MODAL ═══════════ -->
+    <div class="modal-backdrop" id="redirectUrlModalBackdrop">
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="redirectModalTitle"
+        style="max-width: 480px"
+      >
+        <div class="modal-header">
+          <div class="modal-title">
+            <i class="fa-solid fa-link" style="color: var(--success)"></i>
+            <span id="redirectModalTitle">Environment Created Successfully</span>
+          </div>
+          <button
+            class="modal-close"
+            id="closeRedirectModalBtn"
+            aria-label="Close"
+          >
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <div style="margin-bottom: 16px">
+            <p style="color: var(--text-secondary); margin-bottom: 8px; font-size: 13px">
+              Use this URL to configure Wrike authentication:
+            </p>
+            <div class="redirect-url-box" style="position: relative">
+              <div class="redirect-url-text" id="successRedirectUrl" style="margin-right: 36px"></div>
+              <button
+                class="icon-btn"
+                id="copySuccessUrlIcon"
+                title="Copy URL"
+                style="position: absolute; right: 12px; top: 12px; cursor: pointer"
+              >
+                <i class="fa-solid fa-copy"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer" style="justify-content: space-between">
+          <div style="color: var(--text-muted); font-size: 13px">
+            Close in <strong id="countdownTimer">8</strong>s
+          </div>
+          <button class="btn btn-primary" id="closeRedirectModalBtnFooter">
+            <i class="fa-solid fa-check"></i> Done
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- ═══════════ MODAL ═══════════ -->
     <div class="modal-backdrop" id="envModalBackdrop">
@@ -1807,15 +1889,17 @@
 
             <hr class="form-divider" />
 
-            <div class="form-row-label">Redirect URL</div>
-            <div id="redirectUrlSection" style="display: none;">
-              <div class="redirect-url-box">
-                <div class="redirect-url-text" id="redirectUrlDisplay"></div>
-                <i class="fa-solid fa-copy" id="copyRedirectUrlIcon"></i>
+            <div id="redirectUrlContainer" style="display: none;">
+              <div class="form-row-label">Redirect URL</div>
+              <div id="redirectUrlSection" style="display: none;">
+                <div class="redirect-url-box">
+                  <div class="redirect-url-text" id="redirectUrlDisplay"></div>
+                  <i class="fa-solid fa-copy" id="copyRedirectUrlIcon"></i>
+                </div>
               </div>
-            </div>
-            <div id="noEnvironmentNotice" style="padding: 12px; background: var(--bg-surface); border-radius: var(--radius-sm); color: var(--text-muted); font-size: 13px;">
-              <em>Save the environment first to generate the redirect URL</em>
+              <div id="noEnvironmentNotice" style="padding: 12px; background: var(--bg-surface); border-radius: var(--radius-sm); color: var(--text-muted); font-size: 13px;">
+                <em>Save the environment first to generate the redirect URL</em>
+              </div>
             </div>
           </form>
         </div>
@@ -2092,6 +2176,14 @@
               escHtml(env.environment_name) +
               "</strong></td>" +
               "<td>" +
+              '<div class="action-cell">' +
+              '<code style="font-size: 11px; color: var(--text-muted);">' + escHtml(env.id) + '</code>' +
+              '<button class="icon-btn copy-id-btn" data-id="' + env.id + '" title="Copy ID">' +
+              '<i class="fa-solid fa-copy"></i>' +
+              "</button>" +
+              "</div>" +
+              "</td>" +
+              "<td>" +
               escHtml(env.client_id) +
               "</td>" +
               "<td>" +
@@ -2127,7 +2219,10 @@
           pageLength: 10,
           lengthMenu: [5, 10, 25, 50],
           order: [],
-          columnDefs: [{ targets: 5, orderable: false, searchable: false }],
+          columnDefs: [
+            { targets: 1, orderable: false, searchable: false },
+            { targets: 6, orderable: false, searchable: false }
+          ],
           language: {
             emptyTable: "No environments found",
             zeroRecords: "No matching environments",
@@ -2157,7 +2252,7 @@
 
         var recent = environments.slice(0, 5);
         var html =
-          '<table class="dt"><thead><tr><th>Name</th><th>Client ID</th><th>Created</th><th>Status</th><th></th></tr></thead><tbody>';
+          '<table class="dt"><thead><tr><th>Name</th><th>Env ID</th><th>Client ID</th><th>Created</th><th>Status</th><th></th></tr></thead><tbody>';
 
         recent.forEach(function (env) {
           console.log(env)
@@ -2170,6 +2265,14 @@
             "<td><strong>" +
             escHtml(env.environment_name) +
             "</strong></td>" +
+            "<td>" +
+            '<div class="action-cell">' +
+            '<code style="font-size: 11px; color: var(--text-muted);">' + escHtml(env.id) + '</code>' +
+            '<button class="icon-btn copy-id-btn" data-id="' + env.id + '" title="Copy ID" style="margin-left: 4px;">' +
+            '<i class="fa-solid fa-copy"></i>' +
+            "</button>" +
+            "</div>" +
+            "</td>" +
             "<td>" +
             mask(env.client_id) +
             "</td>" +
@@ -2198,8 +2301,7 @@
         $("#envForm")[0].reset();
         $("#envName").prop("disabled", false);
         $("#isActive").prop("checked", true);
-        $("#redirectUrlSection").hide();
-        $("#noEnvironmentNotice").show();
+        $("#redirectUrlContainer").hide();
         $("#envModalBackdrop").addClass("show");
         setTimeout(function () {
           $("#envName").focus();
@@ -2220,7 +2322,10 @@
         $("#accountId").val(env.account_id);
         $("#isActive").prop("checked", env.is_active);
         
-        // Update redirect URL display
+        // Show redirect URL section for edit modal
+        $("#redirectUrlContainer").show();
+        
+        // Update redirect URL display for edit modal
         if (wrikeRedirectUrl && id) {
           const redirectUrl = wrikeRedirectUrl + "?environmentid=" + id;
           $("#redirectUrlDisplay").text(redirectUrl);
@@ -2242,11 +2347,46 @@
         editingId = null;
       }
 
+      /* ── Redirect URL success modal ─────────────────────────── */
+      function showRedirectUrlModal(url) {
+        $("#successRedirectUrl").text(url);
+        $("#redirectUrlModalBackdrop").addClass("show");
+        
+        // Start countdown timer
+        let countdownSeconds = 8;
+        $("#countdownTimer").text(countdownSeconds);
+        
+        const countdownInterval = setInterval(function () {
+          countdownSeconds--;
+          $("#countdownTimer").text(countdownSeconds);
+          
+          if (countdownSeconds <= 0) {
+            clearInterval(countdownInterval);
+            closeRedirectUrlModal();
+          }
+        }, 1000);
+        
+        // Store interval ID in case we close early
+        $("#redirectUrlModalBackdrop").data("countdownInterval", countdownInterval);
+      }
+
+      function closeRedirectUrlModal() {
+        const interval = $("#redirectUrlModalBackdrop").data("countdownInterval");
+        if (interval) clearInterval(interval);
+        $("#redirectUrlModalBackdrop").removeClass("show");
+      }
+
       /* ── Modal button events ────────────────────────────────── */
       $("#addEnvBtn").on("click", openAddModal);
       $("#closeModalBtn, #cancelModalBtn").on("click", closeModal);
       $("#envModalBackdrop").on("click", function (e) {
         if (e.target === this) closeModal();
+      });
+
+      /* ── Redirect URL modal button events ───────────────────── */
+      $("#closeRedirectModalBtn, #closeRedirectModalBtnFooter").on("click", closeRedirectUrlModal);
+      $("#redirectUrlModalBackdrop").on("click", function (e) {
+        if (e.target === this) closeRedirectUrlModal();
       });
 
       /* Close on Escape */
@@ -2263,8 +2403,10 @@
         confirmDelete($(this).data("id"), $(this).data("name"));
       });
 
-      /* ── Copy redirect URL ──────────────────────────────────── */
-      $("#copyRedirectUrlIcon").on("click", function () {
+      /* ── Copy redirect URL (from edit modal) ──────────────────── */
+      $("#copyRedirectUrlIcon").on("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
         const urlText = $("#redirectUrlDisplay").text();
         if (urlText) {
           const $icon = $(this);
@@ -2277,18 +2419,98 @@
             }, 1500);
           };
           
-          navigator.clipboard.writeText(urlText).then(function () {
-            copySuccess();
-          }).catch(function () {
+          navigator.clipboard.writeText(urlText)
+            .then(function () {
+              copySuccess();
+            })
+            .catch(function () {
+              // Fallback for older browsers
+              const $temp = $("<input>");
+              $("body").append($temp);
+              $temp.val(urlText).select();
+              document.execCommand("copy");
+              $temp.remove();
+              copySuccess();
+            });
+        }
+      });
+
+      /* ── Copy success URL button ───────────────────────────── */
+      $("#copySuccessUrlIcon").on("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const urlText = $("#successRedirectUrl").text();
+        if (urlText) {
+          const $btn = $(this);
+          const copySuccess = function () {
+            // Change icon to checkmark
+            const $icon = $btn.find("i");
+            $icon.removeClass("fa-copy").addClass("fa-check");
+            $btn.addClass("copied");
+            // Revert after 1.5 seconds
+            setTimeout(function () {
+              $icon.removeClass("fa-check").addClass("fa-copy");
+              $btn.removeClass("copied");
+            }, 1500);
+          };
+          
+          navigator.clipboard.writeText(urlText)
+            .then(function () {
+              copySuccess();
+            })
+            .catch(function () {
+              // Fallback for older browsers
+              const $temp = $("<input>");
+              $("body").append($temp);
+              $temp.val(urlText).select();
+              document.execCommand("copy");
+              $temp.remove();
+              copySuccess();
+            });
+        }
+      });
+
+      /* ── Copy ID button ─────────────────────────────────────── */
+      $(document).on("click", ".copy-id-btn", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const $btn = $(this);
+        const idValue = $btn.data("id");
+        
+        if (!idValue) return;
+        
+        navigator.clipboard.writeText(idValue)
+          .then(function () {
+            // Change icon to checkmark
+            const $icon = $btn.find("i");
+            $icon.removeClass("fa-copy").addClass("fa-check");
+            $btn.addClass("copied");
+            
+            // Revert after 1.5 seconds
+            setTimeout(function () {
+              $icon.removeClass("fa-check").addClass("fa-copy");
+              $btn.removeClass("copied");
+            }, 1500);
+          })
+          .catch(function (err) {
             // Fallback for older browsers
             const $temp = $("<input>");
             $("body").append($temp);
-            $temp.val(urlText).select();
+            $temp.val(idValue).select();
             document.execCommand("copy");
             $temp.remove();
-            copySuccess();
+            
+            // Change icon to checkmark
+            const $icon = $btn.find("i");
+            $icon.removeClass("fa-copy").addClass("fa-check");
+            $btn.addClass("copied");
+            
+            // Revert after 1.5 seconds
+            setTimeout(function () {
+              $icon.removeClass("fa-check").addClass("fa-copy");
+              $btn.removeClass("copied");
+            }, 1500);
           });
-        }
       });
 
       /* ── Save environment ───────────────────────────────────── */
@@ -2344,13 +2566,23 @@
           if (data.success === false)
             throw new Error(data.message || "Save failed");
 
-          toast(
-            "Environment " +
-              (editingId ? "updated" : "created") +
-              " successfully",
-            "success",
-          );
           closeModal();
+          
+          // Show redirect URL modal after creation (not on edit)
+          if (!editingId && wrikeRedirectUrl && data.data?.id) {
+            const redirectUrl = wrikeRedirectUrl + "?environmentid=" + data.data.id;
+            setTimeout(function () {
+              showRedirectUrlModal(redirectUrl);
+            }, 300);
+          } else {
+            toast(
+              "Environment " +
+                (editingId ? "updated" : "created") +
+                " successfully",
+              "success",
+            );
+          }
+          
           await loadEnvironments();
         } catch (err) {
           toast(err.message || "An error occurred", "error");
