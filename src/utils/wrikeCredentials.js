@@ -22,6 +22,7 @@ export const getWrikeCredentials = async (environmentName) => {
       clientSecret: credential.client_secret
         ? decryptField(credential.client_secret)
         : null,
+      accountId: credential.account_id || null,
     };
   } catch (err) {
     throw err;

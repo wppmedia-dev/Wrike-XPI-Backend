@@ -14,6 +14,7 @@ export const UpdateSchema = {
         environment_name: { type: "string" },
         client_id: { type: "string" },
         client_secret: { type: "string" },
+        account_id: { type: "string" },
       },
     },
   },

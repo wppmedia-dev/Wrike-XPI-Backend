@@ -5,7 +5,13 @@ import { WrikeCredentials } from "../../../../controllers";
 export const Save = (body) => {
   return new Promise(async (resolve, reject) => {
     try {
-      const { profile_id, environment_name, client_id, client_secret } = body;
+      const {
+        profile_id,
+        environment_name,
+        client_id,
+        client_secret,
+        account_id,
+      } = body;
 
       if (!environment_name)
         return reject({
@@ -30,6 +36,7 @@ export const Save = (body) => {
         environment_name,
         client_id: client_id ? encryptField(client_id) : null,
         client_secret: client_secret ? encryptField(client_secret) : null,
+        account_id: account_id || null,
       });
 
       await syncWrikeCredentialsFromDB();
@@ -51,5 +58,6 @@ const formatCredential = (cred) => ({
   environment_name: cred.environment_name,
   client_id: cred.client_id ? decryptField(cred.client_id) : null,
   client_secret: cred.client_secret ? decryptField(cred.client_secret) : null,
+  account_id: cred.account_id || null,
   is_active: cred.is_active,
 });

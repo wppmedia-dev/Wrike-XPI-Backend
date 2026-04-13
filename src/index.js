@@ -158,8 +158,9 @@ import {
 
     let redirectUrl = `${WRIKE_LOGIN_ENDPOINT}/authorize/v4?client_id=${WRIKE_CLIENT_ID}&response_type=code&state=${state}&redirect_uri=${WRIKE_REDIRECT_URL}`;
 
-    if (accountId) {
-      redirectUrl += `&accountId=${accountId}`;
+    const accountIdToUse = selectedCred?.accountId || accountId;
+    if (accountIdToUse) {
+      redirectUrl += `&accountId=${accountIdToUse}`;
     }
 
     res.send({ success: true, redirectUrl });
@@ -207,7 +208,8 @@ import {
 
       let redirectUrl = `${WRIKE_LOGIN_ENDPOINT}/authorize/v4?client_id=${WRIKE_CLIENT_ID}&response_type=code&state=${state}&redirect_uri=${WRIKE_REDIRECT_URL}`;
 
-      if (accountId) redirectUrl += `&accountId=${accountId}`;
+      const accountIdToUse = selectedCred?.accountId || accountId;
+      if (accountIdToUse) redirectUrl += `&accountId=${accountIdToUse}`;
 
       return res.redirect(redirectUrl);
     }
@@ -226,7 +228,8 @@ import {
 
     let redirectUrl = `${WRIKE_LOGIN_ENDPOINT}/authorize/v4?client_id=${WRIKE_CLIENT_ID}&response_type=code&state=${state}&redirect_uri=${WRIKE_REDIRECT_URL}`;
 
-    if (accountId) redirectUrl += `&accountId=${accountId}`;
+    const accountIdToUse = selectedCred?.accountId || accountId;
+    if (accountIdToUse) redirectUrl += `&accountId=${accountIdToUse}`;
 
     const environmentOptionsHtml = Object.keys(allCreds || {})
       .map(

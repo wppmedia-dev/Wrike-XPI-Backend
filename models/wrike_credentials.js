@@ -48,6 +48,11 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
         comment: "Encrypted Client Secret",
       },
+      account_id: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+        comment: "Wrike Account ID",
+      },
       is_active: {
         type: DataTypes.BOOLEAN,
         defaultValue: true,

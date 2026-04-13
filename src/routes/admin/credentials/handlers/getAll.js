@@ -11,6 +11,7 @@ export const GetAll = () => {
         environment_name: cred.environment_name,
         client_id: cred.client_id ? decryptField(cred.client_id) : null,
         client_secret: cred.client_secret || null,
+        account_id: cred.account_id || null,
         is_active: cred.is_active,
         created_at: cred.created_at,
         updated_at: cred.updated_at,

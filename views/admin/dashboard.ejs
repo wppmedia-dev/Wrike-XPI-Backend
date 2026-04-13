@@ -1305,6 +1305,39 @@
         transform: translateX(18px);
       }
 
+      /* ─── Redirect URL Box ────────────────────────────────── */
+      .redirect-url-box {
+        position: relative;
+        padding: 12px;
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        margin-bottom: 16px;
+      }
+
+      .redirect-url-text {
+        font-family: "Courier New", monospace;
+        font-size: 12px;
+        color: var(--text-primary);
+        word-break: break-all;
+        user-select: all;
+        padding-right: 36px;
+      }
+
+      #copyRedirectUrlIcon {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        cursor: pointer;
+        color: var(--text-muted);
+        font-size: 16px;
+        transition: var(--transition);
+      }
+
+      #copyRedirectUrlIcon:hover {
+        color: var(--accent);
+      }
+
       /* ─── NProgress & SweetAlert2 light theme ─────────────── */
       #nprogress .bar {
         background: var(--accent) !important;
@@ -1707,7 +1740,7 @@
           </button>
         </div>
 
-        <div class="modal-body">
+        <div class="modal-body" style="padding-bottom: 0px !important;">
           <form id="envForm" autocomplete="off" onsubmit="return false;">
             <div class="form-group">
               <label class="form-label" for="envName"
@@ -1747,6 +1780,15 @@
                 placeholder="Enter Client Secret"
               />
             </div>
+            <div class="form-group">
+              <label class="form-label" for="accountId">Account ID</label>
+              <input
+                class="form-control"
+                type="text"
+                id="accountId"
+                placeholder="Enter Wrike Account ID"
+              />
+            </div>
 
             <hr class="form-divider" />
 
@@ -1761,6 +1803,19 @@
                 <input type="checkbox" id="isActive" checked />
                 <div class="toggle-track"></div>
               </label>
+            </div>
+
+            <hr class="form-divider" />
+
+            <div class="form-row-label">Redirect URL</div>
+            <div id="redirectUrlSection" style="display: none;">
+              <div class="redirect-url-box">
+                <div class="redirect-url-text" id="redirectUrlDisplay"></div>
+                <i class="fa-solid fa-copy" id="copyRedirectUrlIcon"></i>
+              </div>
+            </div>
+            <div id="noEnvironmentNotice" style="padding: 12px; background: var(--bg-surface); border-radius: var(--radius-sm); color: var(--text-muted); font-size: 13px;">
+              <em>Save the environment first to generate the redirect URL</em>
             </div>
           </form>
         </div>
@@ -1818,6 +1873,7 @@
       let environments = [];
       let editingId = null;
       let envDT = null;
+      const wrikeRedirectUrl = "<%= wrikeRedirectUrl %>";
 
       /* ── Toast helper ───────────────────────────────────────── */
       function toast(msg, type) {
@@ -1924,6 +1980,7 @@
                 environment_name: c.environment_name || "",
                 client_id: c.client_id || "",
                 client_secret: c.client_secret || "",
+                account_id: c.account_id || "",
                 is_active: !!c.is_active,
                 created_at: c.created_at,
                 updated_at: c.updated_at
@@ -2141,6 +2198,8 @@
         $("#envForm")[0].reset();
         $("#envName").prop("disabled", false);
         $("#isActive").prop("checked", true);
+        $("#redirectUrlSection").hide();
+        $("#noEnvironmentNotice").show();
         $("#envModalBackdrop").addClass("show");
         setTimeout(function () {
           $("#envName").focus();
@@ -2158,7 +2217,20 @@
         $("#envName").val(env.environment_name).prop("disabled", false);
         $("#clientId").val(env.client_id);
         $("#clientSecret").val(env.client_secret);
+        $("#accountId").val(env.account_id);
         $("#isActive").prop("checked", env.is_active);
+        
+        // Update redirect URL display
+        if (wrikeRedirectUrl && id) {
+          const redirectUrl = wrikeRedirectUrl + "?environmentid=" + id;
+          $("#redirectUrlDisplay").text(redirectUrl);
+          $("#redirectUrlSection").show();
+          $("#noEnvironmentNotice").hide();
+        } else {
+          $("#redirectUrlSection").hide();
+          $("#noEnvironmentNotice").show();
+        }
+        
         $("#envModalBackdrop").addClass("show");
         setTimeout(function () {
           $("#clientId").focus();
@@ -2191,11 +2263,40 @@
         confirmDelete($(this).data("id"), $(this).data("name"));
       });
 
+      /* ── Copy redirect URL ──────────────────────────────────── */
+      $("#copyRedirectUrlIcon").on("click", function () {
+        const urlText = $("#redirectUrlDisplay").text();
+        if (urlText) {
+          const $icon = $(this);
+          const copySuccess = function () {
+            // Change icon to checkmark
+            $icon.removeClass("fa-copy").addClass("fa-check");
+            // Revert after 1.5 seconds
+            setTimeout(function () {
+              $icon.removeClass("fa-check").addClass("fa-copy");
+            }, 1500);
+          };
+          
+          navigator.clipboard.writeText(urlText).then(function () {
+            copySuccess();
+          }).catch(function () {
+            // Fallback for older browsers
+            const $temp = $("<input>");
+            $("body").append($temp);
+            $temp.val(urlText).select();
+            document.execCommand("copy");
+            $temp.remove();
+            copySuccess();
+          });
+        }
+      });
+
       /* ── Save environment ───────────────────────────────────── */
       $("#saveEnvBtn").on("click", async function () {
         var envName = $("#envName").val().trim();
         var clientId = $("#clientId").val().trim();
         var clientSecret = $("#clientSecret").val().trim();
+        var accountId = $("#accountId").val().trim();
         var isActive = $("#isActive").is(":checked");
 
         if (!envName) {
@@ -2221,6 +2322,7 @@
             environment_name: envName,
             client_id: clientId || undefined,
             client_secret: clientSecret || undefined,
+            account_id: accountId || undefined,
             is_active: isActive,
           };
 

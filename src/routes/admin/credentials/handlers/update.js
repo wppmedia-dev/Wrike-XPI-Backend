@@ -5,7 +5,7 @@ import { WrikeCredentials } from "../../../../controllers";
 export const Update = (profile_id, { id }, body) => {
   return new Promise(async (resolve, reject) => {
     try {
-      const { environment_name, client_id, client_secret } = body;
+      const { environment_name, client_id, client_secret, account_id } = body;
 
       if (!environment_name)
         return reject({
@@ -30,9 +30,10 @@ export const Update = (profile_id, { id }, body) => {
           message: "Environment name already exists",
         });
 
-      const updates = { environment_name };
+      const updates = { environment_name, account_id: account_id || null };
       if (client_id) updates.client_id = encryptField(client_id);
-      if (client_secret) updates.client_secret = encryptField(client_secret);
+      if (client_secret && client_secret != existing?.client_secret)
+        updates.client_secret = encryptField(client_secret);
 
       const updated = await WrikeCredentials.Update(profile_id, id, updates);
 

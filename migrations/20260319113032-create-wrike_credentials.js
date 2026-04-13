@@ -24,6 +24,11 @@ module.exports = {
         allowNull: true,
         comment: "Encrypted Client Secret",
       },
+      account_id: {
+        type: Sequelize.STRING(255),
+        allowNull: true,
+        comment: "Wrike Account ID",
+      },
       is_active: {
         type: Sequelize.BOOLEAN,
         defaultValue: true,
