@@ -11,6 +11,13 @@ export const Save = (body) => {
         client_id,
         client_secret,
         account_id,
+        xpi_api_modules_datahub_id,
+        xpi_api_services_datahub_id,
+        xpi_entity_datahub_id,
+        xpi_field_mapping_datahub_id,
+        xpi_request_form_field_mapping_datahub_id,
+        xpi_request_form_mapping_datahub_id,
+        xpi_space_name_datahub_id,
       } = body;
 
       if (!environment_name)
@@ -37,6 +44,15 @@ export const Save = (body) => {
         client_id: client_id ? encryptField(client_id) : null,
         client_secret: client_secret ? encryptField(client_secret) : null,
         account_id: account_id || null,
+        xpi_api_modules_datahub_id: xpi_api_modules_datahub_id || null,
+        xpi_api_services_datahub_id: xpi_api_services_datahub_id || null,
+        xpi_entity_datahub_id: xpi_entity_datahub_id || null,
+        xpi_field_mapping_datahub_id: xpi_field_mapping_datahub_id || null,
+        xpi_request_form_field_mapping_datahub_id:
+          xpi_request_form_field_mapping_datahub_id || null,
+        xpi_request_form_mapping_datahub_id:
+          xpi_request_form_mapping_datahub_id || null,
+        xpi_space_name_datahub_id: xpi_space_name_datahub_id || null,
       });
 
       await syncWrikeCredentialsFromDB();
@@ -59,5 +75,14 @@ const formatCredential = (cred) => ({
   client_id: cred.client_id ? decryptField(cred.client_id) : null,
   client_secret: cred.client_secret ? decryptField(cred.client_secret) : null,
   account_id: cred.account_id || null,
+  xpi_api_modules_datahub_id: cred.xpi_api_modules_datahub_id || null,
+  xpi_api_services_datahub_id: cred.xpi_api_services_datahub_id || null,
+  xpi_entity_datahub_id: cred.xpi_entity_datahub_id || null,
+  xpi_field_mapping_datahub_id: cred.xpi_field_mapping_datahub_id || null,
+  xpi_request_form_field_mapping_datahub_id:
+    cred.xpi_request_form_field_mapping_datahub_id || null,
+  xpi_request_form_mapping_datahub_id:
+    cred.xpi_request_form_mapping_datahub_id || null,
+  xpi_space_name_datahub_id: cred.xpi_space_name_datahub_id || null,
   is_active: cred.is_active,
 });

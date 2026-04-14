@@ -5,7 +5,19 @@ import { WrikeCredentials } from "../../../../controllers";
 export const Update = (profile_id, { id }, body) => {
   return new Promise(async (resolve, reject) => {
     try {
-      const { environment_name, client_id, client_secret, account_id } = body;
+      const {
+        environment_name,
+        client_id,
+        client_secret,
+        account_id,
+        xpi_api_modules_datahub_id,
+        xpi_api_services_datahub_id,
+        xpi_entity_datahub_id,
+        xpi_field_mapping_datahub_id,
+        xpi_request_form_field_mapping_datahub_id,
+        xpi_request_form_mapping_datahub_id,
+        xpi_space_name_datahub_id,
+      } = body;
 
       if (!environment_name)
         return reject({
@@ -30,7 +42,19 @@ export const Update = (profile_id, { id }, body) => {
           message: "Environment name already exists",
         });
 
-      const updates = { environment_name, account_id: account_id || null };
+      const updates = {
+        environment_name,
+        account_id: account_id || null,
+        xpi_api_modules_datahub_id: xpi_api_modules_datahub_id || null,
+        xpi_api_services_datahub_id: xpi_api_services_datahub_id || null,
+        xpi_entity_datahub_id: xpi_entity_datahub_id || null,
+        xpi_field_mapping_datahub_id: xpi_field_mapping_datahub_id || null,
+        xpi_request_form_field_mapping_datahub_id:
+          xpi_request_form_field_mapping_datahub_id || null,
+        xpi_request_form_mapping_datahub_id:
+          xpi_request_form_mapping_datahub_id || null,
+        xpi_space_name_datahub_id: xpi_space_name_datahub_id || null,
+      };
       if (client_id) updates.client_id = encryptField(client_id);
       if (client_secret && client_secret != existing?.client_secret)
         updates.client_secret = encryptField(client_secret);

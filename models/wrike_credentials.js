@@ -53,6 +53,41 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
         comment: "Wrike Account ID",
       },
+      xpi_api_modules_datahub_id: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+        comment: "XPI API Modules Datahub ID",
+      },
+      xpi_api_services_datahub_id: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+        comment: "XPI API Services Datahub ID",
+      },
+      xpi_entity_datahub_id: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+        comment: "XPI Entity Datahub ID",
+      },
+      xpi_field_mapping_datahub_id: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+        comment: "XPI Field Mapping Datahub ID",
+      },
+      xpi_request_form_field_mapping_datahub_id: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+        comment: "XPI Request Form Field Mapping Datahub ID",
+      },
+      xpi_request_form_mapping_datahub_id: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+        comment: "XPI Request Form Mapping Datahub ID",
+      },
+      xpi_space_name_datahub_id: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+        comment: "XPI Space Name Datahub ID",
+      },
       is_active: {
         type: DataTypes.BOOLEAN,
         defaultValue: true,
