@@ -14,7 +14,7 @@ export const taskRoute = (fastify, opts, done) => {
       const result = await GetTask(
         req?.wrikeToken,
         { ...req.params, ...req.query },
-        fastify
+        req?.environmentName,
       );
 
       reply.code(result.statusCode || 200).send({
@@ -63,7 +63,7 @@ export const taskRoute = (fastify, opts, done) => {
       const result = await UpdateTask(
         req?.wrikeToken,
         { formFields: req.body, ...req.params },
-        fastify
+        req?.environmentName,
       );
 
       reply.code(result.statusCode || 200).send({
@@ -87,7 +87,7 @@ export const taskRoute = (fastify, opts, done) => {
       const result = await DeleteTask(
         req?.wrikeToken,
         { ...req.params },
-        fastify
+        req?.environmentName,
       );
 
       reply.code(result.statusCode || 200).send({

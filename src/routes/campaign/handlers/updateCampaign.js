@@ -1,6 +1,6 @@
 import { getDatahubCustomFields, updateFolder } from "../../../utils/wrike";
 
-export const UpdateCampaign = (wrikeToken, params, fastify) => {
+export const UpdateCampaign = (wrikeToken, params, environmentName) => {
   return new Promise(async (resolve, reject) => {
     try {
       if (!wrikeToken)
@@ -18,7 +18,11 @@ export const UpdateCampaign = (wrikeToken, params, fastify) => {
       // if (Object.keys(datahubCustomFieldsData).length === 0) {
       const datahubCustomFieldsData = await getDatahubCustomFields(
         wrikeToken,
-        process.env.DATAHUB_CUSTOM_FIELDS_ID
+        null,
+        false,
+        true,
+        0,
+        environmentName,
       );
       // }
 
@@ -67,7 +71,7 @@ export const UpdateCampaign = (wrikeToken, params, fastify) => {
         folderId,
         folderFieldsUpdateData,
         folderMetadataUpdateData,
-        folderCFUpdateData
+        folderCFUpdateData,
       );
 
       // Sending submit request form error response
@@ -88,17 +92,17 @@ export const UpdateCampaign = (wrikeToken, params, fastify) => {
           case "Wrike API Metadata Field":
             cfValue =
               updatedFolderData?.data[0]?.metadata?.find(
-                (field) => field.key === value?.cfId
+                (field) => field.key === value?.cfId,
               )?.value ?? "";
             break;
           case "Wrike Custom Field":
             cfValue =
               updatedFolderData?.data[0]?.customFields?.find(
-                (field) => field.id === value.cfId
+                (field) => field.id === value.cfId,
               )?.value ?? "";
             break;
           default:
-            fieldValue = "";
+            cfValue = "";
         }
 
         // if (value.isReadable && value.isCampaignField)

@@ -4,7 +4,7 @@ import {
   getDatahubRecords,
 } from "../../../utils/wrike";
 
-export const GetMasterDataValue = (wrikeToken, params, fastify) => {
+export const GetMasterDataValue = (wrikeToken, params, environmentName) => {
   return new Promise(async (resolve, reject) => {
     try {
       if (!wrikeToken) {
@@ -28,8 +28,11 @@ export const GetMasterDataValue = (wrikeToken, params, fastify) => {
       // Get mapping configuration for this customfield
       const datahubCustomFieldsData = await getDatahubCustomFields(
         wrikeToken,
-        process.env.DATAHUB_CUSTOM_FIELDS_ID,
-        true
+        null,
+        true,
+        true,
+        0,
+        environmentName,
       );
 
       if (!datahubCustomFieldsData) {
@@ -55,7 +58,7 @@ export const GetMasterDataValue = (wrikeToken, params, fastify) => {
 
       const customFieldData = await getCustomFields(
         wrikeToken,
-        datahubCustomFieldsData[masterSlug]["cfId"]
+        datahubCustomFieldsData[masterSlug]["cfId"],
       );
 
       if (!customFieldData?.data || customFieldData?.data.length === 0)
@@ -84,7 +87,7 @@ export const GetMasterDataValue = (wrikeToken, params, fastify) => {
                 : "",
             pageToken: nextPageToken ?? null,
             useCache: false,
-          }
+          },
         );
 
         if (!datahubRecords?.data || datahubRecords.data.length === 0)
@@ -118,7 +121,7 @@ export const GetMasterDataValue = (wrikeToken, params, fastify) => {
           outputValues = "";
           outputValues = customFieldData?.data[0]?.settings?.values?.find(
             (item) =>
-              item?.trim()?.toLowerCase() === recordId?.trim()?.toLowerCase()
+              item?.trim()?.toLowerCase() === recordId?.trim()?.toLowerCase(),
           );
 
           if (!outputValues) {

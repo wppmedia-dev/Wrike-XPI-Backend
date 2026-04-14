@@ -17,7 +17,7 @@ const odataToCustomOp = {
 
 let datahubCustomFieldsData = {};
 
-export const GetAllTasks = (wrikeToken, params, fastify) => {
+export const GetAllTasks = (wrikeToken, params, environmentName) => {
   return new Promise(async (resolve, reject) => {
     try {
       if (!wrikeToken)
@@ -60,7 +60,11 @@ export const GetAllTasks = (wrikeToken, params, fastify) => {
         // if (Object.keys(datahubCustomFieldsData).length === 0)
         datahubCustomFieldsData = await getDatahubCustomFields(
           wrikeToken,
-          process.env.DATAHUB_CUSTOM_FIELDS_ID
+          null,
+          false,
+          true,
+          0,
+          environmentName,
         );
 
         customFieldsParam = extractFilters(filters);
@@ -105,7 +109,7 @@ export const GetAllTasks = (wrikeToken, params, fastify) => {
         if (task?.scope == "RbTask") return;
 
         const taskCustomFieldValues = Object.entries(
-          datahubCustomFieldsData
+          datahubCustomFieldsData,
         ).reduce((acc, [key, value]) => {
           if (!value.isReadable || !value.isTaskField) return acc;
 
@@ -282,8 +286,8 @@ function extractFilters(node, result = []) {
         getValues(
           node?.value?.method,
           node.value.parameters[0],
-          node.value.parameters[1]
-        )
+          node.value.parameters[1],
+        ),
       );
       return result;
     } else

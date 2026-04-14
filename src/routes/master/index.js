@@ -22,7 +22,7 @@ export const masterRoute = (fastify, opts, done) => {
         const result = await CreateMasterDataRecord(
           req?.wrikeToken,
           { masterSlug: req.params?.masterSlug, reqBody: req.body },
-          fastify
+          req?.environmentName,
         );
 
         reply.code(result.statusCode || 200).send({
@@ -40,7 +40,7 @@ export const masterRoute = (fastify, opts, done) => {
             "Fatal error: Unexpected error occurred and service is unable to complete the request.",
         });
       }
-    }
+    },
   );
 
   // Update Dominus API
@@ -52,7 +52,7 @@ export const masterRoute = (fastify, opts, done) => {
         const result = await UpdateMasterDataRecord(
           req?.wrikeToken,
           { ...req.params, reqBody: req.body },
-          fastify
+          req?.environmentName,
         );
 
         reply.code(result.statusCode || 200).send({
@@ -70,7 +70,7 @@ export const masterRoute = (fastify, opts, done) => {
             "Fatal error: Unexpected error occurred and service is unable to complete the request.",
         });
       }
-    }
+    },
   );
 
   // Delete Dominus API
@@ -82,7 +82,7 @@ export const masterRoute = (fastify, opts, done) => {
         const result = await DeleteMasterDataRecord(
           req?.wrikeToken,
           { ...req.params, reqBody: req.body },
-          fastify
+          req?.environmentName,
         );
 
         reply.code(result.statusCode || 200).send({
@@ -100,7 +100,7 @@ export const masterRoute = (fastify, opts, done) => {
             "Fatal error: Unexpected error occurred and service is unable to complete the request.",
         });
       }
-    }
+    },
   );
 
   // Datahub records
@@ -112,7 +112,7 @@ export const masterRoute = (fastify, opts, done) => {
         const result = await GetMasterDataRecord(
           req?.wrikeToken,
           { ...req.params },
-          fastify
+          req?.environmentName,
         );
 
         reply.code(result.statusCode || 200).send({
@@ -130,7 +130,7 @@ export const masterRoute = (fastify, opts, done) => {
             "Fatal error: Unexpected error occurred and service is unable to complete the request.",
         });
       }
-    }
+    },
   );
 
   fastify.get(
@@ -141,7 +141,7 @@ export const masterRoute = (fastify, opts, done) => {
         const result = await GetMasterDataRecord(
           req?.wrikeToken,
           { ...req.params, ...req.query },
-          fastify
+          req?.environmentName,
         );
 
         reply.code(result.statusCode || 200).send({
@@ -160,7 +160,7 @@ export const masterRoute = (fastify, opts, done) => {
             "Fatal error: Unexpected error occurred and service is unable to complete the request.",
         });
       }
-    }
+    },
   );
 
   // Fetch Values
@@ -172,7 +172,7 @@ export const masterRoute = (fastify, opts, done) => {
         const result = await GetMasterDataValue(
           req?.wrikeToken,
           { ...req.params, ...req.query },
-          fastify
+          req?.environmentName,
         );
 
         reply.code(result.statusCode || 200).send({
@@ -190,7 +190,7 @@ export const masterRoute = (fastify, opts, done) => {
             "Fatal error: Unexpected error occurred and service is unable to complete the request.",
         });
       }
-    }
+    },
   );
 
   fastify.get(
@@ -201,7 +201,7 @@ export const masterRoute = (fastify, opts, done) => {
         const result = await GetMasterDataValue(
           req?.wrikeToken,
           { ...req.params },
-          fastify
+          fastify,
         );
 
         reply.code(result.statusCode || 200).send({
@@ -220,7 +220,7 @@ export const masterRoute = (fastify, opts, done) => {
             "Fatal error: Unexpected error occurred and service is unable to complete the request.",
         });
       }
-    }
+    },
   );
 
   done();

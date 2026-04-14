@@ -5,7 +5,7 @@ import {
 } from "../../../utils/wrike";
 import { translateDatahubRecordId } from "../utils/datahubRecordTranslator";
 
-export const GetCampaign = (wrikeToken, params) => {
+export const GetCampaign = (wrikeToken, params, environmentName) => {
   return new Promise(async (resolve, reject) => {
     try {
       if (!wrikeToken)
@@ -27,7 +27,11 @@ export const GetCampaign = (wrikeToken, params) => {
 
       const datahubCustomFieldsData = await getDatahubCustomFields(
         wrikeToken,
-        process.env.DATAHUB_CUSTOM_FIELDS_ID,
+        null,
+        false,
+        true,
+        0,
+        environmentName,
       );
 
       const wrikeFolderData = await getFolder(wrikeToken, folderId);

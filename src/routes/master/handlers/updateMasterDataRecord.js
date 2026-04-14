@@ -5,7 +5,7 @@ import {
   updateDatahubRecord,
 } from "../../../utils/wrike";
 
-export const UpdateMasterDataRecord = (wrikeToken, params, fastify) => {
+export const UpdateMasterDataRecord = (wrikeToken, params, environmentName) => {
   return new Promise(async (resolve, reject) => {
     try {
       if (!wrikeToken) {
@@ -37,8 +37,11 @@ export const UpdateMasterDataRecord = (wrikeToken, params, fastify) => {
       // Get mapping configuration for this customfield
       const datahubCustomFieldsData = await getDatahubCustomFields(
         wrikeToken,
-        process.env.DATAHUB_CUSTOM_FIELDS_ID,
-        true
+        null,
+        true,
+        true,
+        0,
+        environmentName,
       );
 
       if (!datahubCustomFieldsData) {
@@ -64,7 +67,7 @@ export const UpdateMasterDataRecord = (wrikeToken, params, fastify) => {
 
       const customFieldData = await getCustomFields(
         wrikeToken,
-        datahubCustomFieldsData[masterSlug]["cfId"]
+        datahubCustomFieldsData[masterSlug]["cfId"],
       );
 
       if (!customFieldData?.data || customFieldData?.data.length === 0)
@@ -91,7 +94,7 @@ export const UpdateMasterDataRecord = (wrikeToken, params, fastify) => {
         wrikeToken,
         dataHubDatabaseId,
         recordId,
-        reqBody
+        reqBody,
       );
 
       if (!datahubRecord?.id)

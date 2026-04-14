@@ -147,6 +147,7 @@ export const ValidateToken = async (req, reply, fastify) => {
 
     // Store token for route handlers
     req.wrikeToken = accessToken;
+    req.environmentName = token.environment_name;
   } catch (err) {
     console.error(new Date().toISOString(), err);
     reply.code(401).send({

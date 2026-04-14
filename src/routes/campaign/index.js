@@ -16,7 +16,12 @@ import { DeleteCampaignSchema } from "./schema/deleteCampaign";
 export const campaignRoute = (fastify, opts, done) => {
   fastify.post("/", CreateCampaignSchema, async (req, reply) => {
     try {
-      const result = await CreateCampaign(req?.wrikeToken, req.body, fastify);
+      const result = await CreateCampaign(
+        req?.wrikeToken,
+        req.body,
+        fastify,
+        req?.environmentName,
+      );
 
       reply.code(result.statusCode || 200).send({
         success: true,
@@ -39,7 +44,7 @@ export const campaignRoute = (fastify, opts, done) => {
       const result = await GetCampaign(
         req?.wrikeToken,
         { ...req.params, ...req.query },
-        fastify
+        req?.environmentName,
       );
 
       reply.code(result.statusCode || 200).send({
@@ -63,7 +68,7 @@ export const campaignRoute = (fastify, opts, done) => {
       const result = await GetAllCampaigns(
         req?.wrikeToken,
         { ...req.params, ...req.query },
-        fastify
+        req?.environmentName,
       );
 
       reply.code(result.statusCode || 200).send({
@@ -88,7 +93,7 @@ export const campaignRoute = (fastify, opts, done) => {
       const result = await UpdateCampaign(
         req?.wrikeToken,
         { formFields: req.body, ...req.params },
-        fastify
+        req?.environmentName,
       );
 
       reply.code(result.statusCode || 200).send({
@@ -112,7 +117,7 @@ export const campaignRoute = (fastify, opts, done) => {
       const result = await DeleteCampaign(
         req?.wrikeToken,
         { ...req.params },
-        fastify
+        req?.environmentName,
       );
 
       reply.code(result.statusCode || 200).send({

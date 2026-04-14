@@ -18,7 +18,7 @@ const odataToCustomOp = {
 
 let datahubCustomFieldsData = {};
 
-export const GetAllCampaigns = (wrikeToken, params, fastify) => {
+export const GetAllCampaigns = (wrikeToken, params, environmentName) => {
   return new Promise(async (resolve, reject) => {
     try {
       if (!wrikeToken)
@@ -36,7 +36,11 @@ export const GetAllCampaigns = (wrikeToken, params, fastify) => {
 
       datahubCustomFieldsData = await getDatahubCustomFields(
         wrikeToken,
-        process.env.DATAHUB_CUSTOM_FIELDS_ID,
+        null,
+        false,
+        true,
+        0,
+        environmentName,
       );
 
       if (filterParams) {

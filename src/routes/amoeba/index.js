@@ -8,8 +8,11 @@ export const amoebaRoute = (fastify, opts, done) => {
   // Custom Field endpoint - supports both single value and list
   fastify.all("/:moduleSlug/*", AmoebaSchema, async (req, reply) => {
     try {
-      console.log("Amoeba Request Received:", req.params, req.query, req.body);
-      const result = await AmoebaHandler(req?.wrikeToken, req, fastify);
+      const result = await AmoebaHandler(
+        req?.wrikeToken,
+        req,
+        req?.environmentName,
+      );
 
       reply.code(result.statusCode || 200).send({ success: true, ...result });
     } catch (err) {
@@ -27,7 +30,11 @@ export const amoebaRoute = (fastify, opts, done) => {
 
   fastify.all("/:moduleSlug", AmoebaSchema, async (req, reply) => {
     try {
-      const result = await AmoebaHandler(req?.wrikeToken, req, fastify);
+      const result = await AmoebaHandler(
+        req?.wrikeToken,
+        req,
+        req?.environmentName,
+      );
 
       reply.code(result.statusCode || 200).send({ success: true, ...result });
     } catch (err) {

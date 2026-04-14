@@ -12,6 +12,26 @@ const requiredDatahubRequestFormIds = [
   "Variant Id",
 ];
 
+/**
+ * Get Datahub ID by key for a specific environment
+ * @param {string} environmentName - Environment name (used to fetch from cache)
+ * @param {string} idKey - Key like 'xpiSpaceNameDatahubId', 'xpiEntityDatahubId', etc.
+ * @param {string} envVarKey - Fallback env variable key like 'DATAHUB_SPACE_ID'
+ * @returns {string} Datahub ID or fallback env variable value
+ */
+const getDatahubIdForEnvironment = (environmentName, idKey, envVarKey) => {
+  if (!environmentName) {
+    return process.env[envVarKey];
+  }
+
+  const cred = getCachedWrikeCredentials(environmentName);
+  if (cred && cred[idKey]) {
+    return cred[idKey];
+  }
+
+  return process.env[envVarKey];
+};
+
 export const getWrikeTokens = async ({ code, env, refresh_token }) => {
   try {
     if (!code && !refresh_token)
@@ -247,6 +267,7 @@ export const getSpaceDatahub = async (
   wrikeToken,
   useCache = true,
   cacheTTL = null,
+  environmentName = null,
 ) => {
   try {
     // Set default TTL if not provided (null = unlimited, otherwise use provided value or env default)
@@ -270,13 +291,15 @@ export const getSpaceDatahub = async (
       }
     }
 
-    const datahubRecords = await getDatahubRecords(
-      wrikeToken,
-      process.env.DATAHUB_SPACE_ID,
-      {
-        useCache: false,
-      },
+    const spaceId = getDatahubIdForEnvironment(
+      environmentName,
+      "xpiSpaceNameDatahubId",
+      "DATAHUB_SPACE_ID",
     );
+
+    const datahubRecords = await getDatahubRecords(wrikeToken, spaceId, {
+      useCache: false,
+    });
 
     if (datahubRecords?.errorDescription) {
       throw datahubRecords;
@@ -312,6 +335,7 @@ export const getEntityDatahub = async (
   wrikeToken,
   useCache = true,
   cacheTTL = null,
+  environmentName = null,
 ) => {
   try {
     // Set default TTL if not provided (null = unlimited, otherwise use provided value or env default)
@@ -337,7 +361,11 @@ export const getEntityDatahub = async (
 
     const datahubRecords = await getDatahubRecords(
       wrikeToken,
-      process.env.DATAHUB_ENTITY_ID,
+      getDatahubIdForEnvironment(
+        environmentName,
+        "xpiEntityDatahubId",
+        "DATAHUB_ENTITY_ID",
+      ),
       {
         useCache: false,
       },
@@ -382,6 +410,7 @@ export const findRequestFormId = async (
   datahubEntityData,
   useCache = true,
   cacheTTL = null,
+  environmentName = null,
 ) => {
   try {
     // Set default TTL if not provided (null = unlimited, otherwise use provided value or env default)
@@ -412,7 +441,11 @@ export const findRequestFormId = async (
 
     const formFields = await getDatahubFields(
       wrikeToken,
-      process.env.DATAHUB_REQUEST_FORM_ID,
+      getDatahubIdForEnvironment(
+        environmentName,
+        "xpiRequestFormMappingDatahubId",
+        "DATAHUB_REQUEST_FORM_ID",
+      ),
     );
 
     if (formFields?.errorDescription) {
@@ -428,7 +461,11 @@ export const findRequestFormId = async (
 
     const datahubRecords = await getDatahubRecords(
       wrikeToken,
-      process.env.DATAHUB_REQUEST_FORM_ID,
+      getDatahubIdForEnvironment(
+        environmentName,
+        "xpiRequestFormMappingDatahubId",
+        "DATAHUB_REQUEST_FORM_ID",
+      ),
       {
         useCache: false,
       },
@@ -479,6 +516,7 @@ export const getRequestFormFieldDatahub = async (
   datahubSpaceData,
   useCache = true,
   cacheTTL = null,
+  environmentName = null,
 ) => {
   try {
     // Set default TTL if not provided (null = unlimited, otherwise use provided value or env default)
@@ -508,7 +546,11 @@ export const getRequestFormFieldDatahub = async (
 
     const datahubFields = await getDatahubFields(
       wrikeToken,
-      process.env.DATAHUB_REQUEST_FORM_FIELDS_ID,
+      getDatahubIdForEnvironment(
+        environmentName,
+        "xpiRequestFormFieldMappingDatahubId",
+        "DATAHUB_REQUEST_FORM_FIELDS_ID",
+      ),
     );
 
     if (datahubFields?.errorDescription) {
@@ -522,7 +564,11 @@ export const getRequestFormFieldDatahub = async (
 
     const datahubRecords = await getDatahubRecords(
       wrikeToken,
-      process.env.DATAHUB_REQUEST_FORM_FIELDS_ID,
+      getDatahubIdForEnvironment(
+        environmentName,
+        "xpiRequestFormFieldMappingDatahubId",
+        "DATAHUB_REQUEST_FORM_FIELDS_ID",
+      ),
       {
         useCache: false,
       },
@@ -596,6 +642,7 @@ export const getDatahubCustomFields = async (
   isMaster = false,
   useCache = true,
   cacheTTL = 0,
+  environmentName = null,
 ) => {
   try {
     // Set default TTL if not provided (null = unlimited, otherwise use provided value or env default)
@@ -604,10 +651,19 @@ export const getDatahubCustomFields = async (
     //   ? cacheTTL
     //   : parseInt(process.env.REDIS_DEFAULT_TTL) || 3600;
 
+    // Resolve databaseId with environment-specific value if not provided
+    const resolvedDatabaseId =
+      databaseId ||
+      getDatahubIdForEnvironment(
+        environmentName,
+        "xpiFieldMappingDatahubId",
+        "DATAHUB_CUSTOM_FIELDS_ID",
+      );
+
     // Generate cache key
     const cacheKey = redisClient.generateKey(
       "datahub_grouped_data",
-      databaseId ?? process.env.DATAHUB_CUSTOM_FIELDS_ID,
+      resolvedDatabaseId ?? process.env.DATAHUB_CUSTOM_FIELDS_ID,
       isMaster ? "master" : "regular",
     );
 
@@ -625,7 +681,10 @@ export const getDatahubCustomFields = async (
       }
     }
 
-    const datahubFields = await getDatahubFields(wrikeToken, databaseId);
+    const datahubFields = await getDatahubFields(
+      wrikeToken,
+      resolvedDatabaseId,
+    );
 
     if (datahubFields?.errorDescription) {
       throw datahubFields;
@@ -636,14 +695,18 @@ export const getDatahubCustomFields = async (
       formFieldsIds[field.title?.trim()?.toLowerCase()] = field.id;
     });
 
-    const datahubRecords = await getDatahubRecords(wrikeToken, databaseId, {
-      isRecursive: true,
-      fieldIds: undefined,
-      filter: "",
-      pageToken: null,
-      accumulatedData: [],
-      useCache: false,
-    });
+    const datahubRecords = await getDatahubRecords(
+      wrikeToken,
+      resolvedDatabaseId,
+      {
+        isRecursive: true,
+        fieldIds: undefined,
+        filter: "",
+        pageToken: null,
+        accumulatedData: [],
+        useCache: false,
+      },
+    );
 
     if (datahubRecords?.errorDescription) {
       throw datahubRecords;

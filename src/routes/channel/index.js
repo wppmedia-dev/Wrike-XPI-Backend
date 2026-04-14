@@ -14,7 +14,7 @@ export const channelRoute = (fastify, opts, done) => {
       const result = await GetChannel(
         req?.wrikeToken,
         { ...req.params, ...req.query },
-        fastify
+        req?.environmentName,
       );
 
       reply.code(result.statusCode || 200).send({
@@ -63,7 +63,7 @@ export const channelRoute = (fastify, opts, done) => {
       const result = await UpdateChannel(
         req?.wrikeToken,
         { formFields: req.body, ...req.params },
-        fastify
+        req?.environmentName,
       );
 
       reply.code(result.statusCode || 200).send({
@@ -87,7 +87,7 @@ export const channelRoute = (fastify, opts, done) => {
       const result = await DeleteChannel(
         req?.wrikeToken,
         { ...req.params },
-        fastify
+        req?.environmentName,
       );
 
       reply.code(result.statusCode || 200).send({

@@ -4,7 +4,7 @@ import {
   getDatahubRecords,
 } from "../../../utils/wrike";
 
-export const GetMasterDataRecord = (wrikeToken, params, fastify) => {
+export const GetMasterDataRecord = (wrikeToken, params, environmentName) => {
   return new Promise(async (resolve, reject) => {
     try {
       if (!wrikeToken) {
@@ -28,8 +28,11 @@ export const GetMasterDataRecord = (wrikeToken, params, fastify) => {
       // Get mapping configuration for this customfield
       const datahubCustomFieldsData = await getDatahubCustomFields(
         wrikeToken,
-        process.env.DATAHUB_CUSTOM_FIELDS_ID,
-        true
+        null,
+        true,
+        true,
+        0,
+        environmentName,
       );
 
       if (!datahubCustomFieldsData) {
@@ -55,7 +58,7 @@ export const GetMasterDataRecord = (wrikeToken, params, fastify) => {
 
       const customFieldData = await getCustomFields(
         wrikeToken,
-        datahubCustomFieldsData[masterSlug]["cfId"]
+        datahubCustomFieldsData[masterSlug]["cfId"],
       );
 
       if (!customFieldData?.data || customFieldData?.data.length === 0)
@@ -83,12 +86,12 @@ export const GetMasterDataRecord = (wrikeToken, params, fastify) => {
 
       const mirrorFieldIds =
         customFieldData?.data[0]?.settings?.linkToDatabaseInfo?.mirrorFields?.map(
-          (field) => field.dataHubFieldId
+          (field) => field.dataHubFieldId,
         );
 
       const mirrorCustomfieldIds =
         customFieldData?.data[0]?.settings?.linkToDatabaseInfo?.mirrorFields?.map(
-          (field) => field.customFieldId
+          (field) => field.customFieldId,
         );
 
       let mirrorCustomFieldsData = {};
@@ -100,13 +103,13 @@ export const GetMasterDataRecord = (wrikeToken, params, fastify) => {
         // Get mapping configuration for this customfield
         const result = await getCustomFields(
           wrikeToken,
-          mirrorCustomfieldIds.join(",")
+          mirrorCustomfieldIds.join(","),
         );
 
         for (const cf of result?.data || []) {
           const datahubId =
             customFieldData?.data[0]?.settings?.linkToDatabaseInfo?.mirrorFields?.find(
-              (field) => field.customFieldId === cf.id
+              (field) => field.customFieldId === cf.id,
             );
 
           mirrorCustomFieldsData[datahubId?.dataHubFieldId] = cf.title;
@@ -128,7 +131,7 @@ export const GetMasterDataRecord = (wrikeToken, params, fastify) => {
           pageToken: nextPageToken ?? null,
           limit,
           useCache: false,
-        }
+        },
       );
 
       if (!datahubRecords?.data || datahubRecords.data.length === 0)

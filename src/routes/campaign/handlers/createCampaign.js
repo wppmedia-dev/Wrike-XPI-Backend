@@ -11,7 +11,12 @@ import {
   getEntityDatahub,
 } from "../../../utils/wrike";
 
-export const CreateCampaign = (wrikeToken, params, fastify) => {
+export const CreateCampaign = (
+  wrikeToken,
+  params,
+  fastify,
+  environmentName,
+) => {
   return new Promise(async (resolve, reject) => {
     try {
       if (!wrikeToken)
@@ -26,14 +31,24 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
       const { space, entity, variantId, fields: formFields } = params;
 
       // if (Object.keys(datahubSpaceData).length == 0) {
-      const datahubSpaceData = await getSpaceDatahub(wrikeToken, true, 0);
+      const datahubSpaceData = await getSpaceDatahub(
+        wrikeToken,
+        true,
+        0,
+        environmentName,
+      );
       if (datahubSpaceData?.errorDescription) {
         return reject({ message: datahubSpaceData?.errorDescription });
       }
       // }
 
       // if (Object.keys(datahubEntityData).length == 0) {
-      const datahubEntityData = await getEntityDatahub(wrikeToken, true, 0);
+      const datahubEntityData = await getEntityDatahub(
+        wrikeToken,
+        true,
+        0,
+        environmentName,
+      );
       if (datahubEntityData?.errorDescription) {
         return reject({ message: datahubEntityData?.errorDescription });
       }
@@ -48,7 +63,8 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
         datahubSpaceData,
         datahubEntityData,
         true,
-        0
+        0,
+        environmentName,
       );
       // Sending submit request form error response
       if (requestForm?.errorDescription) {
@@ -67,7 +83,11 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
       // if (Object.keys(datahubCustomFieldsData).length === 0) {
       const datahubCustomFieldsData = await getDatahubCustomFields(
         wrikeToken,
-        process.env.DATAHUB_CUSTOM_FIELDS_ID
+        null,
+        false,
+        true,
+        0,
+        environmentName,
       );
       if (datahubCustomFieldsData?.errorDescription) {
         return reject({ message: datahubCustomFieldsData?.errorDescription });
@@ -82,7 +102,8 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
         datahubCustomFieldsData,
         datahubSpaceData,
         true,
-        0
+        0,
+        environmentName,
       );
       if (datahubRequestFormFieldsData?.errorDescription) {
         return reject({
@@ -100,7 +121,7 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
       }
 
       const { pages: requestFormPages = null } = requestFormData?.data?.find(
-        (form) => form.id === requestFormId
+        (form) => form.id === requestFormId,
       );
 
       if (!requestFormPages)
@@ -124,7 +145,7 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
               if (!formField?.items) continue;
 
               const defaultValue = formField?.items.find(
-                (f) => f.selectedByDefault
+                (f) => f.selectedByDefault,
               );
 
               if (!defaultValue?.id) continue;
@@ -136,7 +157,7 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
           }
 
           matchedField = page?.fields.find(
-            (f) => f.id === datahubRequestFormFieldsData[field]?.fieldId
+            (f) => f.id === datahubRequestFormFieldsData[field]?.fieldId,
           );
           if (matchedField) break; // Exit once found
         }
@@ -156,7 +177,7 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
             matchedField.items.map((item) => [
               item.title?.trim()?.toLowerCase(),
               item.id,
-            ])
+            ]),
           );
 
           if (Array.isArray(formFields[field])) {
@@ -175,7 +196,7 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
           } else if (typeof formFields[field?.trim()] == "string") {
             const matchedFieldItemId =
               lowerItemMap.get(
-                formFields[field?.trim()]?.trim()?.toLowerCase()
+                formFields[field?.trim()]?.trim()?.toLowerCase(),
               ) || null;
 
             if (!matchedFieldItemId) {
@@ -199,7 +220,7 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
       // Appending default fields to the requst form submit api payload
       for (const defaultFieldId in requestFormDefaultFields || []) {
         const isDefaultExist = submitRequestFieldsPayload.some(
-          (param) => param.fieldId === defaultFieldId
+          (param) => param.fieldId === defaultFieldId,
         );
 
         if (isDefaultExist) continue;
@@ -214,7 +235,7 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
       const submittedRequestFormData = await submitRequestForm(
         wrikeToken,
         requestFormId,
-        submitRequestFieldsPayload
+        submitRequestFieldsPayload,
       );
 
       // Sending submit request form error response
@@ -224,7 +245,7 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
 
       const asynJobData = await getRequestFormStatus(
         wrikeToken,
-        submittedRequestFormData?.data[0]?.id
+        submittedRequestFormData?.data[0]?.id,
       );
 
       // Sending folder update error response
@@ -236,7 +257,7 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
       if (asynJobData?.result?.projectId)
         outputData = await getFolder(
           wrikeToken,
-          asynJobData?.result?.projectId
+          asynJobData?.result?.projectId,
         );
       else outputData = await getTask(wrikeToken, asynJobData?.result?.taskId);
 
@@ -258,17 +279,17 @@ export const CreateCampaign = (wrikeToken, params, fastify) => {
           case "Wrike API Metadata Field":
             cfValue =
               outputData?.data[0]?.metadata?.find(
-                (field) => field.key === value?.cfId
+                (field) => field.key === value?.cfId,
               )?.value ?? "";
             break;
           case "Wrike Custom Field":
             cfValue =
               outputData?.data[0]?.customFields?.find(
-                (field) => field.id === value.cfId
+                (field) => field.id === value.cfId,
               )?.value ?? "";
             break;
           default:
-            fieldValue = "";
+            cfValue = "";
         }
 
         // if (value.isReadable && value.isCampaignField)

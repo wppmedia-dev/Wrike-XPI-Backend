@@ -2,7 +2,9 @@ import { getDatahubDataById } from "../../../utils/wrike";
 import { GetResponseWithStatusCode } from "../../../utils/node-fetch";
 import redisClient from "../../../utils/redis";
 
-export const AmoebaHandler = (wrikeToken, req, fastify) => {
+import { getCachedWrikeCredentials } from "../../../utils/wrikeCredentials";
+
+export const AmoebaHandler = (wrikeToken, req, environmentName) => {
   return new Promise(async (resolve, reject) => {
     try {
       if (!wrikeToken) {
@@ -13,7 +15,20 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
         });
       }
 
-      if (!process.env.DATAHUB_AMOEBA_MODULE_ID) {
+      // Get Datahub IDs from cache based on environment
+
+      const moduleDatahubId = getDatahubIdForEnvironment(
+        environmentName,
+        "xpiApiModulesDatahubId",
+        "DATAHUB_AMOEBA_MODULE_ID",
+      );
+      const serviceDatahubId = getDatahubIdForEnvironment(
+        environmentName,
+        "xpiApiServicesDatahubId",
+        "DATAHUB_AMOEBA_SERVICE_ID",
+      );
+
+      if (!moduleDatahubId) {
         return reject({
           statusCode: 400,
           message:
@@ -25,7 +40,7 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
 
       let isServiceSlugExist = serviceSlug && !serviceSlug.includes(":");
 
-      if (isServiceSlugExist && !process.env.DATAHUB_AMOEBA_SERVICE_ID) {
+      if (isServiceSlugExist && !serviceDatahubId) {
         return reject({
           statusCode: 400,
           message:
@@ -56,9 +71,7 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
           value: serviceSlug,
         });
 
-      const datahubId = isServiceSlugExist
-        ? process.env.DATAHUB_AMOEBA_SERVICE_ID
-        : process.env.DATAHUB_AMOEBA_MODULE_ID;
+      const datahubId = isServiceSlugExist ? serviceDatahubId : moduleDatahubId;
 
       if (!datahubId)
         return reject({
@@ -69,7 +82,7 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
         wrikeToken,
         datahubId,
         filter,
-        false
+        false,
       );
 
       if (!datahubRecords || (datahubRecords?.length ?? 0) == 0) {
@@ -81,9 +94,9 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
 
         datahubRecords = await getDatahubDataById(
           wrikeToken,
-          process.env.DATAHUB_AMOEBA_MODULE_ID,
+          moduleDatahubId,
           [filter[0]],
-          false
+          false,
         );
 
         if (!datahubRecords || (datahubRecords?.length ?? 0) == 0) {
@@ -106,12 +119,12 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
       const isEnabled = datahubRecords[0]["enabled"];
 
       const isWrikeToken = isServiceSlugExist
-        ? datahubRecords[0]["service features"]?.includes(
-            "XPI Token Exchange"
-          ) ?? false
-        : datahubRecords[0]["module features"]?.includes(
-            "XPI Token Exchange"
-          ) ?? false;
+        ? (datahubRecords[0]["service features"]?.includes(
+            "XPI Token Exchange",
+          ) ?? false)
+        : (datahubRecords[0]["module features"]?.includes(
+            "XPI Token Exchange",
+          ) ?? false);
 
       const targetUrl = isServiceSlugExist
         ? datahubRecords[0]["target service url"]
@@ -119,7 +132,7 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
 
       const isAuthFree =
         datahubRecords[0]["service features"]?.includes(
-          "No Authentication Token"
+          "No Authentication Token",
         ) ?? false;
 
       const isCacheable =
@@ -160,7 +173,7 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
       const cacheKey = redisClient.generateKey(
         "amoeba_data",
         datahubId,
-        originalUrl?.replace("/api/v1/wrikexpi/amoeba/", "")
+        originalUrl?.replace("/api/v1/wrikexpi/amoeba/", ""),
       );
 
       // Try to get from cache first
@@ -175,7 +188,7 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
         } catch (cacheError) {
           console.warn(
             "Cache read error, proceeding without cache:",
-            cacheError
+            cacheError,
           );
         }
       }
@@ -188,7 +201,7 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
         const pathIndex = originalUrl.indexOf(pathPattern);
         if (pathIndex !== -1) {
           const afterServiceSlug = originalUrl.substring(
-            pathIndex + pathPattern.length
+            pathIndex + pathPattern.length,
           );
           targetPath = afterServiceSlug;
         }
@@ -198,7 +211,7 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
         const pathIndex = originalUrl.indexOf(pathPattern);
         if (pathIndex !== -1) {
           const afterModuleSlug = originalUrl.substring(
-            pathIndex + pathPattern.length
+            pathIndex + pathPattern.length,
           );
 
           // Remove route parameter placeholders like /:service_slug or /:anything
@@ -275,8 +288,8 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
         req.body
           ? req.body
           : ["POST", "PUT", "PATCH"].includes(method)
-          ? {}
-          : undefined
+            ? {}
+            : undefined,
       );
 
       if (targetResponse?.status >= 400)
@@ -305,13 +318,13 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
           const isSaved = await redisClient.set(
             cacheKey,
             targetResponse?.data,
-            ttl
+            ttl,
           );
           if (isSaved)
             console.log(
               `Data cached for datahub data by id ${datahubId} with TTL ${
                 ttl === 0 ? "unlimited" : ttl + "s"
-              }`
+              }`,
             );
         } catch (cacheError) {
           console.warn("Cache write error:", cacheError);
@@ -329,6 +342,17 @@ export const AmoebaHandler = (wrikeToken, req, fastify) => {
       });
     }
   });
+};
+
+const getDatahubIdForEnvironment = (environmentName, idKey, envVarKey) => {
+  if (!environmentName) {
+    return process.env[envVarKey];
+  }
+  const cred = getCachedWrikeCredentials(environmentName);
+  if (cred && cred[idKey]) {
+    return cred[idKey];
+  }
+  return process.env[envVarKey];
 };
 
 // HTML entity decoder function using browser-like approach

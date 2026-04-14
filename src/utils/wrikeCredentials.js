@@ -23,6 +23,15 @@ export const getWrikeCredentials = async (environmentName) => {
         ? decryptField(credential.client_secret)
         : null,
       accountId: credential.account_id || null,
+      xpiApiModulesDatahubId: credential.xpi_api_modules_datahub_id || null,
+      xpiApiServicesDatahubId: credential.xpi_api_services_datahub_id || null,
+      xpiEntityDatahubId: credential.xpi_entity_datahub_id || null,
+      xpiFieldMappingDatahubId: credential.xpi_field_mapping_datahub_id || null,
+      xpiRequestFormFieldMappingDatahubId:
+        credential.xpi_request_form_field_mapping_datahub_id || null,
+      xpiRequestFormMappingDatahubId:
+        credential.xpi_request_form_mapping_datahub_id || null,
+      xpiSpaceNameDatahubId: credential.xpi_space_name_datahub_id || null,
     };
   } catch (err) {
     throw err;
@@ -88,4 +97,43 @@ export const getCachedWrikeCredentials = (environmentName = null) => {
  */
 export const clearCachedWrikeCredentials = () => {
   cachedCredentials = {};
+};
+
+/**
+ * Get Datahub IDs for an environment
+ * @param {string} environmentName - Environment name
+ * @returns {object} Datahub IDs with keys matching env variable names for backward compatibility
+ */
+export const getDatahubIds = (environmentName) => {
+  const cred = getCachedWrikeCredentials(environmentName);
+
+  return {
+    DATAHUB_REQUEST_FORM_ID:
+      cred?.xpiRequestFormMappingDatahubId ||
+      process.env.DATAHUB_REQUEST_FORM_ID,
+    DATAHUB_SPACE_ID:
+      cred?.xpiSpaceNameDatahubId || process.env.DATAHUB_SPACE_ID,
+    DATAHUB_ENTITY_ID:
+      cred?.xpiEntityDatahubId || process.env.DATAHUB_ENTITY_ID,
+    DATAHUB_CUSTOM_FIELDS_ID:
+      cred?.xpiFieldMappingDatahubId || process.env.DATAHUB_CUSTOM_FIELDS_ID,
+    DATAHUB_REQUEST_FORM_FIELDS_ID:
+      cred?.xpiRequestFormFieldMappingDatahubId ||
+      process.env.DATAHUB_REQUEST_FORM_FIELDS_ID,
+    DATAHUB_AMOEBA_MODULE_ID:
+      cred?.xpiApiModulesDatahubId || process.env.DATAHUB_AMOEBA_MODULE_ID,
+    DATAHUB_AMOEBA_SERVICE_ID:
+      cred?.xpiApiServicesDatahubId || process.env.DATAHUB_AMOEBA_SERVICE_ID,
+  };
+};
+
+/**
+ * Get a specific Datahub ID for an environment by key
+ * @param {string} environmentName - Environment name
+ * @param {string} key - Datahub ID key (e.g., 'DATAHUB_SPACE_ID')
+ * @returns {string} Datahub ID or env variable fallback
+ */
+export const getDatahubIdByKey = (environmentName, key) => {
+  const ids = getDatahubIds(environmentName);
+  return ids[key];
 };

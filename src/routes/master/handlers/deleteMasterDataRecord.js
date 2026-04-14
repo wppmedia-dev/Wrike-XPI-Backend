@@ -4,7 +4,7 @@ import {
   deleteDatahubRecord,
 } from "../../../utils/wrike";
 
-export const DeleteMasterDataRecord = (wrikeToken, params, fastify) => {
+export const DeleteMasterDataRecord = (wrikeToken, params, environmentName) => {
   return new Promise(async (resolve, reject) => {
     try {
       if (!wrikeToken) {
@@ -36,8 +36,11 @@ export const DeleteMasterDataRecord = (wrikeToken, params, fastify) => {
       // Get mapping configuration for this customfield
       const datahubCustomFieldsData = await getDatahubCustomFields(
         wrikeToken,
-        process.env.DATAHUB_CUSTOM_FIELDS_ID,
-        true
+        null,
+        true,
+        true,
+        0,
+        environmentName,
       );
 
       if (!datahubCustomFieldsData) {
@@ -63,7 +66,7 @@ export const DeleteMasterDataRecord = (wrikeToken, params, fastify) => {
 
       const customFieldData = await getCustomFields(
         wrikeToken,
-        datahubCustomFieldsData[masterSlug]["cfId"]
+        datahubCustomFieldsData[masterSlug]["cfId"],
       );
 
       if (!customFieldData?.data || customFieldData?.data.length === 0)
@@ -89,7 +92,7 @@ export const DeleteMasterDataRecord = (wrikeToken, params, fastify) => {
       const datahubRecord = await deleteDatahubRecord(
         wrikeToken,
         dataHubDatabaseId,
-        [recordId]
+        [recordId],
       );
 
       if (datahubRecord.errorDescription)

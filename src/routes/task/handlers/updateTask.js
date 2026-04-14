@@ -1,6 +1,6 @@
 import { getDatahubCustomFields, updateTask } from "../../../utils/wrike";
 
-export const UpdateTask = (wrikeToken, params, fastify) => {
+export const UpdateTask = (wrikeToken, params, environmentName) => {
   return new Promise(async (resolve, reject) => {
     try {
       if (!wrikeToken)
@@ -18,7 +18,11 @@ export const UpdateTask = (wrikeToken, params, fastify) => {
       // if (Object.keys(datahubCustomFieldsData).length === 0) {
       const datahubCustomFieldsData = await getDatahubCustomFields(
         wrikeToken,
-        process.env.DATAHUB_CUSTOM_FIELDS_ID
+        null,
+        false,
+        true,
+        0,
+        environmentName,
       );
       // }
 
@@ -67,7 +71,7 @@ export const UpdateTask = (wrikeToken, params, fastify) => {
         taskId,
         taskFieldsUpdateData,
         taskMetadataUpdateData,
-        taskCFUpdateData
+        taskCFUpdateData,
       );
 
       // Sending submit request form error response
@@ -88,13 +92,13 @@ export const UpdateTask = (wrikeToken, params, fastify) => {
           case "Wrike API Metadata Field":
             cfValue =
               updatedTaskData?.data[0]?.metadata?.find(
-                (field) => field.key === value?.cfId
+                (field) => field.key === value?.cfId,
               )?.value ?? "";
             break;
           case "Wrike Custom Field":
             cfValue =
               updatedTaskData?.data[0]?.customFields?.find(
-                (field) => field.id === value.cfId
+                (field) => field.id === value.cfId,
               )?.value ?? "";
             break;
           default:
