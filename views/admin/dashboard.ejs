@@ -2429,8 +2429,15 @@
       /* ── Modal button events ────────────────────────────────── */
       $("#addEnvBtn").on("click", openAddModal);
       $("#closeModalBtn, #cancelModalBtn").on("click", closeModal);
+      
+      /* Prevent modal from closing when clicking inside the modal */
+      $("#envModalBackdrop .modal").on("click", function (e) {
+        e.stopPropagation();
+      });
+
+      /* Prevent modal from closing when clicking on backdrop */
       $("#envModalBackdrop").on("click", function (e) {
-        if (e.target === this) closeModal();
+        e.stopPropagation();
       });
 
       /* ── Redirect URL modal button events ───────────────────── */
