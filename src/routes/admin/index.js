@@ -24,6 +24,7 @@ const AdminDashboardPage = (req, reply) => {
   try {
     return reply.view("admin/dashboard", {
       wrikeRedirectUrl: process.env.WRIKE_REDIRECT_URL || "",
+      appUrl: process.env.APP_URL || "",
     });
   } catch (err) {
     return reply.code(500).send({ error: "Failed to load dashboard" });

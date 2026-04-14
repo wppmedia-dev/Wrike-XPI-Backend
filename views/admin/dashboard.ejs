@@ -1777,13 +1777,30 @@
         <div class="modal-body">
           <div style="margin-bottom: 16px">
             <p style="color: var(--text-secondary); margin-bottom: 8px; font-size: 13px">
-              Use this URL to configure Wrike authentication:
+              Redirect URL (for Wrike OAuth):
             </p>
             <div class="redirect-url-box" style="position: relative">
               <div class="redirect-url-text" id="successRedirectUrl" style="margin-right: 36px"></div>
               <button
                 class="icon-btn"
                 id="copySuccessUrlIcon"
+                title="Copy URL"
+                style="position: absolute; right: 12px; top: 12px; cursor: pointer"
+              >
+                <i class="fa-solid fa-copy"></i>
+              </button>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 16px">
+            <p style="color: var(--text-secondary); margin-bottom: 8px; font-size: 13px">
+              Login URL (with environment):
+            </p>
+            <div class="redirect-url-box" style="position: relative">
+              <div class="redirect-url-text" id="successLoginUrl" style="margin-right: 36px"></div>
+              <button
+                class="icon-btn"
+                id="copySuccessLoginUrlIcon"
                 title="Copy URL"
                 style="position: absolute; right: 12px; top: 12px; cursor: pointer"
               >
@@ -1890,15 +1907,28 @@
             <hr class="form-divider" />
 
             <div id="redirectUrlContainer" style="display: none;">
-              <div class="form-row-label">Redirect URL</div>
-              <div id="redirectUrlSection" style="display: none;">
-                <div class="redirect-url-box">
-                  <div class="redirect-url-text" id="redirectUrlDisplay"></div>
-                  <i class="fa-solid fa-copy" id="copyRedirectUrlIcon"></i>
+              <div class="form-row-label">URLs</div>
+              <div>
+                <p style="color: var(--text-secondary); margin-bottom: 6px; font-size: 12px">Redirect URL:</p>
+                <div id="redirectUrlSection" style="display: none;">
+                  <div class="redirect-url-box">
+                    <div class="redirect-url-text" id="redirectUrlDisplay"></div>
+                    <i class="fa-solid fa-copy" id="copyRedirectUrlIcon"></i>
+                  </div>
+                </div>
+                <div id="noEnvironmentNotice" style="padding: 12px; background: var(--bg-surface); border-radius: var(--radius-sm); color: var(--text-muted); font-size: 13px;">
+                  <em>Save the environment first to generate the redirect URL</em>
                 </div>
               </div>
-              <div id="noEnvironmentNotice" style="padding: 12px; background: var(--bg-surface); border-radius: var(--radius-sm); color: var(--text-muted); font-size: 13px;">
-                <em>Save the environment first to generate the redirect URL</em>
+
+              <div style="margin-top: 12px;">
+                <p style="color: var(--text-secondary); margin-bottom: 6px; font-size: 12px">Login URL:</p>
+                <div id="loginUrlSection" style="display: none;">
+                  <div class="redirect-url-box">
+                    <div class="redirect-url-text" id="loginUrlDisplay"></div>
+                    <i class="fa-solid fa-copy" id="copyLoginUrlIcon"></i>
+                  </div>
+                </div>
               </div>
             </div>
           </form>
@@ -1958,6 +1988,7 @@
       let editingId = null;
       let envDT = null;
       const wrikeRedirectUrl = "<%= wrikeRedirectUrl %>";
+      const appUrl = "<%= appUrl %>";
 
       /* ── Toast helper ───────────────────────────────────────── */
       function toast(msg, type) {
@@ -2326,13 +2357,20 @@
         $("#redirectUrlContainer").show();
         
         // Update redirect URL display for edit modal
-        if (wrikeRedirectUrl && id) {
-          const redirectUrl = wrikeRedirectUrl + "?environmentid=" + id;
-          $("#redirectUrlDisplay").text(redirectUrl);
+        if (wrikeRedirectUrl && id && appUrl) {
+          // Redirect URL without environmentId
+          $("#redirectUrlDisplay").text(wrikeRedirectUrl);
           $("#redirectUrlSection").show();
+          
+          // Login URL with environmentId
+          const loginUrl = appUrl + "?environmentId=" + id;
+          $("#loginUrlDisplay").text(loginUrl);
+          $("#loginUrlSection").show();
+          
           $("#noEnvironmentNotice").hide();
         } else {
           $("#redirectUrlSection").hide();
+          $("#loginUrlSection").hide();
           $("#noEnvironmentNotice").show();
         }
         
@@ -2348,8 +2386,9 @@
       }
 
       /* ── Redirect URL success modal ─────────────────────────── */
-      function showRedirectUrlModal(url) {
-        $("#successRedirectUrl").text(url);
+      function showRedirectUrlModal(redirectUrl, loginUrl) {
+        $("#successRedirectUrl").text(redirectUrl);
+        $("#successLoginUrl").text(loginUrl);
         $("#redirectUrlModalBackdrop").addClass("show");
         
         // Start countdown timer
@@ -2435,11 +2474,78 @@
         }
       });
 
+      /* ── Copy login URL (from edit modal) ────────────────────── */
+      $("#copyLoginUrlIcon").on("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const urlText = $("#loginUrlDisplay").text();
+        if (urlText) {
+          const $icon = $(this);
+          const copySuccess = function () {
+            // Change icon to checkmark
+            $icon.removeClass("fa-copy").addClass("fa-check");
+            // Revert after 1.5 seconds
+            setTimeout(function () {
+              $icon.removeClass("fa-check").addClass("fa-copy");
+            }, 1500);
+          };
+          
+          navigator.clipboard.writeText(urlText)
+            .then(function () {
+              copySuccess();
+            })
+            .catch(function () {
+              // Fallback for older browsers
+              const $temp = $("<input>");
+              $("body").append($temp);
+              $temp.val(urlText).select();
+              document.execCommand("copy");
+              $temp.remove();
+              copySuccess();
+            });
+        }
+      });
+
       /* ── Copy success URL button ───────────────────────────── */
       $("#copySuccessUrlIcon").on("click", function (e) {
         e.preventDefault();
         e.stopPropagation();
         const urlText = $("#successRedirectUrl").text();
+        if (urlText) {
+          const $btn = $(this);
+          const copySuccess = function () {
+            // Change icon to checkmark
+            const $icon = $btn.find("i");
+            $icon.removeClass("fa-copy").addClass("fa-check");
+            $btn.addClass("copied");
+            // Revert after 1.5 seconds
+            setTimeout(function () {
+              $icon.removeClass("fa-check").addClass("fa-copy");
+              $btn.removeClass("copied");
+            }, 1500);
+          };
+          
+          navigator.clipboard.writeText(urlText)
+            .then(function () {
+              copySuccess();
+            })
+            .catch(function () {
+              // Fallback for older browsers
+              const $temp = $("<input>");
+              $("body").append($temp);
+              $temp.val(urlText).select();
+              document.execCommand("copy");
+              $temp.remove();
+              copySuccess();
+            });
+        }
+      });
+
+      /* ── Copy success login URL button ──────────────────────── */
+      $("#copySuccessLoginUrlIcon").on("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const urlText = $("#successLoginUrl").text();
         if (urlText) {
           const $btn = $(this);
           const copySuccess = function () {
@@ -2569,10 +2675,11 @@
           closeModal();
           
           // Show redirect URL modal after creation (not on edit)
-          if (!editingId && wrikeRedirectUrl && data.data?.id) {
-            const redirectUrl = wrikeRedirectUrl + "?environmentid=" + data.data.id;
+          if (!editingId && wrikeRedirectUrl && appUrl && data.data?.id) {
+            const redirectUrl = wrikeRedirectUrl;
+            const loginUrl = appUrl + "?environmentId=" + data.data.id;
             setTimeout(function () {
-              showRedirectUrlModal(redirectUrl);
+              showRedirectUrlModal(redirectUrl, loginUrl);
             }, 300);
           } else {
             toast(
