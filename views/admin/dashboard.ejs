@@ -116,11 +116,11 @@
         background: transparent;
       }
       ::-webkit-scrollbar-thumb {
-        background: var(--bg-surface-2);
+        background: #8b95a6;
         border-radius: 3px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: var(--text-muted);
+        background: #6b7580;
       }
 
       /* ═══════════════════════════════════════════════════════
@@ -1135,7 +1135,9 @@
         width: 100%;
         max-width: 520px;
         max-height: 92vh;
-        overflow-y: auto;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
         box-shadow: var(--shadow-lg);
         animation: modalIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       }
@@ -1193,6 +1195,8 @@
 
       .modal-body {
         padding: 22px;
+        flex: 1;
+        overflow-y: auto;
       }
       .modal-footer {
         display: flex;
