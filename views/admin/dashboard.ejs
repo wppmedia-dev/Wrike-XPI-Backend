@@ -1366,6 +1366,31 @@
         color: var(--accent);
       }
 
+      /* Copy icons in modals */
+      #copySuccessUrlIcon,
+      #copySuccessLoginUrlIcon,
+      #copyLoginUrlIcon {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        cursor: pointer;
+        color: var(--text-muted);
+        font-size: 16px;
+        transition: var(--transition);
+        background: none;
+        border: none;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      #copySuccessUrlIcon:hover,
+      #copySuccessLoginUrlIcon:hover,
+      #copyLoginUrlIcon:hover {
+        color: var(--accent);
+      }
+
       /* ─── NProgress & SweetAlert2 light theme ─────────────── */
       #nprogress .bar {
         background: var(--accent) !important;
@@ -1781,14 +1806,7 @@
             </p>
             <div class="redirect-url-box" style="position: relative">
               <div class="redirect-url-text" id="successRedirectUrl" style="margin-right: 36px"></div>
-              <button
-                class="icon-btn"
-                id="copySuccessUrlIcon"
-                title="Copy URL"
-                style="position: absolute; right: 12px; top: 12px; cursor: pointer"
-              >
-                <i class="fa-solid fa-copy"></i>
-              </button>
+              <i class="fa-solid fa-copy" id="copySuccessUrlIcon" title="Copy URL"></i>
             </div>
           </div>
 
@@ -1798,14 +1816,7 @@
             </p>
             <div class="redirect-url-box" style="position: relative">
               <div class="redirect-url-text" id="successLoginUrl" style="margin-right: 36px"></div>
-              <button
-                class="icon-btn"
-                id="copySuccessLoginUrlIcon"
-                title="Copy URL"
-                style="position: absolute; right: 12px; top: 12px; cursor: pointer"
-              >
-                <i class="fa-solid fa-copy"></i>
-              </button>
+              <i class="fa-solid fa-copy" id="copySuccessLoginUrlIcon" title="Copy URL"></i>
             </div>
           </div>
         </div>
@@ -2512,16 +2523,13 @@
         e.stopPropagation();
         const urlText = $("#successRedirectUrl").text();
         if (urlText) {
-          const $btn = $(this);
+          const $icon = $(this);
           const copySuccess = function () {
             // Change icon to checkmark
-            const $icon = $btn.find("i");
             $icon.removeClass("fa-copy").addClass("fa-check");
-            $btn.addClass("copied");
             // Revert after 1.5 seconds
             setTimeout(function () {
               $icon.removeClass("fa-check").addClass("fa-copy");
-              $btn.removeClass("copied");
             }, 1500);
           };
           
@@ -2547,16 +2555,13 @@
         e.stopPropagation();
         const urlText = $("#successLoginUrl").text();
         if (urlText) {
-          const $btn = $(this);
+          const $icon = $(this);
           const copySuccess = function () {
             // Change icon to checkmark
-            const $icon = $btn.find("i");
             $icon.removeClass("fa-copy").addClass("fa-check");
-            $btn.addClass("copied");
             // Revert after 1.5 seconds
             setTimeout(function () {
               $icon.removeClass("fa-check").addClass("fa-copy");
-              $btn.removeClass("copied");
             }, 1500);
           };
           
