@@ -16,10 +16,13 @@ export const GetAll = () => {
         xpi_api_services_datahub_id: cred.xpi_api_services_datahub_id || null,
         xpi_entity_datahub_id: cred.xpi_entity_datahub_id || null,
         xpi_field_mapping_datahub_id: cred.xpi_field_mapping_datahub_id || null,
-        xpi_request_form_field_mapping_datahub_id: cred.xpi_request_form_field_mapping_datahub_id || null,
-        xpi_request_form_mapping_datahub_id: cred.xpi_request_form_mapping_datahub_id || null,
+        xpi_request_form_field_mapping_datahub_id:
+          cred.xpi_request_form_field_mapping_datahub_id || null,
+        xpi_request_form_mapping_datahub_id:
+          cred.xpi_request_form_mapping_datahub_id || null,
         xpi_space_name_datahub_id: cred.xpi_space_name_datahub_id || null,
         is_active: cred.is_active,
+        is_visible: cred.is_visible,
         created_at: cred.created_at,
         updated_at: cred.updated_at,
       }));

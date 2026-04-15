@@ -61,16 +61,42 @@ export const getAllWrikeCredentials = async () => {
 };
 
 /**
+ * Fetch all visible credentials (visible environments only)
+ * @returns {Promise<object>} Object keyed by environment name
+ */
+export const getAllVisibleWrikeCredentials = async () => {
+  try {
+    const credentials = await WrikeCredentials.GetAllVisible();
+    const result = {};
+
+    for (const credential of credentials) {
+      const decrypted = await getWrikeCredentials(credential.environment_name);
+      if (decrypted) {
+        result[credential.environment_name] = decrypted;
+      }
+    }
+
+    return result;
+  } catch (err) {
+    throw err;
+  }
+};
+
+/**
  * Sync credentials from database into in-memory cache.
  * Call at startup and after any credential change.
  * @returns {Promise<object>} Synced credentials keyed by environment name
  */
 let cachedCredentials = {};
+let cachedVisibleCredentials = {};
 
 export const syncWrikeCredentialsFromDB = async () => {
   try {
     const allCredentials = await getAllWrikeCredentials();
+    const visibleCredentials = await getAllVisibleWrikeCredentials();
+
     cachedCredentials = allCredentials;
+    cachedVisibleCredentials = visibleCredentials;
 
     console.log("Wrike credentials synced from database successfully");
     return allCredentials;
@@ -90,6 +116,18 @@ export const getCachedWrikeCredentials = (environmentName = null) => {
     return cachedCredentials[environmentName] || null;
   }
   return cachedCredentials;
+};
+
+/**
+ * Get cached visible credentials (for user-facing dropdowns)
+ * @param {string} environmentName - Environment name; returns all visible cached credentials if omitted
+ * @returns {object|null} Cached visible credentials for the environment, or all visible cached credentials
+ */
+export const getCachedVisibleWrikeCredentials = (environmentName = null) => {
+  if (environmentName) {
+    return cachedVisibleCredentials[environmentName] || null;
+  }
+  return cachedVisibleCredentials;
 };
 
 /**

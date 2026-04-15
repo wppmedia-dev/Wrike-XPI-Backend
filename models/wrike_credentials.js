@@ -88,6 +88,11 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
         comment: "XPI Space Name Datahub ID",
       },
+      is_visible: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true,
+        comment: "Flag to control visibility of environment in UI dropdowns",
+      },
       is_active: {
         type: DataTypes.BOOLEAN,
         defaultValue: true,

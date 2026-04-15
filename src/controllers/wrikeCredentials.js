@@ -84,6 +84,24 @@ export const GetAll = async () => {
   }
 };
 
+// Get all active and visible credentials (for user-facing dropdowns)
+export const GetAllVisible = async () => {
+  try {
+    const credentials = await models.WrikeCredentials.findAll({
+      where: {
+        is_active: true,
+        is_visible: true,
+        deleted_at: null,
+      },
+      order: [["created_at", "DESC"]],
+    });
+
+    return credentials;
+  } catch (err) {
+    throw err;
+  }
+};
+
 // Get credentials by UUID primary key
 export const GetById = async (id) => {
   try {

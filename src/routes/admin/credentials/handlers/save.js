@@ -18,6 +18,7 @@ export const Save = (body) => {
         xpi_request_form_field_mapping_datahub_id,
         xpi_request_form_mapping_datahub_id,
         xpi_space_name_datahub_id,
+        is_visible,
       } = body;
 
       if (!environment_name)
@@ -53,6 +54,7 @@ export const Save = (body) => {
         xpi_request_form_mapping_datahub_id:
           xpi_request_form_mapping_datahub_id || null,
         xpi_space_name_datahub_id: xpi_space_name_datahub_id || null,
+        is_visible: is_visible !== undefined ? is_visible : true,
       });
 
       await syncWrikeCredentialsFromDB();
@@ -85,4 +87,5 @@ const formatCredential = (cred) => ({
     cred.xpi_request_form_mapping_datahub_id || null,
   xpi_space_name_datahub_id: cred.xpi_space_name_datahub_id || null,
   is_active: cred.is_active,
+  is_visible: cred.is_visible,
 });

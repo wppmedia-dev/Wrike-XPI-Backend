@@ -14,6 +14,7 @@ import { syncSecrets } from "./utils/azure_vault";
 import {
   syncWrikeCredentialsFromDB,
   getCachedWrikeCredentials,
+  getCachedVisibleWrikeCredentials,
 } from "./utils/wrikeCredentials";
 
 (async () => {
@@ -263,7 +264,9 @@ import {
     const accountIdToUse = selectedCred?.accountId || accountId;
     if (accountIdToUse) redirectUrl += `&accountId=${accountIdToUse}`;
 
-    const environmentOptionsHtml = Object.keys(allCreds || {})
+    // Use visible credentials for dropdown (only admins can see hidden environments)
+    const visibleCreds = getCachedVisibleWrikeCredentials();
+    const environmentOptionsHtml = Object.keys(visibleCreds || {})
       .map(
         (env) =>
           `<option value="${env}"${env === selectedEnvironment ? " selected" : ""}>${env}</option>`,
@@ -486,7 +489,7 @@ import {
     const initialRedirectUri = "${redirectUri || ""}";
     const initialAccountId = "${accountId || ""}";
     const initialEnvironment = "${selectedEnvironment}";
-    const environmentsAvailable = ${Object.keys(allCreds || {}).length};
+    const environmentsAvailable = ${Object.keys(visibleCreds || {}).length};
 
     // Handle environmentId query parameter (extract from URL for client-side lookup)
     function getEnvironmentIdFromUrl() {

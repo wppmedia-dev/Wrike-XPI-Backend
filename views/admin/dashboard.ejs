@@ -840,7 +840,23 @@
 
       /* ─── Table ──────────────────────────────────────────── */
       .table-wrapper {
+        overflow: visible;
+      }
+
+      .dataTables_wrapper {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .dataTables_wrapper .dataTables_filter,
+      .dataTables_wrapper .dataTables_length {
+        flex-shrink: 0;
+      }
+
+      .dataTables_wrapper .dataTables_scroll {
+        flex: 1;
         overflow-x: auto;
+        min-width: 0;
       }
 
       table.dt {
@@ -881,10 +897,27 @@
         background: rgba(255, 255, 255, 0.02);
       }
 
+      /* Ensure table scrolls only horizontally for wide content */
+      .dataTables_wrapper .dataTables_scroll {
+        max-width: 100%;
+      }
+
       /* DataTables overrides */
       .dataTables_wrapper {
         font-size: 13px;
         color: var(--text-muted);
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+      }
+
+      .dataTables_wrapper > * {
+        flex-shrink: 0;
+      }
+
+      .dataTables_wrapper > div[style*="overflow-x"] {
+        flex: 1;
+        min-width: 0;
       }
 
       .dataTables_wrapper .dataTables_filter label,
@@ -892,6 +925,21 @@
       .dataTables_wrapper .dataTables_info {
         color: var(--text-muted) !important;
         font-size: 12.5px !important;
+        margin: 0 !important;
+      }
+
+      .dataTables_wrapper .dataTables_filter,
+      .dataTables_wrapper .dataTables_length {
+        display: flex;
+        align-items: center;
+      }
+
+      .dataTables_wrapper .dataTables_filter label,
+      .dataTables_wrapper .dataTables_length label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
       }
 
       .dataTables_wrapper .dataTables_filter input,
@@ -911,14 +959,20 @@
         box-shadow: 0 0 0 3px rgba(47, 129, 247, 0.12) !important;
       }
 
+      div.dataTables_wrapper div.dataTables_info {
+        flex-shrink: 0;
+        margin: 0;
+      }
+
       div.dataTables_wrapper div.dataTables_filter,
       div.dataTables_wrapper div.dataTables_length {
-        text-align: right;
-        margin-bottom: 12px;
+        flex-shrink: 0;
       }
       div.dataTables_wrapper div.dataTables_paginate {
-        margin-top: 14px;
-        text-align: right;
+        flex-shrink: 0;
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
       }
 
       .dataTables_wrapper .dataTables_paginate .paginate_button {
@@ -1712,21 +1766,24 @@
             <div class="card">
               <div class="card-body">
                 <div id="alertContainer"></div>
-                <div class="table-wrapper">
-                  <table class="dt" id="envTable">
-                    <thead>
-                      <tr>
-                        <th>Environment</th>
-                        <th>Env ID</th>
-                        <th>Client ID</th>
-                        <th>Created</th>
-                        <th>Last Updated</th>
-                        <th>Status</th>
-                        <th style="width: 140px">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody id="envTableBody"></tbody>
-                  </table>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                  <div class="table-wrapper">
+                    <table class="dt" id="envTable">
+                      <thead>
+                        <tr>
+                          <th>Environment</th>
+                          <th>Env ID</th>
+                          <th>Client ID</th>
+                          <th>Created</th>
+                          <th>Last Updated</th>
+                          <th>Visibility</th>
+                          <th>Status</th>
+                          <th style="width: 140px">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody id="envTableBody"></tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1982,6 +2039,21 @@
 
             <div class="toggle-row">
               <div class="toggle-row-info">
+                <div class="toggle-row-label">Visibility</div>
+                <div class="toggle-row-desc">
+                  Show or hide this environment in dropdowns
+                </div>
+              </div>
+              <label class="toggle-wrap">
+                <input type="checkbox" id="isVisible" checked />
+                <div class="toggle-track"></div>
+              </label>
+            </div>
+
+            <hr class="form-divider" />
+
+            <div class="toggle-row">
+              <div class="toggle-row-info">
                 <div class="toggle-row-label">Active Status</div>
                 <div class="toggle-row-desc">
                   Enable or disable this environment
@@ -2193,6 +2265,7 @@
                 xpi_request_form_mapping_datahub_id: c.xpi_request_form_mapping_datahub_id || "",
                 xpi_space_name_datahub_id: c.xpi_space_name_datahub_id || "",
                 is_active: !!c.is_active,
+                is_visible: !!c.is_visible,
                 created_at: c.created_at,
                 updated_at: c.updated_at
               };
@@ -2280,7 +2353,7 @@
         if (environments.length === 0) {
           $tbody.html(
             "<tr>" +
-              '<td colspan="7">' +
+              '<td colspan="8">' +
               '<div class="empty-state">' +
               '<div class="empty-state-icon"><i class="fa-regular fa-folder-open"></i></div>' +
               "<h3>No environments found</h3>" +
@@ -2296,6 +2369,10 @@
           var badge = env.is_active
             ? '<span class="badge badge-success"><span class="dot"></span> Active</span>'
             : '<span class="badge badge-danger"><span class="dot"></span> Inactive</span>';
+
+          var visibilityBadge = env.is_visible
+            ? '<span class="badge badge-success"><span class="dot"></span> Visible</span>'
+            : '<span class="badge badge-warning"><span class="dot"></span> Hidden</span>';
 
           $tbody.append(
             "<tr>" +
@@ -2318,6 +2395,9 @@
               "</td>" +
               "<td>" +
               formatLocalDate(env.updated_at) +
+              "</td>" +
+              "<td>" +
+              visibilityBadge +
               "</td>" +
               "<td>" +
               badge +
@@ -2348,7 +2428,7 @@
           order: [],
           columnDefs: [
             { targets: 1, orderable: false, searchable: false },
-            { targets: 6, orderable: false, searchable: false }
+            { targets: 7, orderable: false, searchable: false }
           ],
           language: {
             emptyTable: "No environments found",
@@ -2360,6 +2440,43 @@
             paginate: { previous: "‹", next: "›" },
           },
         });
+
+        // Restructure DataTables wrapper to make only table scroll
+        setTimeout(function() {
+          var $wrapper = $("#envTable").closest(".dataTables_wrapper");
+          var $table = $wrapper.find("table");
+          var $filter = $wrapper.find(".dataTables_filter");
+          var $length = $wrapper.find(".dataTables_length");
+          var $info = $wrapper.find(".dataTables_info");
+          var $paginate = $wrapper.find(".dataTables_paginate");
+          
+          // Store references and detach elements
+          $table.detach();
+          $filter.detach();
+          $length.detach();
+          $info.detach();
+          $paginate.detach();
+          
+          // Create scrollable container for table
+          var $scrollContainer = $('<div style="overflow-x: auto; min-width: 0; flex: 1;"></div>');
+          $scrollContainer.append($table);
+          
+          // Create top controls section (filter and length)
+          var $topControls = $('<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 12px;"></div>');
+          $topControls.append($length);
+          $topControls.append($filter);
+          
+          // Create bottom controls section (info and pagination)
+          var $bottomControls = $('<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; flex-wrap: wrap; gap: 12px;"></div>');
+          $bottomControls.append($info);
+          $bottomControls.append($paginate);
+          
+          // Empty wrapper and rebuild
+          $wrapper.empty();
+          $wrapper.append($topControls);
+          $wrapper.append($scrollContainer);
+          $wrapper.append($bottomControls);
+        }, 10);
       }
 
       /* ── Overview recent list ───────────────────────────────── */
@@ -2427,6 +2544,7 @@
         $("#modalTitle").text("Add Environment");
         $("#envForm")[0].reset();
         $("#envName").prop("disabled", false);
+        $("#isVisible").prop("checked", true);
         $("#isActive").prop("checked", true);
         $("#redirectUrlContainer").hide();
         $("#envModalBackdrop").addClass("show");
@@ -2454,6 +2572,7 @@
         $("#xpiRequestFormFieldMappingDatahubId").val(env.xpi_request_form_field_mapping_datahub_id);
         $("#xpiRequestFormMappingDatahubId").val(env.xpi_request_form_mapping_datahub_id);
         $("#xpiSpaceNameDatahubId").val(env.xpi_space_name_datahub_id);
+        $("#isVisible").prop("checked", env.is_visible);
         $("#isActive").prop("checked", env.is_active);
         
         // Show redirect URL section for edit modal
@@ -2736,6 +2855,7 @@
         var xpiRequestFormFieldMappingDatahubId = $("#xpiRequestFormFieldMappingDatahubId").val().trim();
         var xpiRequestFormMappingDatahubId = $("#xpiRequestFormMappingDatahubId").val().trim();
         var xpiSpaceNameDatahubId = $("#xpiSpaceNameDatahubId").val().trim();
+        var isVisible = $("#isVisible").is(":checked");
         var isActive = $("#isActive").is(":checked");
 
         if (!envName) {
@@ -2769,6 +2889,7 @@
             xpi_request_form_field_mapping_datahub_id: xpiRequestFormFieldMappingDatahubId || undefined,
             xpi_request_form_mapping_datahub_id: xpiRequestFormMappingDatahubId || undefined,
             xpi_space_name_datahub_id: xpiSpaceNameDatahubId || undefined,
+            is_visible: isVisible,
             is_active: isActive,
           };
 
