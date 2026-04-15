@@ -17,6 +17,8 @@ export const Update = (profile_id, { id }, body) => {
         xpi_request_form_field_mapping_datahub_id,
         xpi_request_form_mapping_datahub_id,
         xpi_space_name_datahub_id,
+        campaign_space_id,
+        request_form_space_id,
         is_visible,
         is_active,
       } = body;
@@ -56,6 +58,8 @@ export const Update = (profile_id, { id }, body) => {
         xpi_request_form_mapping_datahub_id:
           xpi_request_form_mapping_datahub_id || null,
         xpi_space_name_datahub_id: xpi_space_name_datahub_id || null,
+        campaign_space_id: campaign_space_id || null,
+        request_form_space_id: request_form_space_id || null,
       };
       if (client_id) updates.client_id = encryptField(client_id);
       if (client_secret && client_secret != existing?.client_secret)

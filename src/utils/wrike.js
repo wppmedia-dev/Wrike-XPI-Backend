@@ -1111,11 +1111,22 @@ export const getCustomFields = async (wrikeToken, customFieldId = null) => {
   }
 };
 
-export const getRequestForm = async (wrikeToken) => {
+export const getRequestForm = async (wrikeToken, environmentName) => {
   try {
+    // Get credential to fetch request_form_space_id from database
+    const credential = getCachedWrikeCredentials(environmentName);
+    const requestFormSpaceId =
+      credential?.request_form_space_id || process.env.REQUEST_FORM_SPACE_ID;
+
+    if (!requestFormSpaceId) {
+      throw new Error(
+        "Request Form Space ID is not configured for this environment.",
+      );
+    }
+
     // Get folder data
     const wrikeRequestFormData = await GetResponse(
-      `${process.env.WRIKE_ENDPOINT}/spaces/${process.env.REQUEST_FORM_SPACE_ID}/request_forms`,
+      `${process.env.WRIKE_ENDPOINT}/spaces/${requestFormSpaceId}/request_forms`,
       "GET",
       {
         "content-type": "application/json",

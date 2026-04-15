@@ -2,6 +2,7 @@ import { GetResponse } from "../../../utils/node-fetch";
 import { defaultParser } from "@odata/parser";
 import { getCustomFields, getDatahubCustomFields } from "../../../utils/wrike";
 import { translateDatahubRecordId } from "../utils/datahubRecordTranslator";
+import { getCachedWrikeCredentials } from "../../../utils/wrikeCredentials";
 
 // Operator mapping from OData to your custom operators
 const odataToCustomOp = {
@@ -70,8 +71,17 @@ export const GetAllCampaigns = (wrikeToken, params, environmentName) => {
             "Missing required datahub customfield mapping field: workitemlevel",
         });
 
+      // Get credential to fetch campaign_space_id from database
+      const credential = getCachedWrikeCredentials(environmentName);
+      if (!credential || !credential.campaign_space_id) {
+        return reject({
+          statusCode: 500,
+          message: "Campaign Space ID is not configured for this environment.",
+        });
+      }
+
       let wrikeUrl = `${process.env.WRIKE_ENDPOINT}/spaces/${
-        process.env.CAMPAIGN_SPACE_ID
+        credential.campaign_space_id
       }/folders?deleted=false&fields=[customFields]&nextPageToken=${
         nextPageToken || ""
       }`;

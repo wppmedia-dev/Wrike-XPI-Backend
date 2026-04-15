@@ -113,7 +113,7 @@ export const CreateCampaign = (
       // }
 
       // Submit Request Form
-      const requestFormData = await getRequestForm(wrikeToken);
+      const requestFormData = await getRequestForm(wrikeToken, environmentName);
 
       // Sending get request form error response
       if (requestFormData?.errorDescription) {
