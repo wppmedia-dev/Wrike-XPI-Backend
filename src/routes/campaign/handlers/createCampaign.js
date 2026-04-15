@@ -120,9 +120,11 @@ export const CreateCampaign = (
         return reject({ message: requestFormData?.errorDescription });
       }
 
-      const { pages: requestFormPages = null } = requestFormData?.data?.find(
+      const form = requestFormData?.data?.find(
         (form) => form.id === requestFormId,
       );
+
+      const requestFormPages = form?.pages ?? null;
 
       if (!requestFormPages)
         return reject({
