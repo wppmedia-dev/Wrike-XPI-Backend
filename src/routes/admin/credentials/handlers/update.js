@@ -18,6 +18,7 @@ export const Update = (profile_id, { id }, body) => {
         xpi_request_form_mapping_datahub_id,
         xpi_space_name_datahub_id,
         is_visible,
+        is_active,
       } = body;
 
       if (!environment_name)
@@ -60,6 +61,7 @@ export const Update = (profile_id, { id }, body) => {
       if (client_secret && client_secret != existing?.client_secret)
         updates.client_secret = encryptField(client_secret);
       if (is_visible !== undefined) updates.is_visible = is_visible;
+      if (is_active !== undefined) updates.is_active = is_active;
 
       const updated = await WrikeCredentials.Update(profile_id, id, updates);
 

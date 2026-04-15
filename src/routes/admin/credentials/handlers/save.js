@@ -19,6 +19,7 @@ export const Save = (body) => {
         xpi_request_form_mapping_datahub_id,
         xpi_space_name_datahub_id,
         is_visible,
+        is_active,
       } = body;
 
       if (!environment_name)
@@ -55,6 +56,7 @@ export const Save = (body) => {
           xpi_request_form_mapping_datahub_id || null,
         xpi_space_name_datahub_id: xpi_space_name_datahub_id || null,
         is_visible: is_visible !== undefined ? is_visible : true,
+        is_active: is_active !== undefined ? is_active : true,
       });
 
       await syncWrikeCredentialsFromDB();
