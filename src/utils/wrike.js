@@ -1113,10 +1113,10 @@ export const getCustomFields = async (wrikeToken, customFieldId = null) => {
 
 export const getRequestForm = async (wrikeToken, environmentName) => {
   try {
-    // Get credential to fetch request_form_space_id from database
+    // Get credential to fetch  requestFormSpaceId from database
     const credential = getCachedWrikeCredentials(environmentName);
     const requestFormSpaceId =
-      credential?.request_form_space_id || process.env.REQUEST_FORM_SPACE_ID;
+      credential?.requestFormSpaceId || process.env.REQUEST_FORM_SPACE_ID;
 
     if (!requestFormSpaceId) {
       throw new Error(

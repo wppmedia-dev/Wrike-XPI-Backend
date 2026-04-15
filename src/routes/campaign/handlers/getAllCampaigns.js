@@ -71,9 +71,9 @@ export const GetAllCampaigns = (wrikeToken, params, environmentName) => {
             "Missing required datahub customfield mapping field: workitemlevel",
         });
 
-      // Get credential to fetch campaign_space_id from database
+      // Get credential to fetch campaignSpaceId from database
       const credential = getCachedWrikeCredentials(environmentName);
-      if (!credential || !credential.campaign_space_id) {
+      if (!credential || !credential.campaignSpaceId) {
         return reject({
           statusCode: 500,
           message: "Campaign Space ID is not configured for this environment.",
@@ -81,7 +81,7 @@ export const GetAllCampaigns = (wrikeToken, params, environmentName) => {
       }
 
       let wrikeUrl = `${process.env.WRIKE_ENDPOINT}/spaces/${
-        credential.campaign_space_id
+        credential.campaignSpaceId
       }/folders?deleted=false&fields=[customFields]&nextPageToken=${
         nextPageToken || ""
       }`;
