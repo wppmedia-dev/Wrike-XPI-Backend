@@ -19,7 +19,6 @@ export const Save = (body) => {
         xpi_request_form_mapping_datahub_id,
         xpi_space_name_datahub_id,
         campaign_space_id,
-        request_form_space_id,
         is_visible,
         is_active,
       } = body;
@@ -58,7 +57,6 @@ export const Save = (body) => {
           xpi_request_form_mapping_datahub_id || null,
         xpi_space_name_datahub_id: xpi_space_name_datahub_id || null,
         campaign_space_id: campaign_space_id || null,
-        request_form_space_id: request_form_space_id || null,
         is_visible: is_visible !== undefined ? is_visible : true,
         is_active: is_active !== undefined ? is_active : true,
       });
@@ -93,7 +91,6 @@ const formatCredential = (cred) => ({
     cred.xpi_request_form_mapping_datahub_id || null,
   xpi_space_name_datahub_id: cred.xpi_space_name_datahub_id || null,
   campaign_space_id: cred.campaign_space_id || null,
-  request_form_space_id: cred.request_form_space_id || null,
   is_active: cred.is_active,
   is_visible: cred.is_visible,
 });

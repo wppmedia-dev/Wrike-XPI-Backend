@@ -33,7 +33,6 @@ export const getWrikeCredentials = async (environmentName) => {
         credential.xpi_request_form_mapping_datahub_id || null,
       xpiSpaceNameDatahubId: credential.xpi_space_name_datahub_id || null,
       campaignSpaceId: credential.campaign_space_id || null,
-      requestFormSpaceId: credential.request_form_space_id || null,
     };
   } catch (err) {
     throw err;

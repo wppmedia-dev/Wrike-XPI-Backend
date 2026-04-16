@@ -2057,17 +2057,6 @@
               />
             </div>
 
-            <div class="form-group">
-              <label class="form-label" for="requestFormSpaceId">Request Form Space ID <span style="color: var(--danger)">*</span></label>
-              <input
-                class="form-control"
-                type="text"
-                id="requestFormSpaceId"
-                placeholder="Enter Request Form Space ID"
-                required
-              />
-            </div>
-
             <hr class="form-divider" />
 
             <div class="toggle-row">
@@ -2298,7 +2287,7 @@
                 xpi_request_form_mapping_datahub_id: c.xpi_request_form_mapping_datahub_id || "",
                 xpi_space_name_datahub_id: c.xpi_space_name_datahub_id || "",
                 campaign_space_id: c.campaign_space_id || "",
-                request_form_space_id: c.request_form_space_id || "",
+
                 is_active: !!c.is_active,
                 is_visible: !!c.is_visible,
                 created_at: c.created_at,
@@ -2608,7 +2597,7 @@
         $("#xpiRequestFormMappingDatahubId").val(env.xpi_request_form_mapping_datahub_id);
         $("#xpiSpaceNameDatahubId").val(env.xpi_space_name_datahub_id);
         $("#campaignSpaceId").val(env.campaign_space_id);
-        $("#requestFormSpaceId").val(env.request_form_space_id);
+
         $("#isVisible").prop("checked", env.is_visible);
         $("#isActive").prop("checked", env.is_active);
         
@@ -2893,7 +2882,7 @@
         var xpiRequestFormMappingDatahubId = $("#xpiRequestFormMappingDatahubId").val().trim();
         var xpiSpaceNameDatahubId = $("#xpiSpaceNameDatahubId").val().trim();
         var campaignSpaceId = $("#campaignSpaceId").val().trim();
-        var requestFormSpaceId = $("#requestFormSpaceId").val().trim();
+
         var isVisible = $("#isVisible").is(":checked");
         var isActive = $("#isActive").is(":checked");
 
@@ -2953,10 +2942,7 @@
           return;
         }
 
-        if (!requestFormSpaceId) {
-          toast("Request Form Space ID is required", "error");
-          return;
-        }
+
 
         var $btn = $(this).addClass("loading").prop("disabled", true);
 
@@ -2974,7 +2960,6 @@
             xpi_request_form_mapping_datahub_id: xpiRequestFormMappingDatahubId || undefined,
             xpi_space_name_datahub_id: xpiSpaceNameDatahubId || undefined,
             campaign_space_id: campaignSpaceId || undefined,
-            request_form_space_id: requestFormSpaceId || undefined,
             is_visible: isVisible,
             is_active: isActive,
           };

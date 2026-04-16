@@ -21,7 +21,6 @@ export const UpdateSchema = {
         "xpi_request_form_mapping_datahub_id",
         "xpi_space_name_datahub_id",
         "campaign_space_id",
-        "request_form_space_id",
       ],
       properties: {
         environment_name: { type: "string" },
@@ -36,7 +35,6 @@ export const UpdateSchema = {
         xpi_request_form_mapping_datahub_id: { type: "string" },
         xpi_space_name_datahub_id: { type: "string" },
         campaign_space_id: { type: "string" },
-        request_form_space_id: { type: "string" },
         is_visible: { type: "boolean" },
       },
     },
