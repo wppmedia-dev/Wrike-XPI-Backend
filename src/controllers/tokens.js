@@ -166,7 +166,7 @@ export const GetAllByUserId = async (id) => {
   }
 };
 
-export const GetByUserAccountEnvId = async (id, accountId, envId) => {
+export const GetByUserAccountEnvId = async (id, accountId, environmentId) => {
   try {
     if (!id) {
       throw {
@@ -182,7 +182,7 @@ export const GetByUserAccountEnvId = async (id, accountId, envId) => {
       };
     }
 
-    if (!envId)
+    if (!environmentId)
       throw {
         statusCode: 420,
         message: "Env Id must not be empty!",
@@ -194,7 +194,7 @@ export const GetByUserAccountEnvId = async (id, accountId, envId) => {
     };
 
     if (accountId) where["account_id"] = accountId;
-    if (envId) where["env_id"] = envId;
+    if (environmentId) where["env_id"] = environmentId;
 
     const userTokens = await models.UserTokens.findOne({
       attributes: [

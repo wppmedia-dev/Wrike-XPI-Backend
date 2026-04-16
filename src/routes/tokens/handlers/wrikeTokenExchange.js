@@ -2,15 +2,20 @@ import * as crypto from "../../../utils/crypto";
 import { Tokens, Users } from "../../../controllers";
 import { getWrikeTokens, getUserData } from "../../../utils/wrike";
 import models from "../../../../models";
+import { GetById } from "../../../controllers/wrikeCredentials";
 
-export const WrikeTokenExchange = ({ code, env, envId }, fastify) => {
+export const WrikeTokenExchange = ({ code, environmentId }, fastify) => {
   return new Promise(async (resolve, reject) => {
     // Start database transaction for data consistency
     const transaction = await models.sequelize.transaction();
 
     try {
       if (!code) return reject({ message: "Access Token must not be empty" });
-      if (!env) return reject({ message: "Environment must not be empty" });
+      if (!environmentId)
+        return reject({ message: "Environment must not be empty" });
+
+      const envData = await GetById(environmentId);
+      const env = envData?.environment_name;
 
       // Get Wrike tokens from OAuth code
       const { access_token, refresh_token } = await getWrikeTokens({
@@ -56,7 +61,7 @@ export const WrikeTokenExchange = ({ code, env, envId }, fastify) => {
       }
 
       // Generate username from email + account_id
-      const username = `${accountId}-${envId}-${primaryEmail}`;
+      const username = `${accountId}-${environmentId}-${primaryEmail}`;
 
       // Generate random strong password
       const password = crypto.generateSecurePassword();
@@ -82,7 +87,7 @@ export const WrikeTokenExchange = ({ code, env, envId }, fastify) => {
       const userTokenData = await Tokens.GetByUserAccountEnvId(
         userId,
         accountId,
-        envId,
+        environmentId,
       );
       let userTokenId = userTokenData?.id;
 
@@ -106,7 +111,7 @@ export const WrikeTokenExchange = ({ code, env, envId }, fastify) => {
           userId,
           {
             account_id: accountId,
-            env_id: envId,
+            env_id: environmentId,
             encrypted_access_token: encryptedAccessToken,
             encrypted_refresh_token: encryptedRefreshToken,
             username,

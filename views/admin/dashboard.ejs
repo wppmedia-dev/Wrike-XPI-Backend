@@ -4270,13 +4270,13 @@
         }
       }
 
-      async function puRevokeEnv(userId, envId) {
+      async function puRevokeEnv(userId, environmentId) {
         try {
           const res = await fetch(
             "/api/v1/admin/portal-users/" +
               userId +
               "/environments?env_id=" +
-              envId,
+              environmentId,
             { method: "DELETE", headers: authHeaders() },
           );
           const json = await res.json();

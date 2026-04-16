@@ -166,13 +166,11 @@ import {
     if (redirectUri) {
       state = fastify.jwt.sign({
         redirectUri,
-        env: selectedCred ? resolvedEnvironment : "",
-        envId: selectedCred?.id,
+        environmentId: selectedCred?.id,
       });
     } else {
       state = fastify.jwt.sign({
-        env: selectedCred ? resolvedEnvironment : "",
-        envId: selectedCred?.id,
+        environmentId: selectedCred?.id,
       });
     }
 
@@ -233,11 +231,11 @@ import {
       if (redirectUri) {
         state = fastify.jwt.sign({
           redirectUri,
-          env: selectedCred ? selectedEnvironment : "",
+          environmentId: selectedCred ? selectedCred?.id : "",
         });
       } else {
         state = fastify.jwt.sign({
-          env: selectedCred ? selectedEnvironment : "",
+          environmentId: selectedCred ? selectedCred?.id : "",
         });
       }
 
@@ -253,11 +251,11 @@ import {
     if (redirectUri) {
       state = fastify.jwt.sign({
         redirectUri,
-        env: selectedCred ? selectedEnvironment : "",
+        environmentId: selectedCred ? selectedCred?.id : "",
       });
     } else {
       state = fastify.jwt.sign({
-        env: selectedCred ? selectedEnvironment : "",
+        environmentId: selectedCred ? selectedCred?.id : "",
       });
     }
 

@@ -59,7 +59,7 @@ export const GetById = async (id) => {
 
 export const GetByWrikeId = async (id) => {
   try {
-    const userData = await models.PortalUsers.findOne({
+    const userData = await models.Users.findOne({
       attributes: ["id"],
       where: { wrike_user_id: id },
     });
@@ -155,10 +155,10 @@ export const GetUserEnvironments = async (userId) => {
   }
 };
 
-export const AssignEnvironment = async (profile_id, userId, envId) => {
+export const AssignEnvironment = async (profile_id, userId, environmentId) => {
   try {
     const env = await models.WrikeCredentials.findOne({
-      where: { id: envId, deleted_at: null },
+      where: { id: environmentId, deleted_at: null },
     });
     if (!env) throw { statusCode: 404, message: "Environment not found" };
 
@@ -171,7 +171,7 @@ export const AssignEnvironment = async (profile_id, userId, envId) => {
     await models.WrikeCredentials.update(
       { owner_id: userId },
       {
-        where: { id: envId },
+        where: { id: environmentId },
         individualHooks: true,
         profile_id,
       },
@@ -181,12 +181,12 @@ export const AssignEnvironment = async (profile_id, userId, envId) => {
   }
 };
 
-export const RevokeEnvironment = async (userId, envId) => {
+export const RevokeEnvironment = async (userId, environmentId) => {
   try {
     const updated = await models.WrikeCredentials.update(
       { owner_id: null },
       {
-        where: { id: envId, owner_id: userId },
+        where: { id: environmentId, owner_id: userId },
         individualHooks: true,
       },
     );
