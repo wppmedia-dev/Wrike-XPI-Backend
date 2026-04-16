@@ -22,6 +22,7 @@ export const GetAll = () => {
           cred.xpi_request_form_mapping_datahub_id || null,
         xpi_space_name_datahub_id: cred.xpi_space_name_datahub_id || null,
         campaign_space_id: cred.campaign_space_id || null,
+        owner_id: cred.owner_id || null,
         is_active: cred.is_active,
         is_visible: cred.is_visible,
         created_at: cred.created_at,

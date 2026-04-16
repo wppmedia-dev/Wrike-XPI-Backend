@@ -16,13 +16,6 @@ export const Insert = async (profile_id, data, options = {}) => {
 // Update credentials by UUID primary key
 export const Update = async (profile_id, id, data, options = {}) => {
   try {
-    if (!profile_id) {
-      return reject({
-        statusCode: 420,
-        message: "user Token Id must not be empty!",
-      });
-    }
-
     if (!id) {
       throw {
         statusCode: 420,
@@ -78,6 +71,23 @@ export const GetAll = async () => {
       order: [["created_at", "DESC"]],
     });
 
+    return credentials;
+  } catch (err) {
+    throw err;
+  }
+};
+
+// Get admin-level environments (owner_id is null — not assigned to any portal user)
+export const GetAdminEnvironments = async () => {
+  try {
+    const credentials = await models.WrikeCredentials.findAll({
+      where: {
+        owner_id: null,
+        is_active: true,
+        deleted_at: null,
+      },
+      order: [["created_at", "DESC"]],
+    });
     return credentials;
   } catch (err) {
     throw err;
@@ -157,6 +167,55 @@ export const Deactivate = async (environmentName) => {
     );
 
     return updated;
+  } catch (err) {
+    throw err;
+  }
+};
+
+// Get environments owned by a specific portal user
+export const GetByOwnerId = async (ownerId) => {
+  try {
+    if (!ownerId)
+      throw { statusCode: 400, message: "Owner id must not be empty" };
+
+    const credentials = await models.WrikeCredentials.findAll({
+      where: { owner_id: ownerId, deleted_at: null },
+      order: [["created_at", "DESC"]],
+    });
+
+    return credentials;
+  } catch (err) {
+    throw err;
+  }
+};
+
+// Get ALL non-deleted environments (for portal admin)
+export const GetAllForPortal = async () => {
+  try {
+    const credentials = await models.WrikeCredentials.findAll({
+      where: { deleted_at: null },
+      order: [["created_at", "DESC"]],
+    });
+    return credentials;
+  } catch (err) {
+    throw err;
+  }
+};
+
+// Soft delete by UUID with profile tracking
+export const DeleteById = async (profile_id, id) => {
+  try {
+    if (!id) throw { statusCode: 420, message: "Id must not be empty" };
+
+    const credential = await models.WrikeCredentials.findOne({
+      where: { id, deleted_at: null },
+    });
+
+    if (!credential)
+      throw { statusCode: 404, message: "Environment not found" };
+
+    await credential.destroy({ profile_id });
+    return credential;
   } catch (err) {
     throw err;
   }

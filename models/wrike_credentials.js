@@ -11,6 +11,12 @@ module.exports = (sequelize, DataTypes) => {
         onUpdate: "CASCADE",
         onDelete: "RESTRICT",
       });
+      WrikeCredentials.belongsTo(models.PortalUsers, {
+        as: "owner",
+        foreignKey: "owner_id",
+        onUpdate: "CASCADE",
+        onDelete: "SET NULL",
+      });
       WrikeCredentials.belongsTo(models.AdminUsers, {
         as: "creator",
         foreignKey: "created_by",
@@ -110,6 +116,10 @@ module.exports = (sequelize, DataTypes) => {
       },
       deleted_at: {
         type: DataTypes.DATE,
+      },
+      owner_id: {
+        type: DataTypes.UUID,
+        allowNull: true,
       },
       created_by: {
         type: DataTypes.UUID,

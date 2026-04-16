@@ -7,6 +7,7 @@ import { taskRoute } from "./task";
 import { masterRoute } from "./master";
 import { amoebaRoute } from "./amoeba";
 import { adminApiRoute } from "./admin";
+import { portalApiRoute } from "./portal";
 
 // Auth Middleware
 import { ValidateToken } from "../middlewares/authentication";
@@ -23,6 +24,7 @@ import { GetAllTasksSchema } from "./task/schema/getAllTasks";
 export const PublicRouters = (fastify, opts, done) => {
   fastify.register(tokenRoute, { prefix: "/wrikexpi/token" });
   fastify.register(adminApiRoute, { prefix: "/admin" });
+  fastify.register(portalApiRoute, { prefix: "/portal" });
 
   done();
 };

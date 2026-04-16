@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sign In — WrikeXPI Portal</title>
+    <link
+      rel="icon"
+      href="https://cdn.wrike.com/static/branding/wrike/favicons/favicon.ico"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    />
+    <style>
+      :root {
+        --bg-body: #f0f4f8;
+        --bg-card: #ffffff;
+        --bg-surface: #f5f7fa;
+        --border: #e2e8f0;
+        --text-primary: #0f172a;
+        --text-secondary: #475569;
+        --text-muted: #94a3b8;
+        --accent: #008262;
+        --accent-hover: #006d52;
+        --danger: #ef4444;
+        --danger-soft: rgba(239, 68, 68, 0.1);
+        --radius-sm: 6px;
+      }
+
+      *,
+      *::before,
+      *::after {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+      }
+
+      body {
+        font-family:
+          "Inter",
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        background: var(--bg-body);
+        color: var(--text-primary);
+        font-size: 14px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: 24px;
+      }
+
+      .login-card {
+        width: 100%;
+        max-width: 400px;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+        padding: 40px 36px 32px;
+      }
+
+      .card-brand {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 32px;
+      }
+
+      .logo-lockup {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .logo-mark {
+        width: 38px;
+        height: 38px;
+        background: #008262;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .logo-mark svg {
+        width: 22px;
+        height: auto;
+        fill: #fff;
+      }
+
+      .logo-name {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--text-primary);
+        letter-spacing: -0.4px;
+      }
+
+      .card-subtitle {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        margin-top: 2px;
+      }
+
+      .form-heading {
+        font-size: 17px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 20px;
+      }
+
+      .form-group {
+        margin-bottom: 16px;
+      }
+
+      .form-label {
+        display: block;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        margin-bottom: 6px;
+      }
+
+      .input-wrap {
+        position: relative;
+      }
+
+      .input-wrap .input-icon {
+        position: absolute;
+        left: 11px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-muted);
+        font-size: 13px;
+        pointer-events: none;
+      }
+
+      .form-control {
+        width: 100%;
+        height: 40px;
+        padding: 0 12px 0 34px;
+        font-family: inherit;
+        font-size: 14px;
+        color: var(--text-primary);
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        outline: none;
+        transition:
+          border-color 0.15s ease,
+          box-shadow 0.15s ease;
+      }
+
+      .form-control:focus {
+        border-color: var(--accent);
+        background: #fff;
+        box-shadow: 0 0 0 3px rgba(0, 130, 98, 0.1);
+      }
+
+      .form-control::placeholder {
+        color: var(--text-muted);
+      }
+
+      .toggle-pass {
+        position: absolute;
+        right: 11px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--text-muted);
+        font-size: 13px;
+        padding: 0;
+        line-height: 1;
+        transition: color 0.15s;
+      }
+
+      .toggle-pass:hover {
+        color: var(--text-secondary);
+      }
+
+      .error-box {
+        display: none;
+        align-items: center;
+        gap: 8px;
+        background: var(--danger-soft);
+        border: 1px solid rgba(239, 68, 68, 0.25);
+        border-radius: var(--radius-sm);
+        padding: 10px 12px;
+        font-size: 13px;
+        color: var(--danger);
+        margin-bottom: 16px;
+      }
+
+      .error-box.visible {
+        display: flex;
+      }
+
+      .btn-primary {
+        width: 100%;
+        height: 40px;
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        border-radius: var(--radius-sm);
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition:
+          background 0.15s ease,
+          opacity 0.15s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      .btn-primary:hover {
+        background: var(--accent-hover);
+      }
+      .btn-primary:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.4);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+        display: none;
+      }
+
+      .btn-primary.loading .spinner {
+        display: block;
+      }
+      .btn-primary.loading .btn-label {
+        display: none;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="login-card">
+      <div class="card-brand">
+        <div class="logo-lockup">
+          <div class="logo-mark">
+            <svg viewBox="0 0 24 16" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M0 0h4.8l3.6 9.6 3.6-9.6h4.8l-6 16H6L0 0zm14.4 0H24l-6 16h-4.8l3.6-9.6L14.4 0z"
+              />
+            </svg>
+          </div>
+          <span class="logo-name">WrikeXPI</span>
+        </div>
+        <span class="card-subtitle">Portal</span>
+      </div>
+
+      <div class="form-heading">Sign in to your account</div>
+
+      <div class="error-box" id="errorBox">
+        <i class="fa-solid fa-circle-exclamation"></i>
+        <span id="errorMsg">Invalid username or password.</span>
+      </div>
+
+      <form id="loginForm" autocomplete="off" onsubmit="return false;">
+        <div class="form-group">
+          <label class="form-label" for="username">Username</label>
+          <div class="input-wrap">
+            <i class="fa-solid fa-user input-icon"></i>
+            <input
+              class="form-control"
+              type="text"
+              id="username"
+              name="username"
+              placeholder="Enter your username"
+              autocomplete="username"
+              required
+            />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="password">Password</label>
+          <div class="input-wrap">
+            <i class="fa-solid fa-lock input-icon"></i>
+            <input
+              class="form-control"
+              type="password"
+              id="password"
+              name="password"
+              placeholder="Enter your password"
+              autocomplete="current-password"
+              required
+            />
+            <button
+              type="button"
+              class="toggle-pass"
+              id="togglePass"
+              aria-label="Toggle password visibility"
+              tabindex="-1"
+            >
+              <i class="fa-solid fa-eye" id="togglePassIcon"></i>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-primary" id="loginBtn">
+          <div class="spinner"></div>
+          <span class="btn-label">Sign In</span>
+        </button>
+      </form>
+    </div>
+
+    <script>
+      (function () {
+        // Already authenticated — redirect to appropriate page
+        const token = localStorage.getItem("portal_access_token");
+        const role = localStorage.getItem("portal_role");
+        if (token && role) {
+          window.location.replace(
+            role === "admin" ? "/portal/dashboard" : "/portal/home",
+          );
+        }
+      })();
+
+      const form = document.getElementById("loginForm");
+      const loginBtn = document.getElementById("loginBtn");
+      const errorBox = document.getElementById("errorBox");
+      const errorMsg = document.getElementById("errorMsg");
+      const togglePass = document.getElementById("togglePass");
+      const togglePassIcon = document.getElementById("togglePassIcon");
+      const passwordInput = document.getElementById("password");
+
+      togglePass.addEventListener("click", () => {
+        const isText = passwordInput.type === "text";
+        passwordInput.type = isText ? "password" : "text";
+        togglePassIcon.className = isText
+          ? "fa-solid fa-eye"
+          : "fa-solid fa-eye-slash";
+      });
+
+      form.addEventListener("submit", async () => {
+        const username = document.getElementById("username").value.trim();
+        const password = passwordInput.value;
+
+        if (!username || !password) return;
+
+        errorBox.classList.remove("visible");
+        loginBtn.classList.add("loading");
+        loginBtn.disabled = true;
+
+        try {
+          const res = await fetch("/api/v1/portal/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password }),
+          });
+
+          const json = await res.json();
+
+          if (!res.ok || !json.success) {
+            throw new Error(json.message || "Invalid credentials");
+          }
+
+          const { access_token, role, must_change_password } = json.data;
+
+          localStorage.setItem("portal_access_token", access_token);
+          localStorage.setItem("portal_role", role);
+
+          if (must_change_password) {
+            window.location.replace("/portal/change-password");
+          } else {
+            window.location.replace(
+              role === "admin" ? "/portal/dashboard" : "/portal/home",
+            );
+          }
+        } catch (err) {
+          errorMsg.textContent = err.message || "An unexpected error occurred";
+          errorBox.classList.add("visible");
+        } finally {
+          loginBtn.classList.remove("loading");
+          loginBtn.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>

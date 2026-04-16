@@ -10,6 +10,7 @@ dotenv.config();
 // Importing Routes
 import { PrivateRouters, PublicRouters } from "./routes";
 import { adminRoute } from "./routes/admin";
+import { portalRoute } from "./routes/portal";
 import { syncSecrets } from "./utils/azure_vault";
 import {
   syncWrikeCredentialsFromDB,
@@ -39,6 +40,7 @@ import {
   fastify.register(PublicRouters, { prefix: "/api/v1" });
   fastify.register(PrivateRouters, { prefix: "/api/v1" });
   fastify.register(adminRoute, { prefix: "/admin" });
+  fastify.register(portalRoute, { prefix: "/portal" });
 
   // Hooks
   fastify.addHook("onError", async (request, reply, error) => {

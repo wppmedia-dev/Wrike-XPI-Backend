@@ -13,8 +13,8 @@ const IV_LENGTH = 12;
 export const generateSecurePassword = () => {
   const charset =
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+[]{}|;,.<>?";
-  const length = 48;
-  const password = Array.from(crypto.getRandomValues(new Uint8Array(length)))
+  const length = 10 + (crypto.randomBytes(1)[0] % 7); // 10–16
+  const password = Array.from(crypto.randomBytes(length))
     .map((byte) => charset[byte % charset.length])
     .join("");
   return password;

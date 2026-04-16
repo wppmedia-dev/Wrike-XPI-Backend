@@ -1178,7 +1178,8 @@
         justify-content: center;
       }
 
-      .modal-backdrop.show {
+      .modal-backdrop.show,
+      .modal-backdrop.open {
         display: flex;
       }
 
@@ -1301,7 +1302,8 @@
       }
 
       select.form-control option {
-        background: #1c2128;
+        background: #ffffff;
+        color: #0d1117;
       }
 
       .form-divider {
@@ -1766,7 +1768,7 @@
             <div class="card">
               <div class="card-body">
                 <div id="alertContainer"></div>
-                <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div style="display: flex; flex-direction: column; gap: 12px">
                   <div class="table-wrapper">
                     <table class="dt" id="envTable">
                       <thead>
@@ -1793,21 +1795,37 @@
           <div class="page" id="page-users">
             <div class="section-header">
               <div>
-                <div class="section-title">Users</div>
+                <div class="section-title">Portal Users</div>
                 <div class="section-subtitle">
-                  Manage admin users and permissions
+                  Manage portal user accounts and environment access
                 </div>
               </div>
+              <button class="btn btn-primary" id="puAddUserBtn">
+                <i class="fa-solid fa-plus"></i> Add User
+              </button>
             </div>
             <div class="card">
-              <div class="coming-soon">
-                <div class="coming-soon-icon">
-                  <i class="fa-solid fa-users-gear"></i>
+              <div class="card-body">
+                <div id="alertContainer"></div>
+                <div style="overflow-x: auto">
+                  <div class="table-wrapper">
+                    <table class="dt" id="puTable">
+                      <thead>
+                        <tr>
+                          <th>Username</th>
+                          <th>Full Name</th>
+                          <th>Email</th>
+                          <th>Role</th>
+                          <th>Last Login</th>
+                          <th>Status</th>
+                          <th>Must Change Pwd</th>
+                          <th style="width: 110px">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody id="puTableBody"></tbody>
+                    </table>
+                  </div>
                 </div>
-                <h2>Users Management</h2>
-                <p>
-                  Admin user management is under construction. Check back soon.
-                </p>
               </div>
             </div>
           </div>
@@ -1837,6 +1855,467 @@
     </div>
     <!-- /#app -->
 
+    <!-- ═══════════ PU: ADD USER MODAL ═══════════ -->
+    <div class="modal-backdrop" id="puUserModalBackdrop">
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        style="max-width: 440px"
+      >
+        <div class="modal-header">
+          <div class="modal-title">
+            <i class="fa-solid fa-user-plus"></i> Add Portal User
+          </div>
+          <button class="modal-close" id="puCloseUserModal">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <form id="puUserForm" autocomplete="off" onsubmit="return false;">
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                background: var(--bg-surface);
+                border: 1px solid var(--border);
+                border-radius: var(--radius-sm);
+                padding: 10px 12px;
+                margin-bottom: 16px;
+                gap: 12px;
+              "
+            >
+              <div
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 8px;
+                  min-width: 0;
+                "
+              >
+                <i
+                  class="fa-solid fa-wand-magic-sparkles"
+                  style="color: var(--accent); font-size: 13px; flex-shrink: 0"
+                ></i>
+                <span
+                  style="
+                    font-size: 12.5px;
+                    color: var(--text-secondary);
+                    line-height: 1.4;
+                  "
+                >
+                  Auto-fill username &amp; password with secure generated
+                  values.
+                </span>
+              </div>
+              <button
+                type="button"
+                class="btn btn-ghost"
+                id="puGenCredsBtn"
+                style="flex-shrink: 0; padding: 5px 12px; font-size: 12px"
+              >
+                <i
+                  class="fa-solid fa-wand-magic-sparkles"
+                  id="puGenCredsIcon"
+                ></i>
+                Auto Fill
+              </button>
+            </div>
+            <div class="form-group">
+              <label class="form-label"
+                >Username <span style="color: var(--danger)">*</span></label
+              >
+              <input
+                class="form-control"
+                type="text"
+                id="puUsername"
+                placeholder="e.g. john.doe"
+                autocomplete="off"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Full Name</label>
+              <input
+                class="form-control"
+                type="text"
+                id="puFullName"
+                placeholder="Full name"
+              />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email</label>
+              <input
+                class="form-control"
+                type="email"
+                id="puEmail"
+                placeholder="user@example.com"
+              />
+            </div>
+            <div class="form-group">
+              <label class="form-label"
+                >Password <span style="color: var(--danger)">*</span></label
+              >
+              <div style="position: relative">
+                <input
+                  class="form-control"
+                  type="password"
+                  id="puPassword"
+                  placeholder="Password"
+                  autocomplete="new-password"
+                  minlength="10"
+                  maxlength="16"
+                  style="padding-right: 38px"
+                  required
+                />
+                <button
+                  type="button"
+                  onclick="puTogglePwd('puPassword', 'puPwdEye')"
+                  style="
+                    position: absolute;
+                    right: 10px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    background: none;
+                    border: none;
+                    color: var(--text-muted);
+                    cursor: pointer;
+                    padding: 0;
+                    font-size: 13px;
+                  "
+                  tabindex="-1"
+                >
+                  <i class="fa-solid fa-eye" id="puPwdEye"></i>
+                </button>
+              </div>
+              <div
+                style="
+                  display: flex;
+                  align-items: center;
+                  justify-content: space-between;
+                  margin-top: 6px;
+                "
+              >
+                <span style="font-size: 11.5px; color: var(--text-muted)">
+                  <i class="fa-solid fa-circle-info"></i> User will be required
+                  to change this on first login.
+                </span>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" id="puCancelUserBtn">Cancel</button>
+          <button class="btn btn-primary" id="puSaveUserBtn">
+            <i class="fa-solid fa-floppy-disk"></i> Save User
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ PU: GENERATE CREDENTIALS MODAL ═══════════ -->
+    <div class="modal-backdrop" id="puGenCredsModalBackdrop">
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        style="max-width: 400px"
+      >
+        <div class="modal-header">
+          <div class="modal-title">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> Generated
+            Credentials
+          </div>
+          <button class="modal-close" id="puCloseGenCreds">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <p
+            style="
+              font-size: 13px;
+              color: var(--text-muted);
+              margin-bottom: 16px;
+            "
+          >
+            Share these credentials securely. The password will not be shown
+            again.
+          </p>
+          <div class="form-group">
+            <label class="form-label">Username</label>
+            <input
+              class="form-control"
+              type="text"
+              id="puGenUsername"
+              readonly
+              onclick="this.select()"
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <input
+              class="form-control"
+              type="text"
+              id="puGenPassword"
+              readonly
+              onclick="this.select()"
+            />
+          </div>
+          <div
+            style="
+              background: rgba(245, 158, 11, 0.1);
+              border: 1px solid rgba(245, 158, 11, 0.3);
+              border-radius: 6px;
+              padding: 10px 12px;
+              font-size: 12.5px;
+              color: #92400e;
+              margin-top: 4px;
+            "
+          >
+            <i class="fa-solid fa-triangle-exclamation"></i> Store this password
+            safely — it cannot be recovered.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button
+            class="btn btn-ghost"
+            id="puCloseGenCreds2"
+            onclick="
+              document
+                .getElementById('puGenCredsModalBackdrop')
+                .classList.remove('open', 'show')
+            "
+          >
+            Close
+          </button>
+          <button class="btn btn-primary" id="puUseGenCreds">
+            <i class="fa-solid fa-user-plus"></i> Use to Create User
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ PU: RESET PASSWORD MODAL ═══════════ -->
+    <div class="modal-backdrop" id="puResetPwdModalBackdrop">
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        style="max-width: 380px"
+      >
+        <div class="modal-header">
+          <div class="modal-title">
+            <i class="fa-solid fa-key"></i> Reset Password
+          </div>
+          <button class="modal-close" id="puCloseResetModal">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <p
+            style="
+              font-size: 13px;
+              color: var(--text-muted);
+              margin-bottom: 16px;
+            "
+          >
+            Set a new password for <strong id="puResetUsername"></strong>. The
+            user must change it on next login.
+          </p>
+          <div class="form-group">
+            <label class="form-label"
+              >New Password <span style="color: var(--danger)">*</span></label
+            >
+            <div style="position: relative">
+              <input
+                class="form-control"
+                type="password"
+                id="puResetPwdInput"
+                placeholder="Minimum 8 characters"
+                style="padding-right: 38px"
+              />
+              <button
+                type="button"
+                onclick="puTogglePwd('puResetPwdInput', 'puResetPwdEye')"
+                style="
+                  position: absolute;
+                  right: 10px;
+                  top: 50%;
+                  transform: translateY(-50%);
+                  background: none;
+                  border: none;
+                  color: var(--text-muted);
+                  cursor: pointer;
+                  padding: 0;
+                  font-size: 13px;
+                "
+                tabindex="-1"
+              >
+                <i class="fa-solid fa-eye" id="puResetPwdEye"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" id="puCancelResetBtn">Cancel</button>
+          <button class="btn btn-primary" id="puConfirmResetBtn">
+            <i class="fa-solid fa-key"></i> Reset
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ PU: EDIT USER MODAL ═══════════ -->
+    <div class="modal-backdrop" id="puEditUserModalBackdrop">
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        style="max-width: 440px"
+      >
+        <div class="modal-header">
+          <div class="modal-title">
+            <i class="fa-solid fa-user-pen"></i> Edit User —
+            <span id="puEditUsername" style="font-weight: 500"></span>
+          </div>
+          <button class="modal-close" id="puCloseEditUserModal">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <form id="puEditUserForm" autocomplete="off" onsubmit="return false;">
+            <div class="form-group">
+              <label class="form-label">Username</label>
+              <div style="position: relative">
+                <input
+                  class="form-control"
+                  type="text"
+                  id="puEditUsernameInput"
+                  placeholder="Username"
+                  autocomplete="off"
+                  style="padding-right: 38px"
+                />
+                <button
+                  type="button"
+                  id="puEditGenUsernameBtn"
+                  title="Generate username"
+                  tabindex="-1"
+                  style="
+                    position: absolute;
+                    right: 10px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    background: none;
+                    border: none;
+                    color: var(--text-muted);
+                    cursor: pointer;
+                    padding: 0;
+                    font-size: 13px;
+                  "
+                >
+                  <i
+                    class="fa-solid fa-wand-magic-sparkles"
+                    id="puEditGenUsernameIcon"
+                  ></i>
+                </button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Full Name</label>
+              <input
+                class="form-control"
+                type="text"
+                id="puEditFullName"
+                placeholder="Full name"
+              />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email</label>
+              <input
+                class="form-control"
+                type="email"
+                id="puEditEmail"
+                placeholder="user@example.com"
+              />
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" id="puCancelEditUserBtn">Cancel</button>
+          <button class="btn btn-primary" id="puSaveEditUserBtn">
+            <i class="fa-solid fa-floppy-disk"></i> Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ PU: ASSIGN ENVIRONMENTS MODAL ═══════════ -->
+    <div class="modal-backdrop" id="puAssignEnvModalBackdrop">
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        style="max-width: 480px"
+      >
+        <div class="modal-header">
+          <div class="modal-title">
+            <i class="fa-solid fa-plug"></i> Manage Environments —
+            <span id="puAssignEnvUsername" style="font-weight: 500"></span>
+          </div>
+          <button class="modal-close" id="puCloseAssignEnvModal">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="modal-body" style="padding-bottom: 8px">
+          <!-- Assigned list -->
+          <div class="form-section-label">
+            <i class="fa-solid fa-link"></i> Assigned Environments
+          </div>
+          <div
+            id="puAssignedEnvList"
+            style="min-height: 40px; margin-bottom: 18px"
+          ></div>
+
+          <!-- Add new -->
+          <div id="puAssignNewEnvSection">
+            <div class="form-section-label">
+              <i class="fa-solid fa-plus-circle"></i> Assign New Environment
+            </div>
+            <div style="display: flex; gap: 8px">
+              <select
+                class="form-control"
+                id="puAssignEnvSelect"
+                style="flex: 1"
+              ></select>
+              <button
+                class="btn btn-primary"
+                style="height: 38px; padding: 0 14px; flex-shrink: 0"
+                id="puAddEnvToUserBtn"
+              >
+                <i class="fa-solid fa-link"></i> Assign
+              </button>
+            </div>
+            <div
+              id="puNoAvailEnvMsg"
+              style="
+                display: none;
+                font-size: 12.5px;
+                color: var(--text-muted);
+                padding: 8px 0;
+              "
+            >
+              <i class="fa-solid fa-circle-info"></i> No unassigned environments
+              available.
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" id="puDoneAssignEnvBtn">Done</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ═══════════ REDIRECT URL SUCCESS MODAL ═══════════ -->
     <div class="modal-backdrop" id="redirectUrlModalBackdrop">
       <div
@@ -1849,7 +2328,9 @@
         <div class="modal-header">
           <div class="modal-title">
             <i class="fa-solid fa-link" style="color: var(--success)"></i>
-            <span id="redirectModalTitle">Environment Created Successfully</span>
+            <span id="redirectModalTitle"
+              >Environment Created Successfully</span
+            >
           </div>
           <button
             class="modal-close"
@@ -1862,22 +2343,50 @@
 
         <div class="modal-body">
           <div style="margin-bottom: 16px">
-            <p style="color: var(--text-secondary); margin-bottom: 8px; font-size: 13px">
+            <p
+              style="
+                color: var(--text-secondary);
+                margin-bottom: 8px;
+                font-size: 13px;
+              "
+            >
               Redirect URL (for Wrike OAuth):
             </p>
             <div class="redirect-url-box" style="position: relative">
-              <div class="redirect-url-text" id="successRedirectUrl" style="margin-right: 36px"></div>
-              <i class="fa-solid fa-copy" id="copySuccessUrlIcon" title="Copy URL"></i>
+              <div
+                class="redirect-url-text"
+                id="successRedirectUrl"
+                style="margin-right: 36px"
+              ></div>
+              <i
+                class="fa-solid fa-copy"
+                id="copySuccessUrlIcon"
+                title="Copy URL"
+              ></i>
             </div>
           </div>
 
           <div style="margin-bottom: 16px">
-            <p style="color: var(--text-secondary); margin-bottom: 8px; font-size: 13px">
+            <p
+              style="
+                color: var(--text-secondary);
+                margin-bottom: 8px;
+                font-size: 13px;
+              "
+            >
               Login URL (with environment):
             </p>
             <div class="redirect-url-box" style="position: relative">
-              <div class="redirect-url-text" id="successLoginUrl" style="margin-right: 36px"></div>
-              <i class="fa-solid fa-copy" id="copySuccessLoginUrlIcon" title="Copy URL"></i>
+              <div
+                class="redirect-url-text"
+                id="successLoginUrl"
+                style="margin-right: 36px"
+              ></div>
+              <i
+                class="fa-solid fa-copy"
+                id="copySuccessLoginUrlIcon"
+                title="Copy URL"
+              ></i>
             </div>
           </div>
         </div>
@@ -1911,7 +2420,7 @@
           </button>
         </div>
 
-        <div class="modal-body" style="padding-bottom: 0px !important;">
+        <div class="modal-body" style="padding-bottom: 0px !important">
           <form id="envForm" autocomplete="off" onsubmit="return false;">
             <div class="form-group">
               <label class="form-label" for="envName"
@@ -1932,7 +2441,9 @@
             <div class="form-section-label">Credentials</div>
 
             <div class="form-group">
-              <label class="form-label" for="clientId">Client ID <span style="color: var(--danger)">*</span></label>
+              <label class="form-label" for="clientId"
+                >Client ID <span style="color: var(--danger)">*</span></label
+              >
               <input
                 class="form-control"
                 type="text"
@@ -1943,7 +2454,8 @@
             </div>
             <div class="form-group">
               <label class="form-label" for="clientSecret"
-                >Client Secret <span style="color: var(--danger)">*</span></label
+                >Client Secret
+                <span style="color: var(--danger)">*</span></label
               >
               <input
                 class="form-control"
@@ -1968,7 +2480,10 @@
             <div class="form-section-label">Datahub IDs</div>
 
             <div class="form-group">
-              <label class="form-label" for="xpiApiModulesDatahubId">XPI API Modules Datahub ID <span style="color: var(--danger)">*</span></label>
+              <label class="form-label" for="xpiApiModulesDatahubId"
+                >XPI API Modules Datahub ID
+                <span style="color: var(--danger)">*</span></label
+              >
               <input
                 class="form-control"
                 type="text"
@@ -1979,7 +2494,10 @@
             </div>
 
             <div class="form-group">
-              <label class="form-label" for="xpiApiServicesDatahubId">XPI API Services Datahub ID <span style="color: var(--danger)">*</span></label>
+              <label class="form-label" for="xpiApiServicesDatahubId"
+                >XPI API Services Datahub ID
+                <span style="color: var(--danger)">*</span></label
+              >
               <input
                 class="form-control"
                 type="text"
@@ -1990,7 +2508,10 @@
             </div>
 
             <div class="form-group">
-              <label class="form-label" for="xpiEntityDatahubId">XPI Entity Datahub ID <span style="color: var(--danger)">*</span></label>
+              <label class="form-label" for="xpiEntityDatahubId"
+                >XPI Entity Datahub ID
+                <span style="color: var(--danger)">*</span></label
+              >
               <input
                 class="form-control"
                 type="text"
@@ -2001,7 +2522,10 @@
             </div>
 
             <div class="form-group">
-              <label class="form-label" for="xpiFieldMappingDatahubId">XPI Field Mapping Datahub ID <span style="color: var(--danger)">*</span></label>
+              <label class="form-label" for="xpiFieldMappingDatahubId"
+                >XPI Field Mapping Datahub ID
+                <span style="color: var(--danger)">*</span></label
+              >
               <input
                 class="form-control"
                 type="text"
@@ -2012,7 +2536,12 @@
             </div>
 
             <div class="form-group">
-              <label class="form-label" for="xpiRequestFormFieldMappingDatahubId">XPI Request Form Field Mapping Datahub ID <span style="color: var(--danger)">*</span></label>
+              <label
+                class="form-label"
+                for="xpiRequestFormFieldMappingDatahubId"
+                >XPI Request Form Field Mapping Datahub ID
+                <span style="color: var(--danger)">*</span></label
+              >
               <input
                 class="form-control"
                 type="text"
@@ -2023,7 +2552,10 @@
             </div>
 
             <div class="form-group">
-              <label class="form-label" for="xpiRequestFormMappingDatahubId">XPI Request Form Mapping Datahub ID <span style="color: var(--danger)">*</span></label>
+              <label class="form-label" for="xpiRequestFormMappingDatahubId"
+                >XPI Request Form Mapping Datahub ID
+                <span style="color: var(--danger)">*</span></label
+              >
               <input
                 class="form-control"
                 type="text"
@@ -2034,7 +2566,10 @@
             </div>
 
             <div class="form-group">
-              <label class="form-label" for="xpiSpaceNameDatahubId">XPI Space Name Datahub ID <span style="color: var(--danger)">*</span></label>
+              <label class="form-label" for="xpiSpaceNameDatahubId"
+                >XPI Space Name Datahub ID
+                <span style="color: var(--danger)">*</span></label
+              >
               <input
                 class="form-control"
                 type="text"
@@ -2047,7 +2582,10 @@
             <div class="form-section-label">Space IDs</div>
 
             <div class="form-group">
-              <label class="form-label" for="campaignSpaceId">Campaign Space ID <span style="color: var(--danger)">*</span></label>
+              <label class="form-label" for="campaignSpaceId"
+                >Campaign Space ID
+                <span style="color: var(--danger)">*</span></label
+              >
               <input
                 class="form-control"
                 type="text"
@@ -2089,24 +2627,54 @@
 
             <hr class="form-divider" />
 
-            <div id="redirectUrlContainer" style="display: none;">
+            <div id="redirectUrlContainer" style="display: none">
               <div class="form-row-label">URLs</div>
               <div>
-                <p style="color: var(--text-secondary); margin-bottom: 6px; font-size: 12px">Redirect URL:</p>
-                <div id="redirectUrlSection" style="display: none;">
+                <p
+                  style="
+                    color: var(--text-secondary);
+                    margin-bottom: 6px;
+                    font-size: 12px;
+                  "
+                >
+                  Redirect URL:
+                </p>
+                <div id="redirectUrlSection" style="display: none">
                   <div class="redirect-url-box">
-                    <div class="redirect-url-text" id="redirectUrlDisplay"></div>
+                    <div
+                      class="redirect-url-text"
+                      id="redirectUrlDisplay"
+                    ></div>
                     <i class="fa-solid fa-copy" id="copyRedirectUrlIcon"></i>
                   </div>
                 </div>
-                <div id="noEnvironmentNotice" style="padding: 12px; background: var(--bg-surface); border-radius: var(--radius-sm); color: var(--text-muted); font-size: 13px;">
-                  <em>Save the environment first to generate the redirect URL</em>
+                <div
+                  id="noEnvironmentNotice"
+                  style="
+                    padding: 12px;
+                    background: var(--bg-surface);
+                    border-radius: var(--radius-sm);
+                    color: var(--text-muted);
+                    font-size: 13px;
+                  "
+                >
+                  <em
+                    >Save the environment first to generate the redirect URL</em
+                  >
                 </div>
               </div>
 
-              <div style="margin-top: 12px;">
-                <p style="color: var(--text-secondary); margin-bottom: 6px; font-size: 12px">Login URL:</p>
-                <div id="loginUrlSection" style="display: none;">
+              <div style="margin-top: 12px">
+                <p
+                  style="
+                    color: var(--text-secondary);
+                    margin-bottom: 6px;
+                    font-size: 12px;
+                  "
+                >
+                  Login URL:
+                </p>
+                <div id="loginUrlSection" style="display: none">
                   <div class="redirect-url-box">
                     <div class="redirect-url-text" id="loginUrlDisplay"></div>
                     <i class="fa-solid fa-copy" id="copyLoginUrlIcon"></i>
@@ -2146,8 +2714,8 @@
 
       /* ── Global API Response Interceptor ────────────────────── */
       const originalFetch = window.fetch;
-      window.fetch = function(...args) {
-        return originalFetch.apply(this, args).then(response => {
+      window.fetch = function (...args) {
+        return originalFetch.apply(this, args).then((response) => {
           // Check for 401 (Unauthorized) or 403 (Forbidden)
           if (response.status === 401 || response.status === 403) {
             // Clear localStorage
@@ -2155,7 +2723,7 @@
             // Redirect to login with replace to prevent going back
             window.location.replace("/admin/login");
             // Return a rejected promise to prevent further execution
-            return Promise.reject(new Error('Session expired or unauthorized'));
+            return Promise.reject(new Error("Session expired or unauthorized"));
           }
           return response;
         });
@@ -2280,18 +2848,22 @@
                 client_secret: c.client_secret || "",
                 account_id: c.account_id || "",
                 xpi_api_modules_datahub_id: c.xpi_api_modules_datahub_id || "",
-                xpi_api_services_datahub_id: c.xpi_api_services_datahub_id || "",
+                xpi_api_services_datahub_id:
+                  c.xpi_api_services_datahub_id || "",
                 xpi_entity_datahub_id: c.xpi_entity_datahub_id || "",
-                xpi_field_mapping_datahub_id: c.xpi_field_mapping_datahub_id || "",
-                xpi_request_form_field_mapping_datahub_id: c.xpi_request_form_field_mapping_datahub_id || "",
-                xpi_request_form_mapping_datahub_id: c.xpi_request_form_mapping_datahub_id || "",
+                xpi_field_mapping_datahub_id:
+                  c.xpi_field_mapping_datahub_id || "",
+                xpi_request_form_field_mapping_datahub_id:
+                  c.xpi_request_form_field_mapping_datahub_id || "",
+                xpi_request_form_mapping_datahub_id:
+                  c.xpi_request_form_mapping_datahub_id || "",
                 xpi_space_name_datahub_id: c.xpi_space_name_datahub_id || "",
                 campaign_space_id: c.campaign_space_id || "",
 
                 is_active: !!c.is_active,
                 is_visible: !!c.is_visible,
                 created_at: c.created_at,
-                updated_at: c.updated_at
+                updated_at: c.updated_at,
               };
             });
           }
@@ -2326,21 +2898,21 @@
 
       /* ── Date formatter for local timezone ────────────────────── */
       function formatLocalDate(dateStr) {
-        if (!dateStr) return '—';
+        if (!dateStr) return "—";
         try {
           const date = new Date(dateStr);
-          return date.toLocaleString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: true
+          return date.toLocaleString("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: true,
           });
         } catch (err) {
-          console.log(err)
-          return '--';
+          console.log(err);
+          return "--";
         }
       }
 
@@ -2405,8 +2977,12 @@
               "</strong></td>" +
               "<td>" +
               '<div class="action-cell">' +
-              '<code style="font-size: 11px; color: var(--text-muted);">' + escHtml(env.id) + '</code>' +
-              '<button class="icon-btn copy-id-btn" data-id="' + env.id + '" title="Copy ID">' +
+              '<code style="font-size: 11px; color: var(--text-muted);">' +
+              escHtml(env.id) +
+              "</code>" +
+              '<button class="icon-btn copy-id-btn" data-id="' +
+              env.id +
+              '" title="Copy ID">' +
               '<i class="fa-solid fa-copy"></i>' +
               "</button>" +
               "</div>" +
@@ -2452,7 +3028,7 @@
           order: [],
           columnDefs: [
             { targets: 1, orderable: false, searchable: false },
-            { targets: 7, orderable: false, searchable: false }
+            { targets: 7, orderable: false, searchable: false },
           ],
           language: {
             emptyTable: "No environments found",
@@ -2466,35 +3042,41 @@
         });
 
         // Restructure DataTables wrapper to make only table scroll
-        setTimeout(function() {
+        setTimeout(function () {
           var $wrapper = $("#envTable").closest(".dataTables_wrapper");
           var $table = $wrapper.find("table");
           var $filter = $wrapper.find(".dataTables_filter");
           var $length = $wrapper.find(".dataTables_length");
           var $info = $wrapper.find(".dataTables_info");
           var $paginate = $wrapper.find(".dataTables_paginate");
-          
+
           // Store references and detach elements
           $table.detach();
           $filter.detach();
           $length.detach();
           $info.detach();
           $paginate.detach();
-          
+
           // Create scrollable container for table
-          var $scrollContainer = $('<div style="overflow-x: auto; min-width: 0; flex: 1;"></div>');
+          var $scrollContainer = $(
+            '<div style="overflow-x: auto; min-width: 0; flex: 1;"></div>',
+          );
           $scrollContainer.append($table);
-          
+
           // Create top controls section (filter and length)
-          var $topControls = $('<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 12px;"></div>');
+          var $topControls = $(
+            '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 12px;"></div>',
+          );
           $topControls.append($length);
           $topControls.append($filter);
-          
+
           // Create bottom controls section (info and pagination)
-          var $bottomControls = $('<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; flex-wrap: wrap; gap: 12px;"></div>');
+          var $bottomControls = $(
+            '<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; flex-wrap: wrap; gap: 12px;"></div>',
+          );
           $bottomControls.append($info);
           $bottomControls.append($paginate);
-          
+
           // Empty wrapper and rebuild
           $wrapper.empty();
           $wrapper.append($topControls);
@@ -2523,7 +3105,7 @@
           '<table class="dt"><thead><tr><th>Name</th><th>Env ID</th><th>Client ID</th><th>Created</th><th>Status</th><th></th></tr></thead><tbody>';
 
         recent.forEach(function (env) {
-          console.log(env)
+          console.log(env);
           var badge = env.is_active
             ? '<span class="badge badge-success"><span class="dot"></span> Active</span>'
             : '<span class="badge badge-danger"><span class="dot"></span> Inactive</span>';
@@ -2535,8 +3117,12 @@
             "</strong></td>" +
             "<td>" +
             '<div class="action-cell">' +
-            '<code style="font-size: 11px; color: var(--text-muted);">' + escHtml(env.id) + '</code>' +
-            '<button class="icon-btn copy-id-btn" data-id="' + env.id + '" title="Copy ID" style="margin-left: 4px;">' +
+            '<code style="font-size: 11px; color: var(--text-muted);">' +
+            escHtml(env.id) +
+            "</code>" +
+            '<button class="icon-btn copy-id-btn" data-id="' +
+            env.id +
+            '" title="Copy ID" style="margin-left: 4px;">' +
             '<i class="fa-solid fa-copy"></i>' +
             "</button>" +
             "</div>" +
@@ -2593,35 +3179,39 @@
         $("#xpiApiServicesDatahubId").val(env.xpi_api_services_datahub_id);
         $("#xpiEntityDatahubId").val(env.xpi_entity_datahub_id);
         $("#xpiFieldMappingDatahubId").val(env.xpi_field_mapping_datahub_id);
-        $("#xpiRequestFormFieldMappingDatahubId").val(env.xpi_request_form_field_mapping_datahub_id);
-        $("#xpiRequestFormMappingDatahubId").val(env.xpi_request_form_mapping_datahub_id);
+        $("#xpiRequestFormFieldMappingDatahubId").val(
+          env.xpi_request_form_field_mapping_datahub_id,
+        );
+        $("#xpiRequestFormMappingDatahubId").val(
+          env.xpi_request_form_mapping_datahub_id,
+        );
         $("#xpiSpaceNameDatahubId").val(env.xpi_space_name_datahub_id);
         $("#campaignSpaceId").val(env.campaign_space_id);
 
         $("#isVisible").prop("checked", env.is_visible);
         $("#isActive").prop("checked", env.is_active);
-        
+
         // Show redirect URL section for edit modal
         $("#redirectUrlContainer").show();
-        
+
         // Update redirect URL display for edit modal
         if (wrikeRedirectUrl && id && appUrl) {
           // Redirect URL without environmentId
           $("#redirectUrlDisplay").text(wrikeRedirectUrl);
           $("#redirectUrlSection").show();
-          
+
           // Login URL with environmentId
           const loginUrl = appUrl + "?environmentId=" + id;
           $("#loginUrlDisplay").text(loginUrl);
           $("#loginUrlSection").show();
-          
+
           $("#noEnvironmentNotice").hide();
         } else {
           $("#redirectUrlSection").hide();
           $("#loginUrlSection").hide();
           $("#noEnvironmentNotice").show();
         }
-        
+
         $("#envModalBackdrop").addClass("show");
         setTimeout(function () {
           $("#clientId").focus();
@@ -2638,27 +3228,32 @@
         $("#successRedirectUrl").text(redirectUrl);
         $("#successLoginUrl").text(loginUrl);
         $("#redirectUrlModalBackdrop").addClass("show");
-        
+
         // Start countdown timer
         let countdownSeconds = 8;
         $("#countdownTimer").text(countdownSeconds);
-        
+
         const countdownInterval = setInterval(function () {
           countdownSeconds--;
           $("#countdownTimer").text(countdownSeconds);
-          
+
           if (countdownSeconds <= 0) {
             clearInterval(countdownInterval);
             closeRedirectUrlModal();
           }
         }, 1000);
-        
+
         // Store interval ID in case we close early
-        $("#redirectUrlModalBackdrop").data("countdownInterval", countdownInterval);
+        $("#redirectUrlModalBackdrop").data(
+          "countdownInterval",
+          countdownInterval,
+        );
       }
 
       function closeRedirectUrlModal() {
-        const interval = $("#redirectUrlModalBackdrop").data("countdownInterval");
+        const interval = $("#redirectUrlModalBackdrop").data(
+          "countdownInterval",
+        );
         if (interval) clearInterval(interval);
         $("#redirectUrlModalBackdrop").removeClass("show");
       }
@@ -2666,7 +3261,7 @@
       /* ── Modal button events ────────────────────────────────── */
       $("#addEnvBtn").on("click", openAddModal);
       $("#closeModalBtn, #cancelModalBtn").on("click", closeModal);
-      
+
       /* Prevent modal from closing when clicking inside the modal */
       $("#envModalBackdrop .modal").on("click", function (e) {
         e.stopPropagation();
@@ -2678,7 +3273,10 @@
       });
 
       /* ── Redirect URL modal button events ───────────────────── */
-      $("#closeRedirectModalBtn, #closeRedirectModalBtnFooter").on("click", closeRedirectUrlModal);
+      $("#closeRedirectModalBtn, #closeRedirectModalBtnFooter").on(
+        "click",
+        closeRedirectUrlModal,
+      );
       $("#redirectUrlModalBackdrop").on("click", function (e) {
         if (e.target === this) closeRedirectUrlModal();
       });
@@ -2712,8 +3310,9 @@
               $icon.removeClass("fa-check").addClass("fa-copy");
             }, 1500);
           };
-          
-          navigator.clipboard.writeText(urlText)
+
+          navigator.clipboard
+            .writeText(urlText)
             .then(function () {
               copySuccess();
             })
@@ -2744,8 +3343,9 @@
               $icon.removeClass("fa-check").addClass("fa-copy");
             }, 1500);
           };
-          
-          navigator.clipboard.writeText(urlText)
+
+          navigator.clipboard
+            .writeText(urlText)
             .then(function () {
               copySuccess();
             })
@@ -2776,8 +3376,9 @@
               $icon.removeClass("fa-check").addClass("fa-copy");
             }, 1500);
           };
-          
-          navigator.clipboard.writeText(urlText)
+
+          navigator.clipboard
+            .writeText(urlText)
             .then(function () {
               copySuccess();
             })
@@ -2808,8 +3409,9 @@
               $icon.removeClass("fa-check").addClass("fa-copy");
             }, 1500);
           };
-          
-          navigator.clipboard.writeText(urlText)
+
+          navigator.clipboard
+            .writeText(urlText)
             .then(function () {
               copySuccess();
             })
@@ -2831,16 +3433,17 @@
         e.stopPropagation();
         const $btn = $(this);
         const idValue = $btn.data("id");
-        
+
         if (!idValue) return;
-        
-        navigator.clipboard.writeText(idValue)
+
+        navigator.clipboard
+          .writeText(idValue)
           .then(function () {
             // Change icon to checkmark
             const $icon = $btn.find("i");
             $icon.removeClass("fa-copy").addClass("fa-check");
             $btn.addClass("copied");
-            
+
             // Revert after 1.5 seconds
             setTimeout(function () {
               $icon.removeClass("fa-check").addClass("fa-copy");
@@ -2854,12 +3457,12 @@
             $temp.val(idValue).select();
             document.execCommand("copy");
             $temp.remove();
-            
+
             // Change icon to checkmark
             const $icon = $btn.find("i");
             $icon.removeClass("fa-copy").addClass("fa-check");
             $btn.addClass("copied");
-            
+
             // Revert after 1.5 seconds
             setTimeout(function () {
               $icon.removeClass("fa-check").addClass("fa-copy");
@@ -2875,11 +3478,23 @@
         var clientSecret = $("#clientSecret").val().trim();
         var accountId = $("#accountId").val().trim();
         var xpiApiModulesDatahubId = $("#xpiApiModulesDatahubId").val().trim();
-        var xpiApiServicesDatahubId = $("#xpiApiServicesDatahubId").val().trim();
+        var xpiApiServicesDatahubId = $("#xpiApiServicesDatahubId")
+          .val()
+          .trim();
         var xpiEntityDatahubId = $("#xpiEntityDatahubId").val().trim();
-        var xpiFieldMappingDatahubId = $("#xpiFieldMappingDatahubId").val().trim();
-        var xpiRequestFormFieldMappingDatahubId = $("#xpiRequestFormFieldMappingDatahubId").val().trim();
-        var xpiRequestFormMappingDatahubId = $("#xpiRequestFormMappingDatahubId").val().trim();
+        var xpiFieldMappingDatahubId = $("#xpiFieldMappingDatahubId")
+          .val()
+          .trim();
+        var xpiRequestFormFieldMappingDatahubId = $(
+          "#xpiRequestFormFieldMappingDatahubId",
+        )
+          .val()
+          .trim();
+        var xpiRequestFormMappingDatahubId = $(
+          "#xpiRequestFormMappingDatahubId",
+        )
+          .val()
+          .trim();
         var xpiSpaceNameDatahubId = $("#xpiSpaceNameDatahubId").val().trim();
         var campaignSpaceId = $("#campaignSpaceId").val().trim();
 
@@ -2923,7 +3538,10 @@
         }
 
         if (!xpiRequestFormFieldMappingDatahubId) {
-          toast("XPI Request Form Field Mapping Datahub ID is required", "error");
+          toast(
+            "XPI Request Form Field Mapping Datahub ID is required",
+            "error",
+          );
           return;
         }
 
@@ -2942,8 +3560,6 @@
           return;
         }
 
-
-
         var $btn = $(this).addClass("loading").prop("disabled", true);
 
         try {
@@ -2956,8 +3572,10 @@
             xpi_api_services_datahub_id: xpiApiServicesDatahubId || undefined,
             xpi_entity_datahub_id: xpiEntityDatahubId || undefined,
             xpi_field_mapping_datahub_id: xpiFieldMappingDatahubId || undefined,
-            xpi_request_form_field_mapping_datahub_id: xpiRequestFormFieldMappingDatahubId || undefined,
-            xpi_request_form_mapping_datahub_id: xpiRequestFormMappingDatahubId || undefined,
+            xpi_request_form_field_mapping_datahub_id:
+              xpiRequestFormFieldMappingDatahubId || undefined,
+            xpi_request_form_mapping_datahub_id:
+              xpiRequestFormMappingDatahubId || undefined,
             xpi_space_name_datahub_id: xpiSpaceNameDatahubId || undefined,
             campaign_space_id: campaignSpaceId || undefined,
             is_visible: isVisible,
@@ -2983,7 +3601,7 @@
             throw new Error(data.message || "Save failed");
 
           closeModal();
-          
+
           // Show redirect URL modal after creation (not on edit)
           if (!editingId && wrikeRedirectUrl && appUrl && data.data?.id) {
             const redirectUrl = wrikeRedirectUrl;
@@ -2999,7 +3617,7 @@
               "success",
             );
           }
-          
+
           await loadEnvironments();
         } catch (err) {
           toast(err.message || "An error occurred", "error");
@@ -3086,6 +3704,644 @@
         NProgress.configure({ showSpinner: false, minimum: 0.15 });
         loadEnvironments();
       });
+
+      /* ══════════════════════════════════════════════════════════
+         PORTAL USERS MANAGEMENT
+      ══════════════════════════════════════════════════════════ */
+      let puUsers = [];
+      let puDT = null;
+      let puResetId = null;
+      let puAssignId = null;
+      let puEditId = null;
+      let puGenCreds = null;
+
+      /* ── Password show/hide ────────────────────────────────── */
+      function puTogglePwd(inputId, iconId) {
+        const inp = document.getElementById(inputId);
+        const ico = document.getElementById(iconId);
+        if (inp.type === "password") {
+          inp.type = "text";
+          ico.classList.replace("fa-eye", "fa-eye-slash");
+        } else {
+          inp.type = "password";
+          ico.classList.replace("fa-eye-slash", "fa-eye");
+        }
+      }
+
+      /* ── Load portal users (triggered when Users tab is clicked) ── */
+      async function loadPortalUsers() {
+        try {
+          const res = await fetch("/api/v1/admin/portal-users", {
+            headers: authHeaders(),
+          });
+          const json = await res.json();
+          if (!res.ok || !json.success)
+            throw new Error(json.message || "Failed to load users");
+          puUsers = json.data || [];
+          renderPuTable();
+        } catch (err) {
+          toast(err.message || "Failed to load portal users", "error");
+        }
+      }
+
+      function renderPuTable() {
+        if (puDT) {
+          puDT.destroy();
+          puDT = null;
+        }
+        const tbody = document.getElementById("puTableBody");
+        tbody.innerHTML = "";
+
+        if (!puUsers.length) {
+          tbody.innerHTML =
+            '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted);"><i class="fa-solid fa-users" style="font-size:24px;display:block;margin-bottom:10px;opacity:0.3;"></i>No portal users found.</td></tr>';
+          return;
+        }
+
+        puUsers.forEach((u) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML =
+            "<td><strong>" +
+            escHtml(u.username) +
+            "</strong></td>" +
+            "<td>" +
+            (u.full_name
+              ? escHtml(u.full_name)
+              : '<span style="color:var(--text-muted)">—</span>') +
+            "</td>" +
+            '<td style="font-size:12.5px;">' +
+            (u.email
+              ? escHtml(u.email)
+              : '<span style="color:var(--text-muted)">—</span>') +
+            "</td>" +
+            "<td>" +
+            puRoleBadge(u.role) +
+            "</td>" +
+            '<td style="font-size:12px;color:var(--text-muted);">' +
+            puFmtDate(u.last_login_at) +
+            "</td>" +
+            "<td>" +
+            puStatusBadge(u.is_active) +
+            "</td>" +
+            "<td>" +
+            (u.must_change_password
+              ? '<span class="badge badge-warning"><i class="fa-solid fa-clock"></i> Pending</span>'
+              : '<span class="badge badge-success"><i class="fa-solid fa-check"></i> Set</span>') +
+            "</td>" +
+            '<td><div style="display:flex;gap:6px;align-items:center;">' +
+            '<button class="icon-btn" onclick="puOpenEdit(\'' +
+            u.id +
+            '\')" title="Edit User"><i class="fa-solid fa-pen-to-square"></i></button>' +
+            '<button class="icon-btn" onclick="puOpenReset(\'' +
+            u.id +
+            "','" +
+            escHtml(u.username) +
+            '\')" title="Reset Password"><i class="fa-solid fa-key"></i></button>' +
+            '<button class="icon-btn" onclick="puOpenAssignEnv(\'' +
+            u.id +
+            "','" +
+            escHtml(u.username) +
+            '\')" title="Manage Environments"><i class="fa-solid fa-plug"></i></button>' +
+            '<button class="icon-btn" style="' +
+            (u.is_active ? "color:var(--danger);" : "color:var(--success);") +
+            '" onclick="puToggle(\'' +
+            u.id +
+            "'," +
+            !u.is_active +
+            ')" title="' +
+            (u.is_active ? "Disable" : "Enable") +
+            '">' +
+            '<i class="fa-solid ' +
+            (u.is_active ? "fa-ban" : "fa-circle-check") +
+            '"></i></button>' +
+            "</div></td>";
+          tbody.appendChild(tr);
+        });
+
+        puDT = $("#puTable").DataTable({
+          pageLength: 10,
+          order: [[0, "asc"]],
+          language: {
+            search: "",
+            searchPlaceholder: "Search users…",
+            lengthMenu: "Show _MENU_ rows",
+            info: "Showing _START_–_END_ of _TOTAL_",
+            paginate: { previous: "‹", next: "›" },
+          },
+          columnDefs: [{ targets: 7, orderable: false }],
+        });
+
+        // Restructure DataTables wrapper to make only table scroll
+        setTimeout(function () {
+          var $wrapper = $("#puTable").closest(".dataTables_wrapper");
+          var $table = $wrapper.find("table");
+          var $filter = $wrapper.find(".dataTables_filter");
+          var $length = $wrapper.find(".dataTables_length");
+          var $info = $wrapper.find(".dataTables_info");
+          var $paginate = $wrapper.find(".dataTables_paginate");
+
+          $table.detach();
+          $filter.detach();
+          $length.detach();
+          $info.detach();
+          $paginate.detach();
+
+          var $scrollContainer = $(
+            '<div style="overflow-x: auto; min-width: 0; flex: 1;"></div>',
+          );
+          $scrollContainer.append($table);
+
+          var $topControls = $(
+            '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 12px;"></div>',
+          );
+          $topControls.append($length);
+          $topControls.append($filter);
+
+          var $bottomControls = $(
+            '<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; flex-wrap: wrap; gap: 12px;"></div>',
+          );
+          $bottomControls.append($info);
+          $bottomControls.append($paginate);
+
+          $wrapper.empty();
+          $wrapper.append($topControls);
+          $wrapper.append($scrollContainer);
+          $wrapper.append($bottomControls);
+        }, 10);
+      }
+
+      function puStatusBadge(active) {
+        return active
+          ? '<span class="badge badge-success"><span class="dot"></span> Active</span>'
+          : '<span class="badge badge-danger"><span class="dot"></span> Inactive</span>';
+      }
+
+      function puRoleBadge(role) {
+        return role === "admin"
+          ? '<span class="badge badge-info"><i class="fa-solid fa-shield-halved"></i> Admin</span>'
+          : '<span class="badge" style="background:var(--bg-surface);color:var(--text-muted);border:1px solid var(--border);"><i class="fa-solid fa-user"></i> User</span>';
+      }
+
+      function puFmtDate(d) {
+        if (!d) return "—";
+        return new Date(d).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
+      }
+
+      /* ── Add User ─────────────────────────────────────────── */
+      document.getElementById("puAddUserBtn").addEventListener("click", () => {
+        document.getElementById("puUserForm").reset();
+        // Ensure password is hidden again after reset
+        const pwdInp = document.getElementById("puPassword");
+        const pwdEye = document.getElementById("puPwdEye");
+        pwdInp.type = "password";
+        pwdEye.classList.replace("fa-eye-slash", "fa-eye");
+        document.getElementById("puUserModalBackdrop").classList.add("open");
+      });
+
+      document
+        .getElementById("puSaveUserBtn")
+        .addEventListener("click", async () => {
+          const username = document.getElementById("puUsername").value.trim();
+          const password = document.getElementById("puPassword").value;
+          const role = "user";
+          const full_name = document.getElementById("puFullName").value.trim();
+          const email = document.getElementById("puEmail").value.trim();
+
+          if (!username || !password || !role) {
+            toast("Username, password and role are required", "error");
+            return;
+          }
+          if (password.length < 10 || password.length > 16) {
+            toast("Password must be 10 to 16 characters", "error");
+            return;
+          }
+
+          const btn = document.getElementById("puSaveUserBtn");
+          btn.disabled = true;
+
+          try {
+            const res = await fetch("/api/v1/admin/portal-users", {
+              method: "POST",
+              headers: { ...authHeaders(), "Content-Type": "application/json" },
+              body: JSON.stringify({
+                username,
+                password,
+                role,
+                full_name: full_name || undefined,
+                email: email || undefined,
+              }),
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message);
+            toast("User created successfully", "success");
+            document
+              .getElementById("puUserModalBackdrop")
+              .classList.remove("open");
+            await loadPortalUsers();
+          } catch (err) {
+            toast(err.message, "error");
+          } finally {
+            btn.disabled = false;
+          }
+        });
+
+      document
+        .getElementById("puCancelUserBtn")
+        .addEventListener("click", () =>
+          document
+            .getElementById("puUserModalBackdrop")
+            .classList.remove("open"),
+        );
+      document
+        .getElementById("puCloseUserModal")
+        .addEventListener("click", () =>
+          document
+            .getElementById("puUserModalBackdrop")
+            .classList.remove("open"),
+        );
+
+      /* ── Generate Credentials (combined) ────────────────── */
+      document
+        .getElementById("puGenCredsBtn")
+        .addEventListener("click", async () => {
+          const icon = document.getElementById("puGenCredsIcon");
+          icon.classList.replace("fa-wand-magic-sparkles", "fa-spinner");
+          icon.classList.add("fa-spin");
+          try {
+            const res = await fetch(
+              "/api/v1/admin/portal-users/generate-credentials",
+              { method: "POST", headers: authHeaders() },
+            );
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message);
+            document.getElementById("puUsername").value = json.data.username;
+            const pwdInp = document.getElementById("puPassword");
+            const pwdEye = document.getElementById("puPwdEye");
+            pwdInp.value = json.data.password;
+            pwdInp.type = "text";
+            pwdEye.classList.replace("fa-eye", "fa-eye-slash");
+            toast("Credentials generated", "success");
+          } catch (err) {
+            toast(err.message || "Failed to generate credentials", "error");
+          } finally {
+            icon.classList.replace("fa-spinner", "fa-wand-magic-sparkles");
+            icon.classList.remove("fa-spin");
+          }
+        });
+
+      /* ── Edit: generate username ─────────────────────────── */
+      document
+        .getElementById("puEditGenUsernameBtn")
+        .addEventListener("click", async () => {
+          const icon = document.getElementById("puEditGenUsernameIcon");
+          icon.classList.replace("fa-wand-magic-sparkles", "fa-spinner");
+          icon.classList.add("fa-spin");
+          try {
+            const res = await fetch(
+              "/api/v1/admin/portal-users/generate-credentials",
+              { method: "POST", headers: authHeaders() },
+            );
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message);
+            document.getElementById("puEditUsernameInput").value =
+              json.data.username;
+            toast("Username generated", "success");
+          } catch (err) {
+            toast(err.message || "Failed to generate username", "error");
+          } finally {
+            icon.classList.replace("fa-spinner", "fa-wand-magic-sparkles");
+            icon.classList.remove("fa-spin");
+          }
+        });
+
+      /* ── Edit User ────────────────────────────────────────── */
+      function puOpenEdit(userId) {
+        const user = puUsers.find((u) => u.id === userId);
+        if (!user) return;
+        puEditId = userId;
+        document.getElementById("puEditUsername").textContent = user.username;
+        document.getElementById("puEditUsernameInput").value = user.username;
+        document.getElementById("puEditFullName").value = user.full_name || "";
+        document.getElementById("puEditEmail").value = user.email || "";
+        document
+          .getElementById("puEditUserModalBackdrop")
+          .classList.add("open");
+      }
+
+      document
+        .getElementById("puSaveEditUserBtn")
+        .addEventListener("click", async () => {
+          const username = document
+            .getElementById("puEditUsernameInput")
+            .value.trim();
+          const full_name = document
+            .getElementById("puEditFullName")
+            .value.trim();
+          const email = document.getElementById("puEditEmail").value.trim();
+
+          const btn = document.getElementById("puSaveEditUserBtn");
+          btn.disabled = true;
+
+          try {
+            const res = await fetch("/api/v1/admin/portal-users/" + puEditId, {
+              method: "PATCH",
+              headers: {
+                ...authHeaders(),
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                username: username || undefined,
+                full_name: full_name || null,
+                email: email || null,
+              }),
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message);
+            toast("User updated successfully", "success");
+            document
+              .getElementById("puEditUserModalBackdrop")
+              .classList.remove("open");
+            await loadPortalUsers();
+          } catch (err) {
+            toast(err.message, "error");
+          } finally {
+            btn.disabled = false;
+          }
+        });
+
+      document
+        .getElementById("puCancelEditUserBtn")
+        .addEventListener("click", () =>
+          document
+            .getElementById("puEditUserModalBackdrop")
+            .classList.remove("open"),
+        );
+      document
+        .getElementById("puCloseEditUserModal")
+        .addEventListener("click", () =>
+          document
+            .getElementById("puEditUserModalBackdrop")
+            .classList.remove("open"),
+        );
+
+      /* ── Reset Password ───────────────────────────────────── */
+      function puOpenReset(userId, username) {
+        puResetId = userId;
+        document.getElementById("puResetUsername").textContent = username;
+        document.getElementById("puResetPwdInput").value = "";
+        const eye = document.getElementById("puResetPwdEye");
+        document.getElementById("puResetPwdInput").type = "password";
+        eye.classList.replace("fa-eye-slash", "fa-eye");
+        document
+          .getElementById("puResetPwdModalBackdrop")
+          .classList.add("open");
+      }
+
+      document
+        .getElementById("puConfirmResetBtn")
+        .addEventListener("click", async () => {
+          const new_password = document.getElementById("puResetPwdInput").value;
+          if (!new_password || new_password.length < 8) {
+            toast("Password must be at least 8 characters", "error");
+            return;
+          }
+
+          const btn = document.getElementById("puConfirmResetBtn");
+          btn.disabled = true;
+
+          try {
+            const res = await fetch(
+              "/api/v1/admin/portal-users/" + puResetId + "/reset-password",
+              {
+                method: "PATCH",
+                headers: {
+                  ...authHeaders(),
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ new_password }),
+              },
+            );
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message);
+            toast("Password reset successfully", "success");
+            document
+              .getElementById("puResetPwdModalBackdrop")
+              .classList.remove("open");
+            await loadPortalUsers();
+          } catch (err) {
+            toast(err.message, "error");
+          } finally {
+            btn.disabled = false;
+          }
+        });
+
+      document
+        .getElementById("puCancelResetBtn")
+        .addEventListener("click", () =>
+          document
+            .getElementById("puResetPwdModalBackdrop")
+            .classList.remove("open"),
+        );
+      document
+        .getElementById("puCloseResetModal")
+        .addEventListener("click", () =>
+          document
+            .getElementById("puResetPwdModalBackdrop")
+            .classList.remove("open"),
+        );
+
+      /* ── Toggle status ────────────────────────────────────── */
+      async function puToggle(userId, is_active) {
+        const confirmed = await Swal.fire({
+          title: (is_active ? "Enable" : "Disable") + " user?",
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonText: is_active ? "Enable" : "Disable",
+          confirmButtonColor: is_active ? "#008262" : "#ef4444",
+        });
+        if (!confirmed.isConfirmed) return;
+
+        try {
+          const res = await fetch(
+            "/api/v1/admin/portal-users/" + userId + "/status",
+            {
+              method: "PATCH",
+              headers: { ...authHeaders(), "Content-Type": "application/json" },
+              body: JSON.stringify({ is_active }),
+            },
+          );
+          const json = await res.json();
+          if (!res.ok || !json.success) throw new Error(json.message);
+          toast("User " + (is_active ? "enabled" : "disabled"), "success");
+          await loadPortalUsers();
+        } catch (err) {
+          toast(err.message, "error");
+        }
+      }
+
+      /* ── Manage Environments ──────────────────────────────── */
+      async function puOpenAssignEnv(userId, username) {
+        puAssignId = userId;
+        document.getElementById("puAssignEnvUsername").textContent = username;
+        document
+          .getElementById("puAssignEnvModalBackdrop")
+          .classList.add("open");
+        await puLoadEnvModal(userId);
+      }
+
+      async function puLoadEnvModal(userId) {
+        const list = document.getElementById("puAssignedEnvList");
+        const sel = document.getElementById("puAssignEnvSelect");
+        const noMsg = document.getElementById("puNoAvailEnvMsg");
+        const addSection = document.getElementById("puAssignNewEnvSection");
+
+        list.innerHTML =
+          '<div style="color:var(--text-muted);font-size:13px;">Loading...</div>';
+
+        try {
+          // Fetch user's environments + all credentials in parallel
+          const [userEnvsRes, allCredsRes] = await Promise.all([
+            fetch("/api/v1/admin/portal-users/" + userId + "/environments", {
+              headers: authHeaders(),
+            }),
+            fetch("/api/v1/admin/credentials", { headers: authHeaders() }),
+          ]);
+
+          const userEnvsJson = await userEnvsRes.json();
+          const allCredsJson = await allCredsRes.json();
+
+          const userEnvs = userEnvsJson.data || [];
+          const unassigned = (allCredsJson.data || []).filter(
+            (e) => !e.owner_id && e.is_active && !e.deleted_at,
+          );
+
+          // Render assigned list
+          if (!userEnvs.length) {
+            list.innerHTML =
+              '<div style="color:var(--text-muted);font-size:13px;padding:8px 0;"><i class="fa-solid fa-circle-info" style="margin-right:5px;"></i>No environments assigned yet.</div>';
+          } else {
+            list.innerHTML = userEnvs
+              .map(
+                (env) =>
+                  '<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px;">' +
+                  '<span style="font-size:13px;font-weight:500;">' +
+                  '<i class="fa-solid fa-circle-dot" style="color:var(--success);margin-right:7px;font-size:9px;"></i>' +
+                  escHtml(env.environment_name) +
+                  "</span>" +
+                  '<button class="btn btn-ghost" style="height:26px;padding:0 10px;font-size:12px;color:var(--danger);border-color:rgba(239,68,68,0.3);" onclick="puRevokeEnv(\'' +
+                  userId +
+                  "','" +
+                  env.id +
+                  '\')"><i class="fa-solid fa-link-slash"></i> Revoke</button>' +
+                  "</div>",
+              )
+              .join("");
+          }
+
+          // Render unassigned dropdown
+          sel.innerHTML = '<option value="">Select environment…</option>';
+          unassigned.forEach((env) => {
+            const opt = document.createElement("option");
+            opt.value = env.id;
+            opt.textContent = env.environment_name;
+            sel.appendChild(opt);
+          });
+
+          if (!unassigned.length) {
+            sel.style.display = "none";
+            document
+              .getElementById("puAddEnvToUserBtn")
+              .setAttribute("disabled", "true");
+            noMsg.style.display = "block";
+          } else {
+            sel.style.display = "";
+            document
+              .getElementById("puAddEnvToUserBtn")
+              .removeAttribute("disabled");
+            noMsg.style.display = "none";
+          }
+        } catch (err) {
+          list.innerHTML =
+            '<div style="color:var(--danger);font-size:13px;">Failed to load environments.</div>';
+        }
+      }
+
+      async function puRevokeEnv(userId, envId) {
+        try {
+          const res = await fetch(
+            "/api/v1/admin/portal-users/" +
+              userId +
+              "/environments?env_id=" +
+              envId,
+            { method: "DELETE", headers: authHeaders() },
+          );
+          const json = await res.json();
+          if (!res.ok || !json.success) throw new Error(json.message);
+          toast("Environment revoked", "success");
+          await puLoadEnvModal(userId);
+        } catch (err) {
+          toast(err.message, "error");
+        }
+      }
+
+      document
+        .getElementById("puAddEnvToUserBtn")
+        .addEventListener("click", async () => {
+          const env_id = document.getElementById("puAssignEnvSelect").value;
+          if (!env_id) {
+            toast("Select an environment first", "warning");
+            return;
+          }
+
+          const btn = document.getElementById("puAddEnvToUserBtn");
+          btn.disabled = true;
+
+          try {
+            const res = await fetch(
+              "/api/v1/admin/portal-users/" + puAssignId + "/environments",
+              {
+                method: "POST",
+                headers: {
+                  ...authHeaders(),
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ env_id }),
+              },
+            );
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message);
+            toast("Environment assigned", "success");
+            await puLoadEnvModal(puAssignId);
+          } catch (err) {
+            toast(err.message, "error");
+          } finally {
+            btn.disabled = false;
+          }
+        });
+
+      document
+        .getElementById("puCloseAssignEnvModal")
+        .addEventListener("click", () =>
+          document
+            .getElementById("puAssignEnvModalBackdrop")
+            .classList.remove("open"),
+        );
+      document
+        .getElementById("puDoneAssignEnvBtn")
+        .addEventListener("click", () =>
+          document
+            .getElementById("puAssignEnvModalBackdrop")
+            .classList.remove("open"),
+        );
+
+      /* ── Load when Users tab is clicked ──────────────────── */
+      document
+        .querySelector('[data-page="users"]')
+        .addEventListener("click", loadPortalUsers);
     </script>
   </body>
 </html>

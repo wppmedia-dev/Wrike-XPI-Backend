@@ -1,0 +1,2736 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portal — WrikeXPI</title>
+    <link
+      rel="icon"
+      href="https://cdn.wrike.com/static/branding/wrike/favicons/favicon.ico"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/nprogress@0.2.0/nprogress.css"
+    />
+
+    <style>
+      :root {
+        --bg-body: #f0f4f8;
+        --bg-sidebar: #ffffff;
+        --bg-card: #ffffff;
+        --bg-surface: #f5f7fa;
+        --bg-surface-2: #eaeff5;
+        --border: #e2e8f0;
+        --border-light: rgba(226, 232, 240, 0.7);
+        --text-primary: #0f172a;
+        --text-secondary: #475569;
+        --text-muted: #94a3b8;
+        --accent: #008262;
+        --accent-hover: #006d52;
+        --accent-soft: rgba(0, 130, 98, 0.12);
+        --success: #008262;
+        --success-soft: rgba(0, 130, 98, 0.12);
+        --danger: #ef4444;
+        --danger-soft: rgba(239, 68, 68, 0.1);
+        --warning: #d29922;
+        --warning-soft: rgba(210, 153, 34, 0.12);
+        --sidebar-width: 256px;
+        --topbar-height: 60px;
+        --radius-sm: 6px;
+        --radius-md: 10px;
+        --radius-lg: 14px;
+        --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.06);
+        --shadow-md: 0 1px 8px rgba(0, 0, 0, 0.08);
+        --shadow-lg: 0 4px 24px rgba(0, 0, 0, 0.12);
+        --transition: all 0.18s ease;
+      }
+
+      *,
+      *::before,
+      *::after {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+      }
+
+      body {
+        font-family:
+          "Inter",
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        background: var(--bg-body);
+        color: var(--text-primary);
+        font-size: 14px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      ::-webkit-scrollbar {
+        width: 5px;
+        height: 5px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #8b95a6;
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #6b7580;
+      }
+
+      /* ─── Layout ─────────────────────────────────────────── */
+      #app {
+        display: flex;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      /* ─── Sidebar ─────────────────────────────────────────── */
+      #sidebar {
+        width: var(--sidebar-width);
+        min-width: var(--sidebar-width);
+        height: 100vh;
+        background: var(--bg-sidebar);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        transition:
+          width 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+          min-width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        z-index: 100;
+        flex-shrink: 0;
+      }
+
+      #sidebar.collapsed {
+        width: 64px;
+        min-width: 64px;
+      }
+
+      .sidebar-logo-row {
+        height: var(--topbar-height);
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 0 12px 0 16px;
+        border-bottom: 1px solid var(--border);
+        overflow: hidden;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+
+      #sidebar.collapsed .sidebar-logo-row {
+        padding: 0 8px;
+        justify-content: center;
+        gap: 0;
+      }
+
+      .sidebar-logo {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        text-decoration: none;
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+      }
+
+      #sidebar.collapsed .sidebar-logo {
+        flex: unset;
+        min-width: unset;
+      }
+      #sidebar.collapsed .logo-text {
+        display: none;
+      }
+      #sidebar.collapsed .sidebar-collapse-btn {
+        margin-left: 0;
+      }
+
+      .logo-mark {
+        width: 34px;
+        height: 34px;
+        min-width: 34px;
+        border-radius: var(--radius-sm);
+        background: linear-gradient(135deg, #008262 0%, #005c46 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        flex-shrink: 0;
+      }
+
+      .logo-mark svg {
+        width: 20px;
+        height: 13px;
+        fill: #fff;
+        display: block;
+      }
+
+      .logo-text {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.25;
+        overflow: hidden;
+      }
+      .logo-text .brand {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--text-primary);
+        letter-spacing: -0.3px;
+      }
+      .logo-text .sub {
+        font-size: 10.5px;
+        color: var(--text-muted);
+        font-weight: 400;
+      }
+
+      .sidebar-collapse-btn {
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
+        border-radius: var(--radius-sm);
+        background: transparent;
+        border: 1px solid transparent;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 12px;
+        transition: var(--transition);
+        flex-shrink: 0;
+      }
+
+      .sidebar-collapse-btn:hover {
+        background: var(--bg-surface);
+        border-color: var(--border);
+        color: var(--text-secondary);
+      }
+      #sidebar.collapsed .sidebar-collapse-btn i {
+        transform: rotate(180deg);
+      }
+
+      .sidebar-nav {
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 10px 8px;
+      }
+
+      .nav-group-label {
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+        color: var(--text-muted);
+        padding: 10px 10px 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        transition:
+          opacity 0.18s ease,
+          height 0.18s ease;
+      }
+
+      #sidebar.collapsed .nav-group-label {
+        opacity: 0;
+        height: 0;
+        padding: 0;
+      }
+
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 8px 10px;
+        border-radius: var(--radius-sm);
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: var(--transition);
+        white-space: nowrap;
+        overflow: hidden;
+        position: relative;
+        margin-bottom: 1px;
+        border: 1px solid transparent;
+        user-select: none;
+      }
+
+      .nav-item:hover {
+        background: var(--bg-surface);
+        color: var(--text-primary);
+      }
+      .nav-item.active {
+        background: var(--accent-soft);
+        color: var(--accent);
+        border-color: rgba(0, 130, 98, 0.2);
+        font-weight: 500;
+      }
+
+      .nav-item .ni {
+        width: 18px;
+        min-width: 18px;
+        text-align: center;
+        font-size: 14px;
+      }
+      .nav-item .nl {
+        font-size: 13.5px;
+      }
+
+      .nav-badge {
+        margin-left: auto;
+        background: var(--accent);
+        color: #fff;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 1px 6px;
+        border-radius: 10px;
+        min-width: 18px;
+        text-align: center;
+        line-height: 1.6;
+      }
+
+      #sidebar.collapsed .nl,
+      #sidebar.collapsed .nav-badge,
+      #sidebar.collapsed .nav-group-label {
+        display: none;
+      }
+
+      #sidebar.collapsed .nav-item {
+        justify-content: center;
+        padding: 8px 0;
+        gap: 0;
+      }
+
+      .sidebar-footer {
+        border-top: 1px solid var(--border);
+        padding: 10px 8px;
+        flex-shrink: 0;
+        overflow: hidden;
+      }
+
+      .user-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+      }
+
+      .user-avatar {
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #008262 0%, #005c46 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 700;
+        color: white;
+      }
+
+      .user-row-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        overflow: hidden;
+        flex: 1;
+        min-width: 0;
+      }
+      .user-meta {
+        overflow: hidden;
+      }
+      .user-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .user-role {
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      #sidebar.collapsed .user-meta {
+        display: none;
+      }
+      #sidebar.collapsed .user-row {
+        justify-content: center;
+      }
+      #sidebar.collapsed .user-row-left {
+        display: none;
+      }
+
+      .signout-icon-btn {
+        width: 30px;
+        height: 30px;
+        min-width: 30px;
+        border-radius: var(--radius-sm);
+        background: transparent;
+        border: 1px solid transparent;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 14px;
+        transition: var(--transition);
+        flex-shrink: 0;
+      }
+
+      .signout-icon-btn:hover {
+        background: var(--danger-soft);
+        border-color: rgba(239, 68, 68, 0.28);
+        color: var(--danger);
+      }
+
+      /* ─── Main ──────────────────────────────────────────── */
+      #main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        min-width: 0;
+      }
+
+      #topbar {
+        height: var(--topbar-height);
+        min-height: var(--topbar-height);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 24px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-card);
+        box-shadow: 0 1px 0 var(--border);
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        flex-shrink: 0;
+      }
+
+      .topbar-left {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+
+      .topbar-mobile-btn {
+        display: none;
+        width: 37px;
+        height: 37px;
+        background: transparent;
+        border: none;
+        color: var(--text-secondary);
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 18px;
+        transition: var(--transition);
+        padding: 0;
+      }
+
+      .topbar-mobile-btn:hover {
+        color: var(--text-primary);
+      }
+
+      .page-title {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--text-primary);
+        letter-spacing: -0.2px;
+      }
+
+      .breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 1px;
+      }
+      .bc-sep {
+        opacity: 0.4;
+      }
+
+      .topbar-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .topbar-icon-btn {
+        width: 34px;
+        height: 34px;
+        border-radius: var(--radius-sm);
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        color: var(--text-secondary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: var(--transition);
+        font-size: 14px;
+      }
+
+      .topbar-icon-btn:hover {
+        background: var(--bg-surface-2);
+        color: var(--text-primary);
+      }
+
+      #content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 24px;
+      }
+
+      /* ─── Pages ─────────────────────────────────────────── */
+      .page {
+        display: none;
+        animation: pageIn 0.18s ease;
+      }
+      .page.active {
+        display: block;
+      }
+
+      @keyframes pageIn {
+        from {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .section-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        margin-bottom: 20px;
+        gap: 12px;
+      }
+
+      .section-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--text-primary);
+        letter-spacing: -0.3px;
+      }
+      .section-subtitle {
+        font-size: 13px;
+        color: var(--text-muted);
+        margin-top: 2px;
+      }
+
+      /* ─── Stats ─────────────────────────────────────────── */
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+        margin-bottom: 24px;
+      }
+
+      @media (max-width: 1024px) {
+        .stats-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+
+      .stat-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: 18px 20px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        transition: var(--transition);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .stat-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+      }
+      .stat-card.blue::before {
+        background: linear-gradient(90deg, var(--accent), transparent);
+      }
+      .stat-card.green::before {
+        background: linear-gradient(90deg, var(--success), transparent);
+      }
+      .stat-card.red::before {
+        background: linear-gradient(90deg, var(--danger), transparent);
+      }
+      .stat-card.yellow::before {
+        background: linear-gradient(90deg, var(--warning), transparent);
+      }
+
+      .stat-card:hover {
+        border-color: var(--bg-surface-2);
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-md);
+      }
+
+      .stat-icon {
+        width: 42px;
+        height: 42px;
+        min-width: 42px;
+        border-radius: var(--radius-sm);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 17px;
+      }
+
+      .stat-icon.blue {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+      .stat-icon.green {
+        background: var(--success-soft);
+        color: var(--success);
+      }
+      .stat-icon.red {
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+      .stat-icon.yellow {
+        background: var(--warning-soft);
+        color: var(--warning);
+      }
+
+      .stat-body {
+        min-width: 0;
+      }
+      .stat-value {
+        font-size: 24px;
+        font-weight: 800;
+        color: var(--text-primary);
+        line-height: 1;
+        letter-spacing: -0.5px;
+      }
+      .stat-label {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 4px;
+        font-weight: 500;
+      }
+
+      /* ─── Card ──────────────────────────────────────────── */
+      .card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        overflow: hidden;
+        margin-bottom: 20px;
+      }
+      .card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border);
+      }
+      .card-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .card-title i {
+        color: var(--text-muted);
+        font-size: 13px;
+      }
+      .card-body {
+        padding: 20px;
+      }
+
+      /* ─── Buttons ───────────────────────────────────────── */
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 14px;
+        border-radius: var(--radius-sm);
+        font-size: 13.5px;
+        font-weight: 500;
+        font-family: inherit;
+        cursor: pointer;
+        border: 1px solid transparent;
+        transition: var(--transition);
+        white-space: nowrap;
+        vertical-align: middle;
+        line-height: 1.4;
+      }
+
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .btn-primary {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+      }
+      .btn-primary:hover:not(:disabled) {
+        background: var(--accent-hover);
+        border-color: var(--accent-hover);
+      }
+      .btn-ghost {
+        background: transparent;
+        color: var(--text-secondary);
+        border-color: var(--border);
+      }
+      .btn-ghost:hover:not(:disabled) {
+        background: var(--bg-surface);
+        color: var(--text-primary);
+      }
+      .btn-danger {
+        background: transparent;
+        color: var(--danger);
+        border-color: rgba(239, 68, 68, 0.3);
+      }
+      .btn-danger:hover:not(:disabled) {
+        background: var(--danger-soft);
+        border-color: var(--danger);
+      }
+      .btn-sm {
+        padding: 4px 10px;
+        font-size: 12.5px;
+      }
+
+      /* ─── Table ─────────────────────────────────────────── */
+      .table-wrapper {
+        overflow: visible;
+      }
+
+      table.dt {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      table.dt thead th {
+        background: var(--bg-surface);
+        color: var(--text-muted);
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        padding: 10px 16px;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+        white-space: nowrap;
+      }
+
+      table.dt tbody td {
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border-light);
+        color: var(--text-primary);
+        font-size: 13.5px;
+        vertical-align: middle;
+        white-space: nowrap;
+      }
+
+      #recentEnvsBody table.dt tbody td {
+        padding: 12px 16px;
+      }
+      table.dt tbody tr:last-child td {
+        border-bottom: none;
+      }
+      table.dt tbody tr:hover td {
+        background: var(--bg-surface);
+      }
+
+      /* DataTables overrides */
+      .dataTables_wrapper {
+        font-size: 13px;
+        color: var(--text-muted);
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+      }
+
+      .dataTables_wrapper > * {
+        flex-shrink: 0;
+      }
+      .dataTables_wrapper > div[style*="overflow-x"] {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .dataTables_wrapper .dataTables_filter label,
+      .dataTables_wrapper .dataTables_length label,
+      .dataTables_wrapper .dataTables_info {
+        color: var(--text-muted) !important;
+        font-size: 12.5px !important;
+        margin: 0 !important;
+      }
+
+      .dataTables_wrapper .dataTables_filter,
+      .dataTables_wrapper .dataTables_length {
+        display: flex;
+        align-items: center;
+      }
+
+      .dataTables_wrapper .dataTables_filter label,
+      .dataTables_wrapper .dataTables_length label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+      }
+
+      .dataTables_wrapper .dataTables_filter input,
+      .dataTables_wrapper .dataTables_length select {
+        background: var(--bg-surface) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: var(--radius-sm) !important;
+        color: var(--text-primary) !important;
+        padding: 5px 10px !important;
+        font-size: 13px !important;
+        font-family: inherit !important;
+        outline: none !important;
+      }
+
+      .dataTables_wrapper .dataTables_filter input:focus {
+        border-color: var(--accent) !important;
+        box-shadow: 0 0 0 3px rgba(0, 130, 98, 0.12) !important;
+      }
+
+      div.dataTables_wrapper div.dataTables_info {
+        flex-shrink: 0;
+        margin: 0;
+      }
+
+      div.dataTables_wrapper div.dataTables_filter,
+      div.dataTables_wrapper div.dataTables_length {
+        flex-shrink: 0;
+      }
+
+      div.dataTables_wrapper div.dataTables_paginate {
+        flex-shrink: 0;
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+      }
+
+      .dataTables_wrapper .dataTables_paginate .paginate_button {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        min-width: 30px !important;
+        height: 30px !important;
+        padding: 0 8px !important;
+        border-radius: var(--radius-sm) !important;
+        background: var(--bg-surface) !important;
+        border: 1px solid var(--border) !important;
+        color: var(--text-secondary) !important;
+        cursor: pointer !important;
+        font-size: 12.5px !important;
+        transition: var(--transition) !important;
+        margin: 0 2px !important;
+      }
+
+      .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+        background: var(--accent) !important;
+        border-color: var(--accent) !important;
+        color: #fff !important;
+        font-weight: 600 !important;
+      }
+
+      .dataTables_wrapper
+        .dataTables_paginate
+        .paginate_button:hover:not(.current):not(.disabled) {
+        background: var(--bg-surface-2) !important;
+        color: var(--text-primary) !important;
+      }
+
+      .dataTables_wrapper .dataTables_paginate .paginate_button.disabled {
+        opacity: 0.35 !important;
+        cursor: default !important;
+      }
+
+      /* ─── Badges ─────────────────────────────────────────── */
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 11.5px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+      }
+      .badge .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+      .badge-success {
+        background: var(--success-soft);
+        color: var(--success);
+      }
+      .badge-success .dot {
+        background: var(--success);
+        box-shadow: 0 0 4px var(--success);
+      }
+      .badge-danger {
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+      .badge-danger .dot {
+        background: var(--danger);
+      }
+      .badge-info {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+      .badge-warning {
+        background: var(--warning-soft);
+        color: var(--warning);
+      }
+      .badge-muted {
+        background: var(--bg-surface-2);
+        color: var(--text-muted);
+      }
+
+      /* ─── Action cell ────────────────────────────────────── */
+      .action-cell {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      /* ─── Empty state ─────────────────────────────────────── */
+      .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 56px 24px;
+        text-align: center;
+      }
+      .empty-state-icon {
+        width: 56px;
+        height: 56px;
+        background: var(--bg-surface);
+        border-radius: var(--radius-md);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        color: var(--text-muted);
+        margin-bottom: 14px;
+      }
+      .empty-state h3 {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 6px;
+      }
+      .empty-state p {
+        font-size: 13px;
+        color: var(--text-muted);
+        max-width: 300px;
+      }
+
+      /* ─── Icon button (copy btn in tables) ─────────────── */
+      .icon-btn {
+        width: 24px;
+        height: 24px;
+        min-width: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: 1px solid transparent;
+        border-radius: var(--radius-sm);
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 12px;
+        transition: var(--transition);
+        padding: 0;
+      }
+
+      .icon-btn:hover {
+        background: var(--bg-surface);
+        color: var(--accent);
+        border-color: var(--border);
+      }
+
+      .icon-btn.copied {
+        color: var(--success);
+      }
+
+      /* ─── Modal ──────────────────────────────────────────── */
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.55);
+        backdrop-filter: blur(3px);
+        z-index: 200;
+        display: none;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .modal-backdrop.open {
+        display: flex;
+      }
+
+      .modal {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        width: 100%;
+        max-width: 500px;
+        max-height: 92vh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        box-shadow: var(--shadow-lg);
+        animation: modalIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      @keyframes modalIn {
+        from {
+          opacity: 0;
+          transform: scale(0.96) translateY(12px);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1) translateY(0);
+        }
+      }
+
+      .modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 22px;
+        border-bottom: 1px solid var(--border);
+      }
+      .modal-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+      .modal-title i {
+        color: var(--accent);
+      }
+      .modal-close {
+        width: 28px;
+        height: 28px;
+        border-radius: var(--radius-sm);
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        transition: var(--transition);
+      }
+      .modal-close:hover {
+        background: var(--bg-surface);
+        color: var(--text-primary);
+      }
+      .modal-body {
+        padding: 22px;
+        flex: 1;
+        overflow-y: auto;
+      }
+      .modal-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        padding: 14px 22px;
+        border-top: 1px solid var(--border);
+      }
+
+      /* ─── Form ───────────────────────────────────────────── */
+      .form-group {
+        margin-bottom: 16px;
+      }
+      .form-label {
+        display: block;
+        font-size: 11.5px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .form-control {
+        width: 100%;
+        padding: 9px 12px;
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        color: var(--text-primary);
+        font-size: 14px;
+        font-family: inherit;
+        transition: var(--transition);
+        outline: none;
+      }
+      .form-control:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(0, 130, 98, 0.12);
+      }
+      .form-control::placeholder {
+        color: var(--text-muted);
+      }
+      .form-control:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+      .form-section-label {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+        color: var(--text-muted);
+        margin: 20px 0 12px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 0;
+      }
+      .toggle-row-info .toggle-row-label {
+        font-size: 13.5px;
+        font-weight: 500;
+        color: var(--text-primary);
+      }
+      .toggle-row-info .toggle-row-desc {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 1px;
+      }
+
+      .toggle-wrap {
+        position: relative;
+        width: 40px;
+        height: 22px;
+        flex-shrink: 0;
+      }
+      .toggle-wrap input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+        position: absolute;
+      }
+      .toggle-track {
+        position: absolute;
+        inset: 0;
+        background: var(--bg-surface-2);
+        border-radius: 11px;
+        cursor: pointer;
+        transition: var(--transition);
+        border: 1px solid var(--border);
+      }
+      .toggle-track::before {
+        content: "";
+        position: absolute;
+        width: 16px;
+        height: 16px;
+        left: 2px;
+        top: 2px;
+        background: #fff;
+        border-radius: 50%;
+        transition: transform 0.18s ease;
+      }
+      .toggle-wrap input:checked + .toggle-track {
+        background: var(--success);
+        border-color: var(--success);
+      }
+      .toggle-wrap input:checked + .toggle-track::before {
+        transform: translateX(18px);
+      }
+
+      /* Copy icons inside modals (redirect URL boxes) */
+      #copySuccessUrlIcon,
+      #copySuccessLoginUrlIcon,
+      #copyEnvRedirectUrlIcon,
+      #copyEnvLoginUrlIcon {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        cursor: pointer;
+        color: var(--text-muted);
+        font-size: 16px;
+        transition: var(--transition);
+        background: none;
+        border: none;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      #copySuccessUrlIcon:hover,
+      #copySuccessLoginUrlIcon:hover,
+      #copyEnvRedirectUrlIcon:hover,
+      #copyEnvLoginUrlIcon:hover {
+        color: var(--accent);
+      }
+
+      .mval {
+        font-family: "Courier New", monospace;
+        font-size: 12px;
+      }
+
+      /* ─── NProgress & SweetAlert2 ─────────────────────────── */
+      #nprogress .bar {
+        background: var(--accent) !important;
+        height: 2px !important;
+      }
+      #nprogress .peg {
+        box-shadow:
+          0 0 8px var(--accent),
+          0 0 3px var(--accent) !important;
+      }
+
+      .swal2-popup {
+        background: #ffffff !important;
+        border: 1px solid var(--border) !important;
+        color: var(--text-primary) !important;
+        border-radius: var(--radius-md) !important;
+        font-family: "Inter", sans-serif !important;
+        box-shadow: var(--shadow-lg) !important;
+      }
+      .swal2-title {
+        color: var(--text-primary) !important;
+        font-size: 18px !important;
+        font-weight: 700 !important;
+      }
+      .swal2-html-container {
+        color: var(--text-secondary) !important;
+        font-size: 14px !important;
+      }
+      .swal2-confirm {
+        background: var(--accent) !important;
+        border-radius: var(--radius-sm) !important;
+        font-family: "Inter", sans-serif !important;
+        font-weight: 500 !important;
+        font-size: 13.5px !important;
+        padding: 8px 18px !important;
+      }
+      .swal2-cancel {
+        background: var(--bg-surface-2) !important;
+        color: var(--text-primary) !important;
+        border-radius: var(--radius-sm) !important;
+        font-family: "Inter", sans-serif !important;
+        font-weight: 500 !important;
+        font-size: 13.5px !important;
+        padding: 8px 18px !important;
+      }
+
+      /* ─── Responsive ─────────────────────────────────────── */
+      @media (max-width: 900px) {
+        #sidebar {
+          position: fixed;
+          height: 100vh;
+          z-index: 300;
+          transform: translateX(calc(-1 * var(--sidebar-width)));
+          transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          width: var(--sidebar-width) !important;
+          min-width: var(--sidebar-width) !important;
+        }
+        #sidebar.mobile-open {
+          transform: translateX(0);
+        }
+        #sidebar-overlay {
+          display: none;
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.55);
+          z-index: 299;
+        }
+        #sidebar.mobile-open ~ #sidebar-overlay {
+          display: block;
+        }
+        .topbar-mobile-btn {
+          display: flex;
+        }
+        .stats-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+
+      @media (max-width: 540px) {
+        .stats-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+        #content {
+          padding: 16px;
+        }
+        .section-header {
+          flex-direction: column;
+          align-items: stretch;
+        }
+      }
+
+      /* ─── Redirect URL Box ───────────────────────────────── */
+      .redirect-url-box {
+        position: relative;
+        padding: 12px;
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        margin-bottom: 16px;
+      }
+
+      .redirect-url-text {
+        font-family: "Courier New", monospace;
+        font-size: 12px;
+        color: var(--text-primary);
+        word-break: break-all;
+        user-select: all;
+        padding-right: 36px;
+      }
+
+      #copyEnvRedirectUrlIcon,
+      #copyEnvLoginUrlIcon {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        cursor: pointer;
+        color: var(--text-muted);
+        font-size: 16px;
+        transition: var(--transition);
+        background: none;
+        border: none;
+      }
+
+      #copyEnvRedirectUrlIcon:hover,
+      #copyEnvLoginUrlIcon:hover {
+        color: var(--accent);
+      }
+
+      .mval {
+        font-family: "Courier New", monospace;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <!-- ═══════════ SIDEBAR ═══════════ -->
+      <nav id="sidebar">
+        <div class="sidebar-logo-row">
+          <a class="sidebar-logo" href="/portal/home">
+            <div class="logo-mark">
+              <svg
+                viewBox="0 0 31 20"
+                role="img"
+                aria-label="Wrike symbol"
+                aria-hidden="true"
+              >
+                <path
+                  d="M20.78 1.404C21.885.298 22.587 0 24.113 0h6.878c.561 0 .684.509.35.842l-11.49 11.491c-.176.176-.246.21-.352.246-.035.018-.087.018-.122.018s-.088 0-.123-.018c-.106-.035-.176-.07-.351-.246L14.85 8.281c-.175-.176-.21-.246-.245-.351-.018-.035-.018-.088-.018-.123s0-.088.018-.123c.035-.105.07-.175.245-.35l5.93-5.93zM10.745 8.649C9.64 7.544 8.92 7.263 7.395 7.263H.534c-.562 0-.685.509-.351.842l11.49 11.492c.176.175.246.21.352.245a.299.299 0 00.123.018c.035 0 .087 0 .122-.018.105-.035.176-.07.351-.245l4.053-4.07c.175-.176.21-.246.245-.351a.3.3 0 00.018-.123c0-.035 0-.088-.018-.123-.035-.105-.07-.175-.245-.351l-5.93-5.93z"
+                />
+              </svg>
+            </div>
+            <div class="logo-text">
+              <svg
+                class="wrike-wordmark"
+                viewBox="33 0 67 20"
+                role="img"
+                aria-label="Wrike"
+              >
+                <path
+                  d="M71.064 4.72a1.965 1.965 0 100-3.93 1.965 1.965 0 000 3.93zm1.579 1.578h-3.158v11.035h3.158V6.298zm-9.877 11.035V12.37c0-3 2.649-2.948 4.035-2.72V6.263c-2.21-.193-3.526.421-4.123 1.614h-.07l.017-1.561h-3.07v11.018h3.21zm-22.685 0h2.474l3.79-7.087 3.666 7.087h2.509l5.632-11.035h-3.737l-3.456 7.035-3.281-7.035h-2.684l-3.456 7.07-3.281-7.07H34.52l5.561 11.035zm36.053 0h2l3.298-4.158 2.79 4.158h3.72l-4.387-6.386 3.842-4.649h-3.701l-4.386 5.544h-.07L79.275.79h-3.14v16.544zm18.228-2.368c1.351 0 2.158-.72 2.544-1.298l2.421 1.667c-.982 1.28-2.509 2.28-5.035 2.28-3.386 0-5.912-2.544-5.912-5.754 0-3.228 2.579-5.755 5.912-5.755 3.403 0 5.702 2.562 5.702 5.755v.877h-8.58c.246 1.316 1.37 2.228 2.948 2.228zm2.58-4.421c-.352-1.158-1.37-1.965-2.825-1.965-1.492 0-2.492.807-2.843 1.965h5.667z"
+                />
+              </svg>
+              <span class="sub">Portal</span>
+            </div>
+          </a>
+          <button
+            class="sidebar-collapse-btn"
+            id="sidebarToggle"
+            title="Collapse sidebar"
+          >
+            <i class="fa-solid fa-chevron-left" id="toggleIcon"></i>
+          </button>
+        </div>
+
+        <div class="sidebar-nav">
+          <div class="nav-group-label">Workspace</div>
+          <div class="nav-item active" data-page="overview">
+            <span class="ni"><i class="fa-solid fa-chart-pie"></i></span>
+            <span class="nl">Overview</span>
+          </div>
+          <div class="nav-item" data-page="environments">
+            <span class="ni"><i class="fa-solid fa-layer-group"></i></span>
+            <span class="nl">Environments</span>
+            <span class="nav-badge" id="envCount">0</span>
+          </div>
+        </div>
+
+        <div class="sidebar-footer">
+          <div class="user-row">
+            <div class="user-row-left">
+              <div class="user-avatar" id="sidebarAvatar">U</div>
+              <div class="user-meta">
+                <div class="user-name" id="sidebarUsername">User</div>
+                <div class="user-role" id="sidebarRole">Portal User</div>
+              </div>
+            </div>
+            <button class="signout-icon-btn" id="logoutBtn" title="Sign Out">
+              <i class="fa-solid fa-right-from-bracket"></i>
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      <div id="sidebar-overlay"></div>
+
+      <!-- ═══════════ MAIN ═══════════ -->
+      <div id="main">
+        <div id="topbar">
+          <div class="topbar-left">
+            <div class="topbar-mobile-btn" id="mobileSidebarBtn">
+              <i class="fa-solid fa-bars"></i>
+            </div>
+            <div>
+              <div class="page-title" id="pageTitle">Overview</div>
+              <div class="breadcrumb">
+                <span>Portal</span>
+                <span class="bc-sep">/</span>
+                <span id="breadcrumbCurrent">Overview</span>
+              </div>
+            </div>
+          </div>
+          <div class="topbar-right">
+            <div class="topbar-icon-btn" id="refreshBtn" title="Refresh data">
+              <i class="fa-solid fa-rotate-right"></i>
+            </div>
+          </div>
+        </div>
+
+        <div id="content">
+          <!-- ══════ OVERVIEW PAGE ══════ -->
+          <div class="page active" id="page-overview">
+            <div class="section-header">
+              <div>
+                <div class="section-title">Dashboard Overview</div>
+                <div class="section-subtitle" id="overviewSubtitle">
+                  Welcome back
+                </div>
+              </div>
+            </div>
+
+            <div class="stats-grid">
+              <div class="stat-card blue">
+                <div class="stat-icon blue">
+                  <i class="fa-solid fa-layer-group"></i>
+                </div>
+                <div class="stat-body">
+                  <div class="stat-value" id="statTotal">—</div>
+                  <div class="stat-label">Total Environments</div>
+                </div>
+              </div>
+              <div class="stat-card green">
+                <div class="stat-icon green">
+                  <i class="fa-solid fa-circle-check"></i>
+                </div>
+                <div class="stat-body">
+                  <div class="stat-value" id="statActive">—</div>
+                  <div class="stat-label">Active</div>
+                </div>
+              </div>
+              <div class="stat-card red">
+                <div class="stat-icon red">
+                  <i class="fa-solid fa-circle-xmark"></i>
+                </div>
+                <div class="stat-body">
+                  <div class="stat-value" id="statInactive">—</div>
+                  <div class="stat-label">Inactive</div>
+                </div>
+              </div>
+              <div class="stat-card yellow">
+                <div class="stat-icon yellow">
+                  <i class="fa-solid fa-eye"></i>
+                </div>
+                <div class="stat-body">
+                  <div class="stat-value" id="statVisible">—</div>
+                  <div class="stat-label">Visible</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">
+                  <i class="fa-solid fa-clock-rotate-left"></i>
+                  Recent Environments
+                </div>
+                <button class="btn btn-ghost btn-sm" id="viewAllBtn">
+                  View All &nbsp;<i class="fa-solid fa-arrow-right"></i>
+                </button>
+              </div>
+              <div id="recentEnvsBody">
+                <div class="empty-state">
+                  <div class="empty-state-icon">
+                    <i class="fa-regular fa-folder-open"></i>
+                  </div>
+                  <h3>No environments yet</h3>
+                  <p>Create your first environment to get started.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ══════ ENVIRONMENTS PAGE ══════ -->
+          <div class="page" id="page-environments">
+            <div class="section-header">
+              <div>
+                <div class="section-title">My Environments</div>
+                <div class="section-subtitle">
+                  Manage your Wrike environments
+                </div>
+              </div>
+              <button class="btn btn-primary" id="addEnvBtn">
+                <i class="fa-solid fa-plus"></i>
+                Add Environment
+              </button>
+            </div>
+
+            <div class="card">
+              <div class="card-body">
+                <div style="display: flex; flex-direction: column; gap: 12px">
+                  <div class="table-wrapper">
+                    <table class="dt" id="envTable">
+                      <thead>
+                        <tr>
+                          <th>Environment</th>
+                          <th>Env ID</th>
+                          <th>Client ID</th>
+                          <th>Created</th>
+                          <th>Last Updated</th>
+                          <th>Visibility</th>
+                          <th>Status</th>
+                          <th style="width: 140px">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody id="envTableBody"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- /#content -->
+      </div>
+      <!-- /#main -->
+    </div>
+    <!-- /#app -->
+
+    <!-- ════════════ REDIRECT URL SUCCESS MODAL ════════════ -->
+    <div class="modal-backdrop" id="redirectUrlModalBackdrop">
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="redirectModalTitle"
+        style="max-width: 480px"
+      >
+        <div class="modal-header">
+          <div class="modal-title">
+            <i class="fa-solid fa-link" style="color: var(--success)"></i>
+            <span id="redirectModalTitle"
+              >Environment Created Successfully</span
+            >
+          </div>
+          <button
+            class="modal-close"
+            id="closeRedirectModalBtn"
+            aria-label="Close"
+          >
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <div style="margin-bottom: 16px">
+            <p
+              style="
+                color: var(--text-secondary);
+                margin-bottom: 8px;
+                font-size: 13px;
+              "
+            >
+              Redirect URL (for Wrike OAuth):
+            </p>
+            <div class="redirect-url-box" style="position: relative">
+              <div
+                class="redirect-url-text"
+                id="successRedirectUrl"
+                style="margin-right: 36px"
+              ></div>
+              <i
+                class="fa-solid fa-copy"
+                id="copySuccessUrlIcon"
+                title="Copy URL"
+              ></i>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 16px">
+            <p
+              style="
+                color: var(--text-secondary);
+                margin-bottom: 8px;
+                font-size: 13px;
+              "
+            >
+              Login URL (with environment):
+            </p>
+            <div class="redirect-url-box" style="position: relative">
+              <div
+                class="redirect-url-text"
+                id="successLoginUrl"
+                style="margin-right: 36px"
+              ></div>
+              <i
+                class="fa-solid fa-copy"
+                id="copySuccessLoginUrlIcon"
+                title="Copy URL"
+              ></i>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer" style="justify-content: space-between">
+          <div style="color: var(--text-muted); font-size: 13px">
+            Close in <strong id="countdownTimer">8</strong>s
+          </div>
+          <button class="btn btn-primary" id="closeRedirectModalBtnFooter">
+            <i class="fa-solid fa-check"></i> Done
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════ ADD / EDIT ENVIRONMENT MODAL ════════════ -->
+    <div class="modal-backdrop" id="envModalBackdrop">
+      <div class="modal" style="max-width: 560px">
+        <div class="modal-header">
+          <div class="modal-title">
+            <i class="fa-solid fa-layer-group" id="envModalIcon"></i>
+            <span id="envModalTitle">Add Environment</span>
+          </div>
+          <button class="modal-close" id="envModalClose">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="envModalName"
+              >Environment Name
+              <span style="color: var(--danger)">*</span></label
+            >
+            <input
+              type="text"
+              class="form-control"
+              id="envModalName"
+              placeholder="e.g. Production, Staging, Development"
+              maxlength="255"
+            />
+          </div>
+
+          <div class="form-section-label">Credentials</div>
+
+          <div class="form-group">
+            <label class="form-label" for="envModalClientId"
+              >Client ID <span style="color: var(--danger)">*</span></label
+            >
+            <input
+              type="text"
+              class="form-control"
+              id="envModalClientId"
+              placeholder="Enter Client ID"
+              autocomplete="off"
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="envModalClientSecret"
+              >Client Secret <span style="color: var(--danger)">*</span></label
+            >
+            <div style="position: relative">
+              <input
+                type="password"
+                class="form-control"
+                id="envModalClientSecret"
+                placeholder="Enter Client Secret"
+                autocomplete="new-password"
+                style="padding-right: 38px"
+              />
+              <button
+                type="button"
+                id="toggleSecret"
+                tabindex="-1"
+                style="
+                  position: absolute;
+                  right: 10px;
+                  top: 50%;
+                  transform: translateY(-50%);
+                  background: none;
+                  border: none;
+                  cursor: pointer;
+                  color: var(--text-muted);
+                  font-size: 14px;
+                  padding: 0;
+                  line-height: 1;
+                "
+              >
+                <i class="fa-solid fa-eye" id="toggleSecretIcon"></i>
+              </button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="envModalAccountId">Account ID</label>
+            <input
+              type="text"
+              class="form-control"
+              id="envModalAccountId"
+              placeholder="Enter Wrike Account ID"
+              maxlength="255"
+            />
+          </div>
+
+          <div class="form-section-label">Datahub IDs</div>
+
+          <div class="form-group">
+            <label class="form-label" for="envModalXpiApiModules"
+              >XPI API Modules Datahub ID
+              <span style="color: var(--danger)">*</span></label
+            >
+            <input
+              type="text"
+              class="form-control"
+              id="envModalXpiApiModules"
+              placeholder="Enter XPI API Modules Datahub ID"
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="envModalXpiApiServices"
+              >XPI API Services Datahub ID
+              <span style="color: var(--danger)">*</span></label
+            >
+            <input
+              type="text"
+              class="form-control"
+              id="envModalXpiApiServices"
+              placeholder="Enter XPI API Services Datahub ID"
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="envModalXpiEntity"
+              >XPI Entity Datahub ID
+              <span style="color: var(--danger)">*</span></label
+            >
+            <input
+              type="text"
+              class="form-control"
+              id="envModalXpiEntity"
+              placeholder="Enter XPI Entity Datahub ID"
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="envModalXpiFieldMapping"
+              >XPI Field Mapping Datahub ID
+              <span style="color: var(--danger)">*</span></label
+            >
+            <input
+              type="text"
+              class="form-control"
+              id="envModalXpiFieldMapping"
+              placeholder="Enter XPI Field Mapping Datahub ID"
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="envModalXpiReqFormField"
+              >XPI Request Form Field Mapping Datahub ID
+              <span style="color: var(--danger)">*</span></label
+            >
+            <input
+              type="text"
+              class="form-control"
+              id="envModalXpiReqFormField"
+              placeholder="Enter XPI Request Form Field Mapping Datahub ID"
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="envModalXpiReqFormMapping"
+              >XPI Request Form Mapping Datahub ID
+              <span style="color: var(--danger)">*</span></label
+            >
+            <input
+              type="text"
+              class="form-control"
+              id="envModalXpiReqFormMapping"
+              placeholder="Enter XPI Request Form Mapping Datahub ID"
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="envModalXpiSpaceName"
+              >XPI Space Name Datahub ID
+              <span style="color: var(--danger)">*</span></label
+            >
+            <input
+              type="text"
+              class="form-control"
+              id="envModalXpiSpaceName"
+              placeholder="Enter XPI Space Name Datahub ID"
+            />
+          </div>
+
+          <div class="form-section-label">Space IDs</div>
+
+          <div class="form-group">
+            <label class="form-label" for="envModalCampaignSpace"
+              >Campaign Space ID
+              <span style="color: var(--danger)">*</span></label
+            >
+            <input
+              type="text"
+              class="form-control"
+              id="envModalCampaignSpace"
+              placeholder="Enter Campaign Space ID"
+            />
+          </div>
+
+          <hr
+            style="
+              border: none;
+              border-top: 1px solid var(--border);
+              margin: 8px 0 14px;
+            "
+          />
+          <div class="toggle-row">
+            <div class="toggle-row-info">
+              <div class="toggle-row-label">Active Status</div>
+              <div class="toggle-row-desc">
+                Enable or disable this environment
+              </div>
+            </div>
+            <label class="toggle-wrap">
+              <input type="checkbox" id="envModalActive" checked />
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <div class="toggle-row-info">
+              <div class="toggle-row-label">Visibility</div>
+              <div class="toggle-row-desc">
+                Show or hide in environment dropdowns
+              </div>
+            </div>
+            <label class="toggle-wrap">
+              <input type="checkbox" id="envModalVisible" checked />
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+
+          <div id="envRedirectUrlContainer" style="display: none">
+            <div class="form-section-label">URLs</div>
+            <div>
+              <p
+                style="
+                  color: var(--text-secondary);
+                  margin-bottom: 6px;
+                  font-size: 12px;
+                "
+              >
+                Redirect URL:
+              </p>
+              <div id="envRedirectUrlSection" style="display: none">
+                <div class="redirect-url-box">
+                  <div
+                    class="redirect-url-text"
+                    id="envRedirectUrlDisplay"
+                  ></div>
+                  <i class="fa-solid fa-copy" id="copyEnvRedirectUrlIcon"></i>
+                </div>
+              </div>
+              <div
+                id="envNoEnvironmentNotice"
+                style="
+                  padding: 12px;
+                  background: var(--bg-surface);
+                  border-radius: var(--radius-sm);
+                  color: var(--text-muted);
+                  font-size: 13px;
+                "
+              >
+                <em
+                  >Save the environment first to generate the redirect and login
+                  URLs.</em
+                >
+              </div>
+            </div>
+            <div style="margin-top: 12px">
+              <p
+                style="
+                  color: var(--text-secondary);
+                  margin-bottom: 6px;
+                  font-size: 12px;
+                "
+              >
+                Login URL:
+              </p>
+              <div id="envLoginUrlSection" style="display: none">
+                <div class="redirect-url-box">
+                  <div class="redirect-url-text" id="envLoginUrlDisplay"></div>
+                  <i class="fa-solid fa-copy" id="copyEnvLoginUrlIcon"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" id="envModalCancel">Cancel</button>
+          <button class="btn btn-primary" id="envModalSave">
+            <i class="fa-solid fa-floppy-disk"></i> Save
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <script src="https://unpkg.com/nprogress@0.2.0/nprogress.js"></script>
+
+    <script>
+      /* ─── Auth guard ───────────────────────────────────── */
+      const accessToken = localStorage.getItem("portal_access_token");
+      const portalRole = localStorage.getItem("portal_role");
+      const appUrl = "<%= appUrl %>";
+      const wrikeRedirectUrl = "<%= wrikeRedirectUrl %>";
+
+      if (!accessToken) {
+        window.location.replace("/portal/login");
+      } else if (portalRole === "admin") {
+        window.location.replace("/portal/dashboard");
+      }
+
+      /* ─── Intercept 401/403 ────────────────────────────── */
+      const _origFetch = window.fetch;
+      window.fetch = function (...args) {
+        return _origFetch.apply(this, args).then(function (res) {
+          if (res.status === 401 || res.status === 403) {
+            localStorage.removeItem("portal_access_token");
+            localStorage.removeItem("portal_role");
+            window.location.replace("/portal/login");
+            return Promise.reject(new Error("Session expired"));
+          }
+          return res;
+        });
+      };
+
+      function authHeaders(extra) {
+        return Object.assign(
+          { Authorization: "Bearer " + accessToken },
+          extra || {},
+        );
+      }
+
+      /* ─── State ────────────────────────────────────────── */
+      let environments = [];
+      let envDT = null;
+      let envEditId = null; // null = add mode, UUID = edit mode
+
+      /* ─── Toast ────────────────────────────────────────── */
+      function toast(msg, type) {
+        const p = {
+          success: "linear-gradient(135deg,#008262,#006d52)",
+          error: "linear-gradient(135deg,#f85149,#d03030)",
+          info: "linear-gradient(135deg,#008262,#005c46)",
+          warning: "linear-gradient(135deg,#d29922,#b07d12)",
+        };
+        Toastify({
+          text: msg,
+          duration: 4500,
+          gravity: "top",
+          position: "right",
+          stopOnFocus: true,
+          style: {
+            background: p[type] || p.info,
+            borderRadius: "8px",
+            fontFamily: "'Inter',sans-serif",
+            fontSize: "13.5px",
+            padding: "12px 18px",
+            boxShadow: "0 6px 24px rgba(0,0,0,0.28)",
+            minWidth: "260px",
+          },
+        }).showToast();
+      }
+
+      /* ─── Page navigation ──────────────────────────────── */
+      const PAGE_NAMES = {
+        overview: "Overview",
+        environments: "My Environments",
+      };
+
+      function showPage(pageId) {
+        $(".page").removeClass("active");
+        $("#page-" + pageId).addClass("active");
+        $(".nav-item").removeClass("active");
+        $(".nav-item[data-page='" + pageId + "']").addClass("active");
+        const title = PAGE_NAMES[pageId] || pageId;
+        $("#pageTitle").text(title);
+        $("#breadcrumbCurrent").text(title);
+        $("#sidebar").removeClass("mobile-open");
+      }
+
+      /* ─── Sidebar collapse ─────────────────────────────── */
+      $("#sidebarToggle").on("click", function () {
+        $("#sidebar").toggleClass("collapsed");
+        const c = $("#sidebar").hasClass("collapsed");
+        $("#toggleIcon")
+          .toggleClass("fa-chevron-left", !c)
+          .toggleClass("fa-chevron-right", c);
+      });
+
+      /* ─── Mobile sidebar ───────────────────────────────── */
+      $("#mobileSidebarBtn").on("click", function () {
+        $("#sidebar").toggleClass("mobile-open");
+      });
+      $("#sidebar-overlay").on("click", function () {
+        $("#sidebar").removeClass("mobile-open");
+      });
+
+      /* ─── Nav clicks ───────────────────────────────────── */
+      $(document).on("click", ".nav-item[data-page]", function () {
+        showPage($(this).data("page"));
+      });
+
+      /* ─── View all ─────────────────────────────────────── */
+      $("#viewAllBtn").on("click", function () {
+        showPage("environments");
+      });
+
+      /* ─── Refresh ──────────────────────────────────────── */
+      $("#refreshBtn").on("click", function () {
+        const $i = $(this).find("i");
+        $i.addClass("fa-spin");
+        loadEnvironments().finally(() =>
+          setTimeout(() => $i.removeClass("fa-spin"), 600),
+        );
+      });
+
+      /* ─── Populate sidebar from JWT ────────────────────── */
+      (function () {
+        try {
+          const p = JSON.parse(atob(accessToken.split(".")[1]));
+          const name = p.username || p.email || "User";
+          const role = p.role || "user";
+          $("#sidebarUsername").text(name);
+          $("#sidebarAvatar").text(name.charAt(0).toUpperCase());
+          $("#sidebarRole").text(
+            role === "admin" ? "Portal Admin" : "Portal User",
+          );
+          $("#overviewSubtitle").text("Welcome back, " + name);
+        } catch (_) {}
+      })();
+
+      /* ─── Logout ───────────────────────────────────────── */
+      $("#logoutBtn").on("click", async function () {
+        const r = await Swal.fire({
+          title: "Sign out?",
+          html: "Your portal session will be ended.",
+          icon: "question",
+          showCancelButton: true,
+          confirmButtonText:
+            '<i class="fa-solid fa-right-from-bracket" style="margin-right:6px"></i>Sign Out',
+          cancelButtonText: "Stay",
+          reverseButtons: true,
+        });
+        if (!r.isConfirmed) return;
+        localStorage.removeItem("portal_access_token");
+        localStorage.removeItem("portal_role");
+        window.location.replace("/portal/login");
+      });
+
+      /* ─── XSS-safe escape ──────────────────────────────── */
+      function esc(str) {
+        return $("<div>")
+          .text(str || "")
+          .html();
+      }
+
+      /* ─── Load environments ────────────────────────────── */
+      async function loadEnvironments() {
+        NProgress.start();
+        try {
+          const res = await fetch("/api/v1/portal/environments/", {
+            headers: authHeaders(),
+          });
+          const data = await res.json();
+          environments = data.data || [];
+
+          const total = environments.length;
+          const active = environments.filter((e) => e.is_active).length;
+          const visible = environments.filter((e) => e.is_visible).length;
+
+          $("#envCount").text(total);
+          $("#statTotal").text(total);
+          $("#statActive").text(active);
+          $("#statInactive").text(total - active);
+          $("#statVisible").text(visible);
+
+          renderEnvTable();
+          renderRecentEnvs();
+        } catch (err) {
+          toast("Failed to load environments", "error");
+          console.error(err);
+        } finally {
+          NProgress.done();
+        }
+      }
+
+      /* ─── Mask helper (shows first 6 chars + bullets) ───── */
+      function mask(str) {
+        if (!str) return '<span class="mval">—</span>';
+        var visible = esc(str.substring(0, Math.min(6, str.length)));
+        return '<span class="mval">' + visible + "••••••</span>";
+      }
+
+      /* ─── Format date to local timezone ────────────────── */
+      function formatLocalDate(dateStr) {
+        if (!dateStr) return "—";
+        try {
+          return new Date(dateStr).toLocaleString("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: true,
+          });
+        } catch (_) {
+          return "——";
+        }
+      }
+
+      /* ─── Render environments table ────────────────────── */
+      function renderEnvTable() {
+        if (envDT) {
+          envDT.destroy();
+          envDT = null;
+        }
+
+        const $tbody = $("#envTableBody").empty();
+
+        if (!environments.length) {
+          $tbody.html(
+            "<tr><td colspan='8'><div class='empty-state'>" +
+              "<div class='empty-state-icon'><i class='fa-regular fa-folder-open'></i></div>" +
+              "<h3>No environments yet</h3>" +
+              "<p>Click <strong>Add Environment</strong> to create your first one.</p>" +
+              "</div></td></tr>",
+          );
+          return;
+        }
+
+        environments.forEach(function (env) {
+          const badge = env.is_active
+            ? "<span class='badge badge-success'><span class='dot'></span> Active</span>"
+            : "<span class='badge badge-danger'><span class='dot'></span> Inactive</span>";
+
+          const visibilityBadge = env.is_visible
+            ? "<span class='badge badge-success'><span class='dot'></span> Visible</span>"
+            : "<span class='badge badge-warning'><span class='dot'></span> Hidden</span>";
+
+          const actions =
+            "<div class='action-cell'>" +
+            "<button class='btn btn-ghost btn-sm env-edit-btn' data-id='" +
+            esc(env.id) +
+            "'><i class='fa-solid fa-pen-to-square'></i> Edit</button>" +
+            "<button class='btn btn-danger btn-sm env-del-btn' data-id='" +
+            esc(env.id) +
+            "' data-name='" +
+            esc(env.environment_name) +
+            "'><i class='fa-solid fa-trash'></i> Delete</button>" +
+            "</div>";
+
+          $tbody.append(
+            "<tr>" +
+              "<td><strong>" +
+              esc(env.environment_name) +
+              "</strong></td>" +
+              "<td>" +
+              "<div class='action-cell'>" +
+              "<code style='font-size: 11px; color: var(--text-muted);'>" +
+              esc(env.id) +
+              "</code>" +
+              "<button class='icon-btn copy-id-btn' data-id='" +
+              env.id +
+              "' title='Copy ID'>" +
+              "<i class='fa-solid fa-copy'></i>" +
+              "</button>" +
+              "</div>" +
+              "</td>" +
+              "<td>" +
+              mask(env.client_id) +
+              "</td>" +
+              "<td>" +
+              formatLocalDate(env.created_at) +
+              "</td>" +
+              "<td>" +
+              formatLocalDate(env.updated_at) +
+              "</td>" +
+              "<td>" +
+              visibilityBadge +
+              "</td>" +
+              "<td>" +
+              badge +
+              "</td>" +
+              "<td>" +
+              actions +
+              "</td>" +
+              "</tr>",
+          );
+        });
+
+        envDT = $("#envTable").DataTable({
+          pageLength: 10,
+          lengthMenu: [5, 10, 25, 50],
+          order: [],
+          columnDefs: [
+            { targets: 1, orderable: false, searchable: false },
+            { targets: 7, orderable: false, searchable: false },
+          ],
+          language: {
+            emptyTable: "No environments yet",
+            zeroRecords: "No matching environments",
+            lengthMenu: "Show _MENU_ rows",
+            search: "",
+            searchPlaceholder: "Search environments…",
+            info: "Showing _START_–_END_ of _TOTAL_",
+            paginate: { previous: "‹", next: "›" },
+          },
+        });
+
+        setTimeout(function () {
+          const $w = $("#envTable").closest(".dataTables_wrapper");
+          const $tbl = $w.find("table"),
+            $flt = $w.find(".dataTables_filter");
+          const $len = $w.find(".dataTables_length"),
+            $inf = $w.find(".dataTables_info");
+          const $pg = $w.find(".dataTables_paginate");
+
+          $tbl.detach();
+          $flt.detach();
+          $len.detach();
+          $inf.detach();
+          $pg.detach();
+
+          const $scroll = $(
+            '<div style="overflow-x:auto;min-width:0;flex:1;"></div>',
+          ).append($tbl);
+          const $top = $(
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:12px;"></div>',
+          )
+            .append($len)
+            .append($flt);
+          const $bot = $(
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;flex-wrap:wrap;gap:12px;"></div>',
+          )
+            .append($inf)
+            .append($pg);
+
+          $w.empty().append($top).append($scroll).append($bot);
+        }, 10);
+      }
+
+      /* ─── Render overview recent list ──────────────────── */
+      function renderRecentEnvs() {
+        const $body = $("#recentEnvsBody");
+
+        if (!environments.length) {
+          $body.html(
+            "<div class='empty-state'>" +
+              "<div class='empty-state-icon'><i class='fa-regular fa-folder-open'></i></div>" +
+              "<h3>No environments yet</h3><p>Add your first Wrike environment to get started.</p>" +
+              "</div>",
+          );
+          return;
+        }
+
+        const recent = environments.slice(0, 5);
+        let html =
+          "<table class='dt'><thead><tr>" +
+          "<th>Name</th><th>Env ID</th><th>Client ID</th><th>Created</th><th>Status</th><th></th>" +
+          "</tr></thead><tbody>";
+
+        recent.forEach(function (env) {
+          const badge = env.is_active
+            ? "<span class='badge badge-success'><span class='dot'></span> Active</span>"
+            : "<span class='badge badge-danger'><span class='dot'></span> Inactive</span>";
+
+          html +=
+            "<tr>" +
+            "<td><strong>" +
+            esc(env.environment_name) +
+            "</strong></td>" +
+            "<td>" +
+            "<div class='action-cell'>" +
+            "<code style='font-size: 11px; color: var(--text-muted);'>" +
+            esc(env.id) +
+            "</code>" +
+            "<button class='icon-btn copy-id-btn' data-id='" +
+            env.id +
+            "' title='Copy ID' style='margin-left: 4px;'>" +
+            "<i class='fa-solid fa-copy'></i>" +
+            "</button>" +
+            "</div>" +
+            "</td>" +
+            "<td>" +
+            mask(env.client_id) +
+            "</td>" +
+            "<td>" +
+            formatLocalDate(env.created_at) +
+            "</td>" +
+            "<td>" +
+            badge +
+            "</td>" +
+            "<td><button class='btn btn-ghost btn-sm env-edit-btn' data-id='" +
+            env.id +
+            "'><i class='fa-solid fa-pen-to-square'></i> Edit</button></td>" +
+            "</tr>";
+        });
+
+        $body.html(html + "</tbody></table>");
+      }
+
+      /* ─── Show/hide client secret ───────────────────────── */
+      $("#toggleSecret").on("click", function () {
+        const $inp = $("#envModalClientSecret");
+        const isPass = $inp.attr("type") === "password";
+        $inp.attr("type", isPass ? "text" : "password");
+        $("#toggleSecretIcon")
+          .toggleClass("fa-eye", !isPass)
+          .toggleClass("fa-eye-slash", isPass);
+      });
+
+      /* ─── Modal helpers ────────────────────────────────── */
+      function openEnvModal(env) {
+        envEditId = env ? env.id : null;
+
+        // Reset secret visibility
+        $("#envModalClientSecret").attr("type", "password");
+        $("#toggleSecretIcon").removeClass("fa-eye-slash").addClass("fa-eye");
+
+        if (env) {
+          $("#envModalTitle").text("Edit Environment");
+          $("#envModalIcon").attr("class", "fa-solid fa-pen-to-square");
+          $("#envModalName").val(env.environment_name);
+          $("#envModalClientId").val(env.client_id || "");
+          $("#envModalClientSecret").val(env.client_secret || "");
+          $("#envModalAccountId").val(env.account_id || "");
+          $("#envModalXpiApiModules").val(env.xpi_api_modules_datahub_id || "");
+          $("#envModalXpiApiServices").val(
+            env.xpi_api_services_datahub_id || "",
+          );
+          $("#envModalXpiEntity").val(env.xpi_entity_datahub_id || "");
+          $("#envModalXpiFieldMapping").val(
+            env.xpi_field_mapping_datahub_id || "",
+          );
+          $("#envModalXpiReqFormField").val(
+            env.xpi_request_form_field_mapping_datahub_id || "",
+          );
+          $("#envModalXpiReqFormMapping").val(
+            env.xpi_request_form_mapping_datahub_id || "",
+          );
+          $("#envModalXpiSpaceName").val(env.xpi_space_name_datahub_id || "");
+          $("#envModalCampaignSpace").val(env.campaign_space_id || "");
+          $("#envModalActive").prop("checked", env.is_active);
+          $("#envModalVisible").prop("checked", env.is_visible);
+
+          $("#envRedirectUrlContainer").show();
+          if (wrikeRedirectUrl && appUrl && env.id) {
+            $("#envRedirectUrlDisplay").text(wrikeRedirectUrl);
+            $("#envLoginUrlDisplay").text(appUrl + "?environmentId=" + env.id);
+            $("#envRedirectUrlSection").show();
+            $("#envLoginUrlSection").show();
+            $("#envNoEnvironmentNotice").hide();
+          } else {
+            $("#envRedirectUrlSection").hide();
+            $("#envLoginUrlSection").hide();
+            $("#envNoEnvironmentNotice").show();
+          }
+        } else {
+          $("#envModalTitle").text("Add Environment");
+          $("#envModalIcon").attr("class", "fa-solid fa-layer-group");
+          $("#envModalName").val("");
+          $("#envModalClientId").val("");
+          $("#envModalClientSecret").val("");
+          $("#envModalAccountId").val("");
+          $("#envModalXpiApiModules").val("");
+          $("#envModalXpiApiServices").val("");
+          $("#envModalXpiEntity").val("");
+          $("#envModalXpiFieldMapping").val("");
+          $("#envModalXpiReqFormField").val("");
+          $("#envModalXpiReqFormMapping").val("");
+          $("#envModalXpiSpaceName").val("");
+          $("#envModalCampaignSpace").val("");
+          $("#envModalActive").prop("checked", true);
+          $("#envModalVisible").prop("checked", true);
+
+          $("#envRedirectUrlContainer").hide();
+          $("#envRedirectUrlSection").hide();
+          $("#envLoginUrlSection").hide();
+          $("#envNoEnvironmentNotice").hide();
+        }
+
+        $("#envModalBackdrop").addClass("open");
+        setTimeout(() => $("#envModalName").focus(), 80);
+      }
+
+      function closeEnvModal() {
+        $("#envModalBackdrop").removeClass("open");
+        envEditId = null;
+      }
+
+      /* ─── Add button ───────────────────────────────────── */
+      $("#addEnvBtn").on("click", function () {
+        openEnvModal(null);
+      });
+
+      /* ─── Edit button (delegated) ──────────────────────── */
+      $(document).on("click", ".env-edit-btn", function () {
+        const id = $(this).data("id");
+        const env = environments.find((e) => e.id === id);
+        if (env) openEnvModal(env);
+      });
+
+      /* ─── Modal close / cancel ─────────────────────────── */
+      $("#envModalClose, #envModalCancel").on("click", closeEnvModal);
+      $("#envModalBackdrop").on("click", function (e) {
+        if (e.target === this) closeEnvModal();
+      });
+
+      /* ─── Copy redirect/login URLs ─────────────────────── */
+      $("#copyEnvRedirectUrlIcon").on("click", function () {
+        const url = $("#envRedirectUrlDisplay").text();
+        if (!url) return;
+        navigator.clipboard.writeText(url).then(() => {
+          const $icon = $(this);
+          $icon.removeClass("fa-copy").addClass("fa-check");
+          setTimeout(
+            () => $icon.removeClass("fa-check").addClass("fa-copy"),
+            1500,
+          );
+        });
+      });
+      $("#copyEnvLoginUrlIcon").on("click", function () {
+        const url = $("#envLoginUrlDisplay").text();
+        if (!url) return;
+        navigator.clipboard.writeText(url).then(() => {
+          const $icon = $(this);
+          $icon.removeClass("fa-copy").addClass("fa-check");
+          setTimeout(
+            () => $icon.removeClass("fa-check").addClass("fa-copy"),
+            1500,
+          );
+        });
+      });
+
+      /* ─── Save environment ─────────────────────────────── */
+      $("#envModalSave").on("click", async function () {
+        const name = $("#envModalName").val().trim();
+        const clientId = $("#envModalClientId").val().trim();
+        const clientSecret = $("#envModalClientSecret").val().trim();
+        const accountId = $("#envModalAccountId").val().trim();
+        const xpiApiModules = $("#envModalXpiApiModules").val().trim();
+        const xpiApiServices = $("#envModalXpiApiServices").val().trim();
+        const xpiEntity = $("#envModalXpiEntity").val().trim();
+        const xpiFieldMapping = $("#envModalXpiFieldMapping").val().trim();
+        const xpiReqFormField = $("#envModalXpiReqFormField").val().trim();
+        const xpiReqFormMapping = $("#envModalXpiReqFormMapping").val().trim();
+        const xpiSpaceName = $("#envModalXpiSpaceName").val().trim();
+        const campaignSpace = $("#envModalCampaignSpace").val().trim();
+        const isActive = $("#envModalActive").is(":checked");
+        const isVisible = $("#envModalVisible").is(":checked");
+
+        if (!name) {
+          toast("Environment name is required", "warning");
+          return;
+        }
+        if (!clientId) {
+          toast("Client ID is required", "warning");
+          return;
+        }
+        if (!clientSecret) {
+          toast("Client Secret is required", "warning");
+          return;
+        }
+        if (!xpiApiModules) {
+          toast("XPI API Modules Datahub ID is required", "warning");
+          return;
+        }
+        if (!xpiApiServices) {
+          toast("XPI API Services Datahub ID is required", "warning");
+          return;
+        }
+        if (!xpiEntity) {
+          toast("XPI Entity Datahub ID is required", "warning");
+          return;
+        }
+        if (!xpiFieldMapping) {
+          toast("XPI Field Mapping Datahub ID is required", "warning");
+          return;
+        }
+        if (!xpiReqFormField) {
+          toast(
+            "XPI Request Form Field Mapping Datahub ID is required",
+            "warning",
+          );
+          return;
+        }
+        if (!xpiReqFormMapping) {
+          toast("XPI Request Form Mapping Datahub ID is required", "warning");
+          return;
+        }
+        if (!xpiSpaceName) {
+          toast("XPI Space Name Datahub ID is required", "warning");
+          return;
+        }
+        if (!campaignSpace) {
+          toast("Campaign Space ID is required", "warning");
+          return;
+        }
+
+        const $btn = $(this)
+          .prop("disabled", true)
+          .html('<i class="fa-solid fa-spinner fa-spin"></i> Saving…');
+
+        try {
+          const body = JSON.stringify({
+            environment_name: name,
+            client_id: clientId,
+            client_secret: clientSecret,
+            account_id: accountId || null,
+            xpi_api_modules_datahub_id: xpiApiModules,
+            xpi_api_services_datahub_id: xpiApiServices,
+            xpi_entity_datahub_id: xpiEntity,
+            xpi_field_mapping_datahub_id: xpiFieldMapping,
+            xpi_request_form_field_mapping_datahub_id: xpiReqFormField,
+            xpi_request_form_mapping_datahub_id: xpiReqFormMapping,
+            xpi_space_name_datahub_id: xpiSpaceName,
+            campaign_space_id: campaignSpace,
+            is_active: isActive,
+            is_visible: isVisible,
+          });
+          const isEdit = !!envEditId;
+          const url = isEdit
+            ? "/api/v1/portal/environments/" + envEditId
+            : "/api/v1/portal/environments/";
+          const method = isEdit ? "PATCH" : "POST";
+
+          const res = await fetch(url, {
+            method,
+            headers: authHeaders({ "Content-Type": "application/json" }),
+            body,
+          });
+          const data = await res.json();
+
+          if (!data.success) throw new Error(data.message || "Request failed");
+
+          closeEnvModal();
+
+          // Show redirect URL popup after creation (not on edit)
+          if (!isEdit && wrikeRedirectUrl && appUrl && data.data?.id) {
+            const redirectUrl = wrikeRedirectUrl;
+            const loginUrl = appUrl + "?environmentId=" + data.data.id;
+            setTimeout(function () {
+              showRedirectUrlModal(redirectUrl, loginUrl);
+            }, 300);
+          } else {
+            toast(
+              isEdit ? "Environment updated" : "Environment created",
+              "success",
+            );
+          }
+
+          await loadEnvironments();
+        } catch (err) {
+          toast(err.message || "Failed to save environment", "error");
+        } finally {
+          $btn
+            .prop("disabled", false)
+            .html('<i class="fa-solid fa-floppy-disk"></i> Save');
+        }
+      });
+
+      /* ─── Delete environment (delegated) ───────────────── */
+      $(document).on("click", ".env-del-btn", async function () {
+        const id = $(this).data("id");
+        const name = $(this).data("name");
+
+        const r = await Swal.fire({
+          title: "Delete environment?",
+          html:
+            "This will permanently delete <strong>" +
+            esc(name) +
+            "</strong>. This cannot be undone.",
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonText: "Delete",
+          cancelButtonText: "Cancel",
+          reverseButtons: true,
+          customClass: { confirmButton: "swal2-confirm swal2-danger" },
+        });
+
+        if (!r.isConfirmed) return;
+
+        try {
+          const res = await fetch("/api/v1/portal/environments/" + id, {
+            method: "DELETE",
+            headers: authHeaders(),
+          });
+          const data = await res.json();
+          if (!data.success) throw new Error(data.message || "Delete failed");
+          toast("Environment deleted", "success");
+          await loadEnvironments();
+        } catch (err) {
+          toast(err.message || "Failed to delete environment", "error");
+        }
+      });
+
+      /* ─── Redirect URL success modal ───────────────────── */
+      function showRedirectUrlModal(redirectUrl, loginUrl) {
+        $("#successRedirectUrl").text(redirectUrl);
+        $("#successLoginUrl").text(loginUrl);
+        $("#redirectUrlModalBackdrop").addClass("open");
+
+        let countdownSeconds = 8;
+        $("#countdownTimer").text(countdownSeconds);
+
+        const countdownInterval = setInterval(function () {
+          countdownSeconds--;
+          $("#countdownTimer").text(countdownSeconds);
+          if (countdownSeconds <= 0) {
+            clearInterval(countdownInterval);
+            closeRedirectUrlModal();
+          }
+        }, 1000);
+
+        $("#redirectUrlModalBackdrop").data(
+          "countdownInterval",
+          countdownInterval,
+        );
+      }
+
+      function closeRedirectUrlModal() {
+        const interval = $("#redirectUrlModalBackdrop").data(
+          "countdownInterval",
+        );
+        if (interval) clearInterval(interval);
+        $("#redirectUrlModalBackdrop").removeClass("open");
+      }
+
+      $("#closeRedirectModalBtn, #closeRedirectModalBtnFooter").on(
+        "click",
+        closeRedirectUrlModal,
+      );
+      $("#redirectUrlModalBackdrop").on("click", function (e) {
+        if (e.target === this) closeRedirectUrlModal();
+      });
+
+      /* Copy URL icons in success modal */
+      $("#copySuccessUrlIcon").on("click", function () {
+        const url = $("#successRedirectUrl").text();
+        if (!url) return;
+        const $icon = $(this);
+        navigator.clipboard.writeText(url).then(function () {
+          $icon.removeClass("fa-copy").addClass("fa-check");
+          setTimeout(function () {
+            $icon.removeClass("fa-check").addClass("fa-copy");
+          }, 1500);
+        });
+      });
+
+      $("#copySuccessLoginUrlIcon").on("click", function () {
+        const url = $("#successLoginUrl").text();
+        if (!url) return;
+        const $icon = $(this);
+        navigator.clipboard.writeText(url).then(function () {
+          $icon.removeClass("fa-copy").addClass("fa-check");
+          setTimeout(function () {
+            $icon.removeClass("fa-check").addClass("fa-copy");
+          }, 1500);
+        });
+      });
+
+      /* ─── Init ─────────────────────────────────────────── */
+      $(document).ready(function () {
+        NProgress.configure({ showSpinner: false, minimum: 0.15 });
+        loadEnvironments();
+      });
+    </script>
+  </body>
+</html>

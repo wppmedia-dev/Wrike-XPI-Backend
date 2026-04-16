@@ -1,0 +1,1883 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portal — WrikeXPI</title>
+    <link
+      rel="icon"
+      href="https://cdn.wrike.com/static/branding/wrike/favicons/favicon.ico"
+    />
+
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Font Awesome 6 -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    />
+
+    <!-- DataTables -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css"
+    />
+
+    <!-- SweetAlert2 -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css"
+    />
+
+    <!-- Toastify -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css"
+    />
+
+    <!-- NProgress -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/nprogress@0.2.0/nprogress.css"
+    />
+
+    <style>
+      /* ─── CSS Variables ──────────────────────────────────── */
+      :root {
+        --bg-body: #f0f4f8;
+        --bg-sidebar: #ffffff;
+        --bg-card: #ffffff;
+        --bg-surface: #f5f7fa;
+        --bg-surface-2: #eaeff5;
+        --border: #e2e8f0;
+        --border-light: rgba(226, 232, 240, 0.7);
+        --text-primary: #0f172a;
+        --text-secondary: #475569;
+        --text-muted: #94a3b8;
+        --accent: #008262;
+        --accent-hover: #006d52;
+        --accent-soft: rgba(0, 130, 98, 0.12);
+        --success: #008262;
+        --success-soft: rgba(0, 130, 98, 0.12);
+        --danger: #ef4444;
+        --danger-soft: rgba(239, 68, 68, 0.1);
+        --warning: #f59e0b;
+        --warning-soft: rgba(245, 158, 11, 0.1);
+        --sidebar-width: 256px;
+        --topbar-height: 60px;
+        --radius-sm: 6px;
+        --radius-md: 10px;
+        --radius-lg: 14px;
+        --shadow-md: 0 1px 8px rgba(0, 0, 0, 0.08);
+        --shadow-lg: 0 4px 24px rgba(0, 0, 0, 0.12);
+        --transition: all 0.18s ease;
+      }
+
+      /* ─── Reset ──────────────────────────────────────────── */
+      *,
+      *::before,
+      *::after {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+      }
+
+      body {
+        font-family:
+          "Inter",
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        background: var(--bg-body);
+        color: var(--text-primary);
+        font-size: 14px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      /* ─── Custom Scrollbar ───────────────────────────────── */
+      ::-webkit-scrollbar {
+        width: 5px;
+        height: 5px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #8b95a6;
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #6b7580;
+      }
+
+      /* ═══════════════════════════════════════════════════════
+         LAYOUT
+      ═══════════════════════════════════════════════════════ */
+      #app {
+        display: flex;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      /* ─── Sidebar ────────────────────────────────────────── */
+      #sidebar {
+        width: var(--sidebar-width);
+        min-width: var(--sidebar-width);
+        height: 100vh;
+        background: var(--bg-sidebar);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        transition:
+          width 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+          min-width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        z-index: 100;
+        flex-shrink: 0;
+      }
+
+      #sidebar.collapsed {
+        width: 64px;
+        min-width: 64px;
+      }
+
+      /* Logo area */
+      .sidebar-logo-row {
+        height: var(--topbar-height);
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 0 12px 0 16px;
+        border-bottom: 1px solid var(--border);
+        overflow: hidden;
+        white-space: nowrap;
+        flex-shrink: 0;
+        text-decoration: none;
+      }
+
+      #sidebar.collapsed .sidebar-logo-row {
+        padding: 0 8px;
+        justify-content: center;
+        gap: 0;
+      }
+
+      .sidebar-logo {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        text-decoration: none;
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+      }
+
+      #sidebar.collapsed .sidebar-logo {
+        flex: unset;
+        min-width: unset;
+      }
+
+      #sidebar.collapsed .logo-text {
+        display: none;
+      }
+
+      #sidebar.collapsed .sidebar-collapse-btn {
+        margin-left: 0;
+      }
+
+      .logo-mark {
+        width: 34px;
+        height: 34px;
+        min-width: 34px;
+        border-radius: var(--radius-sm);
+        background: #008262;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        flex-shrink: 0;
+      }
+
+      .logo-mark svg {
+        width: 20px;
+        height: 13px;
+        fill: #ffffff;
+        display: block;
+      }
+
+      .logo-text .wrike-wordmark {
+        display: block;
+        height: 13px;
+        width: auto;
+        fill: var(--text-primary);
+      }
+
+      .logo-text {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.25;
+        overflow: hidden;
+      }
+      .logo-text .brand {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--text-primary);
+        letter-spacing: -0.3px;
+      }
+      .logo-text .sub {
+        font-size: 10.5px;
+        color: var(--text-muted);
+        font-weight: 400;
+      }
+
+      /* Sidebar nav */
+      .sidebar-nav {
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 10px 8px;
+      }
+
+      .nav-group-label {
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+        color: var(--text-muted);
+        padding: 10px 10px 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        transition:
+          opacity 0.18s ease,
+          height 0.18s ease;
+      }
+
+      #sidebar.collapsed .nav-group-label {
+        opacity: 0;
+        height: 0;
+        padding: 0;
+      }
+
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 8px 10px;
+        border-radius: var(--radius-sm);
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: var(--transition);
+        white-space: nowrap;
+        overflow: hidden;
+        position: relative;
+        margin-bottom: 1px;
+        border: 1px solid transparent;
+        user-select: none;
+      }
+
+      .nav-item:hover {
+        background: var(--bg-surface);
+        color: var(--text-primary);
+      }
+
+      .nav-item.active {
+        background: var(--accent-soft);
+        color: var(--accent);
+        border-color: rgba(47, 129, 247, 0.2);
+        font-weight: 500;
+      }
+
+      .nav-item .ni {
+        width: 18px;
+        min-width: 18px;
+        text-align: center;
+        font-size: 14px;
+      }
+      .nav-item .nl {
+        font-size: 13.5px;
+      }
+
+      .nav-badge {
+        margin-left: auto;
+        background: var(--accent);
+        color: #fff;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 1px 6px;
+        border-radius: 10px;
+        min-width: 18px;
+        text-align: center;
+        line-height: 1.6;
+      }
+
+      #sidebar.collapsed .nl,
+      #sidebar.collapsed .nav-badge,
+      #sidebar.collapsed .nav-group-label {
+        display: none;
+      }
+
+      #sidebar.collapsed .nav-item {
+        justify-content: center;
+        padding: 8px 0;
+        gap: 0;
+      }
+
+      /* Collapse toggle — inside logo row header */
+      .sidebar-collapse-btn {
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
+        border-radius: var(--radius-sm);
+        background: transparent;
+        border: 1px solid transparent;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 12px;
+        transition: var(--transition);
+        flex-shrink: 0;
+      }
+
+      .sidebar-collapse-btn:hover {
+        background: var(--bg-surface);
+        border-color: var(--border);
+        color: var(--text-secondary);
+      }
+
+      #sidebar.collapsed .sidebar-collapse-btn i {
+        transform: rotate(180deg);
+      }
+
+      /* Sidebar footer */
+      .sidebar-footer {
+        border-top: 1px solid var(--border);
+        padding: 10px 8px;
+        flex-shrink: 0;
+        overflow: hidden;
+      }
+
+      .sidebar-footer .user-row {
+        justify-content: space-between;
+      }
+
+      #sidebar.collapsed .user-row {
+        justify-content: center;
+      }
+
+      #sidebar.collapsed .user-row-left {
+        display: none;
+      }
+
+      .user-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+        cursor: default;
+      }
+
+      .user-avatar {
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #6e40c9 0%, #2f81f7 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 700;
+        color: white;
+      }
+
+      .user-row-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        overflow: hidden;
+        flex: 1;
+        min-width: 0;
+      }
+
+      .user-meta {
+        overflow: hidden;
+      }
+      .user-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .user-role {
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      #sidebar.collapsed .user-meta {
+        display: none;
+      }
+
+      /* Sign-out icon button — inline with user row */
+      .signout-icon-btn {
+        width: 30px;
+        height: 30px;
+        min-width: 30px;
+        border-radius: var(--radius-sm);
+        background: transparent;
+        border: 1px solid transparent;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 14px;
+        transition: var(--transition);
+        flex-shrink: 0;
+      }
+
+      .signout-icon-btn:hover {
+        background: var(--danger-soft);
+        border-color: rgba(248, 81, 73, 0.28);
+        color: var(--danger);
+      }
+
+      /* ─── Main ───────────────────────────────────────────── */
+      #main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        min-width: 0;
+      }
+
+      /* Topbar */
+      #topbar {
+        height: var(--topbar-height);
+        min-height: var(--topbar-height);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 24px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-card);
+        box-shadow: 0 1px 0 var(--border);
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        flex-shrink: 0;
+      }
+
+      .topbar-left {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+
+      .topbar-mobile-btn {
+        display: none;
+        width: 37px;
+        height: 37px;
+        border-radius: 0;
+        background: transparent;
+        border: none;
+        color: var(--text-secondary);
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 18px;
+        transition: var(--transition);
+        box-shadow: none;
+        padding: 0;
+      }
+
+      .topbar-mobile-btn:hover,
+      .topbar-mobile-btn:active {
+        background: transparent;
+        border-color: transparent;
+        color: var(--text-primary);
+        transform: none;
+        box-shadow: none;
+      }
+
+      .topbar-mobile-btn i {
+        font-size: 20px;
+      }
+
+      .page-title {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--text-primary);
+        letter-spacing: -0.2px;
+      }
+      .breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 1px;
+      }
+      .bc-sep {
+        opacity: 0.4;
+      }
+
+      .topbar-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .topbar-icon-btn {
+        width: 34px;
+        height: 34px;
+        border-radius: var(--radius-sm);
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        color: var(--text-secondary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: var(--transition);
+        font-size: 14px;
+      }
+
+      .topbar-icon-btn:hover {
+        background: var(--bg-surface-2);
+        color: var(--text-primary);
+      }
+
+      /* Content area */
+      #content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 24px;
+      }
+
+      /* ═══════════════════════════════════════════════════════
+         PAGES
+      ═══════════════════════════════════════════════════════ */
+      .page {
+        display: none;
+        animation: pageIn 0.18s ease;
+      }
+      .page.active {
+        display: block;
+      }
+
+      @keyframes pageIn {
+        from {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      /* Section header */
+      .section-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        margin-bottom: 20px;
+        gap: 12px;
+      }
+
+      .section-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--text-primary);
+        letter-spacing: -0.3px;
+      }
+      .section-subtitle {
+        font-size: 13px;
+        color: var(--text-muted);
+        margin-top: 2px;
+      }
+
+      /* ─── Stat cards ─────────────────────────────────────── */
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+        margin-bottom: 24px;
+      }
+
+      @media (max-width: 1024px) {
+        .stats-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+
+      .stat-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: 18px 20px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        transition: var(--transition);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .stat-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+      }
+
+      .stat-card.blue::before {
+        background: linear-gradient(90deg, var(--accent), transparent);
+      }
+      .stat-card.green::before {
+        background: linear-gradient(90deg, var(--success), transparent);
+      }
+      .stat-card.red::before {
+        background: linear-gradient(90deg, var(--danger), transparent);
+      }
+      .stat-card.yellow::before {
+        background: linear-gradient(90deg, var(--warning), transparent);
+      }
+
+      .stat-card:hover {
+        border-color: var(--bg-surface-2);
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-md);
+      }
+
+      .stat-icon {
+        width: 42px;
+        height: 42px;
+        min-width: 42px;
+        border-radius: var(--radius-sm);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 17px;
+      }
+
+      .stat-icon.blue {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+      .stat-icon.green {
+        background: var(--success-soft);
+        color: var(--success);
+      }
+      .stat-icon.red {
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+      .stat-icon.yellow {
+        background: var(--warning-soft);
+        color: var(--warning);
+      }
+
+      .stat-body {
+        min-width: 0;
+      }
+      .stat-value {
+        font-size: 24px;
+        font-weight: 800;
+        color: var(--text-primary);
+        line-height: 1;
+        letter-spacing: -0.5px;
+      }
+      .stat-label {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 4px;
+        font-weight: 500;
+      }
+
+      /* ─── Card ───────────────────────────────────────────── */
+      .card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        overflow: hidden;
+        margin-bottom: 20px;
+      }
+
+      .card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .card-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .card-title i {
+        color: var(--text-muted);
+        font-size: 13px;
+      }
+      .card-body {
+        padding: 20px;
+      }
+
+      /* ─── Buttons ────────────────────────────────────────── */
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 14px;
+        border-radius: var(--radius-sm);
+        font-size: 13.5px;
+        font-weight: 500;
+        font-family: inherit;
+        cursor: pointer;
+        border: 1px solid transparent;
+        transition: var(--transition);
+        text-decoration: none;
+        white-space: nowrap;
+        vertical-align: middle;
+        line-height: 1.4;
+      }
+
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .btn-primary {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+      }
+      .btn-primary:hover:not(:disabled) {
+        background: var(--accent-hover);
+        border-color: var(--accent-hover);
+      }
+
+      .btn-ghost {
+        background: transparent;
+        color: var(--text-secondary);
+        border-color: var(--border);
+      }
+      .btn-ghost:hover:not(:disabled) {
+        background: var(--bg-surface);
+        color: var(--text-primary);
+      }
+
+      .btn-sm {
+        padding: 4px 10px;
+        font-size: 12.5px;
+      }
+
+      /* ─── Table ──────────────────────────────────────────── */
+      .table-wrapper {
+        overflow: visible;
+      }
+
+      .dataTables_wrapper {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .dataTables_wrapper .dataTables_filter,
+      .dataTables_wrapper .dataTables_length {
+        flex-shrink: 0;
+      }
+
+      .dataTables_wrapper .dataTables_scroll {
+        flex: 1;
+        overflow-x: auto;
+        min-width: 0;
+      }
+
+      table.dt {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      table.dt thead th {
+        background: var(--bg-surface);
+        color: var(--text-muted);
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        padding: 10px 16px;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+        white-space: nowrap;
+      }
+
+      table.dt tbody td {
+        padding: 12px 16px 12px 10px;
+        border-bottom: 1px solid var(--border-light);
+        color: var(--text-primary);
+        font-size: 13.5px;
+        vertical-align: middle;
+        white-space: nowrap;
+      }
+
+      #recentEnvsBody table.dt tbody td {
+        padding: 12px 16px 12px 16px;
+      }
+
+      table.dt tbody tr:last-child td {
+        border-bottom: none;
+      }
+      table.dt tbody tr:hover td {
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .dataTables_wrapper .dataTables_scroll {
+        max-width: 100%;
+      }
+
+      .dataTables_wrapper {
+        font-size: 13px;
+        color: var(--text-muted);
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+      }
+
+      .dataTables_wrapper > * {
+        flex-shrink: 0;
+      }
+
+      .dataTables_wrapper > div[style*="overflow-x"] {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .dataTables_wrapper .dataTables_filter label,
+      .dataTables_wrapper .dataTables_length label,
+      .dataTables_wrapper .dataTables_info {
+        color: var(--text-muted) !important;
+        font-size: 12.5px !important;
+        margin: 0 !important;
+      }
+
+      .dataTables_wrapper .dataTables_filter,
+      .dataTables_wrapper .dataTables_length {
+        display: flex;
+        align-items: center;
+      }
+
+      .dataTables_wrapper .dataTables_filter label,
+      .dataTables_wrapper .dataTables_length label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+      }
+
+      .dataTables_wrapper .dataTables_filter input,
+      .dataTables_wrapper .dataTables_length select {
+        background: var(--bg-surface) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: var(--radius-sm) !important;
+        color: var(--text-primary) !important;
+        padding: 5px 10px !important;
+        font-size: 13px !important;
+        font-family: inherit !important;
+        outline: none !important;
+      }
+
+      .dataTables_wrapper .dataTables_filter input:focus {
+        border-color: var(--accent) !important;
+        box-shadow: 0 0 0 3px rgba(47, 129, 247, 0.12) !important;
+      }
+
+      div.dataTables_wrapper div.dataTables_info {
+        flex-shrink: 0;
+        margin: 0;
+      }
+
+      div.dataTables_wrapper div.dataTables_filter,
+      div.dataTables_wrapper div.dataTables_length {
+        flex-shrink: 0;
+      }
+      div.dataTables_wrapper div.dataTables_paginate {
+        flex-shrink: 0;
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+      }
+
+      .dataTables_wrapper .dataTables_paginate .paginate_button {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        min-width: 30px !important;
+        height: 30px !important;
+        padding: 0 8px !important;
+        border-radius: var(--radius-sm) !important;
+        background: var(--bg-surface) !important;
+        border: 1px solid var(--border) !important;
+        color: var(--text-secondary) !important;
+        cursor: pointer !important;
+        font-size: 12.5px !important;
+        transition: var(--transition) !important;
+        margin: 0 2px !important;
+      }
+
+      .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+        background: var(--accent) !important;
+        border-color: var(--accent) !important;
+        color: #fff !important;
+        font-weight: 600 !important;
+      }
+
+      .dataTables_wrapper
+        .dataTables_paginate
+        .paginate_button:hover:not(.current):not(.disabled) {
+        background: var(--bg-surface-2) !important;
+        color: var(--text-primary) !important;
+      }
+
+      .dataTables_wrapper .dataTables_paginate .paginate_button.disabled {
+        opacity: 0.35 !important;
+        cursor: default !important;
+      }
+
+      /* ─── Badges ─────────────────────────────────────────── */
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 11.5px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+      }
+
+      .badge .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+
+      .badge-success {
+        background: var(--success-soft);
+        color: var(--success);
+      }
+      .badge-success .dot {
+        background: var(--success);
+        box-shadow: 0 0 4px var(--success);
+      }
+
+      .badge-danger {
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+      .badge-danger .dot {
+        background: var(--danger);
+      }
+
+      .badge-info {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+      .badge-warning {
+        background: var(--warning-soft);
+        color: var(--warning);
+      }
+
+      /* Action cell */
+      .action-cell {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      /* Icon button for copy */
+      .icon-btn {
+        width: 24px;
+        height: 24px;
+        min-width: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: 1px solid transparent;
+        border-radius: var(--radius-sm);
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 12px;
+        transition: var(--transition);
+        padding: 0;
+      }
+
+      .icon-btn:hover {
+        background: var(--bg-surface);
+        color: var(--accent);
+        border-color: var(--border);
+      }
+
+      .icon-btn.copied {
+        color: var(--success);
+      }
+
+      /* ─── Empty state ─────────────────────────────────────── */
+      .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 56px 24px;
+        text-align: center;
+      }
+
+      .empty-state-icon {
+        width: 56px;
+        height: 56px;
+        background: var(--bg-surface);
+        border-radius: var(--radius-md);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        color: var(--text-muted);
+        margin-bottom: 14px;
+      }
+
+      .empty-state h3 {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 6px;
+      }
+      .empty-state p {
+        font-size: 13px;
+        color: var(--text-muted);
+        max-width: 300px;
+      }
+
+      /* ─── NProgress & SweetAlert2 light theme ─────────────── */
+      #nprogress .bar {
+        background: var(--accent) !important;
+        height: 2px !important;
+      }
+      #nprogress .peg {
+        box-shadow:
+          0 0 8px var(--accent),
+          0 0 3px var(--accent) !important;
+      }
+
+      .swal2-popup {
+        background: #ffffff !important;
+        border: 1px solid var(--border) !important;
+        color: var(--text-primary) !important;
+        border-radius: var(--radius-md) !important;
+        font-family: "Inter", sans-serif !important;
+        box-shadow: var(--shadow-lg) !important;
+      }
+
+      .swal2-title {
+        color: var(--text-primary) !important;
+        font-size: 18px !important;
+        font-weight: 700 !important;
+      }
+      .swal2-html-container {
+        color: var(--text-secondary) !important;
+        font-size: 14px !important;
+      }
+      .swal2-icon.swal2-warning {
+        border-color: var(--warning) !important;
+        color: var(--warning) !important;
+      }
+      .swal2-icon.swal2-question {
+        border-color: var(--accent) !important;
+        color: var(--accent) !important;
+      }
+
+      .swal2-confirm {
+        background: var(--accent) !important;
+        border-radius: var(--radius-sm) !important;
+        font-family: "Inter", sans-serif !important;
+        font-weight: 500 !important;
+        font-size: 13.5px !important;
+        padding: 8px 18px !important;
+      }
+
+      .swal2-cancel {
+        background: var(--bg-surface-2) !important;
+        color: var(--text-primary) !important;
+        border-radius: var(--radius-sm) !important;
+        font-family: "Inter", sans-serif !important;
+        font-weight: 500 !important;
+        font-size: 13.5px !important;
+        padding: 8px 18px !important;
+      }
+
+      /* ─── Responsive ─────────────────────────────────────── */
+      @media (max-width: 900px) {
+        #sidebar {
+          position: fixed;
+          height: 100vh;
+          z-index: 300;
+          transform: translateX(calc(-1 * var(--sidebar-width)));
+          transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          width: var(--sidebar-width) !important;
+          min-width: var(--sidebar-width) !important;
+        }
+
+        #sidebar.mobile-open {
+          transform: translateX(0);
+        }
+
+        #sidebar-overlay {
+          display: none;
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.55);
+          z-index: 299;
+        }
+
+        #sidebar.mobile-open ~ #sidebar-overlay {
+          display: block;
+        }
+
+        .topbar-mobile-btn {
+          display: flex;
+        }
+        .stats-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+
+      @media (max-width: 540px) {
+        .stats-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+        #content {
+          padding: 16px;
+        }
+        .section-header {
+          flex-direction: column;
+          align-items: stretch;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <!-- ═══════════ SIDEBAR ═══════════ -->
+      <nav id="sidebar">
+        <!-- Logo row with collapse btn -->
+        <div class="sidebar-logo-row">
+          <a class="sidebar-logo" href="#">
+            <div class="logo-mark">
+              <svg
+                viewBox="0 0 31 20"
+                role="img"
+                aria-label="Wrike symbol"
+                aria-hidden="true"
+              >
+                <path
+                  d="M20.78 1.404C21.885.298 22.587 0 24.113 0h6.878c.561 0 .684.509.35.842l-11.49 11.491c-.176.176-.246.21-.352.246-.035.018-.087.018-.122.018s-.088 0-.123-.018c-.106-.035-.176-.07-.351-.246L14.85 8.281c-.175-.176-.21-.246-.245-.351-.018-.035-.018-.088-.018-.123s0-.088.018-.123c.035-.105.07-.175.245-.35l5.93-5.93zM10.745 8.649C9.64 7.544 8.92 7.263 7.395 7.263H.534c-.562 0-.685.509-.351.842l11.49 11.492c.176.175.246.21.352.245a.299.299 0 00.123.018c.035 0 .087 0 .122-.018.105-.035.176-.07.351-.245l4.053-4.07c.175-.176.21-.246.245-.351a.3.3 0 00.018-.123c0-.035 0-.088-.018-.123-.035-.105-.07-.175-.245-.351l-5.93-5.93z"
+                />
+              </svg>
+            </div>
+            <div class="logo-text">
+              <svg
+                class="wrike-wordmark"
+                viewBox="33 0 67 20"
+                role="img"
+                aria-label="Wrike"
+              >
+                <path
+                  d="M71.064 4.72a1.965 1.965 0 100-3.93 1.965 1.965 0 000 3.93zm1.579 1.578h-3.158v11.035h3.158V6.298zm-9.877 11.035V12.37c0-3 2.649-2.948 4.035-2.72V6.263c-2.21-.193-3.526.421-4.123 1.614h-.07l.017-1.561h-3.07v11.018h3.21zm-22.685 0h2.474l3.79-7.087 3.666 7.087h2.509l5.632-11.035h-3.737l-3.456 7.035-3.281-7.035h-2.684l-3.456 7.07-3.281-7.07H34.52l5.561 11.035zm36.053 0h2l3.298-4.158 2.79 4.158h3.72l-4.387-6.386 3.842-4.649h-3.701l-4.386 5.544h-.07L79.275.79h-3.14v16.544zm18.228-2.368c1.351 0 2.158-.72 2.544-1.298l2.421 1.667c-.982 1.28-2.509 2.28-5.035 2.28-3.386 0-5.912-2.544-5.912-5.754 0-3.228 2.579-5.755 5.912-5.755 3.403 0 5.702 2.562 5.702 5.755v.877h-8.58c.246 1.316 1.37 2.228 2.948 2.228zm2.58-4.421c-.352-1.158-1.37-1.965-2.825-1.965-1.492 0-2.492.807-2.843 1.965h5.667z"
+                />
+              </svg>
+              <span class="sub">Portal</span>
+            </div>
+          </a>
+          <button
+            class="sidebar-collapse-btn"
+            id="sidebarToggle"
+            title="Collapse sidebar"
+          >
+            <i class="fa-solid fa-chevron-left" id="toggleIcon"></i>
+          </button>
+        </div>
+
+        <!-- Navigation -->
+        <div class="sidebar-nav">
+          <div class="nav-group-label">Workspace</div>
+
+          <div class="nav-item active" data-page="overview">
+            <span class="ni"><i class="fa-solid fa-chart-pie"></i></span>
+            <span class="nl">Overview</span>
+          </div>
+
+          <div class="nav-item" data-page="environments">
+            <span class="ni"><i class="fa-solid fa-layer-group"></i></span>
+            <span class="nl">Environments</span>
+            <span class="nav-badge" id="envCount">0</span>
+          </div>
+        </div>
+
+        <!-- Footer (user info) -->
+        <div class="sidebar-footer">
+          <div class="user-row">
+            <div class="user-row-left">
+              <div class="user-avatar" id="sidebarAvatar">U</div>
+              <div class="user-meta">
+                <div class="user-name" id="sidebarUsername">User</div>
+                <div class="user-role" id="sidebarRole">Portal User</div>
+              </div>
+            </div>
+            <button class="signout-icon-btn" id="logoutBtn" title="Sign Out">
+              <i class="fa-solid fa-right-from-bracket"></i>
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      <!-- Mobile sidebar overlay -->
+      <div id="sidebar-overlay"></div>
+
+      <!-- ═══════════ MAIN ═══════════ -->
+      <div id="main">
+        <!-- Topbar -->
+        <div id="topbar">
+          <div class="topbar-left">
+            <div class="topbar-mobile-btn" id="mobileSidebarBtn">
+              <i class="fa-solid fa-bars"></i>
+            </div>
+            <div>
+              <div class="page-title" id="pageTitle">Overview</div>
+              <div class="breadcrumb">
+                <span>Portal</span>
+                <span class="bc-sep">/</span>
+                <span id="breadcrumbCurrent">Overview</span>
+              </div>
+            </div>
+          </div>
+          <div class="topbar-right">
+            <div class="topbar-icon-btn" id="refreshBtn" title="Refresh data">
+              <i class="fa-solid fa-rotate-right"></i>
+            </div>
+          </div>
+        </div>
+
+        <!-- Content -->
+        <div id="content">
+          <!-- ══════ OVERVIEW PAGE ══════ -->
+          <div class="page active" id="page-overview">
+            <div class="section-header">
+              <div>
+                <div class="section-title">Dashboard Overview</div>
+                <div class="section-subtitle" id="overviewSubtitle">
+                  Welcome back
+                </div>
+              </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats-grid">
+              <div class="stat-card blue">
+                <div class="stat-icon blue">
+                  <i class="fa-solid fa-layer-group"></i>
+                </div>
+                <div class="stat-body">
+                  <div class="stat-value" id="statTotal">—</div>
+                  <div class="stat-label">Total Environments</div>
+                </div>
+              </div>
+              <div class="stat-card green">
+                <div class="stat-icon green">
+                  <i class="fa-solid fa-circle-check"></i>
+                </div>
+                <div class="stat-body">
+                  <div class="stat-value" id="statActive">—</div>
+                  <div class="stat-label">Active</div>
+                </div>
+              </div>
+              <div class="stat-card red">
+                <div class="stat-icon red">
+                  <i class="fa-solid fa-circle-xmark"></i>
+                </div>
+                <div class="stat-body">
+                  <div class="stat-value" id="statInactive">—</div>
+                  <div class="stat-label">Inactive</div>
+                </div>
+              </div>
+              <div class="stat-card yellow">
+                <div class="stat-icon yellow">
+                  <i class="fa-solid fa-eye"></i>
+                </div>
+                <div class="stat-body">
+                  <div class="stat-value" id="statVisible">—</div>
+                  <div class="stat-label">Visible</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Recent environments -->
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">
+                  <i class="fa-solid fa-clock-rotate-left"></i>
+                  Recent Environments
+                </div>
+                <button class="btn btn-ghost btn-sm" id="viewAllBtn">
+                  View All &nbsp;<i class="fa-solid fa-arrow-right"></i>
+                </button>
+              </div>
+              <div id="recentEnvsBody">
+                <div class="empty-state">
+                  <div class="empty-state-icon">
+                    <i class="fa-regular fa-folder-open"></i>
+                  </div>
+                  <h3>No environments yet</h3>
+                  <p>No Wrike environments have been assigned to you.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ══════ ENVIRONMENTS PAGE ══════ -->
+          <div class="page" id="page-environments">
+            <div class="section-header">
+              <div>
+                <div class="section-title">Environments</div>
+                <div class="section-subtitle">
+                  Your assigned Wrike environments
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-body">
+                <div style="display: flex; flex-direction: column; gap: 12px">
+                  <div class="table-wrapper">
+                    <table class="dt" id="envTable">
+                      <thead>
+                        <tr>
+                          <th>Environment</th>
+                          <th>Env ID</th>
+                          <th>Created</th>
+                          <th>Last Updated</th>
+                          <th>Visibility</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody id="envTableBody"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- /#content -->
+      </div>
+      <!-- /#main -->
+    </div>
+    <!-- /#app -->
+
+    <!-- ═══════════ SCRIPTS ═══════════ -->
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <!-- DataTables -->
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- Toastify -->
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <!-- NProgress -->
+    <script src="https://unpkg.com/nprogress@0.2.0/nprogress.js"></script>
+
+    <script>
+      /* ── Session guard ──────────────────────────────────────── */
+      const accessToken = localStorage.getItem("portal_access_token");
+      if (!accessToken) window.location.replace("/portal/login");
+
+      /* ── Global API Response Interceptor ────────────────────── */
+      const originalFetch = window.fetch;
+      window.fetch = function (...args) {
+        return originalFetch.apply(this, args).then((response) => {
+          if (response.status === 401 || response.status === 403) {
+            localStorage.removeItem("portal_access_token");
+            localStorage.removeItem("portal_role");
+            window.location.replace("/portal/login");
+            return Promise.reject(new Error("Session expired or unauthorized"));
+          }
+          return response;
+        });
+      };
+
+      /* helper — returns headers with Bearer token */
+      function authHeaders(extra) {
+        return Object.assign({ Authorization: "Bearer " + accessToken }, extra);
+      }
+
+      /* ── State ──────────────────────────────────────────────── */
+      let environments = [];
+      let envDT = null;
+
+      /* ── Toast helper ───────────────────────────────────────── */
+      function toast(msg, type) {
+        const palettes = {
+          success: "linear-gradient(135deg, #0ecb81, #3fb950)",
+          error: "linear-gradient(135deg, #f85149, #d03030)",
+          info: "linear-gradient(135deg, #2f81f7, #6e40c9)",
+          warning: "linear-gradient(135deg, #d29922, #e89e1d)",
+        };
+        Toastify({
+          text: msg,
+          duration: 4500,
+          gravity: "top",
+          position: "right",
+          stopOnFocus: true,
+          style: {
+            background: palettes[type] || palettes.info,
+            borderRadius: "8px",
+            fontFamily: "'Inter', sans-serif",
+            fontSize: "13.5px",
+            padding: "12px 18px",
+            boxShadow: "0 6px 24px rgba(0,0,0,0.4)",
+            minWidth: "260px",
+          },
+        }).showToast();
+      }
+
+      /* ── Page map ───────────────────────────────────────────── */
+      const PAGE_NAMES = {
+        overview: "Overview",
+        environments: "Environments",
+      };
+
+      /* ── Navigate ───────────────────────────────────────────── */
+      function showPage(pageId) {
+        $(".page").removeClass("active");
+        $(`#page-${pageId}`).addClass("active");
+        $(".nav-item").removeClass("active");
+        $(`.nav-item[data-page="${pageId}"]`).addClass("active");
+
+        const title = PAGE_NAMES[pageId] || pageId;
+        $("#pageTitle").text(title);
+        $("#breadcrumbCurrent").text(title);
+
+        /* close mobile sidebar if open */
+        $("#sidebar").removeClass("mobile-open");
+      }
+
+      /* ── Sidebar collapse ───────────────────────────────────── */
+      $("#sidebarToggle").on("click", function () {
+        $("#sidebar").toggleClass("collapsed");
+        const collapsed = $("#sidebar").hasClass("collapsed");
+        $("#toggleIcon")
+          .toggleClass("fa-chevron-left", !collapsed)
+          .toggleClass("fa-chevron-right", collapsed);
+      });
+
+      /* ── Mobile sidebar ─────────────────────────────────────── */
+      $("#mobileSidebarBtn").on("click", function () {
+        $("#sidebar").toggleClass("mobile-open");
+      });
+
+      $("#sidebar-overlay").on("click", function () {
+        $("#sidebar").removeClass("mobile-open");
+      });
+
+      /* ── Nav clicks ─────────────────────────────────────────── */
+      $(document).on("click", ".nav-item", function () {
+        showPage($(this).data("page"));
+      });
+
+      /* ── View all link ──────────────────────────────────────── */
+      $("#viewAllBtn").on("click", function () {
+        showPage("environments");
+      });
+
+      /* ── Refresh ────────────────────────────────────────────── */
+      $("#refreshBtn").on("click", function () {
+        const $i = $(this).find("i");
+        $i.addClass("fa-spin");
+        loadEnvironments().finally(() =>
+          setTimeout(() => $i.removeClass("fa-spin"), 600),
+        );
+      });
+
+      /* ── Sidebar user info ──────────────────────────────────── */
+      (function loadSidebarUser() {
+        try {
+          const payload = JSON.parse(atob(accessToken.split(".")[1]));
+          const name = payload.username || "User";
+          const storedRole = localStorage.getItem("portal_role") || "user";
+          const roleLabel =
+            storedRole === "admin" ? "Portal Admin" : "Portal User";
+
+          $("#sidebarUsername").text(name);
+          $("#sidebarAvatar").text(name.charAt(0).toUpperCase());
+          $("#sidebarRole").text(roleLabel);
+          $("#overviewSubtitle").text("Welcome back, " + name);
+        } catch (_) {}
+      })();
+
+      /* ─────────────────────────────────────────────────────────
+         DATA
+      ───────────────────────────────────────────────────────── */
+      async function loadEnvironments() {
+        NProgress.start();
+        try {
+          const res = await fetch("/api/v1/portal/environments/", {
+            headers: authHeaders(),
+          });
+          const data = await res.json();
+
+          environments = [];
+          if (data.success && Array.isArray(data.data)) {
+            environments = data.data.map(function (c) {
+              return {
+                id: c.id,
+                environment_name: c.environment_name || "",
+                account_id: c.account_id || "",
+                is_active: !!c.is_active,
+                is_visible: !!c.is_visible,
+                created_at: c.created_at,
+                updated_at: c.updated_at,
+              };
+            });
+          }
+
+          renderStats();
+          renderTable();
+          renderRecentEnvs();
+        } catch (err) {
+          toast("Failed to load environments", "error");
+          console.error(err);
+        } finally {
+          NProgress.done();
+        }
+      }
+
+      /* ── Stats ──────────────────────────────────────────────── */
+      function renderStats() {
+        var total = environments.length;
+        var active = environments.filter(function (e) {
+          return e.is_active;
+        }).length;
+        var visible = environments.filter(function (e) {
+          return e.is_visible;
+        }).length;
+
+        $("#statTotal").text(total);
+        $("#statActive").text(active);
+        $("#statInactive").text(total - active);
+        $("#statVisible").text(visible);
+        $("#envCount").text(total);
+      }
+
+      /* ── Date formatter for local timezone ────────────────────── */
+      function formatLocalDate(dateStr) {
+        if (!dateStr) return "—";
+        try {
+          const date = new Date(dateStr);
+          return date.toLocaleString("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: true,
+          });
+        } catch (err) {
+          return "--";
+        }
+      }
+
+      /* ── XSS escape ─────────────────────────────────────────── */
+      function escHtml(str) {
+        return $("<div>")
+          .text(str || "")
+          .html();
+      }
+
+      /* ── Table ──────────────────────────────────────────────── */
+      function renderTable() {
+        if (envDT) {
+          envDT.destroy();
+          envDT = null;
+        }
+
+        var $tbody = $("#envTableBody").empty();
+
+        if (environments.length === 0) {
+          $tbody.html(
+            "<tr>" +
+              '<td colspan="6">' +
+              '<div class="empty-state">' +
+              '<div class="empty-state-icon"><i class="fa-regular fa-folder-open"></i></div>' +
+              "<h3>No environments found</h3>" +
+              "<p>No Wrike environments have been assigned to you.</p>" +
+              "</div>" +
+              "</td>" +
+              "</tr>",
+          );
+          return;
+        }
+
+        environments.forEach(function (env) {
+          var badge = env.is_active
+            ? '<span class="badge badge-success"><span class="dot"></span> Active</span>'
+            : '<span class="badge badge-danger"><span class="dot"></span> Inactive</span>';
+
+          var visibilityBadge = env.is_visible
+            ? '<span class="badge badge-success"><span class="dot"></span> Visible</span>'
+            : '<span class="badge badge-warning"><span class="dot"></span> Hidden</span>';
+
+          $tbody.append(
+            "<tr>" +
+              "<td><strong>" +
+              escHtml(env.environment_name) +
+              "</strong></td>" +
+              "<td>" +
+              '<div class="action-cell">' +
+              '<code style="font-size: 11px; color: var(--text-muted);">' +
+              escHtml(env.id) +
+              "</code>" +
+              '<button class="icon-btn copy-id-btn" data-id="' +
+              env.id +
+              '" title="Copy ID">' +
+              '<i class="fa-solid fa-copy"></i>' +
+              "</button>" +
+              "</div>" +
+              "</td>" +
+              "<td>" +
+              formatLocalDate(env.created_at) +
+              "</td>" +
+              "<td>" +
+              formatLocalDate(env.updated_at) +
+              "</td>" +
+              "<td>" +
+              visibilityBadge +
+              "</td>" +
+              "<td>" +
+              badge +
+              "</td>" +
+              "</tr>",
+          );
+        });
+
+        envDT = $("#envTable").DataTable({
+          pageLength: 10,
+          lengthMenu: [5, 10, 25, 50],
+          order: [],
+          columnDefs: [{ targets: 1, orderable: false, searchable: false }],
+          language: {
+            emptyTable: "No environments found",
+            zeroRecords: "No matching environments",
+            lengthMenu: "Show _MENU_ rows",
+            search: "",
+            searchPlaceholder: "Search environments…",
+            info: "Showing _START_–_END_ of _TOTAL_",
+            paginate: { previous: "‹", next: "›" },
+          },
+        });
+
+        setTimeout(function () {
+          var $wrapper = $("#envTable").closest(".dataTables_wrapper");
+          var $table = $wrapper.find("table");
+          var $filter = $wrapper.find(".dataTables_filter");
+          var $length = $wrapper.find(".dataTables_length");
+          var $info = $wrapper.find(".dataTables_info");
+          var $paginate = $wrapper.find(".dataTables_paginate");
+
+          $table.detach();
+          $filter.detach();
+          $length.detach();
+          $info.detach();
+          $paginate.detach();
+
+          var $scrollContainer = $(
+            '<div style="overflow-x: auto; min-width: 0; flex: 1;"></div>',
+          );
+          $scrollContainer.append($table);
+
+          var $topControls = $(
+            '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 12px;"></div>',
+          );
+          $topControls.append($length);
+          $topControls.append($filter);
+
+          var $bottomControls = $(
+            '<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; flex-wrap: wrap; gap: 12px;"></div>',
+          );
+          $bottomControls.append($info);
+          $bottomControls.append($paginate);
+
+          $wrapper.empty();
+          $wrapper.append($topControls);
+          $wrapper.append($scrollContainer);
+          $wrapper.append($bottomControls);
+        }, 10);
+      }
+
+      /* ── Overview recent list ───────────────────────────────── */
+      function renderRecentEnvs() {
+        var $body = $("#recentEnvsBody");
+
+        if (environments.length === 0) {
+          $body.html(
+            '<div class="empty-state">' +
+              '<div class="empty-state-icon"><i class="fa-regular fa-folder-open"></i></div>' +
+              "<h3>No environments yet</h3>" +
+              "<p>No Wrike environments have been assigned to you.</p>" +
+              "</div>",
+          );
+          return;
+        }
+
+        var recent = environments.slice(0, 5);
+        var html =
+          '<table class="dt"><thead><tr><th>Name</th><th>Env ID</th><th>Created</th><th>Status</th></tr></thead><tbody>';
+
+        recent.forEach(function (env) {
+          var badge = env.is_active
+            ? '<span class="badge badge-success"><span class="dot"></span> Active</span>'
+            : '<span class="badge badge-danger"><span class="dot"></span> Inactive</span>';
+
+          html +=
+            "<tr>" +
+            "<td><strong>" +
+            escHtml(env.environment_name) +
+            "</strong></td>" +
+            "<td>" +
+            '<div class="action-cell">' +
+            '<code style="font-size: 11px; color: var(--text-muted);">' +
+            escHtml(env.id) +
+            "</code>" +
+            '<button class="icon-btn copy-id-btn" data-id="' +
+            env.id +
+            '" title="Copy ID" style="margin-left: 4px;">' +
+            '<i class="fa-solid fa-copy"></i>' +
+            "</button>" +
+            "</div>" +
+            "</td>" +
+            "<td>" +
+            formatLocalDate(env.created_at) +
+            "</td>" +
+            "<td>" +
+            badge +
+            "</td>" +
+            "</tr>";
+        });
+
+        html += "</tbody></table>";
+        $body.html(html);
+      }
+
+      /* ── Copy ID button ─────────────────────────────────────── */
+      $(document).on("click", ".copy-id-btn", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const $btn = $(this);
+        const idValue = $btn.data("id");
+
+        if (!idValue) return;
+
+        navigator.clipboard
+          .writeText(idValue)
+          .then(function () {
+            const $icon = $btn.find("i");
+            $icon.removeClass("fa-copy").addClass("fa-check");
+            $btn.addClass("copied");
+            setTimeout(function () {
+              $icon.removeClass("fa-check").addClass("fa-copy");
+              $btn.removeClass("copied");
+            }, 1500);
+          })
+          .catch(function () {
+            const $temp = $("<input>");
+            $("body").append($temp);
+            $temp.val(idValue).select();
+            document.execCommand("copy");
+            $temp.remove();
+            const $icon = $btn.find("i");
+            $icon.removeClass("fa-copy").addClass("fa-check");
+            $btn.addClass("copied");
+            setTimeout(function () {
+              $icon.removeClass("fa-check").addClass("fa-copy");
+              $btn.removeClass("copied");
+            }, 1500);
+          });
+      });
+
+      /* ── Logout ─────────────────────────────────────────────── */
+      $("#logoutBtn").on("click", async function () {
+        var result = await Swal.fire({
+          title: "Sign out?",
+          html: "You will be logged out of the portal.",
+          icon: "question",
+          showCancelButton: true,
+          confirmButtonText:
+            '<i class="fa-solid fa-right-from-bracket" style="margin-right:6px"></i>Sign Out',
+          cancelButtonText: "Stay",
+          focusConfirm: false,
+          reverseButtons: true,
+          customClass: {
+            confirmButton: "swal2-confirm",
+            cancelButton: "swal2-cancel",
+          },
+        });
+
+        if (!result.isConfirmed) return;
+
+        NProgress.start();
+        try {
+          await fetch("/api/v1/portal/logout", {
+            method: "POST",
+            headers: authHeaders(),
+          });
+        } finally {
+          localStorage.removeItem("portal_access_token");
+          localStorage.removeItem("portal_role");
+          window.location.replace("/portal/login");
+        }
+      });
+
+      /* ── Init ───────────────────────────────────────────────── */
+      $(document).ready(function () {
+        NProgress.configure({ showSpinner: false, minimum: 0.15 });
+        loadEnvironments();
+      });
+    </script>
+  </body>
+</html>
