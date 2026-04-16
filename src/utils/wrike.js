@@ -297,6 +297,17 @@ export const getSpaceDatahub = async (
       "DATAHUB_SPACE_ID",
     );
 
+    const datahubFields = await getDatahubFields(wrikeToken, spaceId);
+
+    if (datahubFields?.errorDescription) {
+      throw datahubFields;
+    }
+
+    let formFieldsIds = {};
+    datahubFields?.data?.forEach((field) => {
+      formFieldsIds[field.title?.trim()?.toLowerCase()] = field.id;
+    });
+
     const datahubRecords = await getDatahubRecords(wrikeToken, spaceId, {
       useCache: false,
     });
@@ -310,10 +321,24 @@ export const getSpaceDatahub = async (
       datahubSpaceData[record.title?.trim()?.toLowerCase()] = record.id;
     });
 
+    let datahubSpaceMetaData = {};
+    datahubRecords?.data?.forEach((record) => {
+      datahubSpaceMetaData[record?.title?.trim()?.toLowerCase()] = {
+        id: record.id,
+        name: record?.title,
+        remark: record.fieldValues[formFieldsIds["remark"]],
+        cfId: record.fieldValues[formFieldsIds["v4id"]],
+      };
+    });
+
     // Cache the result if caching is enabled
     if (useCache) {
       try {
-        const isSaved = await redisClient.set(cacheKey, datahubSpaceData, ttl);
+        const isSaved = await redisClient.set(
+          cacheKey,
+          { datahubSpaceData, datahubSpaceMetaData },
+          ttl,
+        );
         if (isSaved)
           console.log(
             `Data cached for space datahub with TTL ${
@@ -325,7 +350,7 @@ export const getSpaceDatahub = async (
       }
     }
 
-    return datahubSpaceData;
+    return { datahubSpaceData, datahubSpaceMetaData };
   } catch (err) {
     throw err;
   }
@@ -1111,13 +1136,8 @@ export const getCustomFields = async (wrikeToken, customFieldId = null) => {
   }
 };
 
-export const getRequestForm = async (wrikeToken, environmentName) => {
+export const getRequestForm = async (wrikeToken, requestFormSpaceId) => {
   try {
-    // Get credential to fetch  requestFormSpaceId from database
-    const credential = getCachedWrikeCredentials(environmentName);
-    const requestFormSpaceId =
-      credential?.requestFormSpaceId || process.env.REQUEST_FORM_SPACE_ID;
-
     if (!requestFormSpaceId) {
       throw new Error(
         "Request Form Space ID is not configured for this environment.",

@@ -31,7 +31,7 @@ export const CreateCampaign = (
       const { space, entity, variantId, fields: formFields } = params;
 
       // if (Object.keys(datahubSpaceData).length == 0) {
-      const datahubSpaceData = await getSpaceDatahub(
+      const { datahubSpaceData, datahubSpaceMetaData } = await getSpaceDatahub(
         wrikeToken,
         true,
         0,
@@ -66,6 +66,7 @@ export const CreateCampaign = (
         0,
         environmentName,
       );
+
       // Sending submit request form error response
       if (requestForm?.errorDescription) {
         return reject({ message: requestForm?.errorDescription });
@@ -89,6 +90,7 @@ export const CreateCampaign = (
         0,
         environmentName,
       );
+
       if (datahubCustomFieldsData?.errorDescription) {
         return reject({ message: datahubCustomFieldsData?.errorDescription });
       }
@@ -113,7 +115,10 @@ export const CreateCampaign = (
       // }
 
       // Submit Request Form
-      const requestFormData = await getRequestForm(wrikeToken, environmentName);
+      const requestFormData = await getRequestForm(
+        wrikeToken,
+        datahubSpaceMetaData[space?.toLowerCase()?.trim()]?.cfId,
+      );
 
       // Sending get request form error response
       if (requestFormData?.errorDescription) {
