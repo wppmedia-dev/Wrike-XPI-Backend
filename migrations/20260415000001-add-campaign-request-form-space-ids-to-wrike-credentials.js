@@ -1,7 +1,7 @@
 "use strict";
 module.exports = {
   up: async (queryInterface, Sequelize) => {
-    // Add campaign_space_id and request_form_space_id columns to wrike_credentials table
+    // Add campaign_space_id columns to wrike_credentials table
     await queryInterface.addColumn("wrike_credentials", "campaign_space_id", {
       type: Sequelize.STRING(255),
       allowNull: true,

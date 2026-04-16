@@ -93,11 +93,6 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
         comment: "Campaign Space ID for Wrike DataHub",
       },
-      request_form_space_id: {
-        type: DataTypes.STRING(255),
-        allowNull: true,
-        comment: "Request Form Space ID for Wrike DataHub",
-      },
       is_visible: {
         type: DataTypes.BOOLEAN,
         defaultValue: true,
