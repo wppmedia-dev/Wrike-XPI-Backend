@@ -9,7 +9,20 @@ export const UpdateSchema = {
     },
     body: {
       type: "object",
-      required: ["environment_name"],
+      required: [
+        "environment_name",
+        "client_id",
+        "client_secret",
+        "xpi_api_modules_datahub_id",
+        "xpi_api_services_datahub_id",
+        "xpi_entity_datahub_id",
+        "xpi_field_mapping_datahub_id",
+        "xpi_request_form_field_mapping_datahub_id",
+        "xpi_request_form_mapping_datahub_id",
+        "xpi_space_name_datahub_id",
+        "campaign_space_id",
+        "request_form_space_id",
+      ],
       properties: {
         environment_name: { type: "string" },
         client_id: { type: "string" },

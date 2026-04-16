@@ -1932,23 +1932,25 @@
             <div class="form-section-label">Credentials</div>
 
             <div class="form-group">
-              <label class="form-label" for="clientId">Client ID</label>
+              <label class="form-label" for="clientId">Client ID <span style="color: var(--danger)">*</span></label>
               <input
                 class="form-control"
                 type="text"
                 id="clientId"
                 placeholder="Enter Client ID"
+                required
               />
             </div>
             <div class="form-group">
               <label class="form-label" for="clientSecret"
-                >Client Secret</label
+                >Client Secret <span style="color: var(--danger)">*</span></label
               >
               <input
                 class="form-control"
                 type="password"
                 id="clientSecret"
                 placeholder="Enter Client Secret"
+                required
               />
             </div>
             <div class="form-group">
@@ -1966,94 +1968,103 @@
             <div class="form-section-label">Datahub IDs</div>
 
             <div class="form-group">
-              <label class="form-label" for="xpiApiModulesDatahubId">XPI API Modules Datahub ID</label>
+              <label class="form-label" for="xpiApiModulesDatahubId">XPI API Modules Datahub ID <span style="color: var(--danger)">*</span></label>
               <input
                 class="form-control"
                 type="text"
                 id="xpiApiModulesDatahubId"
                 placeholder="Enter XPI API Modules Datahub ID"
+                required
               />
             </div>
 
             <div class="form-group">
-              <label class="form-label" for="xpiApiServicesDatahubId">XPI API Services Datahub ID</label>
+              <label class="form-label" for="xpiApiServicesDatahubId">XPI API Services Datahub ID <span style="color: var(--danger)">*</span></label>
               <input
                 class="form-control"
                 type="text"
                 id="xpiApiServicesDatahubId"
                 placeholder="Enter XPI API Services Datahub ID"
+                required
               />
             </div>
 
             <div class="form-group">
-              <label class="form-label" for="xpiEntityDatahubId">XPI Entity Datahub ID</label>
+              <label class="form-label" for="xpiEntityDatahubId">XPI Entity Datahub ID <span style="color: var(--danger)">*</span></label>
               <input
                 class="form-control"
                 type="text"
                 id="xpiEntityDatahubId"
                 placeholder="Enter XPI Entity Datahub ID"
+                required
               />
             </div>
 
             <div class="form-group">
-              <label class="form-label" for="xpiFieldMappingDatahubId">XPI Field Mapping Datahub ID</label>
+              <label class="form-label" for="xpiFieldMappingDatahubId">XPI Field Mapping Datahub ID <span style="color: var(--danger)">*</span></label>
               <input
                 class="form-control"
                 type="text"
                 id="xpiFieldMappingDatahubId"
                 placeholder="Enter XPI Field Mapping Datahub ID"
+                required
               />
             </div>
 
             <div class="form-group">
-              <label class="form-label" for="xpiRequestFormFieldMappingDatahubId">XPI Request Form Field Mapping Datahub ID</label>
+              <label class="form-label" for="xpiRequestFormFieldMappingDatahubId">XPI Request Form Field Mapping Datahub ID <span style="color: var(--danger)">*</span></label>
               <input
                 class="form-control"
                 type="text"
                 id="xpiRequestFormFieldMappingDatahubId"
                 placeholder="Enter XPI Request Form Field Mapping Datahub ID"
+                required
               />
             </div>
 
             <div class="form-group">
-              <label class="form-label" for="xpiRequestFormMappingDatahubId">XPI Request Form Mapping Datahub ID</label>
+              <label class="form-label" for="xpiRequestFormMappingDatahubId">XPI Request Form Mapping Datahub ID <span style="color: var(--danger)">*</span></label>
               <input
                 class="form-control"
                 type="text"
                 id="xpiRequestFormMappingDatahubId"
                 placeholder="Enter XPI Request Form Mapping Datahub ID"
+                required
               />
             </div>
 
             <div class="form-group">
-              <label class="form-label" for="xpiSpaceNameDatahubId">XPI Space Name Datahub ID</label>
+              <label class="form-label" for="xpiSpaceNameDatahubId">XPI Space Name Datahub ID <span style="color: var(--danger)">*</span></label>
               <input
                 class="form-control"
                 type="text"
                 id="xpiSpaceNameDatahubId"
                 placeholder="Enter XPI Space Name Datahub ID"
+                required
               />
             </div>
 
             <div class="form-section-label">Space IDs</div>
 
             <div class="form-group">
-              <label class="form-label" for="campaignSpaceId">Campaign Space ID</label>
+              <label class="form-label" for="campaignSpaceId">Campaign Space ID <span style="color: var(--danger)">*</span></label>
               <input
                 class="form-control"
                 type="text"
                 id="campaignSpaceId"
                 placeholder="Enter Campaign Space ID"
+                required
               />
             </div>
 
             <div class="form-group">
-              <label class="form-label" for="requestFormSpaceId">Request Form Space ID</label>
+              <label class="form-label" for="requestFormSpaceId">Request Form Space ID <span style="color: var(--danger)">*</span></label>
               <input
                 class="form-control"
                 type="text"
                 id="requestFormSpaceId"
                 placeholder="Enter Request Form Space ID"
+                required
               />
             </div>
 
@@ -2886,19 +2897,64 @@
         var isVisible = $("#isVisible").is(":checked");
         var isActive = $("#isActive").is(":checked");
 
+        // Validate all required fields (account_id is optional)
         if (!envName) {
           toast("Environment name is required", "error");
           return;
         }
 
-        if (
-          !clientId &&
-          !clientSecret
-        ) {
-          toast(
-            "Please provide at least one credential",
-            "error",
-          );
+        if (!clientId) {
+          toast("Client ID is required", "error");
+          return;
+        }
+
+        if (!clientSecret) {
+          toast("Client Secret is required", "error");
+          return;
+        }
+
+        if (!xpiApiModulesDatahubId) {
+          toast("XPI API Modules Datahub ID is required", "error");
+          return;
+        }
+
+        if (!xpiApiServicesDatahubId) {
+          toast("XPI API Services Datahub ID is required", "error");
+          return;
+        }
+
+        if (!xpiEntityDatahubId) {
+          toast("XPI Entity Datahub ID is required", "error");
+          return;
+        }
+
+        if (!xpiFieldMappingDatahubId) {
+          toast("XPI Field Mapping Datahub ID is required", "error");
+          return;
+        }
+
+        if (!xpiRequestFormFieldMappingDatahubId) {
+          toast("XPI Request Form Field Mapping Datahub ID is required", "error");
+          return;
+        }
+
+        if (!xpiRequestFormMappingDatahubId) {
+          toast("XPI Request Form Mapping Datahub ID is required", "error");
+          return;
+        }
+
+        if (!xpiSpaceNameDatahubId) {
+          toast("XPI Space Name Datahub ID is required", "error");
+          return;
+        }
+
+        if (!campaignSpaceId) {
+          toast("Campaign Space ID is required", "error");
+          return;
+        }
+
+        if (!requestFormSpaceId) {
+          toast("Request Form Space ID is required", "error");
           return;
         }
 
