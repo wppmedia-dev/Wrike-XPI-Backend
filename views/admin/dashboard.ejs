@@ -3589,6 +3589,15 @@
           var $searchInput = $filter.find("input");
           $searchInput.val(cacheSearchPattern);
           $searchInput.attr("placeholder", "Search cache keys / patterns…");
+          $searchInput.attr("type", "search");
+          $searchInput.attr("name", "cache_key_search");
+          $searchInput.attr("autocomplete", "off");
+          $searchInput.attr("autocorrect", "off");
+          $searchInput.attr("autocapitalize", "off");
+          $searchInput.attr("spellcheck", "false");
+          $searchInput.attr("data-form-type", "other");
+          $searchInput.attr("data-lpignore", "true");
+          $searchInput.attr("data-1p-ignore", "true");
           $searchInput.off(".DT");
           $searchInput.off("input.cacheServerSearch");
           $searchInput.on("input.cacheServerSearch", function () {
