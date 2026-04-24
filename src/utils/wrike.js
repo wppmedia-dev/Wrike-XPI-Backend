@@ -671,10 +671,10 @@ export const getDatahubCustomFields = async (
 ) => {
   try {
     // Set default TTL if not provided (null = unlimited, otherwise use provided value or env default)
-    // const ttl =
-    // cacheTTL !== null
-    //   ? cacheTTL
-    //   : parseInt(process.env.REDIS_DEFAULT_TTL) || 3600;
+    const ttl =
+      cacheTTL !== null
+        ? cacheTTL
+        : parseInt(process.env.REDIS_DEFAULT_TTL) || 3600;
 
     // Resolve databaseId with environment-specific value if not provided
     const resolvedDatabaseId =
@@ -788,10 +788,10 @@ export const getDatahubCustomFields = async (
     // Cache the result if caching is enabled
     if (useCache) {
       try {
-        const isSaved = await redisClient.set(cacheKey, datahubData, cacheTTL);
+        const isSaved = await redisClient.set(cacheKey, datahubData, ttl);
         if (isSaved)
           console.log(
-            `Data cached for datahub ${databaseId} with TTL unlimited`,
+            `Data cached for datahub ${databaseId} with TTL ${ttl === 0 ? "unlimited" : ttl + "s"}`,
           );
       } catch (cacheError) {
         console.warn("Cache write error:", cacheError);
