@@ -91,7 +91,7 @@ class RedisClient {
   async set(
     key,
     value,
-    ttlSeconds = parseInt(process.env.REDIS_DEFAULT_TTL) || 3600
+    ttlSeconds = parseInt(process.env.REDIS_DEFAULT_TTL) || 3600,
   ) {
     try {
       if (!this.isConnected && !this.connectionFailed) {
@@ -129,6 +129,26 @@ class RedisClient {
     }
   }
 
+  async delMany(keys = []) {
+    try {
+      if (!Array.isArray(keys) || keys.length === 0) {
+        return 0;
+      }
+
+      if (!this.isConnected && !this.connectionFailed) {
+        await this.connect();
+      }
+
+      if (!this.client || !this.isConnected) {
+        return 0;
+      }
+
+      return await this.client.del(keys);
+    } catch (error) {
+      return 0;
+    }
+  }
+
   async keys(pattern) {
     try {
       if (!this.isConnected && !this.connectionFailed) {
@@ -142,6 +162,54 @@ class RedisClient {
       return await this.client.keys(pattern);
     } catch (error) {
       return [];
+    }
+  }
+
+  async ttl(key) {
+    try {
+      if (!this.isConnected && !this.connectionFailed) {
+        await this.connect();
+      }
+
+      if (!this.client || !this.isConnected) {
+        return null;
+      }
+
+      return await this.client.ttl(key);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async type(key) {
+    try {
+      if (!this.isConnected && !this.connectionFailed) {
+        await this.connect();
+      }
+
+      if (!this.client || !this.isConnected) {
+        return null;
+      }
+
+      return await this.client.type(key);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async getString(key) {
+    try {
+      if (!this.isConnected && !this.connectionFailed) {
+        await this.connect();
+      }
+
+      if (!this.client || !this.isConnected) {
+        return null;
+      }
+
+      return await this.client.get(key);
+    } catch (error) {
+      return null;
     }
   }
 
@@ -162,7 +230,7 @@ class RedisClient {
     }
 
     const sanitizedParams = params.map((param) =>
-      String(param).replace(/[^a-zA-Z0-9-_]/g, "_")
+      String(param).replace(/[^a-zA-Z0-9-_]/g, "_"),
     );
     return `${prefix}:${sanitizedParams.join(":")}`;
   }

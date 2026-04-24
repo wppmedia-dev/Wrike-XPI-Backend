@@ -310,6 +310,47 @@
         font-size: 13.5px;
       }
 
+      .nav-parent {
+        margin-bottom: 1px;
+      }
+
+      .nav-parent-toggle {
+        display: flex;
+      }
+
+      .nav-parent-toggle.submenu-active {
+        background: rgba(0, 130, 98, 0.06);
+        color: var(--accent);
+      }
+
+      .nav-parent-toggle.submenu-active .nav-caret {
+        color: var(--accent);
+      }
+
+      .nav-caret {
+        margin-left: auto;
+        font-size: 11px;
+        color: var(--text-muted);
+        transition: transform 0.18s ease;
+      }
+
+      .nav-parent.expanded .nav-caret {
+        transform: rotate(180deg);
+      }
+
+      .nav-submenu {
+        display: none;
+        padding-left: 10px;
+      }
+
+      .nav-parent.expanded .nav-submenu {
+        display: block;
+      }
+
+      .nav-submenu .nav-item {
+        padding-left: 28px;
+      }
+
       .nav-badge {
         margin-left: auto;
         background: var(--accent);
@@ -325,7 +366,8 @@
 
       #sidebar.collapsed .nl,
       #sidebar.collapsed .nav-badge,
-      #sidebar.collapsed .nav-group-label {
+      #sidebar.collapsed .nav-group-label,
+      #sidebar.collapsed .nav-caret {
         display: none;
       }
 
@@ -333,6 +375,10 @@
         justify-content: center;
         padding: 8px 0;
         gap: 0;
+      }
+
+      #sidebar.collapsed .nav-submenu {
+        display: none !important;
       }
 
       /* Collapse toggle — inside logo row header */
@@ -1166,6 +1212,116 @@
         max-width: 320px;
       }
 
+      .cache-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+      }
+
+      .cache-toolbar-left,
+      .cache-toolbar-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .cache-pattern-input {
+        width: 240px;
+        height: 36px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 0 12px;
+        background: var(--bg-card);
+        color: var(--text-primary);
+        font-size: 13px;
+      }
+
+      .cache-pattern-input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-soft);
+      }
+
+      .cache-meta {
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+
+      .cache-key {
+        font-family: "Consolas", "SFMono-Regular", Menlo, monospace;
+        font-size: 12px;
+        color: var(--text-primary);
+        max-width: 320px;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        overflow: hidden;
+        display: inline-block;
+      }
+
+      .cache-action-wrap {
+        position: relative;
+        display: inline-block;
+      }
+
+      .cache-action-menu {
+        display: none;
+        position: absolute;
+        right: 0;
+        top: calc(100% + 6px);
+        min-width: 138px;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        box-shadow: var(--shadow-md);
+        z-index: 40;
+        padding: 6px;
+      }
+
+      .cache-action-menu.show {
+        display: block;
+      }
+
+      .cache-action-item {
+        width: 100%;
+        border: none;
+        background: transparent;
+        text-align: left;
+        padding: 7px 8px;
+        border-radius: 4px;
+        font-size: 12.5px;
+        color: var(--text-secondary);
+        cursor: pointer;
+      }
+
+      .cache-action-item:hover {
+        background: var(--bg-surface);
+        color: var(--text-primary);
+      }
+
+      .cache-value {
+        max-height: 42vh;
+        overflow: auto;
+        font-family: "Consolas", "SFMono-Regular", Menlo, monospace;
+        font-size: 12px;
+        line-height: 1.5;
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 12px;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      @media (max-width: 760px) {
+        .cache-pattern-input {
+          width: 100%;
+        }
+      }
+
       /* ─── Modal ──────────────────────────────────────────── */
       .modal-backdrop {
         position: fixed;
@@ -1626,9 +1782,20 @@
             <span class="nl">Users</span>
           </div>
 
-          <div class="nav-item" data-page="settings">
-            <span class="ni"><i class="fa-solid fa-sliders"></i></span>
-            <span class="nl">Settings</span>
+          <div class="nav-parent" id="settingsNavParent">
+            <div class="nav-item nav-parent-toggle" id="settingsParentToggle">
+              <span class="ni"><i class="fa-solid fa-sliders"></i></span>
+              <span class="nl">Settings</span>
+              <span class="nav-caret"
+                ><i class="fa-solid fa-chevron-down"></i
+              ></span>
+            </div>
+            <div class="nav-submenu">
+              <div class="nav-item nav-submenu-item" data-page="cache-settings">
+                <span class="ni"><i class="fa-solid fa-database"></i></span>
+                <span class="nl">Cache Settings</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1838,13 +2005,79 @@
                 <div class="section-subtitle">Configure system preferences</div>
               </div>
             </div>
+
             <div class="card">
               <div class="coming-soon">
                 <div class="coming-soon-icon">
                   <i class="fa-solid fa-sliders"></i>
                 </div>
                 <h2>Settings</h2>
-                <p>System configuration options are coming soon.</p>
+                <p>General system settings will be available here.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- ══════ CACHE SETTINGS PAGE ══════ -->
+          <div class="page" id="page-cache-settings">
+            <div class="section-header">
+              <div>
+                <div class="section-title">Cache Settings</div>
+                <div class="section-subtitle">
+                  Manage cache keys and inspect Redis data
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-body">
+                <div class="cache-toolbar">
+                  <div class="cache-toolbar-left">
+                    <input
+                      type="text"
+                      id="cachePatternInput"
+                      class="cache-pattern-input"
+                      value=""
+                      placeholder="Pattern (example: datahub_*)"
+                    />
+                    <button class="btn btn-ghost" id="cacheSearchBtn">
+                      <i class="fa-solid fa-magnifying-glass"></i> Search
+                    </button>
+                  </div>
+                  <div class="cache-toolbar-right">
+                    <button
+                      class="btn btn-danger"
+                      id="cacheBulkDeleteBtn"
+                      disabled
+                    >
+                      <i class="fa-solid fa-trash"></i> Delete Selected
+                    </button>
+                    <button class="btn btn-primary" id="cacheReloadBtn">
+                      <i class="fa-solid fa-rotate-right"></i> Reload
+                    </button>
+                  </div>
+                </div>
+
+                <div class="cache-meta" id="cacheMetaText">
+                  No cache data loaded yet.
+                </div>
+
+                <div class="table-wrapper" style="margin-top: 12px">
+                  <table class="dt" id="cacheTable">
+                    <thead>
+                      <tr>
+                        <th style="width: 42px">
+                          <input type="checkbox" id="cacheSelectAll" />
+                        </th>
+                        <th>Key</th>
+                        <th>Type</th>
+                        <th>TTL</th>
+                        <th>Size</th>
+                        <th style="width: 120px">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="cacheTableBody"></tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
@@ -2695,6 +2928,51 @@
       </div>
     </div>
 
+    <!-- ═══════════ CACHE DETAIL MODAL ═══════════ -->
+    <div class="modal-backdrop" id="cacheDetailModalBackdrop">
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cacheDetailModalTitle"
+        style="max-width: 760px"
+      >
+        <div class="modal-header">
+          <div class="modal-title">
+            <i class="fa-solid fa-database"></i>
+            <span id="cacheDetailModalTitle">Cache Key Details</span>
+          </div>
+          <button
+            class="modal-close"
+            id="cacheDetailCloseBtn"
+            aria-label="Close"
+          >
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div style="display: grid; gap: 10px; margin-bottom: 14px">
+            <div><strong>Key:</strong> <span id="cacheDetailKey">—</span></div>
+            <div>
+              <strong>Type:</strong> <span id="cacheDetailType">—</span>
+              <span style="margin-left: 12px"
+                ><strong>TTL:</strong> <span id="cacheDetailTtl">—</span></span
+              >
+            </div>
+          </div>
+          <div class="cache-value" id="cacheDetailValue">Loading…</div>
+        </div>
+        <div class="modal-footer" style="justify-content: space-between">
+          <button class="btn btn-danger" id="cacheDetailDeleteBtn">
+            <i class="fa-solid fa-trash"></i> Delete This Key
+          </button>
+          <button class="btn btn-ghost" id="cacheDetailCloseBtnFooter">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- ═══════════ SCRIPTS ═══════════ -->
     <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
@@ -2738,6 +3016,11 @@
       let environments = [];
       let editingId = null;
       let envDT = null;
+      let cacheEntries = [];
+      let cacheDT = null;
+      let selectedCacheKeys = new Set();
+      let activeCachePattern = "";
+      let cacheDetailKey = null;
       const wrikeRedirectUrl = "<%= wrikeRedirectUrl %>";
       const appUrl = "<%= appUrl %>";
 
@@ -2773,14 +3056,27 @@
         environments: "Environments",
         users: "Users",
         settings: "Settings",
+        "cache-settings": "Cache Settings",
       };
+
+      function setSettingsExpanded(expanded) {
+        const $parent = $("#settingsNavParent");
+        $parent.toggleClass("expanded", !!expanded);
+      }
 
       /* ── Navigate ───────────────────────────────────────────── */
       function showPage(pageId) {
         $(".page").removeClass("active");
         $(`#page-${pageId}`).addClass("active");
         $(".nav-item").removeClass("active");
-        $(`.nav-item[data-page="${pageId}"]`).addClass("active");
+        $(".nav-parent-toggle").removeClass("submenu-active");
+        const $activeNav = $(`.nav-item[data-page="${pageId}"]`);
+        $activeNav.addClass("active");
+
+        if ($activeNav.closest(".nav-submenu").length > 0) {
+          $("#settingsParentToggle").addClass("submenu-active");
+          setSettingsExpanded(true);
+        }
 
         const title = PAGE_NAMES[pageId] || pageId;
         $("#pageTitle").text(title);
@@ -2810,7 +3106,23 @@
 
       /* ── Nav clicks ─────────────────────────────────────────── */
       $(document).on("click", ".nav-item", function () {
-        showPage($(this).data("page"));
+        if ($(this).hasClass("nav-parent-toggle")) {
+          const isExpanded = $("#settingsNavParent").hasClass("expanded");
+          setSettingsExpanded(!isExpanded);
+          return;
+        }
+
+        const pageId = $(this).data("page");
+        if (!pageId) return;
+        showPage(pageId);
+
+        if (pageId === "users") {
+          loadPortalUsers();
+        }
+
+        if (pageId === "cache-settings") {
+          loadCacheEntries(activeCachePattern);
+        }
       });
 
       /* ── View all link ──────────────────────────────────────── */
@@ -2822,7 +3134,15 @@
       $("#refreshBtn").on("click", function () {
         const $i = $(this).find("i");
         $i.addClass("fa-spin");
-        loadEnvironments().finally(() =>
+        const activePage = $(".page.active").attr("id") || "";
+        const refreshPromise =
+          activePage === "page-cache-settings"
+            ? loadCacheEntries(activeCachePattern)
+            : activePage === "page-users"
+              ? loadPortalUsers()
+              : loadEnvironments();
+
+        refreshPromise.finally(() =>
           setTimeout(() => $i.removeClass("fa-spin"), 600),
         );
       });
@@ -3146,6 +3466,242 @@
       }
 
       /* ─────────────────────────────────────────────────────────
+     SETTINGS: CACHE
+  ───────────────────────────────────────────────────────── */
+      function formatBytes(bytes) {
+        if (!Number.isFinite(bytes) || bytes <= 0) return "—";
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+      }
+
+      function updateCacheSelectionState() {
+        $("#cacheBulkDeleteBtn").prop("disabled", selectedCacheKeys.size === 0);
+        const allCount = cacheEntries.length;
+        const selectedCount = selectedCacheKeys.size;
+
+        if (!allCount) {
+          $("#cacheSelectAll").prop("checked", false);
+          return;
+        }
+
+        $("#cacheSelectAll").prop("checked", allCount === selectedCount);
+      }
+
+      async function loadCacheEntries(patternOverride) {
+        const patternInput =
+          typeof patternOverride === "string"
+            ? patternOverride
+            : $("#cachePatternInput").val() || "";
+
+        const normalizedPattern = patternInput.trim();
+
+        activeCachePattern = normalizedPattern;
+        $("#cachePatternInput").val(normalizedPattern);
+
+        NProgress.start();
+        try {
+          const patternQuery = normalizedPattern
+            ? `pattern=${encodeURIComponent(normalizedPattern)}&`
+            : "";
+
+          const res = await fetch(
+            `/api/v1/admin/cache?${patternQuery}limit=500`,
+            { headers: authHeaders() },
+          );
+          const json = await res.json();
+          if (!res.ok || !json.success) {
+            throw new Error(json.message || "Failed to load cache entries");
+          }
+
+          cacheEntries = json?.data?.entries || [];
+          selectedCacheKeys = new Set();
+          renderCacheTable();
+
+          $("#cacheMetaText").text(
+            `${normalizedPattern ? `Pattern: ${normalizedPattern}` : "Pattern: All keys"} • ${cacheEntries.length} key(s) loaded`,
+          );
+        } catch (err) {
+          cacheEntries = [];
+          selectedCacheKeys = new Set();
+          renderCacheTable();
+          $("#cacheMetaText").text("Failed to load cache data");
+          toast(err.message || "Failed to load cache data", "error");
+        } finally {
+          NProgress.done();
+        }
+      }
+
+      function renderCacheTable() {
+        if (cacheDT) {
+          cacheDT.destroy();
+          cacheDT = null;
+        }
+
+        const $tbody = $("#cacheTableBody").empty();
+
+        if (!cacheEntries.length) {
+          $tbody.html(
+            '<tr><td colspan="6"><div class="empty-state"><div class="empty-state-icon"><i class="fa-solid fa-database"></i></div><h3>No cache entries found</h3><p>Try another key pattern or reload.</p></div></td></tr>',
+          );
+          updateCacheSelectionState();
+          return;
+        }
+
+        cacheEntries.forEach((entry) => {
+          const encodedKey = encodeURIComponent(entry.key);
+          const typeBadge =
+            '<span class="badge" style="background: var(--bg-surface); color: var(--text-secondary); border: 1px solid var(--border)">' +
+            escHtml(entry.redis_type || "unknown") +
+            "</span>";
+
+          $tbody.append(
+            "<tr>" +
+              `<td><input type="checkbox" class="cache-row-check" data-key="${encodedKey}" /></td>` +
+              `<td><span class="cache-key" title="${escHtml(entry.key)}">${escHtml(entry.key)}</span></td>` +
+              `<td>${typeBadge}</td>` +
+              `<td>${escHtml(entry.ttl_label || "Unavailable")}</td>` +
+              `<td>${formatBytes(entry.size_bytes)}</td>` +
+              "<td>" +
+              '<div class="cache-action-wrap">' +
+              `<button class="btn btn-ghost btn-sm cache-action-toggle" data-key="${encodedKey}"><i class="fa-solid fa-ellipsis"></i> Actions</button>` +
+              '<div class="cache-action-menu">' +
+              `<button class="cache-action-item cache-view-btn" data-key="${encodedKey}"><i class="fa-regular fa-eye"></i> View</button>` +
+              `<button class="cache-action-item cache-copy-btn" data-key="${encodedKey}"><i class="fa-regular fa-copy"></i> Copy Key</button>` +
+              `<button class="cache-action-item cache-delete-btn" data-key="${encodedKey}" style="color: var(--danger)"><i class="fa-regular fa-trash-can"></i> Delete</button>` +
+              "</div>" +
+              "</div>" +
+              "</td>" +
+              "</tr>",
+          );
+        });
+
+        cacheDT = $("#cacheTable").DataTable({
+          pageLength: 10,
+          lengthMenu: [10, 25, 50, 100],
+          order: [],
+          columnDefs: [
+            { targets: 0, orderable: false, searchable: false },
+            { targets: 5, orderable: false, searchable: false },
+          ],
+          language: {
+            emptyTable: "No cache entries found",
+            zeroRecords: "No matching cache keys",
+            lengthMenu: "Show _MENU_ keys",
+            search: "",
+            searchPlaceholder: "Search cache keys…",
+            info: "Showing _START_–_END_ of _TOTAL_",
+            paginate: { previous: "‹", next: "›" },
+          },
+        });
+
+        setTimeout(function () {
+          var $wrapper = $("#cacheTable").closest(".dataTables_wrapper");
+          var $table = $wrapper.find("table");
+          var $filter = $wrapper.find(".dataTables_filter");
+          var $length = $wrapper.find(".dataTables_length");
+          var $info = $wrapper.find(".dataTables_info");
+          var $paginate = $wrapper.find(".dataTables_paginate");
+
+          $table.detach();
+          $filter.detach();
+          $length.detach();
+          $info.detach();
+          $paginate.detach();
+
+          var $scrollContainer = $(
+            '<div style="overflow-x: auto; min-width: 0; flex: 1;"></div>',
+          );
+          $scrollContainer.append($table);
+
+          var $topControls = $(
+            '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 12px;"></div>',
+          );
+          $topControls.append($length);
+          $topControls.append($filter);
+
+          var $bottomControls = $(
+            '<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; flex-wrap: wrap; gap: 12px;"></div>',
+          );
+          $bottomControls.append($info);
+          $bottomControls.append($paginate);
+
+          $wrapper.empty();
+          $wrapper.append($topControls);
+          $wrapper.append($scrollContainer);
+          $wrapper.append($bottomControls);
+        }, 10);
+
+        updateCacheSelectionState();
+      }
+
+      async function deleteCacheKey(key) {
+        const decision = await Swal.fire({
+          title: "Delete Cache Key?",
+          html: `This will remove <strong>${escHtml(key)}</strong> from Redis.`,
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonText:
+            '<i class="fa-solid fa-trash" style="margin-right:6px"></i>Delete',
+          cancelButtonText: "Cancel",
+          reverseButtons: true,
+        });
+
+        if (!decision.isConfirmed) return;
+
+        const res = await fetch(
+          `/api/v1/admin/cache?key=${encodeURIComponent(key)}`,
+          {
+            method: "DELETE",
+            headers: authHeaders(),
+          },
+        );
+        const json = await res.json();
+        if (!res.ok || !json.success) {
+          throw new Error(json.message || "Failed to delete cache key");
+        }
+
+        toast("Cache key deleted", "success");
+        await loadCacheEntries(activeCachePattern);
+      }
+
+      async function openCacheDetailModal(key) {
+        cacheDetailKey = key;
+        $("#cacheDetailKey").text(key);
+        $("#cacheDetailType").text("Loading…");
+        $("#cacheDetailTtl").text("Loading…");
+        $("#cacheDetailValue").text("Loading…");
+        $("#cacheDetailModalBackdrop").addClass("open");
+
+        try {
+          const res = await fetch(
+            `/api/v1/admin/cache/detail?key=${encodeURIComponent(key)}`,
+            { headers: authHeaders() },
+          );
+          const json = await res.json();
+          if (!res.ok || !json.success) {
+            throw new Error(json.message || "Failed to fetch cache detail");
+          }
+
+          const detail = json.data || {};
+          $("#cacheDetailType").text(
+            `${detail.redis_type || "unknown"} / ${detail.value_type || "unknown"}`,
+          );
+          $("#cacheDetailTtl").text(detail.ttl_label || "Unavailable");
+
+          const pretty =
+            typeof detail.value === "string"
+              ? detail.value
+              : JSON.stringify(detail.value, null, 2);
+
+          $("#cacheDetailValue").text(pretty || "(empty)");
+        } catch (err) {
+          $("#cacheDetailValue").text(err.message || "Failed to load detail");
+          toast(err.message || "Failed to load cache detail", "error");
+        }
+      }
+
+      /* ─────────────────────────────────────────────────────────
      MODAL
   ───────────────────────────────────────────────────────── */
       function openAddModal() {
@@ -3280,9 +3836,149 @@
         if (e.target === this) closeRedirectUrlModal();
       });
 
+      /* ── Settings: cache controls ───────────────────────────── */
+      $("#cacheSearchBtn, #cacheReloadBtn").on("click", function () {
+        loadCacheEntries();
+      });
+
+      $("#cachePatternInput").on("keydown", function (e) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          loadCacheEntries();
+        }
+      });
+
+      $("#cacheSelectAll").on("change", function () {
+        const checked = $(this).is(":checked");
+        selectedCacheKeys = new Set();
+
+        $(".cache-row-check").each(function () {
+          $(this).prop("checked", checked);
+          if (checked) {
+            selectedCacheKeys.add(decodeURIComponent($(this).data("key")));
+          }
+        });
+
+        updateCacheSelectionState();
+      });
+
+      $(document).on("change", ".cache-row-check", function () {
+        const key = decodeURIComponent($(this).data("key"));
+        if ($(this).is(":checked")) {
+          selectedCacheKeys.add(key);
+        } else {
+          selectedCacheKeys.delete(key);
+        }
+        updateCacheSelectionState();
+      });
+
+      $("#cacheBulkDeleteBtn").on("click", async function () {
+        const keys = Array.from(selectedCacheKeys);
+        if (!keys.length) return;
+
+        const decision = await Swal.fire({
+          title: "Delete Selected Cache Keys?",
+          html: `You are deleting <strong>${keys.length}</strong> key(s).`,
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonText:
+            '<i class="fa-solid fa-trash" style="margin-right:6px"></i>Delete Selected',
+          cancelButtonText: "Cancel",
+          reverseButtons: true,
+        });
+
+        if (!decision.isConfirmed) return;
+
+        try {
+          const res = await fetch("/api/v1/admin/cache/bulk-delete", {
+            method: "POST",
+            headers: authHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ keys }),
+          });
+          const json = await res.json();
+          if (!res.ok || !json.success) {
+            throw new Error(json.message || "Failed to delete selected keys");
+          }
+
+          toast(json.message || "Selected keys deleted", "success");
+          await loadCacheEntries(activeCachePattern);
+        } catch (err) {
+          toast(err.message || "Bulk delete failed", "error");
+        }
+      });
+
+      $(document).on("click", ".cache-action-toggle", function (e) {
+        e.stopPropagation();
+        const $menu = $(this).siblings(".cache-action-menu");
+        $(".cache-action-menu").not($menu).removeClass("show");
+        $menu.toggleClass("show");
+      });
+
+      $(document).on("click", function () {
+        $(".cache-action-menu").removeClass("show");
+      });
+
+      $(document).on("click", ".cache-copy-btn", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const key = decodeURIComponent($(this).data("key"));
+        navigator.clipboard
+          .writeText(key)
+          .then(() => toast("Cache key copied", "success"))
+          .catch(() => toast("Failed to copy cache key", "error"));
+        $(".cache-action-menu").removeClass("show");
+      });
+
+      $(document).on("click", ".cache-view-btn", async function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const key = decodeURIComponent($(this).data("key"));
+        $(".cache-action-menu").removeClass("show");
+        await openCacheDetailModal(key);
+      });
+
+      $(document).on("click", ".cache-delete-btn", async function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const key = decodeURIComponent($(this).data("key"));
+        $(".cache-action-menu").removeClass("show");
+        try {
+          await deleteCacheKey(key);
+        } catch (err) {
+          toast(err.message || "Failed to delete cache key", "error");
+        }
+      });
+
+      function closeCacheDetailModal() {
+        cacheDetailKey = null;
+        $("#cacheDetailModalBackdrop").removeClass("open");
+      }
+
+      $("#cacheDetailCloseBtn, #cacheDetailCloseBtnFooter").on(
+        "click",
+        closeCacheDetailModal,
+      );
+
+      $("#cacheDetailModalBackdrop").on("click", function (e) {
+        if (e.target === this) closeCacheDetailModal();
+      });
+
+      $("#cacheDetailDeleteBtn").on("click", async function () {
+        if (!cacheDetailKey) return;
+        try {
+          await deleteCacheKey(cacheDetailKey);
+          closeCacheDetailModal();
+        } catch (err) {
+          toast(err.message || "Failed to delete cache key", "error");
+        }
+      });
+
       /* Close on Escape */
       $(document).on("keydown", function (e) {
-        if (e.key === "Escape") closeModal();
+        if (e.key === "Escape") {
+          closeModal();
+          closeCacheDetailModal();
+        }
       });
 
       /* Edit / Delete (delegated — works for table + overview list) */
@@ -4336,11 +5032,6 @@
             .getElementById("puAssignEnvModalBackdrop")
             .classList.remove("open"),
         );
-
-      /* ── Load when Users tab is clicked ──────────────────── */
-      document
-        .querySelector('[data-page="users"]')
-        .addEventListener("click", loadPortalUsers);
     </script>
   </body>
 </html>

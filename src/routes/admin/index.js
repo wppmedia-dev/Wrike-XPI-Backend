@@ -1,6 +1,7 @@
 import { adminAuthRoute } from "./auth";
 import { adminCredentialsRoute } from "./credentials";
 import { adminPortalUsersRoute } from "./users";
+import { adminCacheRoute } from "./cache";
 
 // Page handlers
 const AdminIndexPage = (req, reply) => reply.redirect("/admin/login");
@@ -45,6 +46,7 @@ export const adminApiRoute = (fastify, opts, done) => {
   fastify.register(adminAuthRoute);
   fastify.register(adminCredentialsRoute, { prefix: "/credentials" });
   fastify.register(adminPortalUsersRoute, { prefix: "/portal-users" });
+  fastify.register(adminCacheRoute, { prefix: "/cache" });
 
   done();
 };
