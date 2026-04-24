@@ -2964,6 +2964,7 @@
       let cacheDetailKey = null;
       let cacheSearchPattern = "";
       let cacheSearchDebounceTimer = null;
+      const CACHE_SEARCH_DEBOUNCE_MS = 350;
       const wrikeRedirectUrl = "<%= wrikeRedirectUrl %>";
       const appUrl = "<%= appUrl %>";
 
@@ -3454,6 +3455,11 @@
             ? patternOverride.trim()
             : cacheSearchPattern;
 
+        if (cacheSearchDebounceTimer) {
+          clearTimeout(cacheSearchDebounceTimer);
+          cacheSearchDebounceTimer = null;
+        }
+
         cacheSearchPattern = normalizedPattern;
 
         NProgress.start();
@@ -3594,7 +3600,7 @@
 
             cacheSearchDebounceTimer = setTimeout(function () {
               loadCacheEntries(nextPattern);
-            }, 350);
+            }, CACHE_SEARCH_DEBOUNCE_MS);
           });
         }, 10);
 

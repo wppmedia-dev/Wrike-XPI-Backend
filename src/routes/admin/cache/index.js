@@ -4,6 +4,13 @@ import redisClient from "../../../utils/redis";
 const DEFAULT_PATTERN = "*";
 const MAX_LIST_LIMIT = 500;
 
+const hasWildcard = (value) => /[*?\[\]]/.test(value);
+
+const iLikeIncludes = (value, search) =>
+  String(value || "")
+    .toLowerCase()
+    .includes(String(search || "").toLowerCase());
+
 const toTtlLabel = (ttlSeconds) => {
   if (ttlSeconds === null || ttlSeconds === undefined) return "Unavailable";
   if (ttlSeconds === -2) return "Missing";
@@ -75,16 +82,36 @@ export const adminCacheRoute = (fastify, opts, done) => {
   const guard = { preHandler: [verifyAdminJWT] };
 
   // GET /admin/cache?pattern=*&limit=200
+  // - If pattern contains wildcard chars (*, ?, []), Redis pattern search is used.
+  // - Otherwise iLike-style key matching is used (case-insensitive contains).
   fastify.get("/", guard, async (req, reply) => {
     try {
-      const pattern =
-        String(req.query?.pattern || DEFAULT_PATTERN).trim() || DEFAULT_PATTERN;
+      const patternInput = String(req.query?.pattern || "").trim();
+      const pattern = patternInput || DEFAULT_PATTERN;
       const limit = Math.min(
         Math.max(parseInt(req.query?.limit || "200", 10) || 200, 1),
         MAX_LIST_LIMIT,
       );
 
-      const keys = (await redisClient.keys(pattern)).slice(0, limit);
+      let keys = [];
+      let searchMode = "pattern";
+
+      if (!patternInput) {
+        // No search term: list all keys (bounded by limit below).
+        keys = await redisClient.keys(DEFAULT_PATTERN);
+        searchMode = "all";
+      } else if (hasWildcard(patternInput)) {
+        // Wildcard pattern search, e.g. datahub:*
+        keys = await redisClient.keys(patternInput);
+        searchMode = "pattern";
+      } else {
+        // iLike-style search for keys when wildcard is not provided.
+        const allKeys = await redisClient.keys(DEFAULT_PATTERN);
+        keys = allKeys.filter((key) => iLikeIncludes(key, patternInput));
+        searchMode = "ilike";
+      }
+
+      keys = keys.slice(0, limit);
 
       const entries = await Promise.all(
         keys.map(async (key) => {
@@ -115,6 +142,7 @@ export const adminCacheRoute = (fastify, opts, done) => {
         message: "Cache entries fetched",
         data: {
           pattern,
+          mode: searchMode,
           total: entries.length,
           entries,
         },
