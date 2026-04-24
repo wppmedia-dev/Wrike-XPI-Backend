@@ -25,7 +25,7 @@ export const DeleteChannel = (wrikeToken, params, environmentName) => {
         null,
         false,
         true,
-        0,
+        null,
         environmentName,
       );
 

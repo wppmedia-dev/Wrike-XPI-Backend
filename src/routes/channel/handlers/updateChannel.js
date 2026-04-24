@@ -21,7 +21,7 @@ export const UpdateChannel = (wrikeToken, params, environmentName) => {
         null,
         false,
         true,
-        0,
+        null,
         environmentName,
       );
       // }

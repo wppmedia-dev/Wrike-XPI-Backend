@@ -34,7 +34,7 @@ export const CreateCampaign = (
       const { datahubSpaceData, datahubSpaceMetaData } = await getSpaceDatahub(
         wrikeToken,
         true,
-        0,
+        null,
         environmentName,
       );
       if (datahubSpaceData?.errorDescription) {
@@ -46,7 +46,7 @@ export const CreateCampaign = (
       const datahubEntityData = await getEntityDatahub(
         wrikeToken,
         true,
-        0,
+        null,
         environmentName,
       );
       if (datahubEntityData?.errorDescription) {
@@ -63,7 +63,7 @@ export const CreateCampaign = (
         datahubSpaceData,
         datahubEntityData,
         true,
-        0,
+        null,
         environmentName,
       );
 
@@ -87,7 +87,7 @@ export const CreateCampaign = (
         null,
         false,
         true,
-        0,
+        null,
         environmentName,
       );
 
@@ -104,7 +104,7 @@ export const CreateCampaign = (
         datahubCustomFieldsData,
         datahubSpaceData,
         true,
-        0,
+        null,
         environmentName,
       );
       if (datahubRequestFormFieldsData?.errorDescription) {

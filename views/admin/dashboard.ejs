@@ -1263,43 +1263,13 @@
       }
 
       .cache-action-wrap {
-        position: relative;
-        display: inline-block;
+        display: flex;
+        gap: 4px;
+        align-items: center;
       }
 
-      .cache-action-menu {
-        display: none;
-        position: absolute;
-        right: 0;
-        top: calc(100% + 6px);
-        min-width: 138px;
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-sm);
-        box-shadow: var(--shadow-md);
-        z-index: 40;
-        padding: 6px;
-      }
-
-      .cache-action-menu.show {
-        display: block;
-      }
-
-      .cache-action-item {
-        width: 100%;
-        border: none;
-        background: transparent;
-        text-align: left;
-        padding: 7px 8px;
-        border-radius: 4px;
-        font-size: 12.5px;
-        color: var(--text-secondary);
-        cursor: pointer;
-      }
-
-      .cache-action-item:hover {
-        background: var(--bg-surface);
-        color: var(--text-primary);
+      .cache-action-wrap .btn {
+        padding: 4px 8px;
       }
 
       .cache-value {
@@ -2026,6 +1996,9 @@
                   Manage cache keys and inspect Redis data
                 </div>
               </div>
+              <button class="btn btn-danger" id="cacheBulkDeleteBtn">
+                <i class="fa-solid fa-trash"></i> Delete All
+              </button>
             </div>
 
             <div class="card">
@@ -2044,24 +2017,13 @@
                     </button>
                   </div>
                   <div class="cache-toolbar-right">
-                    <button
-                      class="btn btn-danger"
-                      id="cacheBulkDeleteBtn"
-                      disabled
-                    >
-                      <i class="fa-solid fa-trash"></i> Delete Selected
-                    </button>
                     <button class="btn btn-primary" id="cacheReloadBtn">
                       <i class="fa-solid fa-rotate-right"></i> Reload
                     </button>
                   </div>
                 </div>
 
-                <div class="cache-meta" id="cacheMetaText">
-                  No cache data loaded yet.
-                </div>
-
-                <div class="table-wrapper" style="margin-top: 12px">
+                <div class="table-wrapper" style="margin-top: 0">
                   <table class="dt" id="cacheTable">
                     <thead>
                       <tr>
@@ -3476,9 +3438,24 @@
       }
 
       function updateCacheSelectionState() {
-        $("#cacheBulkDeleteBtn").prop("disabled", selectedCacheKeys.size === 0);
         const allCount = cacheEntries.length;
         const selectedCount = selectedCacheKeys.size;
+        const hasSelection = selectedCount > 0;
+
+        // Update button text and state
+        if (allCount === 0) {
+          $("#cacheBulkDeleteBtn")
+            .prop("disabled", true)
+            .html(`<i class="fa-solid fa-trash"></i> Delete All`);
+        } else if (hasSelection) {
+          $("#cacheBulkDeleteBtn")
+            .prop("disabled", false)
+            .html(`<i class="fa-solid fa-trash"></i> Delete Selected (${selectedCount})`);
+        } else {
+          $("#cacheBulkDeleteBtn")
+            .prop("disabled", false)
+            .html(`<i class="fa-solid fa-trash"></i> Delete All`);
+        }
 
         if (!allCount) {
           $("#cacheSelectAll").prop("checked", false);
@@ -3517,15 +3494,10 @@
           cacheEntries = json?.data?.entries || [];
           selectedCacheKeys = new Set();
           renderCacheTable();
-
-          $("#cacheMetaText").text(
-            `${normalizedPattern ? `Pattern: ${normalizedPattern}` : "Pattern: All keys"} • ${cacheEntries.length} key(s) loaded`,
-          );
         } catch (err) {
           cacheEntries = [];
           selectedCacheKeys = new Set();
           renderCacheTable();
-          $("#cacheMetaText").text("Failed to load cache data");
           toast(err.message || "Failed to load cache data", "error");
         } finally {
           NProgress.done();
@@ -3564,12 +3536,8 @@
               `<td>${formatBytes(entry.size_bytes)}</td>` +
               "<td>" +
               '<div class="cache-action-wrap">' +
-              `<button class="btn btn-ghost btn-sm cache-action-toggle" data-key="${encodedKey}"><i class="fa-solid fa-ellipsis"></i> Actions</button>` +
-              '<div class="cache-action-menu">' +
-              `<button class="cache-action-item cache-view-btn" data-key="${encodedKey}"><i class="fa-regular fa-eye"></i> View</button>` +
-              `<button class="cache-action-item cache-copy-btn" data-key="${encodedKey}"><i class="fa-regular fa-copy"></i> Copy Key</button>` +
-              `<button class="cache-action-item cache-delete-btn" data-key="${encodedKey}" style="color: var(--danger)"><i class="fa-regular fa-trash-can"></i> Delete</button>` +
-              "</div>" +
+              `<button class="btn btn-ghost btn-sm cache-view-btn" data-key="${encodedKey}" title="View"><i class="fa-regular fa-eye"></i></button>` +
+              `<button class="btn btn-ghost btn-sm cache-delete-btn" data-key="${encodedKey}" title="Delete" style="color: var(--danger)"><i class="fa-regular fa-trash-can"></i></button>` +
               "</div>" +
               "</td>" +
               "</tr>",
@@ -3873,16 +3841,20 @@
       });
 
       $("#cacheBulkDeleteBtn").on("click", async function () {
-        const keys = Array.from(selectedCacheKeys);
+        const keys = selectedCacheKeys.size > 0 
+          ? Array.from(selectedCacheKeys)
+          : cacheEntries.map(e => e.key);
+
         if (!keys.length) return;
 
+        const isDeleteAll = selectedCacheKeys.size === 0;
         const decision = await Swal.fire({
-          title: "Delete Selected Cache Keys?",
+          title: isDeleteAll ? "Delete All Cache Keys?" : "Delete Selected Cache Keys?",
           html: `You are deleting <strong>${keys.length}</strong> key(s).`,
           icon: "warning",
           showCancelButton: true,
           confirmButtonText:
-            '<i class="fa-solid fa-trash" style="margin-right:6px"></i>Delete Selected',
+            `<i class="fa-solid fa-trash" style="margin-right:6px"></i>${isDeleteAll ? 'Delete All' : 'Delete Selected'}`,
           cancelButtonText: "Cancel",
           reverseButtons: true,
         });
@@ -3900,40 +3872,17 @@
             throw new Error(json.message || "Failed to delete selected keys");
           }
 
-          toast(json.message || "Selected keys deleted", "success");
+          toast(json.message || "Cache keys deleted", "success");
           await loadCacheEntries(activeCachePattern);
         } catch (err) {
           toast(err.message || "Bulk delete failed", "error");
         }
       });
 
-      $(document).on("click", ".cache-action-toggle", function (e) {
-        e.stopPropagation();
-        const $menu = $(this).siblings(".cache-action-menu");
-        $(".cache-action-menu").not($menu).removeClass("show");
-        $menu.toggleClass("show");
-      });
-
-      $(document).on("click", function () {
-        $(".cache-action-menu").removeClass("show");
-      });
-
-      $(document).on("click", ".cache-copy-btn", function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        const key = decodeURIComponent($(this).data("key"));
-        navigator.clipboard
-          .writeText(key)
-          .then(() => toast("Cache key copied", "success"))
-          .catch(() => toast("Failed to copy cache key", "error"));
-        $(".cache-action-menu").removeClass("show");
-      });
-
       $(document).on("click", ".cache-view-btn", async function (e) {
         e.preventDefault();
         e.stopPropagation();
         const key = decodeURIComponent($(this).data("key"));
-        $(".cache-action-menu").removeClass("show");
         await openCacheDetailModal(key);
       });
 
@@ -3941,7 +3890,6 @@
         e.preventDefault();
         e.stopPropagation();
         const key = decodeURIComponent($(this).data("key"));
-        $(".cache-action-menu").removeClass("show");
         try {
           await deleteCacheKey(key);
         } catch (err) {

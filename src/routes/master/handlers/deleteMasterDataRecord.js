@@ -39,7 +39,7 @@ export const DeleteMasterDataRecord = (wrikeToken, params, environmentName) => {
         null,
         true,
         true,
-        0,
+        null,
         environmentName,
       );
 

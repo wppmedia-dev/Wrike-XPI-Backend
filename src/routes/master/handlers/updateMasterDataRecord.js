@@ -40,7 +40,7 @@ export const UpdateMasterDataRecord = (wrikeToken, params, environmentName) => {
         null,
         true,
         true,
-        0,
+        null,
         environmentName,
       );
 
