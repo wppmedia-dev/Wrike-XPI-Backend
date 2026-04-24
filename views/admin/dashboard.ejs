@@ -3105,7 +3105,6 @@
           '<table class="dt"><thead><tr><th>Name</th><th>Env ID</th><th>Client ID</th><th>Created</th><th>Status</th><th></th></tr></thead><tbody>';
 
         recent.forEach(function (env) {
-          console.log(env);
           var badge = env.is_active
             ? '<span class="badge badge-success"><span class="dot"></span> Active</span>'
             : '<span class="badge badge-danger"><span class="dot"></span> Inactive</span>';
@@ -3600,8 +3599,6 @@
           if (data.success === false)
             throw new Error(data.message || "Save failed");
 
-          closeModal();
-
           // Show redirect URL modal after creation (not on edit)
           if (!editingId && wrikeRedirectUrl && appUrl && data.data?.id) {
             const redirectUrl = wrikeRedirectUrl;
@@ -3617,6 +3614,8 @@
               "success",
             );
           }
+
+          closeModal();
 
           await loadEnvironments();
         } catch (err) {
