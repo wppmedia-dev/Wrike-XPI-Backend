@@ -3494,14 +3494,6 @@
 
         const $tbody = $("#cacheTableBody").empty();
 
-        if (!cacheEntries.length) {
-          $tbody.html(
-            '<tr><td colspan="6"><div class="empty-state"><div class="empty-state-icon"><i class="fa-solid fa-database"></i></div><h3>No cache entries found</h3><p>Try another key pattern or reload.</p></div></td></tr>',
-          );
-          updateCacheSelectionState();
-          return;
-        }
-
         cacheEntries.forEach((entry) => {
           const encodedKey = encodeURIComponent(entry.key);
           const typeBadge =
