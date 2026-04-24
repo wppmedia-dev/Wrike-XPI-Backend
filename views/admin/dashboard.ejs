@@ -2003,26 +2003,6 @@
 
             <div class="card">
               <div class="card-body">
-                <div class="cache-toolbar">
-                  <div class="cache-toolbar-left">
-                    <input
-                      type="text"
-                      id="cachePatternInput"
-                      class="cache-pattern-input"
-                      value=""
-                      placeholder="Pattern (example: datahub_*)"
-                    />
-                    <button class="btn btn-ghost" id="cacheSearchBtn">
-                      <i class="fa-solid fa-magnifying-glass"></i> Search
-                    </button>
-                  </div>
-                  <div class="cache-toolbar-right">
-                    <button class="btn btn-primary" id="cacheReloadBtn">
-                      <i class="fa-solid fa-rotate-right"></i> Reload
-                    </button>
-                  </div>
-                </div>
-
                 <div class="table-wrapper" style="margin-top: 0">
                   <table class="dt" id="cacheTable">
                     <thead>
@@ -2981,7 +2961,6 @@
       let cacheEntries = [];
       let cacheDT = null;
       let selectedCacheKeys = new Set();
-      let activeCachePattern = "";
       let cacheDetailKey = null;
       const wrikeRedirectUrl = "<%= wrikeRedirectUrl %>";
       const appUrl = "<%= appUrl %>";
@@ -3083,7 +3062,7 @@
         }
 
         if (pageId === "cache-settings") {
-          loadCacheEntries(activeCachePattern);
+          loadCacheEntries();
         }
       });
 
@@ -3099,7 +3078,7 @@
         const activePage = $(".page.active").attr("id") || "";
         const refreshPromise =
           activePage === "page-cache-settings"
-            ? loadCacheEntries(activeCachePattern)
+            ? loadCacheEntries()
             : activePage === "page-users"
               ? loadPortalUsers()
               : loadEnvironments();
@@ -3450,7 +3429,9 @@
         } else if (hasSelection) {
           $("#cacheBulkDeleteBtn")
             .prop("disabled", false)
-            .html(`<i class="fa-solid fa-trash"></i> Delete Selected (${selectedCount})`);
+            .html(
+              `<i class="fa-solid fa-trash"></i> Delete Selected (${selectedCount})`,
+            );
         } else {
           $("#cacheBulkDeleteBtn")
             .prop("disabled", false)
@@ -3465,27 +3446,12 @@
         $("#cacheSelectAll").prop("checked", allCount === selectedCount);
       }
 
-      async function loadCacheEntries(patternOverride) {
-        const patternInput =
-          typeof patternOverride === "string"
-            ? patternOverride
-            : $("#cachePatternInput").val() || "";
-
-        const normalizedPattern = patternInput.trim();
-
-        activeCachePattern = normalizedPattern;
-        $("#cachePatternInput").val(normalizedPattern);
-
+      async function loadCacheEntries() {
         NProgress.start();
         try {
-          const patternQuery = normalizedPattern
-            ? `pattern=${encodeURIComponent(normalizedPattern)}&`
-            : "";
-
-          const res = await fetch(
-            `/api/v1/admin/cache?${patternQuery}limit=500`,
-            { headers: authHeaders() },
-          );
+          const res = await fetch(`/api/v1/admin/cache?limit=500`, {
+            headers: authHeaders(),
+          });
           const json = await res.json();
           if (!res.ok || !json.success) {
             throw new Error(json.message || "Failed to load cache entries");
@@ -3547,6 +3513,7 @@
         cacheDT = $("#cacheTable").DataTable({
           pageLength: 10,
           lengthMenu: [10, 25, 50, 100],
+          searchDelay: 350,
           order: [],
           columnDefs: [
             { targets: 0, orderable: false, searchable: false },
@@ -3594,6 +3561,12 @@
           $bottomControls.append($info);
           $bottomControls.append($paginate);
 
+          // Keep all four DataTable elements visible even on a single page.
+          $length.css("display", "flex");
+          $filter.css("display", "flex");
+          $info.css("display", "block");
+          $paginate.css("display", "flex");
+
           $wrapper.empty();
           $wrapper.append($topControls);
           $wrapper.append($scrollContainer);
@@ -3630,7 +3603,7 @@
         }
 
         toast("Cache key deleted", "success");
-        await loadCacheEntries(activeCachePattern);
+        await loadCacheEntries();
       }
 
       async function openCacheDetailModal(key) {
@@ -3805,17 +3778,6 @@
       });
 
       /* ── Settings: cache controls ───────────────────────────── */
-      $("#cacheSearchBtn, #cacheReloadBtn").on("click", function () {
-        loadCacheEntries();
-      });
-
-      $("#cachePatternInput").on("keydown", function (e) {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          loadCacheEntries();
-        }
-      });
-
       $("#cacheSelectAll").on("change", function () {
         const checked = $(this).is(":checked");
         selectedCacheKeys = new Set();
@@ -3841,20 +3803,22 @@
       });
 
       $("#cacheBulkDeleteBtn").on("click", async function () {
-        const keys = selectedCacheKeys.size > 0 
-          ? Array.from(selectedCacheKeys)
-          : cacheEntries.map(e => e.key);
+        const keys =
+          selectedCacheKeys.size > 0
+            ? Array.from(selectedCacheKeys)
+            : cacheEntries.map((e) => e.key);
 
         if (!keys.length) return;
 
         const isDeleteAll = selectedCacheKeys.size === 0;
         const decision = await Swal.fire({
-          title: isDeleteAll ? "Delete All Cache Keys?" : "Delete Selected Cache Keys?",
+          title: isDeleteAll
+            ? "Delete All Cache Keys?"
+            : "Delete Selected Cache Keys?",
           html: `You are deleting <strong>${keys.length}</strong> key(s).`,
           icon: "warning",
           showCancelButton: true,
-          confirmButtonText:
-            `<i class="fa-solid fa-trash" style="margin-right:6px"></i>${isDeleteAll ? 'Delete All' : 'Delete Selected'}`,
+          confirmButtonText: `<i class="fa-solid fa-trash" style="margin-right:6px"></i>${isDeleteAll ? "Delete All" : "Delete Selected"}`,
           cancelButtonText: "Cancel",
           reverseButtons: true,
         });
@@ -3873,7 +3837,7 @@
           }
 
           toast(json.message || "Cache keys deleted", "success");
-          await loadCacheEntries(activeCachePattern);
+          await loadCacheEntries();
         } catch (err) {
           toast(err.message || "Bulk delete failed", "error");
         }
