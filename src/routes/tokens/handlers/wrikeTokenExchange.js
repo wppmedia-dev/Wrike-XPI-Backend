@@ -17,14 +17,22 @@ export const WrikeTokenExchange = ({ code, environmentId }, fastify) => {
       const envData = await GetById(environmentId);
       const env = envData?.environment_name;
 
+      console.log("Fetched dynamic environment Data");
+
       // Get Wrike tokens from OAuth code
       const { access_token, refresh_token } = await getWrikeTokens({
         code,
         env,
       });
 
-      if (!access_token || !refresh_token)
+      if (!access_token || !refresh_token) {
+        console.log(
+          "Issue retrieving wrike tokens: Invalid authorization code!",
+        );
         return reject({ message: "Invalid authorization code!" });
+      }
+
+      console.log("Retrieved wrike tokens");
 
       // Get user data from Wrike API
       const wrikeUserData = await getUserData(access_token);
@@ -37,9 +45,12 @@ export const WrikeTokenExchange = ({ code, environmentId }, fastify) => {
       } = wrikeUserData?.data[0];
 
       if (!wrikeUserId) {
+        console.log("Invalid Wrike User!");
         await transaction.rollback();
         return reject({ message: "Invalid Wrike User!" });
       }
+
+      console.log("Fetched Wrike user data");
 
       const accountId = profiles?.[0]?.accountId;
 
@@ -59,6 +70,8 @@ export const WrikeTokenExchange = ({ code, environmentId }, fastify) => {
         );
         userId = newUserData?.id;
       }
+
+      console.log("Fetched exising user data from DB");
 
       // Generate username from email + account_id
       const username = `${accountId}-${environmentId}-${primaryEmail}`;
@@ -91,6 +104,8 @@ export const WrikeTokenExchange = ({ code, environmentId }, fastify) => {
       );
       let userTokenId = userTokenData?.id;
 
+      console.log("Retrieved exising user token data");
+
       // Update or create token record
       if (userTokenId) {
         await Tokens.Update(
@@ -106,6 +121,8 @@ export const WrikeTokenExchange = ({ code, environmentId }, fastify) => {
           },
           { transaction },
         );
+
+        console.log("Updated user token meta data");
       } else {
         const newUserTokenData = await Tokens.Insert(
           userId,
@@ -123,6 +140,8 @@ export const WrikeTokenExchange = ({ code, environmentId }, fastify) => {
           { transaction },
         );
         userTokenId = newUserTokenData?.id;
+
+        console.log("Inserted a new token meta data");
       }
 
       // Create JWE token containing the DEK
@@ -141,6 +160,8 @@ export const WrikeTokenExchange = ({ code, environmentId }, fastify) => {
       );
 
       await transaction.commit();
+
+      console.log("XPI token has been generated successfully!");
 
       // Return credentials and JWE token
       resolve({

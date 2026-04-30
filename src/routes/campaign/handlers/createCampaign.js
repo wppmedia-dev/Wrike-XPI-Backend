@@ -9,7 +9,9 @@ import {
   getRequestFormFieldDatahub,
   getSpaceDatahub,
   getEntityDatahub,
+  getCustomFields,
 } from "../../../utils/wrike";
+import { translateDatahubRecordId } from "../utils/datahubRecordTranslator";
 
 export const CreateCampaign = (
   wrikeToken,
@@ -275,10 +277,21 @@ export const CreateCampaign = (
 
       const folderCustomFieldValues = {};
 
+      const customFieldsMaster = await getCustomFields(wrikeToken);
+
+      if (customFieldsMaster?.errorDescription) {
+        throw { message: customFieldsMaster.errorDescription };
+      }
+
+      // map of custom fields for quick lookup
+      const cfMap = new Map(
+        (customFieldsMaster?.data || []).map((cf) => [cf.id, cf]),
+      );
+
       for (const [key, value] of Object.entries(datahubCustomFieldsData)) {
         if (!value.isReadable || !value.isCampaignField) continue;
 
-        let cfValue;
+        let cfValue, cfData;
         switch (value.xpiFieldType) {
           case "Wrike API Built-in Field":
             cfValue = outputData?.data[0][value?.cfId];
@@ -290,13 +303,28 @@ export const CreateCampaign = (
               )?.value ?? "";
             break;
           case "Wrike Custom Field":
-            cfValue =
+            cfData =
               outputData?.data[0]?.customFields?.find(
                 (field) => field.id === value.cfId,
-              )?.value ?? "";
+              ) ?? "";
+            cfValue = cfData?.value ?? "";
             break;
           default:
             cfValue = "";
+        }
+
+        if (cfValue && cfValue?.startsWith("[") && cfValue?.endsWith("]")) {
+          const cfMetaData = cfMap.get(cfData?.id);
+
+          const databaseId =
+            cfMetaData?.settings?.linkToDatabaseInfo?.dataHubDatabaseId;
+
+          if (databaseId && cfValue)
+            cfValue = await translateDatahubRecordId(
+              wrikeToken,
+              databaseId,
+              cfValue,
+            );
         }
 
         // if (value.isReadable && value.isCampaignField)
