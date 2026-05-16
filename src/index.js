@@ -92,7 +92,7 @@ import {
     );
   }
 
-  fastify.get("/sync-secrets", async (req, res) => {
+  fastify.get("/api/v1/sync-secrets", async (req, res) => {
     try {
       await syncSecrets([
         "XPI-API-ClientId",
@@ -107,7 +107,7 @@ import {
   });
 
   // Sync Wrike Credentials from Database
-  fastify.get("/sync-db-credentials", async (req, res) => {
+  fastify.get("/api/v1/sync-db-credentials", async (req, res) => {
     try {
       await syncWrikeCredentialsFromDB();
       console.log("Database credentials synchronized successfully");
