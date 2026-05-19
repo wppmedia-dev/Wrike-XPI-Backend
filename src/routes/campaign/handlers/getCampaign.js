@@ -152,6 +152,7 @@ export const GetCampaign = (wrikeToken, params, environmentName) => {
       reject({
         message:
           "Fatal error Unexpected error occurred and service is unable complete the request.",
+        details: err,
       });
     }
   });

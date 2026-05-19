@@ -118,6 +118,7 @@ export const DeleteChannel = (wrikeToken, params, environmentName) => {
       reject({
         message:
           "Fatal error Unexpected error occurred and service is unable complete the request.",
+        details: err,
       });
     }
   });
