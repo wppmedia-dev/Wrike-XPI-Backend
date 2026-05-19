@@ -44,7 +44,7 @@ export const masterRoute = (fastify, opts, done) => {
   );
 
   // Update Dominus API
-  fastify.patch(
+  fastify.put(
     "/record/:masterSlug/:recordId",
     UpdateMasterDataRecordSchema,
     async (req, reply) => {

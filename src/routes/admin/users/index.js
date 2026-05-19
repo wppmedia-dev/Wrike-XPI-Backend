@@ -75,8 +75,8 @@ export const adminPortalUsersRoute = (fastify, opts, done) => {
     }
   });
 
-  // PATCH /admin/portal-users/:id/reset-password
-  fastify.patch(
+  // PUT /admin/portal-users/:id/reset-password
+  fastify.put(
     "/:id/reset-password",
     { ...ResetPasswordSchema, ...guard },
     async (req, reply) => {
@@ -95,8 +95,8 @@ export const adminPortalUsersRoute = (fastify, opts, done) => {
     },
   );
 
-  // PATCH /admin/portal-users/:id/status
-  fastify.patch(
+  // PUT /admin/portal-users/:id/status
+  fastify.put(
     "/:id/status",
     { ...ToggleUserSchema, ...guard },
     async (req, reply) => {
@@ -148,8 +148,8 @@ export const adminPortalUsersRoute = (fastify, opts, done) => {
     },
   );
 
-  // PATCH /admin/portal-users/:id  (update profile — no password)
-  fastify.patch("/:id", guard, async (req, reply) => {
+  // PUT /admin/portal-users/:id  (update profile — no password)
+  fastify.put("/:id", guard, async (req, reply) => {
     try {
       const result = await UpdateUser(req.adminUser, req.params, req.body);
       return reply.code(result?.statusCode || 200).send({

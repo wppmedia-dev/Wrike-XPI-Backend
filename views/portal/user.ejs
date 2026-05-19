@@ -2589,7 +2589,7 @@
           const url = isEdit
             ? "/api/v1/portal/environments/" + envEditId
             : "/api/v1/portal/environments/";
-          const method = isEdit ? "PATCH" : "POST";
+          const method = isEdit ? "PUT" : "POST";
 
           const res = await fetch(url, {
             method,

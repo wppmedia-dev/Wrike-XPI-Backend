@@ -285,11 +285,7 @@ export const AmoebaHandler = (wrikeToken, req, environmentName) => {
         fullTargetUrl,
         method,
         targetHeaders,
-        req.body
-          ? req.body
-          : ["POST", "PUT", "PATCH"].includes(method)
-            ? {}
-            : undefined,
+        req.body ? req.body : ["POST", "PUT"].includes(method) ? {} : undefined,
       );
 
       if (targetResponse?.status >= 400)

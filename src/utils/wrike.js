@@ -1049,7 +1049,7 @@ export const updateDatahubRecord = async (
 
     const customFieldsData = await GetResponseWithStatusCode(
       `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/records/${recordId}`,
-      "PATCH",
+      "PUT",
       {
         "content-type": "application/json",
         Authorization: `Bearer ${wrikeToken}`,

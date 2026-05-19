@@ -4,7 +4,7 @@ const fp = require("fastify-plugin");
 
 module.exports = fp(async function (fastify, opts) {
   fastify.register(require("@fastify/cors"), {
-    methods: ["GET", "PUT", "POST", "DELETE", "OPTIONS", "PATCH", "HEAD"],
+    methods: ["GET", "PUT", "POST", "DELETE", "OPTIONS", "HEAD"],
     origin: "*",
   });
 });

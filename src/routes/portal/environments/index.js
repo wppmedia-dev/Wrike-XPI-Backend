@@ -49,8 +49,8 @@ export const portalEnvironmentsRoute = (fastify, opts, done) => {
     }
   });
 
-  // PATCH /portal/environments/:id — update an environment
-  fastify.patch("/:id", { preHandler: authGuard }, async (req, reply) => {
+  // PUT /portal/environments/:id — update an environment
+  fastify.put("/:id", { preHandler: authGuard }, async (req, reply) => {
     try {
       const result = await UpdateEnvironment(
         req.portalUser,

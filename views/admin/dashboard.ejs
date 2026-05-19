@@ -4695,7 +4695,7 @@
 
           try {
             const res = await fetch("/api/v1/admin/portal-users/" + puEditId, {
-              method: "PATCH",
+              method: "PUT",
               headers: {
                 ...authHeaders(),
                 "Content-Type": "application/json",
@@ -4764,7 +4764,7 @@
             const res = await fetch(
               "/api/v1/admin/portal-users/" + puResetId + "/reset-password",
               {
-                method: "PATCH",
+                method: "PUT",
                 headers: {
                   ...authHeaders(),
                   "Content-Type": "application/json",
@@ -4816,7 +4816,7 @@
           const res = await fetch(
             "/api/v1/admin/portal-users/" + userId + "/status",
             {
-              method: "PATCH",
+              method: "PUT",
               headers: { ...authHeaders(), "Content-Type": "application/json" },
               body: JSON.stringify({ is_active }),
             },

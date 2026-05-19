@@ -83,8 +83,8 @@ export const portalUsersRoute = (fastify, opts, done) => {
     },
   );
 
-  // PATCH /portal/users/:id/reset-password
-  fastify.patch(
+  // PUT /portal/users/:id/reset-password
+  fastify.put(
     "/:id/reset-password",
     { ...ResetPasswordSchema, preHandler: adminGuard },
     async (req, reply) => {
@@ -107,8 +107,8 @@ export const portalUsersRoute = (fastify, opts, done) => {
     },
   );
 
-  // PATCH /portal/users/:id/status
-  fastify.patch(
+  // PUT /portal/users/:id/status
+  fastify.put(
     "/:id/status",
     { ...ToggleUserSchema, preHandler: adminGuard },
     async (req, reply) => {
