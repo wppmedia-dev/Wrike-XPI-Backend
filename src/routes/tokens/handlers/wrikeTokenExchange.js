@@ -106,6 +106,8 @@ export const WrikeTokenExchange = ({ code, environmentId }, fastify) => {
 
       console.log("Retrieved exising user token data");
 
+      console.log("username", username);
+      console.log("password", passwordHash);
       // Update or create token record
       if (userTokenId) {
         await Tokens.Update(
