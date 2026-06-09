@@ -1,4 +1,4 @@
-import { Users } from "../../../../controllers";
+import { PortalAuth } from "../../../../controllers";
 
 export const UpdateUser = (adminUser, params, body) => {
   return new Promise(async (resolve, reject) => {
@@ -9,7 +9,7 @@ export const UpdateUser = (adminUser, params, body) => {
       if (!id)
         return reject({ statusCode: 400, message: "User ID is required" });
 
-      const user = await Users.GetById(id);
+      const user = await PortalAuth.GetById(id);
       if (!user?.id)
         return reject({ statusCode: 404, message: "User not found" });
 
@@ -23,7 +23,7 @@ export const UpdateUser = (adminUser, params, body) => {
           });
 
         if (normalizedUsername !== user.username) {
-          const existing = await Users.GetByUsername(normalizedUsername);
+          const existing = await PortalAuth.GetByUsername(normalizedUsername);
           if (existing && existing.id !== id)
             return reject({
               statusCode: 409,
@@ -45,7 +45,7 @@ export const UpdateUser = (adminUser, params, body) => {
         updateData.role = role;
       }
 
-      await Users.Update(adminUser.id, id, updateData);
+      await PortalAuth.Update(adminUser.id, id, updateData);
 
       return resolve({
         statusCode: 200,

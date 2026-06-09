@@ -1,5 +1,5 @@
 import { verifyAdminJWT } from "../../../middlewares/adminAuth";
-import { Users } from "../../../controllers";
+import { PortalAuth } from "../../../controllers";
 
 import { ListUsers } from "../../portal/users/handlers/listUsers";
 import { CreateUser } from "../../portal/users/handlers/createUser";
@@ -118,7 +118,7 @@ export const adminPortalUsersRoute = (fastify, opts, done) => {
   // GET /admin/portal-users/:id/environments
   fastify.get("/:id/environments", guard, async (req, reply) => {
     try {
-      const envs = await Users.GetUserEnvironments(req.params.id);
+      const envs = await PortalAuth.GetUserEnvironments(req.params.id);
       return reply.code(200).send({ success: true, data: envs });
     } catch (err) {
       return reply.code(err?.statusCode || 500).send({

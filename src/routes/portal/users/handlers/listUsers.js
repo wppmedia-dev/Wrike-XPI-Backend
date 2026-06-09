@@ -1,9 +1,9 @@
-import { Users } from "../../../../controllers";
+import { PortalAuth } from "../../../../controllers";
 
 export const ListUsers = () => {
   return new Promise(async (resolve, reject) => {
     try {
-      const users = await Users.GetAll();
+      const users = await PortalAuth.GetAll();
 
       const data = users.map((u) => ({
         id: u.id,

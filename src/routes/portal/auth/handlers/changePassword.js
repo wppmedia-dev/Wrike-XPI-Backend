@@ -1,5 +1,5 @@
 import * as CryptoUtils from "../../../../utils/crypto";
-import { Users } from "../../../../controllers";
+import { PortalAuth } from "../../../../controllers";
 
 export const ChangePassword = (portalUser, body) => {
   return new Promise(async (resolve, reject) => {
@@ -24,7 +24,7 @@ export const ChangePassword = (portalUser, body) => {
           message: "New password must differ from current password",
         });
 
-      const user = await Users.GetByUsername(portalUser.username);
+      const user = await PortalAuth.GetByUsername(portalUser.username);
       if (!user?.id)
         return reject({ statusCode: 404, message: "User not found" });
 
@@ -40,7 +40,7 @@ export const ChangePassword = (portalUser, body) => {
 
       const newHash = await CryptoUtils.hashPassword(new_password);
 
-      await Users.Update(null, user.id, {
+      await PortalAuth.Update(null, user.id, {
         password_hash: newHash,
         must_change_password: false,
       });

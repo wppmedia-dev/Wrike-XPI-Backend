@@ -1,5 +1,5 @@
 import * as CryptoUtils from "../../../../utils/crypto";
-import { Users } from "../../../../controllers";
+import { PortalAuth } from "../../../../controllers";
 
 export const ResetPassword = (adminUser, params, body) => {
   return new Promise(async (resolve, reject) => {
@@ -16,13 +16,13 @@ export const ResetPassword = (adminUser, params, body) => {
           message: "New password must be at least 8 characters",
         });
 
-      const user = await Users.GetById(id);
+      const user = await PortalAuth.GetById(id);
       if (!user?.id)
         return reject({ statusCode: 404, message: "User not found" });
 
       const password_hash = await CryptoUtils.hashPassword(new_password);
 
-      await Users.Update(adminUser.id, id, {
+      await PortalAuth.Update(adminUser.id, id, {
         password_hash,
         must_change_password: true,
       });

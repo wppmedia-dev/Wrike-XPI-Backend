@@ -1,5 +1,5 @@
 import * as CryptoUtils from "../../../../utils/crypto";
-import { Users } from "../../../../controllers";
+import { PortalAuth } from "../../../../controllers";
 
 export const CreateUser = (adminUser, body) => {
   return new Promise(async (resolve, reject) => {
@@ -24,13 +24,13 @@ export const CreateUser = (adminUser, body) => {
           message: "Password must be at least 8 characters",
         });
 
-      const existing = await Users.GetByUsername(username);
+      const existing = await PortalAuth.GetByUsername(username);
       if (existing?.id)
         return reject({ statusCode: 409, message: "Username already exists" });
 
       const password_hash = await CryptoUtils.hashPassword(password);
 
-      const user = await Users.Insert(
+      const user = await PortalAuth.Insert(
         {
           username: username.toLowerCase(),
           password_hash,

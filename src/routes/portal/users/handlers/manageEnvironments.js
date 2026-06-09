@@ -1,4 +1,4 @@
-import { Users } from "../../../../controllers";
+import { PortalAuth } from "../../../../controllers";
 
 export const AssignEnv = (adminUser, params, body) => {
   return new Promise(async (resolve, reject) => {
@@ -12,7 +12,7 @@ export const AssignEnv = (adminUser, params, body) => {
           message: "User ID and env_id are required",
         });
 
-      await Users.AssignEnvironment(adminUser.id, id, env_id);
+      await PortalAuth.AssignEnvironment(adminUser.id, id, env_id);
 
       return resolve({
         statusCode: 200,
@@ -37,7 +37,7 @@ export const RevokeEnv = (params, query) => {
           message: "User ID and env_id are required",
         });
 
-      await Users.RevokeEnvironment(id, env_id);
+      await PortalAuth.RevokeEnvironment(id, env_id);
 
       return resolve({
         statusCode: 200,

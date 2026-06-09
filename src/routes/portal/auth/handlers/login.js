@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import * as CryptoUtils from "../../../../utils/crypto";
-import { Users } from "../../../../controllers";
+import { PortalAuth } from "../../../../controllers";
 
 export const Login = (body) => {
   return new Promise(async (resolve, reject) => {
@@ -13,7 +13,7 @@ export const Login = (body) => {
           message: "Username and password are required",
         });
 
-      const user = await Users.GetByUsername(username);
+      const user = await PortalAuth.GetByUsername(username);
 
       if (!user?.id || !user?.is_active)
         return reject({ statusCode: 401, message: "Invalid credentials" });
@@ -25,7 +25,7 @@ export const Login = (body) => {
       if (!isValid)
         return reject({ statusCode: 401, message: "Invalid credentials" });
 
-      await Users.UpdateLastLogin(user.id);
+      await PortalAuth.UpdateLastLogin(user.id);
 
       const accessToken = jwt.sign(
         {

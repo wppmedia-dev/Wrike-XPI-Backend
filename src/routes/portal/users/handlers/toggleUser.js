@@ -1,4 +1,4 @@
-import { Users } from "../../../../controllers";
+import { PortalAuth } from "../../../../controllers";
 
 export const ToggleUser = (adminUser, params, body) => {
   return new Promise(async (resolve, reject) => {
@@ -15,11 +15,11 @@ export const ToggleUser = (adminUser, params, body) => {
           message: "is_active must be a boolean",
         });
 
-      const user = await Users.GetById(id);
+      const user = await PortalAuth.GetById(id);
       if (!user?.id)
         return reject({ statusCode: 404, message: "User not found" });
 
-      await Users.Update(adminUser.id, id, { is_active });
+      await PortalAuth.Update(adminUser.id, id, { is_active });
 
       return resolve({
         statusCode: 200,
