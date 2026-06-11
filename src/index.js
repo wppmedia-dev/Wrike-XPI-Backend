@@ -214,11 +214,11 @@ import {
       selectedEnvironment = environment;
     }
 
+    const defaultEnvKey = Object.keys(allCreds)[0];
     const selectedCred = selectedEnvironment
       ? allCreds?.[selectedEnvironment]
-      : null;
-    const WRIKE_CLIENT_ID =
-      selectedCred?.clientId || process.env.WRIKE_CLIENT_ID;
+      : allCreds[defaultEnvKey];
+    const WRIKE_CLIENT_ID = selectedCred?.clientId;
 
     if (!WRIKE_CLIENT_ID) {
       return res.status(400).send({
