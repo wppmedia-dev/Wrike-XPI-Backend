@@ -36,57 +36,65 @@ const verifyBasicAuth = async (credentials) => {
 
 // Verify JWE token and extract DEK
 const verifyJWE = async (jweToken) => {
-  const { tid, enc: encryptedDEK } = jwt.verify(
-    jweToken,
-    process.env.JWT_SECRET,
-  );
+  try {
+    const { tid, enc: encryptedDEK } = jwt.verify(
+      jweToken,
+      process.env.JWT_SECRET,
+    );
 
-  if (!encryptedDEK) {
-    throw new Error("Invalid token");
+    if (!encryptedDEK) {
+      throw new Error("Invalid token");
+    }
+
+    const token = await Tokens.GetById(tid);
+    if (!token.id) {
+      throw new Error("Invalid token");
+    }
+
+    // Decrypt the DEK from the JWE and convert back to Buffer
+    const { dek: dekStr } = jwt.verify(encryptedDEK, process.env.JWT_SECRET);
+    const dek = Buffer.from(dekStr, "base64");
+
+    return { token, dek };
+  } catch (err) {
+    throw err;
   }
-
-  const token = await Tokens.GetById(tid);
-  if (!token.id) {
-    throw new Error("Invalid token");
-  }
-
-  // Decrypt the DEK from the JWE and convert back to Buffer
-  const { dek: dekStr } = jwt.verify(encryptedDEK, process.env.JWT_SECRET);
-  const dek = Buffer.from(dekStr, "base64");
-
-  return { token, dek };
 };
 
 /**
  * Handle token refresh using DEK
  */
 const refreshTokens = async (encRefreshToken, dek, createdBy, tid, env) => {
-  // Ensure DEK is a Buffer before decryption
-  const dekBuffer = Buffer.isBuffer(dek) ? dek : Buffer.from(dek, "base64");
-  const refreshToken = crypto
-    .decrypt(Buffer.from(encRefreshToken, "base64"), dekBuffer)
-    .toString();
+  try {
+    // Ensure DEK is a Buffer before decryption
+    const dekBuffer = Buffer.isBuffer(dek) ? dek : Buffer.from(dek, "base64");
+    const refreshToken = crypto
+      .decrypt(Buffer.from(encRefreshToken, "base64"), dekBuffer)
+      .toString();
 
-  const result = await getWrikeTokens({ env, refresh_token: refreshToken });
-  if (!result.access_token || !result.refresh_token) {
-    throw new Error("Token refresh failed");
+    const result = await getWrikeTokens({ env, refresh_token: refreshToken });
+    if (!result.access_token || !result.refresh_token) {
+      throw new Error("Token refresh failed");
+    }
+
+    // Re-encrypt tokens with same DEK
+    const newEncAccessToken = crypto
+      .encrypt(result.access_token, dek)
+      .toString("base64");
+    const newEncRefreshToken = crypto
+      .encrypt(result.refresh_token, dek)
+      .toString("base64");
+
+    // Update tokens in database
+    await Tokens.Update(createdBy, tid, {
+      encrypted_access_token: newEncAccessToken,
+      encrypted_refresh_token: newEncRefreshToken,
+    });
+
+    return result.access_token;
+  } catch (err) {
+    throw err;
   }
-
-  // Re-encrypt tokens with same DEK
-  const newEncAccessToken = crypto
-    .encrypt(result.access_token, dek)
-    .toString("base64");
-  const newEncRefreshToken = crypto
-    .encrypt(result.refresh_token, dek)
-    .toString("base64");
-
-  // Update tokens in database
-  await Tokens.Update(createdBy, tid, {
-    encrypted_access_token: newEncAccessToken,
-    encrypted_refresh_token: newEncRefreshToken,
-  });
-
-  return result.access_token;
 };
 
 export const ValidateToken = async (req, reply, fastify) => {
