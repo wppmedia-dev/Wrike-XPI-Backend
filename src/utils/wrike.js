@@ -1,3 +1,4 @@
+import { getSecrets } from "./azure_vault";
 import { getCachedWrikeCredentials } from "./wrikeCredentials";
 import { GetResponse, GetResponseWithStatusCode } from "./node-fetch";
 import redisClient from "./redis";
@@ -12,13 +13,7 @@ const requiredDatahubRequestFormIds = [
   "Variant Id",
 ];
 
-/**
- * Get Datahub ID by key for a specific environment
- * @param {string} environmentName - Environment name (used to fetch from cache)
- * @param {string} idKey - Key like 'xpiSpaceNameDatahubId', 'xpiEntityDatahubId', etc.
- * @param {string} envVarKey - Fallback env variable key like 'DATAHUB_SPACE_ID'
- * @returns {string} Datahub ID or fallback env variable value
- */
+// Get Datahub ID by key for a specific environment
 const getDatahubIdForEnvironment = (environmentName, idKey, envVarKey) => {
   if (!environmentName) {
     return process.env[envVarKey];
@@ -105,6 +100,10 @@ export const getUserData = async (access_token) => {
 // Datahub Util Functions
 export const getDatahubFields = async (wrikeToken, databaseId) => {
   try {
+    // Pass Service Account Token
+    const secretValues = getSecrets();
+    wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
+
     // Get folder data
     const datahubFields = await GetResponse(
       `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/fields`,
@@ -210,6 +209,10 @@ export const getDatahubRecords = async (
     if (fieldIds) {
       url += `&fieldIds=${fieldIds.join(",")}`;
     }
+
+    // Pass Service Account Token
+    const secretValues = getSecrets();
+    wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
 
     const response = await GetResponse(url, "GET", {
       "content-type": "application/json",
@@ -982,6 +985,8 @@ export const createDatahubRecord = async (
     }
 
     // Pass Service Account Token
+    const secretValues = getSecrets();
+    wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
 
     const customFieldsData = await GetResponse(
       `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/records`,
@@ -1047,6 +1052,10 @@ export const updateDatahubRecord = async (
         fieldValues[data];
     }
 
+    // Pass Service Account Token
+    const secretValues = getSecrets();
+    wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
+
     const customFieldsData = await GetResponseWithStatusCode(
       `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/records/${recordId}`,
       "PUT",
@@ -1080,6 +1089,10 @@ export const deleteDatahubRecord = async (
   try {
     if (!Array.isArray(recordIds) || recordIds.length === 0)
       throw "Record IDs must not be empty";
+
+    // Pass Service Account Token
+    const secretValues = getSecrets();
+    wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
 
     const customFieldsData = await GetResponse(
       `${
