@@ -132,6 +132,10 @@ export const getDatahubRecord = async (wrikeToken, databaseId, recordId) => {
       process.env.WRIKE_DATAHUB_ENDPOINT
     }/databases/${databaseId}/records/${recordId}`;
 
+    // Pass Service Account Token
+    const secretValues = getSecrets();
+    wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
+
     const datahubRecord = await GetResponse(url, "GET", {
       "content-type": "application/json",
       Authorization: `Bearer ${wrikeToken}`,
@@ -1234,6 +1238,38 @@ export const getRequestFormStatus = async (
     } else throw { errorMessage: `Unknown job status: ${jobStatus}` };
   } catch (error) {
     throw error;
+  }
+};
+
+export const getFoldersBySpace = async (
+  wrikeToken,
+  spaceId,
+  nextPageToken,
+  pageSize,
+  customFields,
+) => {
+  try {
+    let url = `${process.env.WRIKE_ENDPOINT}/spaces/${
+      spaceId
+    }/folders?deleted=false&fields=[customFields]&nextPageToken=${
+      nextPageToken || ""
+    }`;
+
+    if (pageSize && pageSize > 0) url += `&pageSize=${pageSize}`;
+
+    if (customFields) url += `&customFields=${JSON.stringify(customFields)}`;
+
+    // Get folder data
+    const wrikeRequestFormData = await GetResponse(url, "GET", {
+      "content-type": "application/json",
+      Authorization: `Bearer ${wrikeToken}`,
+    });
+
+    if (wrikeRequestFormData?.errorDescription) throw wrikeRequestFormData;
+
+    return wrikeRequestFormData;
+  } catch (err) {
+    throw err;
   }
 };
 

@@ -1,8 +1,13 @@
 import { GetResponse } from "../../../utils/node-fetch";
 import { defaultParser } from "@odata/parser";
-import { getCustomFields, getDatahubCustomFields } from "../../../utils/wrike";
+import {
+  getCustomFields,
+  getDatahubCustomFields,
+  getFoldersBySpace,
+} from "../../../utils/wrike";
 import { translateDatahubRecordId } from "../utils/datahubRecordTranslator";
 import { getCachedWrikeCredentials } from "../../../utils/wrikeCredentials";
+import { getSecrets } from "../../../utils/azure_vault";
 
 // Operator mapping from OData to your custom operators
 const odataToCustomOp = {
@@ -80,28 +85,19 @@ export const GetAllCampaigns = (wrikeToken, params, environmentName) => {
         });
       }
 
-      let wrikeUrl = `${process.env.WRIKE_ENDPOINT}/spaces/${
-        credential.campaignSpaceId
-      }/folders?deleted=false&fields=[customFields]&nextPageToken=${
-        nextPageToken || ""
-      }`;
-
-      if (pageSize && pageSize > 0) wrikeUrl += `&pageSize=${pageSize}`;
-
       customFieldsParam.push({
         id: datahubCustomFieldsData?.workitemlevel?.cfId,
         comparator: "EqualTo",
         value: "Campaign",
       });
 
-      if (customFieldsParam && customFieldsParam.length > 0)
-        wrikeUrl += `&customFields=${JSON.stringify(customFieldsParam)}`;
-
-      // Get folder data
-      const wrikeFolderData = await GetResponse(wrikeUrl, "GET", {
-        "content-type": "application/json",
-        Authorization: `Bearer ${wrikeToken}`,
-      });
+      const wrikeFolderData = await getFoldersBySpace(
+        wrikeToken,
+        credential.campaignSpaceId,
+        nextPageToken,
+        pageSize,
+        customFieldsParam,
+      );
 
       // Sending folder update error response
       if (wrikeFolderData?.errorDescription)
@@ -118,7 +114,6 @@ export const GetAllCampaigns = (wrikeToken, params, environmentName) => {
         (customFieldsMaster?.data || []).map((cf) => [cf.id, cf]),
       );
 
-      // Optimize the for loop by using map instead of manual for...of and push
       const campaigns = await Promise.all(
         wrikeFolderData?.data.map(async (folder) => {
           if (folder?.scope === "RbFolder") return;
