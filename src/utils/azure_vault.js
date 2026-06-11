@@ -32,8 +32,7 @@ export const syncSecrets = async (secretNames) => {
   }
 };
 
-export const getSecrets = (environment) =>
-  Object.freeze({ ...secretValues[environment] });
+export const getSecrets = () => Object.freeze({ ...secretValues });
 
 export const listAllSecrets = async () => {
   try {
