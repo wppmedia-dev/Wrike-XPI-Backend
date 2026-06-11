@@ -2,11 +2,7 @@ import { encryptField, decryptField } from "./crypto";
 import { WrikeCredentials } from "../controllers";
 require("dotenv").config();
 
-/**
- * Fetch and decrypt Wrike credentials for an environment
- * @param {string} environmentName - environment name
- * @returns {Promise<object|null>} Decrypted credentials or null if not found
- */
+// Fetch and decrypt Wrike credentials for an environment
 export const getWrikeCredentials = async (environmentName) => {
   try {
     const credential = await WrikeCredentials.GetByType(environmentName);
@@ -39,10 +35,7 @@ export const getWrikeCredentials = async (environmentName) => {
   }
 };
 
-/**
- * Fetch all credentials (all environments)
- * @returns {Promise<object>} Object keyed by environment name
- */
+// Fetch all credentials (all environments)
 export const getAllWrikeCredentials = async () => {
   try {
     const credentials = await WrikeCredentials.GetAll();
@@ -61,10 +54,7 @@ export const getAllWrikeCredentials = async () => {
   }
 };
 
-/**
- * Fetch all visible credentials (visible environments only)
- * @returns {Promise<object>} Object keyed by environment name
- */
+// Fetch all visible credentials (visible environments only)
 export const getAllVisibleWrikeCredentials = async () => {
   try {
     const credentials = await WrikeCredentials.GetAllVisible();
@@ -83,11 +73,7 @@ export const getAllVisibleWrikeCredentials = async () => {
   }
 };
 
-/**
- * Sync credentials from database into in-memory cache.
- * Call at startup and after any credential change.
- * @returns {Promise<object>} Synced credentials keyed by environment name
- */
+// Sync credentials from database into in-memory cache.
 let cachedCredentials = {};
 let cachedVisibleCredentials = {};
 
@@ -107,11 +93,7 @@ export const syncWrikeCredentialsFromDB = async () => {
   }
 };
 
-/**
- * Get cached credentials
- * @param {string} environmentName - Environment name; returns all cached credentials if omitted
- * @returns {object|null} Cached credentials for the environment, or all cached credentials
- */
+// Get cached credentials
 export const getCachedWrikeCredentials = (environmentName = null) => {
   if (environmentName) {
     return cachedCredentials[environmentName] || null;
@@ -119,11 +101,7 @@ export const getCachedWrikeCredentials = (environmentName = null) => {
   return cachedCredentials;
 };
 
-/**
- * Get cached visible credentials (for user-facing dropdowns)
- * @param {string} environmentName - Environment name; returns all visible cached credentials if omitted
- * @returns {object|null} Cached visible credentials for the environment, or all visible cached credentials
- */
+// Get cached visible credentials (for user-facing dropdowns)
 export const getCachedVisibleWrikeCredentials = (environmentName = null) => {
   if (environmentName) {
     return cachedVisibleCredentials[environmentName] || null;
@@ -131,18 +109,12 @@ export const getCachedVisibleWrikeCredentials = (environmentName = null) => {
   return cachedVisibleCredentials;
 };
 
-/**
- * Clear cached credentials
- */
+// Clear cached credentials
 export const clearCachedWrikeCredentials = () => {
   cachedCredentials = {};
 };
 
-/**
- * Get Datahub IDs for an environment
- * @param {string} environmentName - Environment name
- * @returns {object} Datahub IDs with keys matching env variable names for backward compatibility
- */
+// Get Datahub IDs for an environment
 export const getDatahubIds = (environmentName) => {
   const cred = getCachedWrikeCredentials(environmentName);
 

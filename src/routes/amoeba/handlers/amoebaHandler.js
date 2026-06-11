@@ -16,7 +16,6 @@ export const AmoebaHandler = (wrikeToken, req, environmentName) => {
       }
 
       // Get Datahub IDs from cache based on environment
-
       const moduleDatahubId = getDatahubIdForEnvironment(
         environmentName,
         "xpiApiModulesDatahubId",
