@@ -18,6 +18,71 @@ import {
   getCachedVisibleWrikeCredentials,
 } from "./utils/wrikeCredentials";
 
+const findRedirectionURL = (
+  { accountId, redirectUri, autoRedirect, environment, environmentId },
+  fastify,
+) => {
+  try {
+    const { WRIKE_LOGIN_ENDPOINT, WRIKE_REDIRECT_URL } = process.env;
+
+    if (!WRIKE_LOGIN_ENDPOINT) {
+      throw new Error(
+        "Missing WRIKE_LOGIN_ENDPOINT! Please contact your admin",
+      );
+    }
+
+    // Get credentials from cached DB values (API type)
+    const allCreds = getCachedWrikeCredentials();
+
+    // Resolve environment: prioritize environmentId parameter, then environment parameter
+    let selectedEnvironment = "";
+    if (environmentId) {
+      // Find environment by ID
+      for (const [envName, envData] of Object.entries(allCreds || {})) {
+        if (envData?.id == environmentId) {
+          selectedEnvironment = envName;
+          break;
+        }
+      }
+    } else if (environment) {
+      selectedEnvironment = environment;
+    }
+
+    const defaultEnvKey = Object.keys(allCreds)[0];
+    const selectedCred = selectedEnvironment
+      ? allCreds?.[selectedEnvironment]
+      : allCreds[defaultEnvKey];
+    const WRIKE_CLIENT_ID = selectedCred?.clientId;
+
+    if (!WRIKE_CLIENT_ID) {
+      return res.status(400).send({
+        message: "Missing WRIKE_CLIENT_ID. Please contact your admin",
+      });
+    }
+
+    let state = "";
+    if (redirectUri) {
+      state = fastify.jwt.sign({
+        redirectUri,
+        environmentId: selectedCred ? selectedCred?.id : "",
+      });
+    } else {
+      state = fastify.jwt.sign({
+        environmentId: selectedCred ? selectedCred?.id : "",
+      });
+    }
+
+    let redirectUrl = `${WRIKE_LOGIN_ENDPOINT}/authorize/v4?client_id=${WRIKE_CLIENT_ID}&response_type=code&state=${state}&redirect_uri=${WRIKE_REDIRECT_URL}`;
+
+    const accountIdToUse = selectedCred?.accountId || accountId;
+    if (accountIdToUse) redirectUrl += `&accountId=${accountIdToUse}`;
+
+    return { redirectUrl, selectedEnvironment };
+  } catch (err) {
+    throw err;
+  }
+};
+
 (async () => {
   // Configure the framework and instantiate it
   const fastify = Fastify({
@@ -123,146 +188,27 @@ import {
   // Generate redirect URL dynamically based on environment selection
   fastify.get("/get-redirect-url", async (req, res) => {
     const { environment, environmentId, redirectUri, accountId } = req.query;
-    const { WRIKE_LOGIN_ENDPOINT, WRIKE_REDIRECT_URL } = process.env;
 
-    if (!WRIKE_LOGIN_ENDPOINT || !WRIKE_REDIRECT_URL) {
-      return res.status(400).send({
-        success: false,
-        message: "Missing WRIKE_LOGIN_ENDPOINT or WRIKE_REDIRECT_URL",
-      });
-    }
-
-    const allCreds = getCachedWrikeCredentials();
-
-    // Resolve environment: prioritize environmentId parameter, then environment parameter
-    let resolvedEnvironment = "";
-    if (environmentId) {
-      // Find environment by ID
-      for (const [envName, envData] of Object.entries(allCreds || {})) {
-        if (envData?.id == environmentId) {
-          resolvedEnvironment = envName;
-          break;
-        }
-      }
-    } else if (environment) {
-      resolvedEnvironment = environment;
-    }
-
-    const selectedCred = resolvedEnvironment
-      ? allCreds?.[resolvedEnvironment]
-      : null;
-    const WRIKE_CLIENT_ID =
-      selectedCred?.clientId || process.env.WRIKE_CLIENT_ID;
-
-    if (!WRIKE_CLIENT_ID) {
-      return res.status(400).send({
-        success: false,
-        message: "Missing WRIKE_CLIENT_ID",
-      });
-    }
-
-    // Generate state JWT with environment and redirectUri context
-    let state = "";
-    if (redirectUri) {
-      state = fastify.jwt.sign({
-        redirectUri,
-        environmentId: selectedCred?.id,
-      });
-    } else {
-      state = fastify.jwt.sign({
-        environmentId: selectedCred?.id,
-      });
-    }
-
-    let redirectUrl = `${WRIKE_LOGIN_ENDPOINT}/authorize/v4?client_id=${WRIKE_CLIENT_ID}&response_type=code&state=${state}&redirect_uri=${WRIKE_REDIRECT_URL}`;
-
-    const accountIdToUse = selectedCred?.accountId || accountId;
-    if (accountIdToUse) {
-      redirectUrl += `&accountId=${accountIdToUse}`;
-    }
+    const { selectedEnvironment, redirectUrl } = findRedirectionURL(
+      req.query,
+      fastify,
+    );
 
     res.send({ success: true, redirectUrl });
   });
 
   // View Handlers
   fastify.get("/", async (req, res) => {
-    const { WRIKE_LOGIN_ENDPOINT, WRIKE_REDIRECT_URL } = process.env;
+    const { accountId, redirectUri, autoRedirect } = req.query;
 
-    const { accountId, redirectUri, autoRedirect, environment, environmentId } =
-      req.query;
-
-    if (!WRIKE_LOGIN_ENDPOINT) {
-      throw new Error(
-        "Missing WRIKE_LOGIN_ENDPOINT! Please contact your admin",
-      );
-    }
-
-    // Get credentials from cached DB values (API type)
-    const allCreds = getCachedWrikeCredentials();
-
-    // Resolve environment: prioritize environmentId parameter, then environment parameter
-    let selectedEnvironment = "";
-    if (environmentId) {
-      // Find environment by ID
-      for (const [envName, envData] of Object.entries(allCreds || {})) {
-        if (envData?.id == environmentId) {
-          selectedEnvironment = envName;
-          break;
-        }
-      }
-    } else if (environment) {
-      selectedEnvironment = environment;
-    }
-
-    const defaultEnvKey = Object.keys(allCreds)[0];
-    const selectedCred = selectedEnvironment
-      ? allCreds?.[selectedEnvironment]
-      : allCreds[defaultEnvKey];
-    const WRIKE_CLIENT_ID = selectedCred?.clientId;
-
-    if (!WRIKE_CLIENT_ID) {
-      return res.status(400).send({
-        message: "Missing WRIKE_CLIENT_ID. Please contact your admin",
-      });
-    }
+    const { selectedEnvironment, redirectUrl } = findRedirectionURL(
+      req.query,
+      fastify,
+    );
 
     if (autoRedirect == "true" || autoRedirect == "1") {
-      let state = "";
-      if (redirectUri) {
-        state = fastify.jwt.sign({
-          redirectUri,
-          environmentId: selectedCred ? selectedCred?.id : "",
-        });
-      } else {
-        state = fastify.jwt.sign({
-          environmentId: selectedCred ? selectedCred?.id : "",
-        });
-      }
-
-      let redirectUrl = `${WRIKE_LOGIN_ENDPOINT}/authorize/v4?client_id=${WRIKE_CLIENT_ID}&response_type=code&state=${state}&redirect_uri=${WRIKE_REDIRECT_URL}`;
-
-      const accountIdToUse = selectedCred?.accountId || accountId;
-      if (accountIdToUse) redirectUrl += `&accountId=${accountIdToUse}`;
-
       return res.redirect(redirectUrl);
     }
-
-    let state = "";
-    if (redirectUri) {
-      state = fastify.jwt.sign({
-        redirectUri,
-        environmentId: selectedCred ? selectedCred?.id : "",
-      });
-    } else {
-      state = fastify.jwt.sign({
-        environmentId: selectedCred ? selectedCred?.id : "",
-      });
-    }
-
-    let redirectUrl = `${WRIKE_LOGIN_ENDPOINT}/authorize/v4?client_id=${WRIKE_CLIENT_ID}&response_type=code&state=${state}&redirect_uri=${WRIKE_REDIRECT_URL}`;
-
-    const accountIdToUse = selectedCred?.accountId || accountId;
-    if (accountIdToUse) redirectUrl += `&accountId=${accountIdToUse}`;
 
     // Use visible credentials for dropdown (only admins can see hidden environments)
     const visibleCreds = getCachedVisibleWrikeCredentials();
