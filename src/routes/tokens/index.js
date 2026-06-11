@@ -62,7 +62,7 @@ export const tokenRoute = (fastify, opts, done) => {
 
         if (decodedData.redirectUri) {
           // Construct the final redirect URL
-          const redirectUrl = `${decodedData.redirectUri}?code=${req.query.code}`;
+          const redirectUrl = `${decodedData.redirectUri}?code=${req.query.code}&environmentId=${decodedData?.environmentId || null}`;
 
           // Redirect the user
           return reply.redirect(redirectUrl);
