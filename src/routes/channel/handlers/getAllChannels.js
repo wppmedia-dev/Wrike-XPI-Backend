@@ -1,6 +1,15 @@
 import { GetResponse } from "../../../utils/node-fetch";
 import { defaultParser } from "@odata/parser";
-import { getDatahubCustomFields } from "../../../utils/wrike";
+import {
+  getCustomFields,
+  getDatahubCustomFields,
+  getFoldersByFolderId,
+} from "../../../utils/wrike";
+import {
+  translateDatahubRecordId,
+  translateDatahubValue,
+} from "../../campaign/utils/datahubRecordTranslator";
+import { normalizeString } from "../../../utils/json-conversion";
 
 // Operator mapping from OData to your custom operators
 const odataToCustomOp = {
@@ -77,13 +86,45 @@ export const GetAllChannels = (wrikeToken, params, environmentName) => {
             "Missing required datahub customfield mapping field: workitemlevel",
         });
 
-      let wrikeUrl = `${
-        process.env.WRIKE_ENDPOINT
-      }/folders/${campaignId}/folders?fields=[customFields]&nextPageToken=${
-        nextPageToken || ""
-      }`;
+      const customFieldsMaster = await getCustomFields(wrikeToken);
 
-      if (pageSize && pageSize > 0) wrikeUrl += `&pageSize=${pageSize}`;
+      if (customFieldsMaster?.errorDescription) {
+        throw { message: customFieldsMaster.errorDescription };
+      }
+
+      // map of custom fields for quick lookup
+      const cfMap = new Map(
+        (customFieldsMaster?.data || []).map((cf) => [cf.id, cf]),
+      );
+
+      for (const cf of customFieldsParam) {
+        const cfMetaData = cfMap.get(cf?.id);
+
+        const databaseId =
+          cfMetaData?.settings?.linkToDatabaseInfo?.dataHubDatabaseId;
+
+        if (!databaseId) continue;
+
+        const cfValue = cf?.value;
+        if (databaseId && cfValue) {
+          const recordId = await translateDatahubValue(
+            wrikeToken,
+            databaseId,
+            cfValue,
+          );
+
+          if (!recordId)
+            throw {
+              message:
+                "The selected filters are invalid. Please review your filter values and try again.",
+            };
+
+          const finalVal = normalizeString(recordId);
+
+          delete cf.value;
+          cf.values = [recordId];
+        }
+      }
 
       customFieldsParam.push({
         id: datahubCustomFieldsData["workitemlevel"]["cfId"],
@@ -91,15 +132,17 @@ export const GetAllChannels = (wrikeToken, params, environmentName) => {
         value: "Channel/Media Type",
       });
 
-      if (customFieldsParam && customFieldsParam.length > 0) {
-        wrikeUrl += `&customFields=${JSON.stringify(customFieldsParam)}`;
-      }
-
       // Get folder data
-      const wrikeFolderData = await GetResponse(wrikeUrl, "GET", {
-        "content-type": "application/json",
-        Authorization: `Bearer ${wrikeToken}`,
-      });
+      const wrikeFolderData = await getFoldersByFolderId(
+        wrikeToken,
+        campaignId,
+        pageSize,
+        nextPageToken,
+        null,
+        null,
+        null,
+        customFieldsParam,
+      );
 
       // Sending folder update error response
       if (wrikeFolderData?.errorDescription)

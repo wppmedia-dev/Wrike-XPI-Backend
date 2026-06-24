@@ -5,9 +5,13 @@ import {
   getDatahubCustomFields,
   getFoldersBySpace,
 } from "../../../utils/wrike";
-import { translateDatahubRecordId } from "../utils/datahubRecordTranslator";
+import {
+  translateDatahubRecordId,
+  translateDatahubValue,
+} from "../utils/datahubRecordTranslator";
 import { getCachedWrikeCredentials } from "../../../utils/wrikeCredentials";
 import { getSecrets } from "../../../utils/azure_vault";
+import { normalizeString } from "../../../utils/json-conversion";
 
 // Operator mapping from OData to your custom operators
 const odataToCustomOp = {
@@ -85,6 +89,46 @@ export const GetAllCampaigns = (wrikeToken, params, environmentName) => {
         });
       }
 
+      // Map of custom fields for quick lookup
+      const customFieldsMaster = await getCustomFields(wrikeToken);
+
+      if (customFieldsMaster?.errorDescription) {
+        throw { message: customFieldsMaster.errorDescription };
+      }
+
+      const cfMap = new Map(
+        (customFieldsMaster?.data || []).map((cf) => [cf.id, cf]),
+      );
+
+      for (const cf of customFieldsParam) {
+        const cfMetaData = cfMap.get(cf?.id);
+
+        const databaseId =
+          cfMetaData?.settings?.linkToDatabaseInfo?.dataHubDatabaseId;
+
+        if (!databaseId) continue;
+
+        const cfValue = cf?.value;
+        if (databaseId && cfValue) {
+          const recordId = await translateDatahubValue(
+            wrikeToken,
+            databaseId,
+            cfValue,
+          );
+
+          if (!recordId)
+            throw {
+              message:
+                "The selected filters are invalid. Please review your filter values and try again.",
+            };
+
+          const finalVal = normalizeString(recordId);
+
+          delete cf.value;
+          cf.values = [recordId];
+        }
+      }
+
       customFieldsParam.push({
         id: datahubCustomFieldsData?.workitemlevel?.cfId,
         comparator: "EqualTo",
@@ -102,17 +146,6 @@ export const GetAllCampaigns = (wrikeToken, params, environmentName) => {
       // Sending folder update error response
       if (wrikeFolderData?.errorDescription)
         return reject({ message: wrikeFolderData?.errorDescription });
-
-      const customFieldsMaster = await getCustomFields(wrikeToken);
-
-      if (customFieldsMaster?.errorDescription) {
-        throw { message: customFieldsMaster.errorDescription };
-      }
-
-      // map of custom fields for quick lookup
-      const cfMap = new Map(
-        (customFieldsMaster?.data || []).map((cf) => [cf.id, cf]),
-      );
 
       const campaigns = await Promise.all(
         wrikeFolderData?.data.map(async (folder) => {

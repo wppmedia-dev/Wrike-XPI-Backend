@@ -1293,6 +1293,56 @@ export const getFolder = async (wrikeToken, folderId) => {
   }
 };
 
+export const getFoldersByFolderId = async (
+  wrikeToken,
+  folderId,
+  limit = 200,
+  nextPageToken,
+  descendants = false,
+  project = false,
+  customitemTypeIds = [],
+  customFields = [],
+) => {
+  try {
+    // Get tasks from folder with pagination
+    const customItemTypes =
+      Array.isArray(customitemTypeIds) && customitemTypeIds.length
+        ? `[${customitemTypeIds.join(",")}]`
+        : "";
+
+    const params = new URLSearchParams();
+
+    if (descendants != null) params.append("descendants", descendants);
+    if (project != null) params.append("project", project);
+
+    params.append("plainTextCustomFields", "true");
+    params.append("fields", "[customFields, customItemTypeId]");
+
+    if (customFields?.length) {
+      params.append("customFields", JSON.stringify(customFields));
+    }
+
+    let url = `${process.env.WRIKE_ENDPOINT}/folders/${folderId}/folders?${params}`;
+
+    if (limit) {
+      url += `&pageSize=${limit}`;
+    }
+
+    if (nextPageToken) params.append("nextPageToken", nextPageToken);
+
+    const wrikeRequestFormData = await GetResponse(url, "GET", {
+      "content-type": "application/json",
+      Authorization: `Bearer ${wrikeToken}`,
+    });
+
+    if (wrikeRequestFormData?.errorDescription) throw wrikeRequestFormData;
+
+    return wrikeRequestFormData;
+  } catch (err) {
+    throw err;
+  }
+};
+
 export const updateFolder = async (
   wrikeToken,
   folderId,
@@ -1405,6 +1455,56 @@ export const getTask = async (wrikeToken, folderId) => {
         Authorization: `Bearer ${wrikeToken}`,
       },
     );
+
+    if (wrikeRequestFormData?.errorDescription) throw wrikeRequestFormData;
+
+    return wrikeRequestFormData;
+  } catch (err) {
+    throw err;
+  }
+};
+
+export const getTasksByFolderId = async (
+  wrikeToken,
+  folderId,
+  limit = 200,
+  nextPageToken,
+  descendants = false,
+  project = false,
+  customitemTypeIds = [],
+  customFields = [],
+) => {
+  try {
+    // Get tasks from folder with pagination
+    const customItemTypes =
+      Array.isArray(customitemTypeIds) && customitemTypeIds.length
+        ? `[${customitemTypeIds.join(",")}]`
+        : "";
+
+    const params = new URLSearchParams();
+
+    if (descendants != null) params.append("descendants", descendants);
+    if (project != null) params.append("project", project);
+
+    params.append("plainTextCustomFields", "true");
+    params.append("fields", "[customFields, customItemTypeId]");
+
+    if (customFields?.length) {
+      params.append("customFields", JSON.stringify(customFields));
+    }
+
+    let url = `${process.env.WRIKE_ENDPOINT}/folders/${folderId}/tasks?${params}`;
+
+    if (limit) {
+      url += `&pageSize=${limit}`;
+    }
+
+    if (nextPageToken) params.append("nextPageToken", nextPageToken);
+
+    const wrikeRequestFormData = await GetResponse(url, "GET", {
+      "content-type": "application/json",
+      Authorization: `Bearer ${wrikeToken}`,
+    });
 
     if (wrikeRequestFormData?.errorDescription) throw wrikeRequestFormData;
 

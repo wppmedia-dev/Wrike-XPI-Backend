@@ -1,5 +1,5 @@
 import { normalizeString } from "../../../utils/json-conversion";
-import { getDatahubRecord } from "../../../utils/wrike";
+import { getDatahubRecord, getDatahubRecords } from "../../../utils/wrike";
 
 export const translateDatahubRecordId = async (
   wrikeToken,
@@ -28,6 +28,24 @@ export const translateDatahubRecordId = async (
     finalValue = datahubRecords?.title || "";
 
     return finalValue;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const translateDatahubValue = async (
+  wrikeToken,
+  databaseId,
+  originalValue,
+) => {
+  try {
+    if (!originalValue) return originalValue;
+
+    const datahubRecords = await getDatahubRecords(wrikeToken, databaseId, {
+      filter: '{"op": "equals","fld": "FIname","val": "' + originalValue + '"}',
+    });
+
+    return datahubRecords?.data[0]?.id || originalValue;
   } catch (error) {
     throw error;
   }
