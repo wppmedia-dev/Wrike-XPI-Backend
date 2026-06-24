@@ -3,10 +3,12 @@ import { defaultParser } from "@odata/parser";
 import {
   getCustomFields,
   getDatahubCustomFields,
-  getFoldersByFolderId,
+  getTasksByFolderId,
 } from "../../../utils/wrike";
-import { translateDatahubValue } from "../../campaign/utils/datahubRecordTranslator";
-import { normalizeString } from "../../../utils/json-conversion";
+import {
+  translateDatahubRecordId,
+  translateDatahubValue,
+} from "../../campaign/utils/datahubRecordTranslator";
 
 // Operator mapping from OData to your custom operators
 const odataToCustomOp = {
@@ -52,7 +54,7 @@ export const GetAllTasks = (wrikeToken, params, environmentName) => {
         });
 
       let filters;
-      let customFieldsParam;
+      let customFieldsParam = [];
 
       if (filterParams) {
         filters = defaultParser.filter(filterParams);
@@ -63,20 +65,27 @@ export const GetAllTasks = (wrikeToken, params, environmentName) => {
             message: "Request is not supported!",
           });
 
-        // if (Object.keys(datahubCustomFieldsData).length === 0)
-        datahubCustomFieldsData = await getDatahubCustomFields(
-          wrikeToken,
-          null,
-          false,
-          true,
-          null,
-          environmentName,
-        );
-
         customFieldsParam = extractFilters(filters);
       }
 
-      if (!datahubCustomFieldsData["workitemlevel"]["cfId"])
+      datahubCustomFieldsData = await getDatahubCustomFields(
+        wrikeToken,
+        null,
+        false,
+        true,
+        null,
+        environmentName,
+      );
+
+      if (Object.keys(datahubCustomFieldsData).length === 0) {
+        return reject({
+          statusCode: 500,
+          message:
+            "Failed to retrieve datahub custom fields mapping configuration.",
+        });
+      }
+
+      if (!datahubCustomFieldsData?.workitemlevel?.cfId)
         return reject({
           statusCode: 400,
           message:
@@ -116,8 +125,6 @@ export const GetAllTasks = (wrikeToken, params, environmentName) => {
                 "The selected filters are invalid. Please review your filter values and try again.",
             };
 
-          const finalVal = normalizeString(recordId);
-
           delete cf.value;
           cf.values = [recordId];
         }
@@ -130,13 +137,13 @@ export const GetAllTasks = (wrikeToken, params, environmentName) => {
       });
 
       // Get task data
-      const wrikeTaskData = await getFoldersByFolderId(
+      const wrikeTaskData = await getTasksByFolderId(
         wrikeToken,
         channelId,
         pageSize,
         nextPageToken,
-        null,
-        null,
+        true,
+        true,
         null,
         customFieldsParam,
       );
@@ -145,81 +152,69 @@ export const GetAllTasks = (wrikeToken, params, environmentName) => {
       if (wrikeTaskData?.errorDescription)
         return reject({ message: wrikeTaskData?.errorDescription });
 
-      const tasks = wrikeTaskData?.data.map((task) => {
-        if (task?.scope == "RbTask") return;
+      const tasks = await Promise.all(
+        wrikeTaskData?.data.map(async (task) => {
+          if (task?.scope == "RbTask") return;
 
-        const taskCustomFieldValues = Object.entries(
-          datahubCustomFieldsData,
-        ).reduce((acc, [key, value]) => {
-          if (!value.isReadable || !value.isTaskField) return acc;
+          const entries = await Promise.all(
+            Object.entries(datahubCustomFieldsData).map(
+              async ([key, value]) => {
+                if (!value.isReadable || !value.isTaskField)
+                  return [key, undefined];
 
-          let fieldValue;
-          switch (value.xpiFieldType) {
-            case "Wrike API Built-in Field":
-              fieldValue = task[value?.cfId];
-              break;
-            case "Wrike API Metadata Field":
-              fieldValue =
-                task?.metadata?.find((field) => field.key === value?.cfId)
-                  ?.value ?? "";
-              break;
-            case "Wrike Custom Field":
-              fieldValue =
-                task?.customFields?.find((field) => field.id === value?.cfId)
-                  ?.value ?? "";
-              break;
-            default:
-              fieldValue = "";
-          }
+                let fieldValue, cfData;
+                switch (value.xpiFieldType) {
+                  case "Wrike API Built-in Field":
+                    fieldValue = task[value?.cfId];
+                    break;
+                  case "Wrike API Metadata Field":
+                    fieldValue =
+                      task?.metadata?.find((field) => field.key === value?.cfId)
+                        ?.value ?? "";
+                    break;
+                  case "Wrike Custom Field":
+                    cfData =
+                      task?.customFields?.find(
+                        (field) => field.id === value?.cfId,
+                      ) ?? "";
+                    fieldValue = cfData?.value ?? "";
+                    break;
+                  default:
+                    fieldValue = "";
+                }
 
-          // if (fieldValue) {
-          acc[key] = fieldValue;
-          // }
+                if (
+                  fieldValue &&
+                  fieldValue.startsWith("[") &&
+                  fieldValue.endsWith("]")
+                ) {
+                  const cfMetaData = cfMap.get(cfData?.id);
+                  const databaseId =
+                    cfMetaData?.settings?.linkToDatabaseInfo?.dataHubDatabaseId;
 
-          return acc;
-        }, {});
+                  if (databaseId) {
+                    fieldValue = await translateDatahubRecordId(
+                      wrikeToken,
+                      databaseId,
+                      fieldValue,
+                    );
+                  }
+                }
 
-        return {
-          ...taskCustomFieldValues,
-          // taskId: task.id,
-          // // customfieldlist: task?.customFields,
-          // noofcrs: taskCustomFieldValues["noofcrs"],
-          // agency: taskCustomFieldValues["agency"],
-          // mediabuyingtype: taskCustomFieldValues["mediabuyingtype"],
-          // brand: taskCustomFieldValues["brand"],
-          // briefeddate: taskCustomFieldValues["briefeddate"],
-          // taskbudget: taskCustomFieldValues["taskbudget"],
-          // taskenddate: taskCustomFieldValues["taskenddate"],
-          // taskid: taskCustomFieldValues["taskid"],
-          // taskname: taskCustomFieldValues["taskname"],
-          // taskobjective: taskCustomFieldValues["taskobjective"],
-          // taskstartdate: taskCustomFieldValues["taskstartdate"],
-          // taskfeedbackstatus:
-          //   taskCustomFieldValues["taskfeedbackstatus"],
-          // ccuid: taskCustomFieldValues["ccuid"],
-          // mediachannelpractice: taskCustomFieldValues["mediachannelpractice"],
-          // client: taskCustomFieldValues["client"],
-          // comments: taskCustomFieldValues["comments"],
-          // cssid: taskCustomFieldValues["cssid"],
-          // currency: taskCustomFieldValues["currency"],
-          // customerponumber: taskCustomFieldValues["customerponumber"],
-          // debtor: taskCustomFieldValues["debtor"],
-          // kpiobjective: taskCustomFieldValues["kpiobjective"],
-          // originalagency: taskCustomFieldValues["originalagency"],
-          // readyforarchive: taskCustomFieldValues["readyforarchive"],
-          // region: taskCustomFieldValues["region"],
-          // requestedstartdate: taskCustomFieldValues["requestedstartdate"],
-          // requestormarket: taskCustomFieldValues["requestormarket"],
-          // spacename: taskCustomFieldValues["spacename"],
-          // workitemlevel: taskCustomFieldValues["workitemlevel"],
-        };
-      });
+                return [key, fieldValue];
+              },
+            ),
+          );
+
+          return Object.fromEntries(entries);
+        }),
+      );
 
       // Sending final response
       resolve({
         type: "Task",
         nextPageToken: wrikeTaskData.nextPageToken,
-        data: tasks,
+        data: !tasks[0] ? [] : tasks,
       });
     } catch (err) {
       console.log(err?.message || err);

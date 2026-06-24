@@ -1,4 +1,9 @@
-import { getDatahubCustomFields, getTask } from "../../../utils/wrike";
+import {
+  getCustomFields,
+  getDatahubCustomFields,
+  getTask,
+} from "../../../utils/wrike";
+import { translateDatahubRecordId } from "../../campaign/utils/datahubRecordTranslator";
 
 export const GetTask = (wrikeToken, params, environmentName) => {
   return new Promise(async (resolve, reject) => {
@@ -52,10 +57,21 @@ export const GetTask = (wrikeToken, params, environmentName) => {
 
       const taskCustomFieldValues = {};
 
+      const customFieldsMaster = await getCustomFields(wrikeToken);
+
+      if (customFieldsMaster?.errorDescription) {
+        throw { message: customFieldsMaster.errorDescription };
+      }
+
+      // map of custom fields for quick lookup
+      const cfMap = new Map(
+        (customFieldsMaster?.data || []).map((cf) => [cf.id, cf]),
+      );
+
       for (const [key, value] of Object.entries(datahubCustomFieldsData)) {
         if (!value.isReadable || !value.isTaskField) continue;
 
-        let cfValue;
+        let cfValue, cfData;
         switch (value.xpiFieldType) {
           case "Wrike API Built-in Field":
             cfValue = wrikeTaskData?.data[0][value?.cfId];
@@ -67,13 +83,28 @@ export const GetTask = (wrikeToken, params, environmentName) => {
               )?.value ?? "";
             break;
           case "Wrike Custom Field":
-            cfValue =
+            cfData =
               wrikeTaskData?.data[0]?.customFields?.find(
                 (field) => field.id === value.cfId,
-              )?.value ?? "";
+              ) ?? "";
+            cfValue = cfData?.value ?? "";
             break;
           default:
             fieldValue = "";
+        }
+
+        if (cfValue && cfValue?.startsWith("[") && cfValue?.endsWith("]")) {
+          const cfMetaData = cfMap.get(cfData?.id);
+
+          const databaseId =
+            cfMetaData?.settings?.linkToDatabaseInfo?.dataHubDatabaseId;
+
+          if (databaseId && cfValue)
+            cfValue = await translateDatahubRecordId(
+              wrikeToken,
+              databaseId,
+              cfValue,
+            );
         }
 
         // if (value.isReadable && value.isTaskField)
@@ -91,36 +122,6 @@ export const GetTask = (wrikeToken, params, environmentName) => {
         data: {
           type: "Task",
           ...taskCustomFieldValues,
-          // customfieldlist: wrikeTaskData?.data[0]?.customFields,
-          // noofcrs: taskCustomFieldValues["noofcrs"],
-          // agency: taskCustomFieldValues["agency"],
-          // mediabuyingtype: taskCustomFieldValues["mediabuyingtype"],
-          // brand: taskCustomFieldValues["brand"],
-          // briefeddate: taskCustomFieldValues["briefeddate"],
-          // taskbudget: taskCustomFieldValues["taskbudget"],
-          // taskenddate: taskCustomFieldValues["taskenddate"],
-          // taskid: taskCustomFieldValues["taskid"],
-          // taskname: taskCustomFieldValues["taskname"],
-          // taskobjective: taskCustomFieldValues["taskobjective"],
-          // taskstartdate: taskCustomFieldValues["taskstartdate"],
-          // taskfeedbackstatus:
-          //   taskCustomFieldValues["taskfeedbackstatus"],
-          // ccuid: taskCustomFieldValues["ccuid"],
-          // mediachannelpractice: taskCustomFieldValues["mediachannelpractice"],
-          // client: taskCustomFieldValues["client"],
-          // comments: taskCustomFieldValues["comments"],
-          // cssid: taskCustomFieldValues["cssid"],
-          // currency: taskCustomFieldValues["currency"],
-          // customerponumber: taskCustomFieldValues["customerponumber"],
-          // debtor: taskCustomFieldValues["debtor"],
-          // kpiobjective: taskCustomFieldValues["kpiobjective"],
-          // originalagency: taskCustomFieldValues["originalagency"],
-          // readyforarchive: taskCustomFieldValues["readyforarchive"],
-          // region: taskCustomFieldValues["region"],
-          // requestedstartdate: taskCustomFieldValues["requestedstartdate"],
-          // requestormarket: taskCustomFieldValues["requestormarket"],
-          // spacename: taskCustomFieldValues["spacename"],
-          // workitemlevel: taskCustomFieldValues["workitemlevel"],
         },
       });
     } catch (err) {

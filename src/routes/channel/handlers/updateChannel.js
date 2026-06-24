@@ -1,4 +1,12 @@
-import { updateFolder, getDatahubCustomFields } from "../../../utils/wrike";
+import {
+  updateFolder,
+  getDatahubCustomFields,
+  getCustomFields,
+} from "../../../utils/wrike";
+import {
+  translateDatahubRecordId,
+  translateDatahubValue,
+} from "../../campaign/utils/datahubRecordTranslator";
 
 export const UpdateChannel = (wrikeToken, params, environmentName) => {
   return new Promise(async (resolve, reject) => {
@@ -30,8 +38,19 @@ export const UpdateChannel = (wrikeToken, params, environmentName) => {
       let folderMetadataUpdateData = [];
       let folderCFUpdateData = [];
 
-      Object.keys(formFields).forEach((field) => {
-        // for (const field in formFields) {
+      const customFieldsMaster = await getCustomFields(wrikeToken);
+
+      if (customFieldsMaster?.errorDescription) {
+        throw { message: customFieldsMaster.errorDescription };
+      }
+
+      // map of custom fields for quick lookup
+      const cfMap = new Map(
+        (customFieldsMaster?.data || []).map((cf) => [cf.id, cf]),
+      );
+
+      // Object.keys(formFields).forEach((field) => {
+      for (const field of Object.keys(formFields)) {
         if (
           datahubCustomFieldsData[field?.trim()?.toLowerCase()] &&
           datahubCustomFieldsData[field?.trim()?.toLowerCase()]
@@ -56,14 +75,38 @@ export const UpdateChannel = (wrikeToken, params, environmentName) => {
               });
               break;
             case "Wrike Custom Field":
+              const cfId =
+                datahubCustomFieldsData[field?.trim()?.toLowerCase()]?.cfId;
+              const cfMetaData = cfMap.get(cfId);
+
+              const databaseId =
+                cfMetaData?.settings?.linkToDatabaseInfo?.dataHubDatabaseId;
+
+              let cfValue = formFields[field];
+              if (databaseId && cfValue) {
+                const recordId = await translateDatahubValue(
+                  wrikeToken,
+                  databaseId,
+                  cfValue,
+                );
+
+                if (!recordId)
+                  throw {
+                    message:
+                      "The selected filters are invalid. Please review your filter values and try again.",
+                  };
+
+                cfValue = JSON.stringify([recordId]);
+              }
+
               folderCFUpdateData.push({
-                id: datahubCustomFieldsData[field?.trim()?.toLowerCase()]?.cfId,
-                value: formFields[field],
+                id: cfId,
+                value: cfValue,
               });
               break;
           }
         }
-      });
+      }
 
       // Submit Request Form
       const updatedFolderData = await updateFolder(
@@ -84,7 +127,7 @@ export const UpdateChannel = (wrikeToken, params, environmentName) => {
       for (const [key, value] of Object.entries(datahubCustomFieldsData)) {
         if (!value.isReadable || !value.isChannelField) continue;
 
-        let cfValue;
+        let cfValue, cfData;
         switch (value.xpiFieldType) {
           case "Wrike API Built-in Field":
             cfValue = updatedFolderData?.data[0][value?.cfId];
@@ -96,13 +139,28 @@ export const UpdateChannel = (wrikeToken, params, environmentName) => {
               )?.value ?? "";
             break;
           case "Wrike Custom Field":
-            cfValue =
+            cfData =
               updatedFolderData?.data[0]?.customFields?.find(
                 (field) => field.id === value.cfId,
-              )?.value ?? "";
+              ) ?? "";
+            cfValue = cfData?.value ?? "";
             break;
           default:
             fieldValue = "";
+        }
+
+        if (cfValue && cfValue?.startsWith("[") && cfValue?.endsWith("]")) {
+          const cfMetaData = cfMap.get(cfData?.id);
+
+          const databaseId =
+            cfMetaData?.settings?.linkToDatabaseInfo?.dataHubDatabaseId;
+
+          if (databaseId && cfValue)
+            cfValue = await translateDatahubRecordId(
+              wrikeToken,
+              databaseId,
+              cfValue,
+            );
         }
 
         // if (value.isReadable && value.isChannelField)
@@ -114,36 +172,6 @@ export const UpdateChannel = (wrikeToken, params, environmentName) => {
         data: {
           type: "Channel",
           ...folderCustomFieldValues,
-          // // customfieldlist: outputData?.data[0]?.customFields,
-          // noofcrs: folderCustomFieldValues["noofcrs"],
-          // agency: folderCustomFieldValues["agency"],
-          // mediabuyingtype: folderCustomFieldValues["mediabuyingtype"],
-          // brand: folderCustomFieldValues["brand"],
-          // briefeddate: folderCustomFieldValues["briefeddate"],
-          // campaignbudget: folderCustomFieldValues["campaignbudget"],
-          // campaignenddate: folderCustomFieldValues["campaignenddate"],
-          // campaignid: folderCustomFieldValues["campaignid"],
-          // campaignname: folderCustomFieldValues["campaignname"],
-          // campaignobjective: folderCustomFieldValues["campaignobjective"],
-          // campaignstartdate: folderCustomFieldValues["campaignstartdate"],
-          // campaignfeedbackstatus:
-          //   folderCustomFieldValues["campaignfeedbackstatus"],
-          // ccuid: folderCustomFieldValues["ccuid"],
-          // mediachannelpractice: folderCustomFieldValues["mediachannelpractice"],
-          // client: folderCustomFieldValues["client"],
-          // comments: folderCustomFieldValues["comments"],
-          // cssid: folderCustomFieldValues["cssid"],
-          // currency: folderCustomFieldValues["currency"],
-          // customerponumber: folderCustomFieldValues["customerponumber"],
-          // debtor: folderCustomFieldValues["debtor"],
-          // kpiobjective: folderCustomFieldValues["kpiobjective"],
-          // originalagency: folderCustomFieldValues["originalagency"],
-          // readyforarchive: folderCustomFieldValues["readyforarchive"],
-          // region: folderCustomFieldValues["region"],
-          // requestedstartdate: folderCustomFieldValues["requestedstartdate"],
-          // requestormarket: folderCustomFieldValues["requestormarket"],
-          // spacename: folderCustomFieldValues["spacename"],
-          // workitemlevel: folderCustomFieldValues["workitemlevel"],
         },
       });
     } catch (err) {

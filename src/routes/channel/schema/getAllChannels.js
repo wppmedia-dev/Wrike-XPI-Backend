@@ -2,7 +2,7 @@ export const GetAllChannelsSchema = {
   schema: {
     query: {
       type: "object",
-      required: ["filter"],
+      required: [],
       properties: {
         filter: { type: "string" },
         pageSize: { type: "integer" },

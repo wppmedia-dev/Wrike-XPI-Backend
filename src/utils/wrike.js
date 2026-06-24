@@ -1469,8 +1469,8 @@ export const getTasksByFolderId = async (
   folderId,
   limit = 200,
   nextPageToken,
-  descendants = false,
-  project = false,
+  descendants = true,
+  subTasks = true,
   customitemTypeIds = [],
   customFields = [],
 ) => {
@@ -1484,7 +1484,7 @@ export const getTasksByFolderId = async (
     const params = new URLSearchParams();
 
     if (descendants != null) params.append("descendants", descendants);
-    if (project != null) params.append("project", project);
+    if (subTasks != null) params.append("subTasks", subTasks);
 
     params.append("plainTextCustomFields", "true");
     params.append("fields", "[customFields, customItemTypeId]");

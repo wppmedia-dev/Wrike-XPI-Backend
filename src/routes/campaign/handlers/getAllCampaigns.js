@@ -44,15 +44,6 @@ export const GetAllCampaigns = (wrikeToken, params, environmentName) => {
       let filters;
       let customFieldsParam = [];
 
-      datahubCustomFieldsData = await getDatahubCustomFields(
-        wrikeToken,
-        null,
-        false,
-        true,
-        null,
-        environmentName,
-      );
-
       if (filterParams) {
         filters = defaultParser.filter(filterParams);
 
@@ -64,6 +55,15 @@ export const GetAllCampaigns = (wrikeToken, params, environmentName) => {
 
         customFieldsParam = extractFilters(filters);
       }
+
+      datahubCustomFieldsData = await getDatahubCustomFields(
+        wrikeToken,
+        null,
+        false,
+        true,
+        null,
+        environmentName,
+      );
 
       if (Object.keys(datahubCustomFieldsData).length === 0) {
         return reject({
@@ -214,7 +214,7 @@ export const GetAllCampaigns = (wrikeToken, params, environmentName) => {
       resolve({
         type: "Campaign",
         nextPageToken: wrikeFolderData.nextPageToken,
-        data: campaigns,
+        data: !campaigns[0] ? [] : campaigns,
       });
     } catch (err) {
       console.log(err?.message || err);

@@ -1,4 +1,5 @@
 import { deleteFolder, getDatahubCustomFields } from "../../../utils/wrike";
+import { translateDatahubRecordId } from "../utils/datahubRecordTranslator";
 export const DeleteCampaign = (wrikeToken, params, environmentName) => {
   return new Promise(async (resolve, reject) => {
     try {
@@ -49,7 +50,7 @@ export const DeleteCampaign = (wrikeToken, params, environmentName) => {
       for (const [key, value] of Object.entries(datahubCustomFieldsData)) {
         if (!value.isReadable || !value.isCampaignField) continue;
 
-        let cfValue;
+        let cfValue, cfData;
         switch (value.xpiFieldType) {
           case "Wrike API Built-in Field":
             cfValue = wrikeFolderData?.data[0][value?.cfId];
@@ -61,13 +62,32 @@ export const DeleteCampaign = (wrikeToken, params, environmentName) => {
               )?.value ?? "";
             break;
           case "Wrike Custom Field":
-            cfValue =
+            cfData =
               wrikeFolderData?.data[0]?.customFields?.find(
                 (field) => field.id === value.cfId,
               )?.value ?? "";
+            fieldValue = cfData?.value ?? "";
             break;
           default:
             cfValue = "";
+        }
+
+        if (
+          fieldValue &&
+          fieldValue.startsWith("[") &&
+          fieldValue.endsWith("]")
+        ) {
+          const cfMetaData = cfMap.get(cfData?.id);
+          const databaseId =
+            cfMetaData?.settings?.linkToDatabaseInfo?.dataHubDatabaseId;
+
+          if (databaseId) {
+            fieldValue = await translateDatahubRecordId(
+              wrikeToken,
+              databaseId,
+              fieldValue,
+            );
+          }
         }
 
         // if (value.isReadable && value.isCampaignField)
@@ -80,36 +100,6 @@ export const DeleteCampaign = (wrikeToken, params, environmentName) => {
         data: {
           type: "Campaign",
           ...folderCustomFieldValues,
-          // customfieldlist: wrikeFolderData?.data[0]?.customFields,
-          // noofcrs: folderCustomFieldValues["noofcrs"],
-          // agency: folderCustomFieldValues["agency"],
-          // mediabuyingtype: folderCustomFieldValues["mediabuyingtype"],
-          // brand: folderCustomFieldValues["brand"],
-          // briefeddate: folderCustomFieldValues["briefeddate"],
-          // campaignbudget: folderCustomFieldValues["campaignbudget"],
-          // campaignenddate: folderCustomFieldValues["campaignenddate"],
-          // campaignid: folderCustomFieldValues["campaignid"],
-          // campaignname: folderCustomFieldValues["campaignname"],
-          // campaignobjective: folderCustomFieldValues["campaignobjective"],
-          // campaignstartdate: folderCustomFieldValues["campaignstartdate"],
-          // campaignfeedbackstatus:
-          //   folderCustomFieldValues["campaignfeedbackstatus"],
-          // ccuid: folderCustomFieldValues["ccuid"],
-          // mediachannelpractice: folderCustomFieldValues["mediachannelpractice"],
-          // client: folderCustomFieldValues["client"],
-          // comments: folderCustomFieldValues["comments"],
-          // cssid: folderCustomFieldValues["cssid"],
-          // currency: folderCustomFieldValues["currency"],
-          // customerponumber: folderCustomFieldValues["customerponumber"],
-          // debtor: folderCustomFieldValues["debtor"],
-          // kpiobjective: folderCustomFieldValues["kpiobjective"],
-          // originalagency: folderCustomFieldValues["originalagency"],
-          // readyforarchive: folderCustomFieldValues["readyforarchive"],
-          // region: folderCustomFieldValues["region"],
-          // requestedstartdate: folderCustomFieldValues["requestedstartdate"],
-          // requestormarket: folderCustomFieldValues["requestormarket"],
-          // spacename: folderCustomFieldValues["spacename"],
-          // workitemlevel: folderCustomFieldValues["workitemlevel"],
         },
       });
     } catch (err) {

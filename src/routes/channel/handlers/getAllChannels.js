@@ -9,7 +9,6 @@ import {
   translateDatahubRecordId,
   translateDatahubValue,
 } from "../../campaign/utils/datahubRecordTranslator";
-import { normalizeString } from "../../../utils/json-conversion";
 
 // Operator mapping from OData to your custom operators
 const odataToCustomOp = {
@@ -55,7 +54,7 @@ export const GetAllChannels = (wrikeToken, params, environmentName) => {
         });
 
       let filters;
-      let customFieldsParam;
+      let customFieldsParam = [];
 
       if (filterParams) {
         filters = defaultParser.filter(filterParams);
@@ -66,20 +65,27 @@ export const GetAllChannels = (wrikeToken, params, environmentName) => {
             message: "Request is not supported!",
           });
 
-        // if (Object.keys(datahubCustomFieldsData).length === 0)
-        datahubCustomFieldsData = await getDatahubCustomFields(
-          wrikeToken,
-          null,
-          false,
-          true,
-          null,
-          environmentName,
-        );
-
         customFieldsParam = extractFilters(filters);
       }
 
-      if (!datahubCustomFieldsData["workitemlevel"]["cfId"])
+      datahubCustomFieldsData = await getDatahubCustomFields(
+        wrikeToken,
+        null,
+        false,
+        true,
+        null,
+        environmentName,
+      );
+
+      if (Object.keys(datahubCustomFieldsData).length === 0) {
+        return reject({
+          statusCode: 500,
+          message:
+            "Failed to retrieve datahub custom fields mapping configuration.",
+        });
+      }
+
+      if (!datahubCustomFieldsData?.workitemlevel?.cfId)
         return reject({
           statusCode: 400,
           message:
@@ -119,8 +125,6 @@ export const GetAllChannels = (wrikeToken, params, environmentName) => {
                 "The selected filters are invalid. Please review your filter values and try again.",
             };
 
-          const finalVal = normalizeString(recordId);
-
           delete cf.value;
           cf.values = [recordId];
         }
@@ -149,81 +153,69 @@ export const GetAllChannels = (wrikeToken, params, environmentName) => {
         return reject({ message: wrikeFolderData?.errorDescription });
 
       // Optimize the for loop by using map instead of manual for...of and push
-      const channels = wrikeFolderData?.data.map((folder) => {
-        if (folder?.scope == "RbFolder") return;
+      const channels = await Promise.all(
+        wrikeFolderData?.data.map(async (folder) => {
+          if (folder?.scope == "RbFolder") return;
 
-        const folderCustomFieldValues = Object.entries(
-          datahubCustomFieldsData,
-        ).reduce((acc, [key, value]) => {
-          if (!value.isReadable || !value.isChannelField) return acc;
+          const entries = await Promise.all(
+            Object.entries(datahubCustomFieldsData).map(
+              async ([key, value]) => {
+                if (!value.isReadable || !value.isChannelField)
+                  return [key, undefined];
 
-          let fieldValue;
-          switch (value.xpiFieldType) {
-            case "Wrike API Built-in Field":
-              fieldValue = folder[value?.cfId];
-              break;
-            case "Wrike API Metadata Field":
-              fieldValue =
-                folder?.metadata?.find((field) => field.key === value?.cfId)
-                  ?.value ?? "";
-              break;
-            case "Wrike Custom Field":
-              fieldValue =
-                folder?.customFields?.find((field) => field.id === value?.cfId)
-                  ?.value ?? "";
-              break;
-            default:
-              fieldValue = "";
-          }
+                let fieldValue, cfData;
+                switch (value.xpiFieldType) {
+                  case "Wrike API Built-in Field":
+                    fieldValue = folder[value?.cfId];
+                    break;
+                  case "Wrike API Metadata Field":
+                    fieldValue =
+                      folder?.metadata?.find(
+                        (field) => field.key === value?.cfId,
+                      )?.value ?? "";
+                    break;
+                  case "Wrike Custom Field":
+                    cfData =
+                      folder?.customFields?.find(
+                        (field) => field.id === value?.cfId,
+                      ) ?? "";
+                    fieldValue = cfData?.value ?? "";
+                    break;
+                  default:
+                    fieldValue = "";
+                }
 
-          // if (fieldValue) {
-          acc[key] = fieldValue;
-          // }
+                if (
+                  fieldValue &&
+                  fieldValue.startsWith("[") &&
+                  fieldValue.endsWith("]")
+                ) {
+                  const cfMetaData = cfMap.get(cfData?.id);
+                  const databaseId =
+                    cfMetaData?.settings?.linkToDatabaseInfo?.dataHubDatabaseId;
 
-          return acc;
-        }, {});
+                  if (databaseId) {
+                    fieldValue = await translateDatahubRecordId(
+                      wrikeToken,
+                      databaseId,
+                      fieldValue,
+                    );
+                  }
+                }
 
-        return {
-          ...folderCustomFieldValues,
-          // folderId: folder.id,
-          // // customfieldlist: folder?.customFields,
-          // noofcrs: folderCustomFieldValues["noofcrs"],
-          // agency: folderCustomFieldValues["agency"],
-          // mediabuyingtype: folderCustomFieldValues["mediabuyingtype"],
-          // brand: folderCustomFieldValues["brand"],
-          // briefeddate: folderCustomFieldValues["briefeddate"],
-          // campaignbudget: folderCustomFieldValues["campaignbudget"],
-          // campaignenddate: folderCustomFieldValues["campaignenddate"],
-          // campaignid: folderCustomFieldValues["campaignid"],
-          // campaignname: folderCustomFieldValues["campaignname"],
-          // campaignobjective: folderCustomFieldValues["campaignobjective"],
-          // campaignstartdate: folderCustomFieldValues["campaignstartdate"],
-          // campaignfeedbackstatus:
-          //   folderCustomFieldValues["campaignfeedbackstatus"],
-          // ccuid: folderCustomFieldValues["ccuid"],
-          // mediachannelpractice: folderCustomFieldValues["mediachannelpractice"],
-          // client: folderCustomFieldValues["client"],
-          // comments: folderCustomFieldValues["comments"],
-          // cssid: folderCustomFieldValues["cssid"],
-          // currency: folderCustomFieldValues["currency"],
-          // customerponumber: folderCustomFieldValues["customerponumber"],
-          // debtor: folderCustomFieldValues["debtor"],
-          // kpiobjective: folderCustomFieldValues["kpiobjective"],
-          // originalagency: folderCustomFieldValues["originalagency"],
-          // readyforarchive: folderCustomFieldValues["readyforarchive"],
-          // region: folderCustomFieldValues["region"],
-          // requestedstartdate: folderCustomFieldValues["requestedstartdate"],
-          // requestormarket: folderCustomFieldValues["requestormarket"],
-          // spacename: folderCustomFieldValues["spacename"],
-          // workitemlevel: folderCustomFieldValues["workitemlevel"],
-        };
-      });
+                return [key, fieldValue];
+              },
+            ),
+          );
+          return Object.fromEntries(entries);
+        }),
+      );
 
       // Sending final response
       resolve({
         type: "Channel",
         nextPageToken: wrikeFolderData.nextPageToken,
-        data: channels,
+        data: !channels[0] ? [] : channels,
       });
     } catch (err) {
       console.log(err?.message || err);

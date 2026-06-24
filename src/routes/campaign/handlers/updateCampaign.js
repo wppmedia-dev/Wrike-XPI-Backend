@@ -3,7 +3,10 @@ import {
   getDatahubCustomFields,
   updateFolder,
 } from "../../../utils/wrike";
-import { translateDatahubRecordId } from "../utils/datahubRecordTranslator";
+import {
+  translateDatahubRecordId,
+  translateDatahubValue,
+} from "../utils/datahubRecordTranslator";
 
 export const UpdateCampaign = (wrikeToken, params, environmentName) => {
   return new Promise(async (resolve, reject) => {
@@ -35,8 +38,19 @@ export const UpdateCampaign = (wrikeToken, params, environmentName) => {
       let folderMetadataUpdateData = [];
       let folderCFUpdateData = [];
 
-      Object.keys(formFields).forEach((field) => {
-        // for (const field in formFields) {
+      const customFieldsMaster = await getCustomFields(wrikeToken);
+
+      if (customFieldsMaster?.errorDescription) {
+        throw { message: customFieldsMaster.errorDescription };
+      }
+
+      // map of custom fields for quick lookup
+      const cfMap = new Map(
+        (customFieldsMaster?.data || []).map((cf) => [cf.id, cf]),
+      );
+
+      // Object.keys(formFields).forEach((field) => {
+      for (const field of Object.keys(formFields)) {
         if (
           datahubCustomFieldsData[field?.trim()?.toLowerCase()] &&
           datahubCustomFieldsData[field?.trim()?.toLowerCase()]
@@ -61,14 +75,38 @@ export const UpdateCampaign = (wrikeToken, params, environmentName) => {
               });
               break;
             case "Wrike Custom Field":
+              const cfId =
+                datahubCustomFieldsData[field?.trim()?.toLowerCase()]?.cfId;
+              const cfMetaData = cfMap.get(cfId);
+
+              const databaseId =
+                cfMetaData?.settings?.linkToDatabaseInfo?.dataHubDatabaseId;
+
+              let cfValue = formFields[field];
+              if (databaseId && cfValue) {
+                const recordId = await translateDatahubValue(
+                  wrikeToken,
+                  databaseId,
+                  cfValue,
+                );
+
+                if (!recordId)
+                  throw {
+                    message:
+                      "The selected filters are invalid. Please review your filter values and try again.",
+                  };
+
+                cfValue = JSON.stringify([recordId]);
+              }
+
               folderCFUpdateData.push({
-                id: datahubCustomFieldsData[field?.trim()?.toLowerCase()]?.cfId,
-                value: formFields[field],
+                id: cfId,
+                value: cfValue,
               });
               break;
           }
         }
-      });
+      }
 
       // Submit Request Form
       const updatedFolderData = await updateFolder(
@@ -85,17 +123,6 @@ export const UpdateCampaign = (wrikeToken, params, environmentName) => {
       }
 
       const folderCustomFieldValues = {};
-
-      const customFieldsMaster = await getCustomFields(wrikeToken);
-
-      if (customFieldsMaster?.errorDescription) {
-        throw { message: customFieldsMaster.errorDescription };
-      }
-
-      // map of custom fields for quick lookup
-      const cfMap = new Map(
-        (customFieldsMaster?.data || []).map((cf) => [cf.id, cf]),
-      );
 
       for (const [key, value] of Object.entries(datahubCustomFieldsData)) {
         if (!value.isReadable || !value.isCampaignField) continue;
