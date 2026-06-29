@@ -1206,6 +1206,33 @@ export const submitRequestForm = async (
   }
 };
 
+export const submitRequestPreFillForm = async (
+  wrikeToken,
+  requetFormId,
+  formFields,
+) => {
+  try {
+    // Get folder data
+    const wrikeRequestFormData = await GetResponse(
+      `${process.env.WRIKE_ENDPOINT}/request_forms/${requetFormId}/prefill_url`,
+      "POST",
+      {
+        "content-type": "application/json",
+        Authorization: `Bearer ${wrikeToken}`,
+      },
+      {
+        formFields,
+      },
+    );
+
+    if (wrikeRequestFormData?.errorDescription) throw wrikeRequestFormData;
+
+    return wrikeRequestFormData;
+  } catch (err) {
+    throw err;
+  }
+};
+
 export const getRequestFormStatus = async (
   wrikeToken,
   asyncJobId,

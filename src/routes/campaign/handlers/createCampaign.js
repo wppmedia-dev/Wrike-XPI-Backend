@@ -10,6 +10,7 @@ import {
   getSpaceDatahub,
   getEntityDatahub,
   getCustomFields,
+  submitRequestPreFillForm,
 } from "../../../utils/wrike";
 import { translateDatahubRecordId } from "../utils/datahubRecordTranslator";
 
@@ -30,7 +31,13 @@ export const CreateCampaign = (
 
       // Variable Declaration
 
-      const { space, entity, variantId, fields: formFields } = params;
+      const {
+        space,
+        entity,
+        variantId,
+        fields: formFields,
+        isCreatedByURL = false,
+      } = params;
 
       // if (Object.keys(datahubSpaceData).length == 0) {
       const { datahubSpaceData, datahubSpaceMetaData } = await getSpaceDatahub(
@@ -237,6 +244,28 @@ export const CreateCampaign = (
         submitRequestFieldsPayload.push({
           fieldId: defaultFieldId,
           values: [requestFormDefaultFields[defaultFieldId]],
+        });
+      }
+
+      if (isCreatedByURL) {
+        const submittedRequestFormData = await submitRequestPreFillForm(
+          wrikeToken,
+          requestFormId,
+          submitRequestFieldsPayload,
+        );
+
+        // Sending submit request form error response
+        if (submittedRequestFormData?.errorDescription) {
+          return reject({
+            message: submittedRequestFormData?.errorDescription,
+          });
+        }
+
+        return resolve({
+          data: {
+            type: "Campaign",
+            url: submittedRequestFormData?.data[0]?.url,
+          },
         });
       }
 
