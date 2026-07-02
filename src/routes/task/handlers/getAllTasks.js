@@ -56,18 +56,6 @@ export const GetAllTasks = (wrikeToken, params, environmentName) => {
       let filters;
       let customFieldsParam = [];
 
-      if (filterParams) {
-        filters = defaultParser.filter(filterParams);
-
-        if (!filters)
-          return reject({
-            statusCode: 400,
-            message: "Request is not supported!",
-          });
-
-        customFieldsParam = extractFilters(filters);
-      }
-
       datahubCustomFieldsData = await getDatahubCustomFields(
         wrikeToken,
         null,
@@ -83,6 +71,18 @@ export const GetAllTasks = (wrikeToken, params, environmentName) => {
           message:
             "Failed to retrieve datahub custom fields mapping configuration.",
         });
+      }
+
+      if (filterParams) {
+        filters = defaultParser.filter(filterParams);
+
+        if (!filters)
+          return reject({
+            statusCode: 400,
+            message: "Request is not supported!",
+          });
+
+        customFieldsParam = extractFilters(filters);
       }
 
       if (!datahubCustomFieldsData?.workitemlevel?.cfId)
