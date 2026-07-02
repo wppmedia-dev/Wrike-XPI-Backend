@@ -1,5 +1,5 @@
 import {
-  deleteFolder,
+  deleteTask,
   getCustomFields,
   getDatahubCustomFields,
 } from "../../../utils/wrike";
@@ -16,9 +16,9 @@ export const DeleteChannel = (wrikeToken, params, environmentName) => {
         });
 
       // Variable Declaration
-      const { channelId: folderId } = params;
+      const { channelId } = params;
 
-      if (!folderId)
+      if (!channelId)
         return reject({
           statusCode: 400,
           message:
@@ -35,7 +35,7 @@ export const DeleteChannel = (wrikeToken, params, environmentName) => {
       );
 
       // Get folder data
-      const wrikeFolderData = await deleteFolder(wrikeToken, folderId);
+      const wrikeFolderData = await deleteTask(wrikeToken, channelId);
 
       // Sending folder update error response
       if (wrikeFolderData?.errorDescription) {

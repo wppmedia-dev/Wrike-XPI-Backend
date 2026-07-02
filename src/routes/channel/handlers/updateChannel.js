@@ -1,7 +1,7 @@
 import {
-  updateFolder,
   getDatahubCustomFields,
   getCustomFields,
+  updateTask,
 } from "../../../utils/wrike";
 import {
   translateDatahubRecordId,
@@ -20,7 +20,7 @@ export const UpdateChannel = (wrikeToken, params, environmentName) => {
 
       // Variable Declaration
 
-      const { channelId: folderId, formFields } = params;
+      const { channelId, formFields } = params;
 
       // Getting cutom fields data from Datahub
       // if (Object.keys(datahubCustomFieldsData).length === 0) {
@@ -34,9 +34,9 @@ export const UpdateChannel = (wrikeToken, params, environmentName) => {
       );
       // }
 
-      let folderFieldsUpdateData = {};
-      let folderMetadataUpdateData = [];
-      let folderCFUpdateData = [];
+      let channelFieldsUpdateData = {};
+      let chennalMetadataUpdateData = [];
+      let channelCFUpdateData = [];
 
       const customFieldsMaster = await getCustomFields(wrikeToken);
 
@@ -63,12 +63,12 @@ export const UpdateChannel = (wrikeToken, params, environmentName) => {
 
           switch (xpiFieldType) {
             case "Wrike API Built-in Field":
-              folderFieldsUpdateData[
+              channelFieldsUpdateData[
                 datahubCustomFieldsData[field?.trim()?.toLowerCase()]?.cfId
               ] = formFields[field];
               break;
             case "Wrike API Metadata Field":
-              folderMetadataUpdateData.push({
+              chennalMetadataUpdateData.push({
                 key: datahubCustomFieldsData[field?.trim()?.toLowerCase()]
                   ?.cfId,
                 value: formFields[field],
@@ -99,7 +99,7 @@ export const UpdateChannel = (wrikeToken, params, environmentName) => {
                 cfValue = JSON.stringify([recordId]);
               }
 
-              folderCFUpdateData.push({
+              channelCFUpdateData.push({
                 id: cfId,
                 value: cfValue,
               });
@@ -109,12 +109,12 @@ export const UpdateChannel = (wrikeToken, params, environmentName) => {
       }
 
       // Submit Request Form
-      const updatedFolderData = await updateFolder(
+      const updatedFolderData = await updateTask(
         wrikeToken,
-        folderId,
-        folderFieldsUpdateData,
-        folderMetadataUpdateData,
-        folderCFUpdateData,
+        channelId,
+        channelFieldsUpdateData,
+        chennalMetadataUpdateData,
+        channelCFUpdateData,
       );
 
       // Sending submit request form error response

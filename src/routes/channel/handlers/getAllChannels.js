@@ -4,6 +4,7 @@ import {
   getCustomFields,
   getDatahubCustomFields,
   getFoldersByFolderId,
+  getTasksByFolderId,
 } from "../../../utils/wrike";
 import {
   translateDatahubRecordId,
@@ -137,24 +138,24 @@ export const GetAllChannels = (wrikeToken, params, environmentName) => {
       });
 
       // Get folder data
-      const wrikeFolderData = await getFoldersByFolderId(
+      const channelData = await getTasksByFolderId(
         wrikeToken,
         campaignId,
         pageSize,
         nextPageToken,
-        null,
-        null,
+        true,
+        true,
         null,
         customFieldsParam,
       );
 
       // Sending folder update error response
-      if (wrikeFolderData?.errorDescription)
-        return reject({ message: wrikeFolderData?.errorDescription });
+      if (channelData?.errorDescription)
+        return reject({ message: channelData?.errorDescription });
 
       // Optimize the for loop by using map instead of manual for...of and push
       const channels = await Promise.all(
-        wrikeFolderData?.data.map(async (folder) => {
+        channelData?.data.map(async (folder) => {
           if (folder?.scope == "RbFolder") return;
 
           const entries = await Promise.all(
@@ -214,7 +215,7 @@ export const GetAllChannels = (wrikeToken, params, environmentName) => {
       // Sending final response
       resolve({
         type: "Channel",
-        nextPageToken: wrikeFolderData.nextPageToken,
+        nextPageToken: channelData.nextPageToken,
         data: !channels[0] ? [] : channels,
       });
     } catch (err) {

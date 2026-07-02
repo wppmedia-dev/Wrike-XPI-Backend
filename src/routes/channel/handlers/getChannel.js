@@ -1,7 +1,7 @@
 import {
-  getFolder,
   getDatahubCustomFields,
   getCustomFields,
+  getTask,
 } from "../../../utils/wrike";
 import { translateDatahubRecordId } from "../../campaign/utils/datahubRecordTranslator";
 
@@ -16,9 +16,9 @@ export const GetChannel = (wrikeToken, params, environmentName) => {
         });
 
       // Variable Declaration
-      const { channelId: folderId } = params;
+      const { channelId } = params;
 
-      if (!folderId)
+      if (!channelId)
         return reject({
           statusCode: 400,
           message:
@@ -41,14 +41,17 @@ export const GetChannel = (wrikeToken, params, environmentName) => {
             "Missing required datahub customfield mapping field: workitemlevel",
         });
 
-      const wrikeFolderData = await getFolder(wrikeToken, folderId);
+      const channelData = await getTask(wrikeToken, channelId);
 
       // Sending folder update error response
-      if (wrikeFolderData?.errorDescription) {
-        return reject({ message: wrikeFolderData?.errorDescription });
+      if (channelData?.errorDescription) {
+        return reject({ message: channelData?.errorDescription });
       }
 
-      if (wrikeFolderData?.data[0]?.scope == "RbFolder") {
+      if (
+        channelData?.data[0]?.scope == "RbFolder" ||
+        channelData?.data[0]?.scope == "RbTask"
+      ) {
         return reject({
           success: false,
           message: "Invalid Campaign ID",
@@ -74,17 +77,17 @@ export const GetChannel = (wrikeToken, params, environmentName) => {
         let cfValue, cfData;
         switch (value.xpiFieldType) {
           case "Wrike API Built-in Field":
-            cfValue = wrikeFolderData?.data[0][value?.cfId];
+            cfValue = channelData?.data[0][value?.cfId];
             break;
           case "Wrike API Metadata Field":
             cfValue =
-              wrikeFolderData?.data[0]?.metadata?.find(
+              channelData?.data[0]?.metadata?.find(
                 (field) => field.key === value?.cfId,
               )?.value ?? "";
             break;
           case "Wrike Custom Field":
             cfData =
-              wrikeFolderData?.data[0]?.customFields?.find(
+              channelData?.data[0]?.customFields?.find(
                 (field) => field.id === value.cfId,
               ) ?? "";
             cfValue = cfData?.value ?? "";
