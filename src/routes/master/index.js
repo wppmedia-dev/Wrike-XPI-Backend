@@ -31,7 +31,7 @@ export const masterRoute = (fastify, opts, done) => {
           value: result?.data,
         });
       } catch (err) {
-        reply.code(err?.statusCode || 500).send({
+        reply.code(err?.statusCode || 400).send({
           // success: false,
           "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/record/${req.params.masterSlug}`,
           // details: err?.details || null,
@@ -61,7 +61,7 @@ export const masterRoute = (fastify, opts, done) => {
           // value: result?.data,
         });
       } catch (err) {
-        reply.code(err?.statusCode || 500).send({
+        reply.code(err?.statusCode || 400).send({
           // success: false,
           "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/record/${req.params.masterSlug}/${req.params?.recordId}`,
           // details: err?.details || null,
@@ -91,7 +91,7 @@ export const masterRoute = (fastify, opts, done) => {
           // value: result?.data,
         });
       } catch (err) {
-        reply.code(err?.statusCode || 500).send({
+        reply.code(err?.statusCode || 400).send({
           // success: false,
           "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/record/${req.params.masterSlug}/${req.params?.recordId}`,
           // details: err?.details || null,
@@ -121,7 +121,7 @@ export const masterRoute = (fastify, opts, done) => {
           value: result?.data,
         });
       } catch (err) {
-        reply.code(err?.statusCode || 500).send({
+        reply.code(err?.statusCode || 400).send({
           // success: false,
           "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/record/${req.params.masterSlug}/${req.params.recordId}`,
           // details: err?.details || null,
@@ -151,7 +151,7 @@ export const masterRoute = (fastify, opts, done) => {
           value: result?.data,
         });
       } catch (err) {
-        reply.code(err?.statusCode || 500).send({
+        reply.code(err?.statusCode || 400).send({
           // success: false,
           "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/record/${req.params.masterSlug}`,
           // details: err?.details || null,
@@ -181,7 +181,7 @@ export const masterRoute = (fastify, opts, done) => {
           value: result?.data,
         });
       } catch (err) {
-        reply.code(err?.statusCode || 500).send({
+        reply.code(err?.statusCode || 400).send({
           // success: false,
           "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/value/${req.params.masterSlug}/${req.params.recordId}`,
           // details: err?.details || null,
@@ -211,7 +211,7 @@ export const masterRoute = (fastify, opts, done) => {
           value: result?.data,
         });
       } catch (err) {
-        reply.code(err?.statusCode || 500).send({
+        reply.code(err?.statusCode || 400).send({
           // success: false,
           "@odata.context": `${process.env.API_URL}/wrikexpi/v1.0/value/${req.params.masterSlug}`,
           // details: err?.details || null,

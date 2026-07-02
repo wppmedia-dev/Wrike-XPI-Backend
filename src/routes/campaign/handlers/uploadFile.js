@@ -18,29 +18,29 @@ export const UploadFile = (wrikeToken, fileData, fastify) => {
       }
 
       fastify.log.info(
-        `[Upload File] Uploading file: ${fileData.filename}, size: ${fileData.buffer.length} bytes`
+        `[Upload File] Uploading file: ${fileData.filename}, size: ${fileData.buffer.length} bytes`,
       );
 
       // Upload file to Wrike
       const result = await uploadAttachment(
         wrikeToken,
         fileData.buffer,
-        fileData.filename
+        fileData.filename,
       );
 
       if (result?.error) {
         fastify.log.error(
-          `[Upload File] Wrike API error: ${JSON.stringify(result)}`
+          `[Upload File] Wrike API error: ${JSON.stringify(result)}`,
         );
         return reject({
-          statusCode: result?.statusCode || 500,
+          statusCode: result?.statusCode || 400,
           message: result?.error || "Failed to upload file to Wrike.",
           details: result,
         });
       }
 
       fastify.log.info(
-        `[Upload File] File uploaded successfully: ${fileData.filename}`
+        `[Upload File] File uploaded successfully: ${fileData.filename}`,
       );
 
       resolve({
@@ -50,11 +50,11 @@ export const UploadFile = (wrikeToken, fileData, fastify) => {
       });
     } catch (err) {
       fastify.log.error(
-        `[Upload File] Error occurred while uploading file: ${err.message}`
+        `[Upload File] Error occurred while uploading file: ${err.message}`,
       );
 
       reject({
-        statusCode: err?.statusCode || 500,
+        statusCode: err?.statusCode || 400,
         message:
           err?.message ||
           "Fatal error: Unexpected error occurred and service is unable to complete the request.",

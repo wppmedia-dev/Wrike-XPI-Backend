@@ -24,7 +24,7 @@ export const portalEnvironmentsRoute = (fastify, opts, done) => {
           data: result?.data,
         });
       } catch (err) {
-        return reply.code(err?.statusCode || 500).send({
+        return reply.code(err?.statusCode || 400).send({
           success: false,
           message: err?.message || err,
         });
@@ -42,7 +42,7 @@ export const portalEnvironmentsRoute = (fastify, opts, done) => {
         data: result?.data,
       });
     } catch (err) {
-      return reply.code(err?.statusCode || 500).send({
+      return reply.code(err?.statusCode || 400).send({
         success: false,
         message: err?.message || err,
       });
@@ -62,7 +62,7 @@ export const portalEnvironmentsRoute = (fastify, opts, done) => {
         message: result?.message,
       });
     } catch (err) {
-      return reply.code(err?.statusCode || 500).send({
+      return reply.code(err?.statusCode || 400).send({
         success: false,
         message: err?.message || err,
       });
@@ -78,7 +78,7 @@ export const portalEnvironmentsRoute = (fastify, opts, done) => {
         message: result?.message,
       });
     } catch (err) {
-      return reply.code(err?.statusCode || 500).send({
+      return reply.code(err?.statusCode || 400).send({
         success: false,
         message: err?.message || err,
       });

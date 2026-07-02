@@ -67,7 +67,7 @@ export const GetAllCampaigns = (wrikeToken, params, environmentName) => {
 
       if (Object.keys(datahubCustomFieldsData).length === 0) {
         return reject({
-          statusCode: 500,
+          statusCode: 400,
           message:
             "Failed to retrieve datahub custom fields mapping configuration.",
         });
@@ -84,7 +84,7 @@ export const GetAllCampaigns = (wrikeToken, params, environmentName) => {
       const credential = getCachedWrikeCredentials(environmentName);
       if (!credential || !credential.campaignSpaceId) {
         return reject({
-          statusCode: 500,
+          statusCode: 400,
           message: "Campaign Space ID is not configured for this environment.",
         });
       }

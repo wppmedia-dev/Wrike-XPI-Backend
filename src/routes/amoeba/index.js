@@ -16,7 +16,7 @@ export const amoebaRoute = (fastify, opts, done) => {
 
       reply.code(result.statusCode || 200).send({ success: true, ...result });
     } catch (err) {
-      reply.code(err?.statusCode || 500).send({
+      reply.code(err?.statusCode || 400).send({
         success: false,
         details: err?.data,
         message:
@@ -38,7 +38,7 @@ export const amoebaRoute = (fastify, opts, done) => {
 
       reply.code(result.statusCode || 200).send({ success: true, ...result });
     } catch (err) {
-      reply.code(err?.statusCode || 500).send({
+      reply.code(err?.statusCode || 400).send({
         success: false,
         details: err?.data,
         message:

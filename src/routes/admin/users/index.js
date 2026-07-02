@@ -34,7 +34,7 @@ export const adminPortalUsersRoute = (fastify, opts, done) => {
         data: result?.data,
       });
     } catch (err) {
-      return reply.code(err?.statusCode || 500).send({
+      return reply.code(err?.statusCode || 400).send({
         success: false,
         message: err?.message || err,
       });
@@ -51,7 +51,7 @@ export const adminPortalUsersRoute = (fastify, opts, done) => {
         data: result?.data,
       });
     } catch (err) {
-      return reply.code(err?.statusCode || 500).send({
+      return reply.code(err?.statusCode || 400).send({
         success: false,
         message: err?.message || err,
       });
@@ -68,7 +68,7 @@ export const adminPortalUsersRoute = (fastify, opts, done) => {
         data: result?.data,
       });
     } catch (err) {
-      return reply.code(err?.statusCode || 500).send({
+      return reply.code(err?.statusCode || 400).send({
         success: false,
         message: err?.message || err,
       });
@@ -87,7 +87,7 @@ export const adminPortalUsersRoute = (fastify, opts, done) => {
           message: result?.message,
         });
       } catch (err) {
-        return reply.code(err?.statusCode || 500).send({
+        return reply.code(err?.statusCode || 400).send({
           success: false,
           message: err?.message || err,
         });
@@ -107,7 +107,7 @@ export const adminPortalUsersRoute = (fastify, opts, done) => {
           message: result?.message,
         });
       } catch (err) {
-        return reply.code(err?.statusCode || 500).send({
+        return reply.code(err?.statusCode || 400).send({
           success: false,
           message: err?.message || err,
         });
@@ -121,7 +121,7 @@ export const adminPortalUsersRoute = (fastify, opts, done) => {
       const envs = await PortalAuth.GetUserEnvironments(req.params.id);
       return reply.code(200).send({ success: true, data: envs });
     } catch (err) {
-      return reply.code(err?.statusCode || 500).send({
+      return reply.code(err?.statusCode || 400).send({
         success: false,
         message: err?.message || err,
       });
@@ -140,7 +140,7 @@ export const adminPortalUsersRoute = (fastify, opts, done) => {
           message: result?.message,
         });
       } catch (err) {
-        return reply.code(err?.statusCode || 500).send({
+        return reply.code(err?.statusCode || 400).send({
           success: false,
           message: err?.message || err,
         });
@@ -157,7 +157,7 @@ export const adminPortalUsersRoute = (fastify, opts, done) => {
         message: result?.message,
       });
     } catch (err) {
-      return reply.code(err?.statusCode || 500).send({
+      return reply.code(err?.statusCode || 400).send({
         success: false,
         message: err?.message || err,
       });
@@ -176,7 +176,7 @@ export const adminPortalUsersRoute = (fastify, opts, done) => {
           message: result?.message,
         });
       } catch (err) {
-        return reply.code(err?.statusCode || 500).send({
+        return reply.code(err?.statusCode || 400).send({
           success: false,
           message: err?.message || err,
         });

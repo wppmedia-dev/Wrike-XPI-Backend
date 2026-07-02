@@ -68,7 +68,7 @@ export const GetAllChannels = (wrikeToken, params, environmentName) => {
 
       if (Object.keys(datahubCustomFieldsData).length === 0) {
         return reject({
-          statusCode: 500,
+          statusCode: 400,
           message:
             "Failed to retrieve datahub custom fields mapping configuration.",
         });

@@ -148,7 +148,7 @@ export const adminCacheRoute = (fastify, opts, done) => {
         },
       });
     } catch (err) {
-      return reply.code(err?.statusCode || 500).send({
+      return reply.code(err?.statusCode || 400).send({
         success: false,
         message: err?.message || "Failed to fetch cache entries",
       });
@@ -183,7 +183,7 @@ export const adminCacheRoute = (fastify, opts, done) => {
         },
       });
     } catch (err) {
-      return reply.code(err?.statusCode || 500).send({
+      return reply.code(err?.statusCode || 400).send({
         success: false,
         message: err?.message || "Failed to fetch cache detail",
       });
@@ -206,7 +206,7 @@ export const adminCacheRoute = (fastify, opts, done) => {
         data: { key, deleted: deleted > 0 },
       });
     } catch (err) {
-      return reply.code(err?.statusCode || 500).send({
+      return reply.code(err?.statusCode || 400).send({
         success: false,
         message: err?.message || "Failed to delete cache entry",
       });
@@ -238,7 +238,7 @@ export const adminCacheRoute = (fastify, opts, done) => {
         },
       });
     } catch (err) {
-      return reply.code(err?.statusCode || 500).send({
+      return reply.code(err?.statusCode || 400).send({
         success: false,
         message: err?.message || "Failed to bulk delete cache entries",
       });

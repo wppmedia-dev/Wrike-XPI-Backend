@@ -23,7 +23,7 @@ export const taskRoute = (fastify, opts, done) => {
         data: result?.data,
       });
     } catch (err) {
-      reply.code(err?.statusCode || 500).send({
+      reply.code(err?.statusCode || 400).send({
         success: false,
         details: err?.details || null,
         message:
@@ -48,7 +48,7 @@ export const taskRoute = (fastify, opts, done) => {
   //       data: result?.data,
   //     });
   //   } catch (err) {
-  //     reply.code(err?.statusCode || 500).send({
+  //     reply.code(err?.statusCode || 400).send({
   //       success: false,
   //       details: err?.details || null,
   //       message:
@@ -72,7 +72,7 @@ export const taskRoute = (fastify, opts, done) => {
         data: result?.data,
       });
     } catch (err) {
-      reply.code(err?.statusCode || 500).send({
+      reply.code(err?.statusCode || 400).send({
         success: false,
         details: err?.details || null,
         message:
@@ -96,7 +96,7 @@ export const taskRoute = (fastify, opts, done) => {
         data: result?.data,
       });
     } catch (err) {
-      reply.code(err?.statusCode || 500).send({
+      reply.code(err?.statusCode || 400).send({
         success: false,
         details: err?.details || null,
         message:
