@@ -18,7 +18,11 @@ import { GetAllChannelsSchema } from "./channel/schema/getAllChannels";
 
 // Task Handlers and Schemas for OData routes
 import { GetAllTasks } from "./task/handlers/getAllTasks";
-import { GetAllTasksSchema } from "./task/schema/getAllTasks";
+import {
+  GetAllChannelTasksSchema,
+  GetAllTasksSchema,
+} from "./task/schema/getAllChannelTasks";
+import { GetAllCampaignTasksSchema } from "./task/schema/getAllCampaignTasks";
 
 //Public Routes
 export const PublicRouters = (fastify, opts, done) => {
@@ -75,12 +79,43 @@ export const PrivateRouters = (fastify, opts, done) => {
   // Task REST route
   fastify.get(
     "/wrikexpi/channel/:channelId/task",
-    GetAllTasksSchema,
+    GetAllChannelTasksSchema,
     async (req, reply) => {
       try {
         const result = await GetAllTasks(
           req?.wrikeToken,
           { ...req.params, ...req.query },
+          "channel",
+          fastify,
+        );
+
+        reply.code(result.statusCode || 200).send({
+          success: true,
+          message: result.message,
+          nextPageToken: result.nextPageToken,
+          data: result?.data,
+        });
+      } catch (err) {
+        reply.code(err?.statusCode || 400).send({
+          success: false,
+          details: err?.details || null,
+          message:
+            err?.message ||
+            "Fatal error Unexpected error occurred and service is unable complete the request.",
+        });
+      }
+    },
+  );
+
+  fastify.get(
+    "/wrikexpi/campaign/:campaignId/task",
+    GetAllCampaignTasksSchema,
+    async (req, reply) => {
+      try {
+        const result = await GetAllTasks(
+          req?.wrikeToken,
+          { ...req.params, ...req.query },
+          "campaign",
           fastify,
         );
 

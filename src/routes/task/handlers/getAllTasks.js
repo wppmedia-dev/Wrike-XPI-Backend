@@ -3,6 +3,7 @@ import { defaultParser } from "@odata/parser";
 import {
   getCustomFields,
   getDatahubCustomFields,
+  getTask,
   getTasksByFolderId,
 } from "../../../utils/wrike";
 import {
@@ -25,7 +26,7 @@ const odataToCustomOp = {
 
 let datahubCustomFieldsData = {};
 
-export const GetAllTasks = (wrikeToken, params, environmentName) => {
+export const GetAllTasks = (wrikeToken, params, taskType) => {
   return new Promise(async (resolve, reject) => {
     try {
       if (!wrikeToken)
@@ -35,13 +36,15 @@ export const GetAllTasks = (wrikeToken, params, environmentName) => {
             "Failed authorization! User is not authorized to access the service.",
         });
 
+      if (!taskType)
+        return reject({
+          statusCode: 400,
+          message: "Invalid Task type",
+        });
       // Variable Declaration
-      const {
-        filter: filterParams,
-        pageSize,
-        channelId,
-        nextPageToken,
-      } = params;
+      const { filter: filterParams, pageSize, nextPageToken } = params;
+
+      let channelId = params?.channelId || params?.campaignId;
 
       if (
         !channelId ||
@@ -62,7 +65,7 @@ export const GetAllTasks = (wrikeToken, params, environmentName) => {
         false,
         true,
         null,
-        environmentName,
+        null,
       );
 
       if (Object.keys(datahubCustomFieldsData).length === 0) {
@@ -136,17 +139,34 @@ export const GetAllTasks = (wrikeToken, params, environmentName) => {
         value: "Task",
       });
 
+      if (taskType == "channel") {
+        const getTaskData = await getTask(wrikeToken, channelId);
+
+        if (getTaskData?.errorDescription)
+          console.log(
+            "Error while retriving chennel task",
+            getTaskData?.errorDescription,
+          );
+
+        channelId = getTaskData?.data[0]?.subTaskIds;
+      }
+
       // Get task data
-      const wrikeTaskData = await getTasksByFolderId(
-        wrikeToken,
-        channelId,
-        pageSize,
-        nextPageToken,
-        true,
-        true,
-        null,
-        customFieldsParam,
-      );
+      let wrikeTaskData;
+
+      if (taskType == "channel")
+        wrikeTaskData = await getTask(wrikeToken, channelId);
+      else
+        wrikeTaskData = await getTasksByFolderId(
+          wrikeToken,
+          channelId,
+          pageSize,
+          nextPageToken,
+          true,
+          false,
+          null,
+          customFieldsParam,
+        );
 
       // Sending task update error response
       if (wrikeTaskData?.errorDescription)
@@ -221,7 +241,7 @@ export const GetAllTasks = (wrikeToken, params, environmentName) => {
       reject({
         message:
           "Fatal error Unexpected error occurred and service is unable complete the request.",
-        details: err?.message,
+        details: err,
       });
     }
   });

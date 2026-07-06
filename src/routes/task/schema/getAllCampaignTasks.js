@@ -1,4 +1,4 @@
-export const GetAllTasksSchema = {
+export const GetAllCampaignTasksSchema = {
   schema: {
     query: {
       type: "object",
@@ -11,9 +11,9 @@ export const GetAllTasksSchema = {
     },
     params: {
       type: "object",
-      required: ["channelId"],
+      required: ["campaignId"],
       properties: {
-        channelId: { type: "string" },
+        campaignId: { type: "string" },
       },
     },
   },
