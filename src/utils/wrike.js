@@ -1179,6 +1179,32 @@ export const getRequestForm = async (wrikeToken, requestFormSpaceId) => {
   }
 };
 
+export const getRequestFormById = async (wrikeToken, requestFormId) => {
+  try {
+    if (!requestFormId) {
+      throw new Error(
+        "Request Form Space ID is not configured for this environment.",
+      );
+    }
+
+    // Get folder data
+    const wrikeRequestFormData = await GetResponse(
+      `${process.env.WRIKE_ENDPOINT}/request_forms/${requestFormId}`,
+      "GET",
+      {
+        "content-type": "application/json",
+        Authorization: `Bearer ${wrikeToken}`,
+      },
+    );
+
+    if (wrikeRequestFormData?.errorDescription) throw wrikeRequestFormData;
+
+    return wrikeRequestFormData;
+  } catch (err) {
+    throw err;
+  }
+};
+
 export const submitRequestForm = async (
   wrikeToken,
   requetFormId,

@@ -11,6 +11,7 @@ import {
   getEntityDatahub,
   getCustomFields,
   submitRequestPreFillForm,
+  getRequestFormById,
 } from "../../../utils/wrike";
 import { translateDatahubRecordId } from "../utils/datahubRecordTranslator";
 
@@ -123,10 +124,10 @@ export const CreateCampaign = (
       }
       // }
 
-      // Submit Request Form
-      const requestFormData = await getRequestForm(
+      // Get Request Form
+      const requestFormData = await getRequestFormById(
         wrikeToken,
-        datahubSpaceMetaData[space?.toLowerCase()?.trim()]?.cfId,
+        requestFormId,
       );
 
       // Sending get request form error response
@@ -134,9 +135,7 @@ export const CreateCampaign = (
         return reject({ message: requestFormData?.errorDescription });
       }
 
-      const form = requestFormData?.data?.find(
-        (form) => form.id === requestFormId,
-      );
+      const form = requestFormData?.data[0];
 
       const requestFormPages = form?.pages ?? null;
 
@@ -150,7 +149,7 @@ export const CreateCampaign = (
       let defaultFieldPagesCompleted = [];
 
       // Object.keys(formFields).forEach((field) => {
-      for (const field in formFields) {
+      for (const field in formFields || []) {
         let matchedField = null;
 
         // Try to find the matching field in any page
