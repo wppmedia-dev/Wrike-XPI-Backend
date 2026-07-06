@@ -142,11 +142,18 @@ export const GetAllTasks = (wrikeToken, params, taskType) => {
       if (taskType == "channel") {
         const getTaskData = await getTask(wrikeToken, channelId);
 
-        if (getTaskData?.errorDescription)
-          console.log(
-            "Error while retriving chennel task",
-            getTaskData?.errorDescription,
-          );
+        const channelCFValue = getTaskData?.data[0]?.customFields.find(
+          (cf) => cf.id == datahubCustomFieldsData["workitemlevel"]["cfId"],
+        )?.value;
+
+        if (channelCFValue != "Channel/Media Type")
+          throw { message: "Invalid channel ID" };
+
+        if (getTaskData?.errorDescription) throw err;
+        // console.log(
+        //   "Error while retriving chennel task",
+        //   getTaskData?.errorDescription,
+        // );
 
         channelId = getTaskData?.data[0]?.subTaskIds;
       }
