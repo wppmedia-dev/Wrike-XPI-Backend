@@ -789,6 +789,7 @@ export const getDatahubCustomFields = async (
             ) ?? false,
           cfType: record.fieldValues[formFieldsIds["cf type"]],
           xpiFieldType: record.fieldValues[formFieldsIds["xpi field type"]],
+          description: record.fieldValues[formFieldsIds["description"]],
         };
     });
 
