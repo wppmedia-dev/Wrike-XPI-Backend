@@ -23,6 +23,7 @@ import {
   GetAllTasksSchema,
 } from "./task/schema/getAllChannelTasks";
 import { GetAllCampaignTasksSchema } from "./task/schema/getAllCampaignTasks";
+import { getDatahubCustomFields } from "../utils/wrike";
 
 //Public Routes
 export const PublicRouters = (fastify, opts, done) => {
@@ -106,6 +107,25 @@ export const PrivateRouters = (fastify, opts, done) => {
       }
     },
   );
+
+  fastify.get("/datahub/customfield", async (req, reply) => {
+    try {
+      const result = await getDatahubCustomFields();
+
+      reply.code(result.statusCode || 200).send({
+        success: true,
+        data: result,
+      });
+    } catch (err) {
+      reply.code(err?.statusCode || 400).send({
+        success: false,
+        details: err?.details || null,
+        message:
+          err?.message ||
+          "Fatal error Unexpected error occurred and service is unable complete the request.",
+      });
+    }
+  });
 
   fastify.get(
     "/wrikexpi/campaign/:campaignId/task",
