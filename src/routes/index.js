@@ -31,6 +31,30 @@ export const PublicRouters = (fastify, opts, done) => {
   fastify.register(adminApiRoute, { prefix: "/admin" });
   fastify.register(portalApiRoute, { prefix: "/portal" });
 
+  fastify.get("/datahub/customfield", async (req, reply) => {
+    try {
+      const result = await getDatahubCustomFields();
+
+      const cfTypes = [
+        ...new Set(Object.keys(result).map((cf) => result[cf].cfType)),
+      ];
+
+      reply.code(result.statusCode || 200).send({
+        success: true,
+        data: result,
+        cfTypes,
+      });
+    } catch (err) {
+      reply.code(err?.statusCode || 400).send({
+        success: false,
+        details: err?.details || null,
+        message:
+          err?.message ||
+          "Fatal error Unexpected error occurred and service is unable complete the request.",
+      });
+    }
+  });
+
   done();
 };
 
@@ -107,25 +131,6 @@ export const PrivateRouters = (fastify, opts, done) => {
       }
     },
   );
-
-  fastify.get("/datahub/customfield", async (req, reply) => {
-    try {
-      const result = await getDatahubCustomFields();
-
-      reply.code(result.statusCode || 200).send({
-        success: true,
-        data: result,
-      });
-    } catch (err) {
-      reply.code(err?.statusCode || 400).send({
-        success: false,
-        details: err?.details || null,
-        message:
-          err?.message ||
-          "Fatal error Unexpected error occurred and service is unable complete the request.",
-      });
-    }
-  });
 
   fastify.get(
     "/wrikexpi/campaign/:campaignId/task",
