@@ -22,7 +22,7 @@ export const registerChannelTools = (server, ctx) => {
   const { wrikeToken, environmentName } = ctx;
 
   server.registerTool(
-    "channel.list",
+    "channel_list",
     {
       description:
         "List channels for a campaign using the existing channel list workflow.",
@@ -64,7 +64,7 @@ export const registerChannelTools = (server, ctx) => {
   );
 
   server.registerTool(
-    "channel.get",
+    "channel_get",
     {
       description: "Read a single channel by its Wrike task/folder ID.",
       inputSchema: {
@@ -93,7 +93,7 @@ export const registerChannelTools = (server, ctx) => {
   );
 
   server.registerTool(
-    "channel.update",
+    "channel_update",
     {
       description:
         "Update a channel by its Wrike ID. Provide formFields as a key-value object of field names to values.",
@@ -127,7 +127,7 @@ export const registerChannelTools = (server, ctx) => {
   );
 
   server.registerTool(
-    "channel.delete",
+    "channel_delete",
     {
       description: "Delete a channel by its Wrike ID.",
       inputSchema: {
