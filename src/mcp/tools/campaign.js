@@ -26,9 +26,52 @@ export const registerCampaignTools = (server, ctx) => {
     "campaign.list",
     {
       description:
-        "List campaigns using the existing campaign API logic. Supports OData-style filters and pagination.",
+        "List campaigns using the existing campaign API logic. " +
+        "Supports OData-style filters and pagination.\n\n" +
+        "FILTER PARAMETERS:\n" +
+        "  Field names are the short codes returned by datahub_list_fields (e.g. agency, campaignname, campaignbudget, brand, client).\n" +
+        "\n" +
+        "  OPERATORS:\n" +
+        "    eq         – equals (case-insensitive string match)\n" +
+        "    ne         – not equal\n" +
+        "    lt / le    – less than / less or equal\n" +
+        "    gt / ge    – greater than / greater or equal\n" +
+        "    has        – contains (substring match)\n" +
+        "    startswith – starts with a value\n" +
+        "    endswith   – ends with a value\n" +
+        "\n" +
+        "  IMPORTANT:\n" +
+        "    - String values MUST be wrapped in single quotes.\n" +
+        "    - Multiple conditions are combined with 'and' only (OR is NOT supported).\n" +
+        "    - Always wrap the full expression in parentheses.\n" +
+        "    - Numeric values (budget, dates) can be compared with lt/le/gt/ge without quotes.\n" +
+        "\n" +
+        "  EXAMPLES:\n" +
+        "    Single condition:\n" +
+        "      (agency eq 'EssenceMediacom')\n" +
+        "\n" +
+        "    Multiple AND conditions:\n" +
+        "      (agency eq 'EssenceMediacom' and campaignname eq 'Lacer - Pilexil - AO Diciembre')\n" +
+        "\n" +
+        "    Method call-style:\n" +
+        "      startswith(campaignname, 'Industry')\n" +
+        "\n" +
+        "    Contains (substring):\n" +
+        "      has(campaignname, 'Fidelity')\n" +
+        "\n" +
+        "    Numeric comparison:\n" +
+        "      (campaignbudget gt '1000')\n" +
+        "\n" +
+        "  URL equivalent: filter=(agency eq 'EssenceMediacom' and campaignname eq 'Lacer - Pilexil - AO Diciembre')&pageSize=5",
       inputSchema: {
-        filter: z.string().optional().describe("OData filter expression"),
+        filter: z
+          .string()
+          .optional()
+          .describe(
+            "OData filter expression. Use 'and' to combine conditions. OR not supported. " +
+            "Example: (agency eq 'EssenceMediacom' and campaignname eq 'Campaign Name'). " +
+            "Field names are the short codes from datahub_list_fields.",
+          ),
         pageSize: z
           .number()
           .int()

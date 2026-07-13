@@ -22,10 +22,15 @@ export const registerTaskTools = (server, ctx) => {
   const { wrikeToken, environmentName } = ctx;
 
   server.registerTool(
-    "task.list_channel",
+    "task_list_channel",
     {
       description:
-        "List tasks for a channel using the existing channel-task collection logic.",
+        "List tasks for a channel using the existing channel-task collection logic.\n\n" +
+        "FILTER SYNTAX (OData):\n" +
+        "  Operators: eq, ne, lt, le, gt, ge, startswith, endswith, has\n" +
+        "  Values in single quotes.\n" +
+        "  Example: (taskstatus eq 'In Progress')\n" +
+        "  Field keys from datahub_list_fields where isTaskField=true.",
       inputSchema: {
         channelId: z.string().describe("The Wrike ID of the parent channel"),
         filter: z.string().optional().describe("OData filter expression"),
@@ -62,15 +67,34 @@ export const registerTaskTools = (server, ctx) => {
   );
 
   server.registerTool(
-    "task.list_campaign",
+    "task_list_campaign",
     {
       description:
-        "List tasks for a campaign using the existing campaign-task collection logic.",
+        "List tasks for a campaign using the existing campaign-task collection logic.\n\n" +
+        "FILTER PARAMETERS:\n" +
+        "  Field names are the short codes from datahub_list_fields where isTaskField=true.\n" +
+        "\n" +
+        "  OPERATORS: eq, ne, lt, le, gt, ge, has, startswith, endswith\n" +
+        "\n" +
+        "  RULES:\n" +
+        "    - String values must be in single quotes.\n" +
+        "    - Multiple conditions use 'and' only (OR not supported).\n" +
+        "    - Wrap expression in parentheses.\n" +
+        "\n" +
+        "  EXAMPLES:\n" +
+        "    (taskstatus eq 'Completed')\n" +
+        "    (taskstatus eq 'In Progress' and campaignname eq 'Campaign X')\n" +
+        "    startswith(taskname, 'Q1')",
       inputSchema: {
         campaignId: z
           .string()
           .describe("The Wrike folder ID of the parent campaign"),
-        filter: z.string().optional().describe("OData filter expression"),
+        filter: z
+          .string()
+          .optional()
+          .describe(
+            "OData filter expression. 'and' supported. OR not supported. Example: (taskstatus eq 'Completed' and campaignname eq 'Campaign Name')",
+          ),
         pageSize: z
           .number()
           .int()

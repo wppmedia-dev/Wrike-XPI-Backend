@@ -22,15 +22,34 @@ export const registerChannelTools = (server, ctx) => {
   const { wrikeToken, environmentName } = ctx;
 
   server.registerTool(
-    "channel.list",
+    "channel_list",
     {
       description:
-        "List channels for a campaign using the existing channel list workflow.",
+        "List channels for a campaign using the existing channel list workflow.\n\n" +
+        "FILTER PARAMETERS:\n" +
+        "  Field names are the short codes from datahub_list_fields where isChannelField=true.\n" +
+        "\n" +
+        "  OPERATORS: eq, ne, lt, le, gt, ge, has, startswith, endswith\n" +
+        "\n" +
+        "  RULES:\n" +
+        "    - String values must be in single quotes.\n" +
+        "    - Multiple conditions use 'and' only (OR not supported).\n" +
+        "    - Wrap expression in parentheses.\n" +
+        "\n" +
+        "  EXAMPLES:\n" +
+        "    (channelname eq 'TV Spot')\n" +
+        "    (channelname eq 'TV Spot' and mediabuytype eq 'Programmatic')\n" +
+        "    has(channelname, 'Digital')",
       inputSchema: {
         campaignId: z
           .string()
           .describe("The Wrike folder ID of the parent campaign"),
-        filter: z.string().optional().describe("OData filter expression"),
+        filter: z
+          .string()
+          .optional()
+          .describe(
+            "OData filter expression. 'and' supported. OR not supported. Example: (channelname eq 'TV Spot' and mediabuytype eq 'Programmatic')",
+          ),
         pageSize: z
           .number()
           .int()
