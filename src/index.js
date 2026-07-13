@@ -95,6 +95,7 @@ const findRedirectionURL = (
   // This loads all plugins defined in plugins those should be support plugins that are reused through your application
   fastify.register(AutoLoad, {
     dir: path.join(process.cwd(), "/src/plugins"),
+    ignorePattern: /mcp\.js/,
   });
 
   // fastify.get("/", (req, res) => {

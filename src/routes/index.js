@@ -8,9 +8,11 @@ import { masterRoute } from "./master";
 import { amoebaRoute } from "./amoeba";
 import { adminApiRoute } from "./admin";
 import { portalApiRoute } from "./portal";
-
 // Auth Middleware
 import { ValidateToken } from "../middlewares/authentication";
+
+// MCP Plugin
+import mcpPlugin from "../plugins/mcp";
 
 // Channel Handlers and Schemas for OData routes
 import { GetAllChannels } from "./channel/handlers/getAllChannels";
@@ -70,6 +72,7 @@ export const PrivateRouters = (fastify, opts, done) => {
   fastify.register(taskRoute, { prefix: "/wrikexpi/task" });
   fastify.register(masterRoute, { prefix: "/wrikexpi/v1.0" });
   fastify.register(amoebaRoute, { prefix: "/wrikexpi/amoeba" });
+  fastify.register(mcpPlugin, { prefix: "/wrikexpi" });
 
   // Traditional REST route
   fastify.get(
