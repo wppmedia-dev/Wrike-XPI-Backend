@@ -23,7 +23,7 @@ export const registerCampaignTools = (server, ctx) => {
   const { wrikeToken, environmentName, fastify } = ctx;
 
   server.registerTool(
-    "campaign.list",
+    "campaign_list",
     {
       description:
         "List campaigns using the existing campaign API logic. Supports OData-style filters and pagination.",
@@ -62,7 +62,7 @@ export const registerCampaignTools = (server, ctx) => {
   );
 
   server.registerTool(
-    "campaign.get",
+    "campaign_get",
     {
       description: "Read a single campaign by its Wrike folder ID.",
       inputSchema: {
@@ -91,7 +91,7 @@ export const registerCampaignTools = (server, ctx) => {
   );
 
   server.registerTool(
-    "campaign.create",
+    "campaign_create",
     {
       description:
         "Create a campaign using the existing request-form workflow. Requires space, entity, variantId, and optional fields.",
@@ -138,7 +138,7 @@ export const registerCampaignTools = (server, ctx) => {
   );
 
   server.registerTool(
-    "campaign.update",
+    "campaign_update",
     {
       description:
         "Update a campaign by its Wrike folder ID. Provide formFields as a key-value object of field names to values.",
@@ -172,7 +172,7 @@ export const registerCampaignTools = (server, ctx) => {
   );
 
   server.registerTool(
-    "campaign.delete",
+    "campaign_delete",
     {
       description: "Delete a campaign by its Wrike folder ID.",
       inputSchema: {

@@ -27,7 +27,7 @@ export const registerDatahubTools = (server, ctx) => {
   const { wrikeToken, environmentName } = ctx;
 
   server.registerTool(
-    "datahub.list.fields",
+    "datahub_list_fields",
     {
       description:
         "Return the Datahub field mapping metadata for campaign, channel, and task CRUD tools. " +
