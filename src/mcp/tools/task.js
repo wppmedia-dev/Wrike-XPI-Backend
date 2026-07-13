@@ -22,7 +22,7 @@ export const registerTaskTools = (server, ctx) => {
   const { wrikeToken, environmentName } = ctx;
 
   server.registerTool(
-    "task_list_channel",
+    "task.list_channel",
     {
       description:
         "List tasks for a channel using the existing channel-task collection logic.",
@@ -62,7 +62,7 @@ export const registerTaskTools = (server, ctx) => {
   );
 
   server.registerTool(
-    "task_list_campaign",
+    "task.list_campaign",
     {
       description:
         "List tasks for a campaign using the existing campaign-task collection logic.",
@@ -104,7 +104,7 @@ export const registerTaskTools = (server, ctx) => {
   );
 
   server.registerTool(
-    "task_get",
+    "task.get",
     {
       description: "Read a single task by its Wrike task ID.",
       inputSchema: {
@@ -129,7 +129,7 @@ export const registerTaskTools = (server, ctx) => {
   );
 
   server.registerTool(
-    "task_update",
+    "task.update",
     {
       description:
         "Update a task by its Wrike task ID. Provide formFields as a key-value object of field names to values.",
@@ -163,7 +163,7 @@ export const registerTaskTools = (server, ctx) => {
   );
 
   server.registerTool(
-    "task_delete",
+    "task.delete",
     {
       description: "Delete a task by its Wrike task ID.",
       inputSchema: {
