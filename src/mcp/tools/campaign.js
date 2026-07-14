@@ -4,6 +4,7 @@ import { GetCampaign } from "../../routes/campaign/handlers/getCampaign";
 import { CreateCampaign } from "../../routes/campaign/handlers/createCampaign";
 import { UpdateCampaign } from "../../routes/campaign/handlers/updateCampaign";
 import { DeleteCampaign } from "../../routes/campaign/handlers/deleteCampaign";
+import { getAuthError } from "./auth.js";
 
 const serializeResult = (result) => {
   if (!result) return { success: true, data: null };
@@ -16,12 +17,19 @@ const serializeResult = (result) => {
 
 /**
  * Register all campaign-related MCP tools on the given server instance.
+ * Auth is resolved per-session from the sessionAuthStore.
+ *
  * @param {import("@modelcontextprotocol/sdk/server/mcp.js").McpServer} server
- * @param {{wrikeToken: string, environmentName: string, fastify: object}} ctx
+ * @param {{get: Function}} sessionAuthStore
+ * @param {object} fastify
+ * @param {string} serverUrl
  */
-export const registerCampaignTools = (server, ctx) => {
-  const { wrikeToken, environmentName, fastify } = ctx;
-
+export const registerCampaignTools = (
+  server,
+  sessionAuthStore,
+  fastify,
+  serverUrl,
+) => {
   server.registerTool(
     "campaign.list",
     {
@@ -69,8 +77,8 @@ export const registerCampaignTools = (server, ctx) => {
           .optional()
           .describe(
             "OData filter expression. Use 'and' to combine conditions. OR not supported. " +
-            "Example: (agency eq 'EssenceMediacom' and campaignname eq 'Campaign Name'). " +
-            "Field names are the short codes from datahub_list_fields.",
+              "Example: (agency eq 'EssenceMediacom' and campaignname eq 'Campaign Name'). " +
+              "Field names are the short codes from datahub_list_fields.",
           ),
         pageSize: z
           .number()
@@ -83,12 +91,14 @@ export const registerCampaignTools = (server, ctx) => {
           .describe("Token for the next page of results"),
       },
     },
-    async ({ filter, pageSize, nextPageToken }) => {
+    async ({ filter, pageSize, nextPageToken }, extra) => {
+      const auth = sessionAuthStore.get(extra.sessionId);
+      if (!auth) return getAuthError(serverUrl);
       try {
         const result = await GetAllCampaigns(
-          wrikeToken,
+          auth.wrikeToken,
           { filter, pageSize, nextPageToken },
-          environmentName,
+          auth.environmentName,
         );
         return {
           content: [
@@ -112,12 +122,14 @@ export const registerCampaignTools = (server, ctx) => {
         campaignId: z.string().describe("The Wrike folder ID of the campaign"),
       },
     },
-    async ({ campaignId }) => {
+    async ({ campaignId }, extra) => {
+      const auth = sessionAuthStore.get(extra.sessionId);
+      if (!auth) return getAuthError(serverUrl);
       try {
         const result = await GetCampaign(
-          wrikeToken,
+          auth.wrikeToken,
           { campaignId },
-          environmentName,
+          auth.environmentName,
         );
         return {
           content: [
@@ -152,10 +164,12 @@ export const registerCampaignTools = (server, ctx) => {
           .describe("If true, returns a pre-fill URL instead of submitting"),
       },
     },
-    async ({ space, entity, variantId, fields, isCreatedByURL }) => {
+    async ({ space, entity, variantId, fields, isCreatedByURL }, extra) => {
+      const auth = sessionAuthStore.get(extra.sessionId);
+      if (!auth) return getAuthError(serverUrl);
       try {
         const result = await CreateCampaign(
-          wrikeToken,
+          auth.wrikeToken,
           {
             space,
             entity,
@@ -164,7 +178,7 @@ export const registerCampaignTools = (server, ctx) => {
             isCreatedByURL: !!isCreatedByURL,
           },
           fastify,
-          environmentName,
+          auth.environmentName,
         );
         return {
           content: [
@@ -193,12 +207,14 @@ export const registerCampaignTools = (server, ctx) => {
           .describe("Key-value map of field names to new values"),
       },
     },
-    async ({ campaignId, formFields }) => {
+    async ({ campaignId, formFields }, extra) => {
+      const auth = sessionAuthStore.get(extra.sessionId);
+      if (!auth) return getAuthError(serverUrl);
       try {
         const result = await UpdateCampaign(
-          wrikeToken,
+          auth.wrikeToken,
           { campaignId, formFields },
-          environmentName,
+          auth.environmentName,
         );
         return {
           content: [
@@ -222,12 +238,14 @@ export const registerCampaignTools = (server, ctx) => {
         campaignId: z.string().describe("The Wrike folder ID of the campaign"),
       },
     },
-    async ({ campaignId }) => {
+    async ({ campaignId }, extra) => {
+      const auth = sessionAuthStore.get(extra.sessionId);
+      if (!auth) return getAuthError(serverUrl);
       try {
         const result = await DeleteCampaign(
-          wrikeToken,
+          auth.wrikeToken,
           { campaignId },
-          environmentName,
+          auth.environmentName,
         );
         return {
           content: [

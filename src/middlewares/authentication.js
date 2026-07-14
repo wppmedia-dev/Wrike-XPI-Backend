@@ -165,43 +165,76 @@ export const ValidateToken = async (req, reply, fastify) => {
   }
 };
 
+/**
+ * Resolve a JWE token to { wrikeToken, environmentName }.
+ * Reuses the existing verifyJWE + decrypt + refresh logic.
+ * This is used by the MCP auth.login tool for session-based authentication.
+ */
+const resolveAuth = async (token, dek) => {
+  if (!token?.encrypted_access_token) throw new Error("No access token found");
+
+  const dekBuffer = Buffer.isBuffer(dek) ? dek : Buffer.from(dek, "base64");
+  const accessTokenBuf = Buffer.from(token.encrypted_access_token, "base64");
+  let accessToken = crypto.decrypt(accessTokenBuf, dekBuffer).toString();
+  if (!accessToken) throw new Error("Failed to decrypt access token");
+
+  const decodedToken = jwt.decode(accessToken);
+  if (decodedToken && decodedToken.exp) {
+    const now = Date.now() / 1000;
+    if (decodedToken.exp - now < 1800) {
+      accessToken = await refreshTokens(
+        Buffer.from(token.encrypted_refresh_token, "base64"),
+        dekBuffer,
+        token.created_by,
+        token.id,
+        token.environment_name,
+      );
+    }
+  }
+
+  return {
+    wrikeToken: accessToken,
+    environmentName: token.environment_name,
+  };
+};
+
+export const ResolveAuthFromJWT = async (jweToken) => {
+  try {
+    if (!jweToken) throw new Error("No token provided");
+
+    const { token, dek } = await verifyJWE(jweToken);
+    return resolveAuth(token, dek);
+  } catch (err) {
+    console.error(new Date().toISOString(), err);
+    throw { message: err?.message || err, statusCode: 401 };
+  }
+};
+
+export const ResolveAuthFromCredentials = async (username, password) => {
+  try {
+    if (!username || !password) {
+      throw new Error("Username and password are required");
+    }
+
+    const credentials = Buffer.from(`${username}:${password}`).toString(
+      "base64",
+    );
+    const { token, dek } = await verifyBasicAuth(credentials);
+    return resolveAuth(token, dek);
+  } catch (err) {
+    console.error(new Date().toISOString(), err);
+    throw { message: err?.message || err, statusCode: 401 };
+  }
+};
+
 // Individual JWT Token validation
 export const ValidateJWT = async (jwtToken) => {
   try {
     if (!jwtToken) throw new Error("No authorization header");
 
     const { token, dek } = await verifyJWE(jwtToken);
-
-    if (!token.encrypted_access_token) throw new Error("No access token found");
-
-    // Decrypt access token
-    const accessTokenBuf = Buffer.from(token.encrypted_access_token, "base64");
-    let accessToken = crypto.decrypt(accessTokenBuf, dek).toString();
-    if (!accessToken) throw new Error("Failed to decrypt access token");
-
-    // Check token expiry
-    const decodedToken = jwt.decode(accessToken);
-    if (!decodedToken) throw new Error("Invalid access token format");
-
-    const now = Date.now() / 1000;
-
-    if (decodedToken.exp - now < 1800) {
-      // 30 minutes
-      const refreshTokenBuf = Buffer.from(
-        token.encrypted_refresh_token,
-        "base64",
-      );
-      accessToken = await refreshTokens(
-        refreshTokenBuf,
-        dek,
-        token.created_by,
-        token.id,
-        token.environment_name,
-      );
-    }
-
-    // Store token for route handlers
-    return accessToken;
+    const auth = await resolveAuth(token, dek);
+    return auth.wrikeToken;
   } catch (err) {
     console.error(new Date().toISOString(), err);
     throw { message: err?.message || err };

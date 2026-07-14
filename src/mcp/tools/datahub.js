@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { getDatahubCustomFields } from "../../utils/wrike";
+import { getAuthError } from "./auth.js";
 
 const normalizeFieldMap = (fieldMapping = {}) => {
   if (!fieldMapping || typeof fieldMapping !== "object") return {};
@@ -21,11 +22,10 @@ const normalizeFieldMap = (fieldMapping = {}) => {
  * campaign, channel, or task CRUD tools.
  *
  * @param {import("@modelcontextprotocol/sdk/server/mcp.js").McpServer} server
- * @param {{wrikeToken: string, environmentName: string}} ctx
+ * @param {{get: Function}} sessionAuthStore
+ * @param {string} serverUrl
  */
-export const registerDatahubTools = (server, ctx) => {
-  const { wrikeToken, environmentName } = ctx;
-
+export const registerDatahubTools = (server, sessionAuthStore, serverUrl) => {
   server.registerTool(
     "datahub.list_fields",
     {
@@ -41,19 +41,18 @@ export const registerDatahubTools = (server, ctx) => {
           .describe("Include raw metadata alongside field definitions"),
       },
     },
-    async ({ includeMetadata }) => {
-      try {
-        if (!wrikeToken) {
-          throw new Error("Authentication token is not available.");
-        }
+    async ({ includeMetadata }, extra) => {
+      const auth = sessionAuthStore.get(extra.sessionId);
+      if (!auth) return getAuthError(serverUrl);
 
+      try {
         const fieldMapping = await getDatahubCustomFields(
-          wrikeToken,
+          auth.wrikeToken,
           null,
           false,
           true,
           null,
-          environmentName,
+          auth.environmentName,
         );
         const normalizedFieldMap = normalizeFieldMap(fieldMapping);
 

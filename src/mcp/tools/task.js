@@ -3,6 +3,7 @@ import { GetAllTasks } from "../../routes/task/handlers/getAllTasks";
 import { GetTask } from "../../routes/task/handlers/getTask";
 import { UpdateTask } from "../../routes/task/handlers/updateTask";
 import { DeleteTask } from "../../routes/task/handlers/deleteTask";
+import { getAuthError } from "./auth.js";
 
 const serializeResult = (result) => {
   if (!result) return { success: true, data: null };
@@ -16,11 +17,10 @@ const serializeResult = (result) => {
 /**
  * Register all task-related MCP tools on the given server instance.
  * @param {import("@modelcontextprotocol/sdk/server/mcp.js").McpServer} server
- * @param {{wrikeToken: string, environmentName: string}} ctx
+ * @param {{get: Function}} sessionAuthStore
+ * @param {string} serverUrl
  */
-export const registerTaskTools = (server, ctx) => {
-  const { wrikeToken, environmentName } = ctx;
-
+export const registerTaskTools = (server, sessionAuthStore, serverUrl) => {
   server.registerTool(
     "task_list_channel",
     {
@@ -45,10 +45,12 @@ export const registerTaskTools = (server, ctx) => {
           .describe("Token for the next page of results"),
       },
     },
-    async ({ channelId, filter, pageSize, nextPageToken }) => {
+    async ({ channelId, filter, pageSize, nextPageToken }, extra) => {
+      const auth = sessionAuthStore.get(extra.sessionId);
+      if (!auth) return getAuthError(serverUrl);
       try {
         const result = await GetAllTasks(
-          wrikeToken,
+          auth.wrikeToken,
           { channelId, filter, pageSize, nextPageToken },
           "channel",
         );
@@ -106,10 +108,12 @@ export const registerTaskTools = (server, ctx) => {
           .describe("Token for the next page of results"),
       },
     },
-    async ({ campaignId, filter, pageSize, nextPageToken }) => {
+    async ({ campaignId, filter, pageSize, nextPageToken }, extra) => {
+      const auth = sessionAuthStore.get(extra.sessionId);
+      if (!auth) return getAuthError(serverUrl);
       try {
         const result = await GetAllTasks(
-          wrikeToken,
+          auth.wrikeToken,
           { campaignId, filter, pageSize, nextPageToken },
           "campaign",
         );
@@ -135,9 +139,15 @@ export const registerTaskTools = (server, ctx) => {
         taskId: z.string().describe("The Wrike task ID"),
       },
     },
-    async ({ taskId }) => {
+    async ({ taskId }, extra) => {
+      const auth = sessionAuthStore.get(extra.sessionId);
+      if (!auth) return getAuthError(serverUrl);
       try {
-        const result = await GetTask(wrikeToken, { taskId }, environmentName);
+        const result = await GetTask(
+          auth.wrikeToken,
+          { taskId },
+          auth.environmentName,
+        );
         return {
           content: [
             {
@@ -165,12 +175,14 @@ export const registerTaskTools = (server, ctx) => {
           .describe("Key-value map of field names to new values"),
       },
     },
-    async ({ taskId, formFields }) => {
+    async ({ taskId, formFields }, extra) => {
+      const auth = sessionAuthStore.get(extra.sessionId);
+      if (!auth) return getAuthError(serverUrl);
       try {
         const result = await UpdateTask(
-          wrikeToken,
+          auth.wrikeToken,
           { taskId, formFields },
-          environmentName,
+          auth.environmentName,
         );
         return {
           content: [
@@ -194,12 +206,14 @@ export const registerTaskTools = (server, ctx) => {
         taskId: z.string().describe("The Wrike task ID"),
       },
     },
-    async ({ taskId }) => {
+    async ({ taskId }, extra) => {
+      const auth = sessionAuthStore.get(extra.sessionId);
+      if (!auth) return getAuthError(serverUrl);
       try {
         const result = await DeleteTask(
-          wrikeToken,
+          auth.wrikeToken,
           { taskId },
-          environmentName,
+          auth.environmentName,
         );
         return {
           content: [

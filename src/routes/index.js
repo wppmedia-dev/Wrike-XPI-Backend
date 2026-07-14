@@ -32,6 +32,7 @@ export const PublicRouters = (fastify, opts, done) => {
   fastify.register(tokenRoute, { prefix: "/wrikexpi/token" });
   fastify.register(adminApiRoute, { prefix: "/admin" });
   fastify.register(portalApiRoute, { prefix: "/portal" });
+  fastify.register(mcpPlugin, { prefix: "/wrikexpi" });
 
   fastify.get("/datahub/customfield", async (req, reply) => {
     try {
@@ -72,7 +73,6 @@ export const PrivateRouters = (fastify, opts, done) => {
   fastify.register(taskRoute, { prefix: "/wrikexpi/task" });
   fastify.register(masterRoute, { prefix: "/wrikexpi/v1.0" });
   fastify.register(amoebaRoute, { prefix: "/wrikexpi/amoeba" });
-  fastify.register(mcpPlugin, { prefix: "/wrikexpi" });
 
   // Traditional REST route
   fastify.get(

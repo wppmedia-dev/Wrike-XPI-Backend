@@ -3,18 +3,23 @@ import { registerCampaignTools } from "./tools/campaign.js";
 import { registerChannelTools } from "./tools/channel.js";
 import { registerTaskTools } from "./tools/task.js";
 import { registerDatahubTools } from "./tools/datahub.js";
+import { registerAuthTools } from "./tools/auth.js";
+import { sessionAuthStore } from "./sessionAuth.js";
+
+export { sessionAuthStore };
 
 /**
  * Create a fully-configured MCP server with all tools registered.
  *
- * A new server instance is created per-request so that each invocation
- * gets the correct auth context (wrikeToken, environmentName) bound
- * via closure. This avoids any global mutable session state.
+ * Unlike the previous per-request pattern, this creates a SINGLE server
+ * instance. Authentication is resolved per-session via the sessionAuthStore,
+ * using the MCP session ID provided in the `extra` callback parameter.
  *
- * @param {{wrikeToken: string, environmentName: string, fastify?: object}} ctx
+ * @param {object} fastify - Fastify instance (passed to create tool)
+ * @param {string} serverUrl - Base URL for auth instructions
  * @returns {McpServer}
  */
-export const createMcpServer = (ctx) => {
+export const createMcpServer = (fastify, serverUrl) => {
   const server = new McpServer(
     {
       name: "wrikexpi-mcp",
@@ -22,16 +27,19 @@ export const createMcpServer = (ctx) => {
     },
     {
       capabilities: {
-        tools: {}, // advertise tools capability
+        tools: {},
       },
     },
   );
 
-  // Register every tool group — each receives the server and auth context
-  registerCampaignTools(server, ctx);
-  registerChannelTools(server, ctx);
-  registerTaskTools(server, ctx);
-  registerDatahubTools(server, ctx);
+  // Auth tools (do NOT require pre-existing auth)
+  registerAuthTools(server, sessionAuthStore, serverUrl);
+
+  // All other tools resolve auth from the session store keyed by session ID
+  registerCampaignTools(server, sessionAuthStore, fastify, serverUrl);
+  registerChannelTools(server, sessionAuthStore, serverUrl);
+  registerTaskTools(server, sessionAuthStore, serverUrl);
+  registerDatahubTools(server, sessionAuthStore, serverUrl);
 
   return server;
 };

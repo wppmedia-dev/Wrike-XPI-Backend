@@ -3,6 +3,7 @@ import { GetAllChannels } from "../../routes/channel/handlers/getAllChannels";
 import { GetChannel } from "../../routes/channel/handlers/getChannel";
 import { UpdateChannel } from "../../routes/channel/handlers/updateChannel";
 import { DeleteChannel } from "../../routes/channel/handlers/deleteChannel";
+import { getAuthError } from "./auth.js";
 
 const serializeResult = (result) => {
   if (!result) return { success: true, data: null };
@@ -15,12 +16,13 @@ const serializeResult = (result) => {
 
 /**
  * Register all channel-related MCP tools on the given server instance.
+ * Auth is resolved per-session from the sessionAuthStore.
+ *
  * @param {import("@modelcontextprotocol/sdk/server/mcp.js").McpServer} server
- * @param {{wrikeToken: string, environmentName: string}} ctx
+ * @param {{get: Function}} sessionAuthStore
+ * @param {string} serverUrl
  */
-export const registerChannelTools = (server, ctx) => {
-  const { wrikeToken, environmentName } = ctx;
-
+export const registerChannelTools = (server, sessionAuthStore, serverUrl) => {
   server.registerTool(
     "channel_list",
     {
@@ -61,12 +63,14 @@ export const registerChannelTools = (server, ctx) => {
           .describe("Token for the next page of results"),
       },
     },
-    async ({ campaignId, filter, pageSize, nextPageToken }) => {
+    async ({ campaignId, filter, pageSize, nextPageToken }, extra) => {
+      const auth = sessionAuthStore.get(extra.sessionId);
+      if (!auth) return getAuthError(serverUrl);
       try {
         const result = await GetAllChannels(
-          wrikeToken,
+          auth.wrikeToken,
           { campaignId, filter, pageSize, nextPageToken },
-          environmentName,
+          auth.environmentName,
         );
         return {
           content: [
@@ -90,12 +94,14 @@ export const registerChannelTools = (server, ctx) => {
         channelId: z.string().describe("The Wrike ID of the channel"),
       },
     },
-    async ({ channelId }) => {
+    async ({ channelId }, extra) => {
+      const auth = sessionAuthStore.get(extra.sessionId);
+      if (!auth) return getAuthError(serverUrl);
       try {
         const result = await GetChannel(
-          wrikeToken,
+          auth.wrikeToken,
           { channelId },
-          environmentName,
+          auth.environmentName,
         );
         return {
           content: [
@@ -124,12 +130,14 @@ export const registerChannelTools = (server, ctx) => {
           .describe("Key-value map of field names to new values"),
       },
     },
-    async ({ channelId, formFields }) => {
+    async ({ channelId, formFields }, extra) => {
+      const auth = sessionAuthStore.get(extra.sessionId);
+      if (!auth) return getAuthError(serverUrl);
       try {
         const result = await UpdateChannel(
-          wrikeToken,
+          auth.wrikeToken,
           { channelId, formFields },
-          environmentName,
+          auth.environmentName,
         );
         return {
           content: [
@@ -153,12 +161,14 @@ export const registerChannelTools = (server, ctx) => {
         channelId: z.string().describe("The Wrike ID of the channel"),
       },
     },
-    async ({ channelId }) => {
+    async ({ channelId }, extra) => {
+      const auth = sessionAuthStore.get(extra.sessionId);
+      if (!auth) return getAuthError(serverUrl);
       try {
         const result = await DeleteChannel(
-          wrikeToken,
+          auth.wrikeToken,
           { channelId },
-          environmentName,
+          auth.environmentName,
         );
         return {
           content: [
