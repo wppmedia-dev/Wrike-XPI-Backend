@@ -16,33 +16,38 @@ export const registerAuthTools = (server, sessionAuthStore, serverUrl) => {
     "auth.login",
     {
       description:
-        "Authenticate this MCP session. Provide either a JWE token from the WrikeXPI login page, " +
-        "or your Wrike username and password. " +
+        "Authenticate this MCP session. " +
+        `Open this URL for the user: ${serverUrl}/ ` +
+        "Tell the user to open it in their browser, log in with Wrike, then paste the token here. " +
+        "Or the user can provide their Wrike username and password directly. " +
         "Call this first after connecting.",
       inputSchema: z
-        .union([
-          z
-            .object({
-              token: z
-                .string()
-                .describe(
-                  "Your JWE access token from the WrikeXPI login page. If you already have a token, paste it here.",
-                ),
-            })
+        .object({
+          token: z
+            .string()
+            .optional()
             .describe(
-              "Authenticate with a token from the WrikeXPI login page.",
+              "JWE access token. The user opens the URL in a browser, logs in with Wrike, then pastes the token here.",
             ),
-          z
-            .object({
-              username: z
-                .string()
-                .describe("Your Wrike account username or email."),
-              password: z.string().describe("Your Wrike account password."),
-            })
-            .describe("Authenticate with your Wrike username and password."),
-        ])
+          username: z
+            .string()
+            .optional()
+            .describe("Wrike account username or email."),
+          password: z.string().optional().describe("Wrike account password."),
+        })
+        .refine(
+          (data) =>
+            (data.token && data.token.trim().length > 0) ||
+            (data.username &&
+              data.username.trim().length > 0 &&
+              data.password &&
+              data.password.trim().length > 0),
+          {
+            message: "Provide either a token, or both username and password.",
+          },
+        )
         .describe(
-          "Authenticate this MCP session. Provide either a JWE token, or your Wrike username and password. Call this first after connecting.",
+          "Authenticate with a token (from browser login) or username/password.",
         ),
     },
     async ({ token, username, password }, extra) => {
