@@ -18,8 +18,8 @@ export const registerAuthTools = (server, sessionAuthStore, serverUrl) => {
       description:
         "Authenticate this MCP session. " +
         `Open this URL for the user: ${serverUrl}/ ` +
-        "Tell the user to open it in their browser, log in with Wrike, then paste the token here. " +
-        "Or the user can provide their Wrike username and password directly. " +
+        "Tell the user to open it in their browser, log in with their Wrike account, then paste the XPI token here. " +
+        "Or the user can provide their XPI username and password directly. " +
         "Call this first after connecting.",
       inputSchema: z
         .object({
@@ -27,13 +27,13 @@ export const registerAuthTools = (server, sessionAuthStore, serverUrl) => {
             .string()
             .optional()
             .describe(
-              "JWE access token. The user opens the URL in a browser, logs in with Wrike, then pastes the token here.",
+              "XPI access token. The user opens the URL in a browser, logs in with their XPI account, then pastes the token here.",
             ),
           username: z
             .string()
             .optional()
-            .describe("Wrike account username or email."),
-          password: z.string().optional().describe("Wrike account password."),
+            .describe("XPI account username or email."),
+          password: z.string().optional().describe("XPI account password."),
         })
         .refine(
           (data) =>
