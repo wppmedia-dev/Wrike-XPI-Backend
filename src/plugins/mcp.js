@@ -38,13 +38,24 @@ module.exports = async function (fastify, opts) {
 
     try {
       const mcpSessionId = req.headers["mcp-session-id"];
+      console.error(
+        "[MCP] Request received, mcp-session-id:",
+        mcpSessionId,
+        "sessions count:",
+        sessions.size,
+      );
 
       if (mcpSessionId && sessions.has(mcpSessionId)) {
         // ── Existing session — reuse its transport ──
+        console.error("[MCP] Using existing session:", mcpSessionId);
         const transport = sessions.get(mcpSessionId).transport;
         await transport.handleRequest(req.raw, reply.raw, req.body);
       } else {
         // ── New session — create a fresh server + transport ──
+        console.error(
+          "[MCP] Creating new session, client provided session ID:",
+          mcpSessionId,
+        );
         const server = createMcpServer(fastify, serverUrl);
         const transport = new StreamableHTTPServerTransport({
           enableJsonResponse: true,
@@ -55,8 +66,17 @@ module.exports = async function (fastify, opts) {
 
         // Store the session for subsequent requests
         const newSessionId = transport.sessionId;
+        console.error(
+          "[MCP] New session created, transport.sessionId:",
+          newSessionId,
+        );
         if (newSessionId) {
           sessions.set(newSessionId, { transport });
+          console.error("[MCP] Stored session, total sessions:", sessions.size);
+        } else {
+          console.error(
+            "[MCP] WARNING: transport.sessionId was null/undefined after handleRequest",
+          );
         }
       }
     } catch (err) {
