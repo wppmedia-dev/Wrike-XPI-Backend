@@ -62,6 +62,12 @@ export const registerAuthTools = (server, sessionAuthStore, serverUrl) => {
         );
       }
 
+      console.error(
+        "[auth_login] sessionId:",
+        extra.sessionId,
+        "env:",
+        auth?.environmentName,
+      );
       sessionAuthStore.set(extra.sessionId, auth);
 
       return {
