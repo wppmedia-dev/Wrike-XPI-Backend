@@ -1,7 +1,7 @@
 /**
  * In-memory session-to-auth store.
  * Maps MCP session IDs to { wrikeToken, environmentName }.
- * Auth is set by the auth.login tool and cleared on auth.logout.
+ * Auth is set by the auth_login tool and cleared on auth_logout.
  *
  * @type {{get: (id: string) => ({wrikeToken: string, environmentName: string}|null),
  *         set: (id: string, auth: {wrikeToken: string, environmentName: string}) => void,

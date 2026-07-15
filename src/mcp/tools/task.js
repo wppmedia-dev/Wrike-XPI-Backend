@@ -132,7 +132,8 @@ export const registerTaskTools = (server, sessionAuthStore, serverUrl) => {
   );
 
   server.registerTool(
-    "task.get",
+    "task_get",
+
     {
       description: "Read a single task by its Wrike task ID.",
       inputSchema: {
@@ -163,7 +164,8 @@ export const registerTaskTools = (server, sessionAuthStore, serverUrl) => {
   );
 
   server.registerTool(
-    "task.update",
+    "task_update",
+
     {
       description:
         "Update a task by its Wrike task ID. Provide formFields as a key-value object of field names to values.",
@@ -199,7 +201,8 @@ export const registerTaskTools = (server, sessionAuthStore, serverUrl) => {
   );
 
   server.registerTool(
-    "task.delete",
+    "task_delete",
+
     {
       description: "Delete a task by its Wrike task ID.",
       inputSchema: {

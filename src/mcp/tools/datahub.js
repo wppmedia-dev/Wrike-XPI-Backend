@@ -27,7 +27,8 @@ const normalizeFieldMap = (fieldMapping = {}) => {
  */
 export const registerDatahubTools = (server, sessionAuthStore, serverUrl) => {
   server.registerTool(
-    "datahub.list_fields",
+    "datahub_list_fields",
+
     {
       description:
         "Return the Datahub field mapping metadata for campaign, channel, and task CRUD tools. " +

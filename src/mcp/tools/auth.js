@@ -5,7 +5,7 @@ import {
 } from "../../middlewares/authentication";
 
 /**
- * Register authentication-related MCP tools (auth.login, auth.logout).
+ * Register authentication-related MCP tools (auth_login, auth_logout).
  *
  * @param {import("@modelcontextprotocol/sdk/server/mcp.js").McpServer} server
  * @param {{get: Function, set: Function, delete: Function}} sessionAuthStore
@@ -13,7 +13,8 @@ import {
  */
 export const registerAuthTools = (server, sessionAuthStore, serverUrl) => {
   server.registerTool(
-    "auth.login",
+    "auth_login",
+
     {
       description:
         "Authenticate this MCP session. " +
@@ -82,7 +83,8 @@ export const registerAuthTools = (server, sessionAuthStore, serverUrl) => {
   );
 
   server.registerTool(
-    "auth.logout",
+    "auth_logout",
+
     {
       description: "Clear the authentication for the current session.",
       inputSchema: {
@@ -133,7 +135,7 @@ export const getAuthError = (serverUrl) => ({
             },
             step3: {
               action:
-                "Copy the full token and call the 'auth.login' tool with it:",
+                "Copy the full token and call the 'auth_login' tool with it:",
               example: { token: "eyJhbGciOiJIUzI1NiIs..." },
             },
           },

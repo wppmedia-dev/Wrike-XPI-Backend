@@ -87,7 +87,8 @@ export const registerChannelTools = (server, sessionAuthStore, serverUrl) => {
   );
 
   server.registerTool(
-    "channel.get",
+    "channel_get",
+
     {
       description: "Read a single channel by its Wrike task/folder ID.",
       inputSchema: {
@@ -118,7 +119,8 @@ export const registerChannelTools = (server, sessionAuthStore, serverUrl) => {
   );
 
   server.registerTool(
-    "channel.update",
+    "channel_update",
+
     {
       description:
         "Update a channel by its Wrike ID. Provide formFields as a key-value object of field names to values.",
@@ -154,7 +156,8 @@ export const registerChannelTools = (server, sessionAuthStore, serverUrl) => {
   );
 
   server.registerTool(
-    "channel.delete",
+    "channel_delete",
+
     {
       description: "Delete a channel by its Wrike ID.",
       inputSchema: {
