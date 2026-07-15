@@ -5,14 +5,16 @@ import {
 } from "../../middlewares/authentication";
 
 /**
- * Resolve auth from a direct XPI token.
- * Returns null if no token is provided.
+ * Validate an XPI token and return auth data, or null on failure.
+ * Used by every tool — a null return triggers getAuthError with the login URL.
  */
 export const resolveAuth = async (authToken) => {
-  if (authToken && authToken.trim()) {
+  if (!authToken?.trim()) return null;
+  try {
     return await ResolveAuthFromJWT(authToken.trim());
+  } catch {
+    return null; // invalid/expired → caller shows getAuthError with URL
   }
-  return null;
 };
 
 /**
