@@ -52,6 +52,11 @@ export const registerAuthTools = (server, sessionAuthStore, serverUrl) => {
         ),
     },
     async ({ token, username, password }, extra) => {
+      const clientIp =
+        extra?.requestInfo?.headers?.["x-forwarded-for"]
+          ?.split(",")[0]
+          ?.trim() || "unknown";
+
       let auth;
       if (token && token.trim()) {
         auth = await ResolveAuthFromJWT(token.trim());
@@ -62,7 +67,7 @@ export const registerAuthTools = (server, sessionAuthStore, serverUrl) => {
         );
       }
 
-      sessionAuthStore.set(extra.sessionId, auth);
+      await sessionAuthStore.set(extra.sessionId, auth, clientIp);
 
       return {
         content: [
@@ -92,7 +97,11 @@ export const registerAuthTools = (server, sessionAuthStore, serverUrl) => {
       },
     },
     async (_, extra) => {
-      sessionAuthStore.delete(extra.sessionId);
+      const clientIp =
+        extra?.requestInfo?.headers?.["x-forwarded-for"]
+          ?.split(",")[0]
+          ?.trim() || "unknown";
+      await sessionAuthStore.delete(extra.sessionId, clientIp);
       return {
         content: [
           {

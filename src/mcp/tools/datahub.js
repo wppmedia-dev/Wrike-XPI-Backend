@@ -43,7 +43,11 @@ export const registerDatahubTools = (server, sessionAuthStore, serverUrl) => {
       },
     },
     async ({ includeMetadata }, extra) => {
-      const auth = sessionAuthStore.get(extra.sessionId);
+      const clientIp =
+        extra?.requestInfo?.headers?.["x-forwarded-for"]
+          ?.split(",")[0]
+          ?.trim() || "unknown";
+      const auth = await sessionAuthStore.get(extra.sessionId, clientIp);
       if (!auth) return getAuthError(serverUrl);
 
       try {

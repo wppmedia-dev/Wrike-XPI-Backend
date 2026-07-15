@@ -37,7 +37,29 @@ module.exports = async function (fastify, opts) {
     }
 
     try {
+      // Log incoming session ID for diagnostics
       const mcpSessionId = req.headers["mcp-session-id"];
+      const clientIp =
+        req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+        req.ip ||
+        "unknown";
+      console.log(
+        `[MCP] POST sessionId=${mcpSessionId || "(none)"} ip=${clientIp}`,
+      );
+
+      // Ensure Accept header has both values required by the Streamable HTTP transport
+      const accept = req.headers.accept || "";
+      if (
+        !accept.includes("text/event-stream") ||
+        !accept.includes("application/json")
+      ) {
+        req.raw.headers.accept = "application/json, text/event-stream";
+      }
+
+      // Embed client IP so tool handlers can retrieve it from extra.requestInfo
+      if (req.raw.headers) {
+        req.raw.headers["x-forwarded-for"] = clientIp;
+      }
 
       if (mcpSessionId && sessions.has(mcpSessionId)) {
         // ── Existing session — reuse its transport ──

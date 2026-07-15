@@ -64,7 +64,11 @@ export const registerChannelTools = (server, sessionAuthStore, serverUrl) => {
       },
     },
     async ({ campaignId, filter, pageSize, nextPageToken }, extra) => {
-      const auth = sessionAuthStore.get(extra.sessionId);
+      const clientIp =
+        extra?.requestInfo?.headers?.["x-forwarded-for"]
+          ?.split(",")[0]
+          ?.trim() || "unknown";
+      const auth = await sessionAuthStore.get(extra.sessionId, clientIp);
       if (!auth) return getAuthError(serverUrl);
       try {
         const result = await GetAllChannels(
@@ -96,7 +100,11 @@ export const registerChannelTools = (server, sessionAuthStore, serverUrl) => {
       },
     },
     async ({ channelId }, extra) => {
-      const auth = sessionAuthStore.get(extra.sessionId);
+      const clientIp =
+        extra?.requestInfo?.headers?.["x-forwarded-for"]
+          ?.split(",")[0]
+          ?.trim() || "unknown";
+      const auth = await sessionAuthStore.get(extra.sessionId, clientIp);
       if (!auth) return getAuthError(serverUrl);
       try {
         const result = await GetChannel(
@@ -133,7 +141,11 @@ export const registerChannelTools = (server, sessionAuthStore, serverUrl) => {
       },
     },
     async ({ channelId, formFields }, extra) => {
-      const auth = sessionAuthStore.get(extra.sessionId);
+      const clientIp =
+        extra?.requestInfo?.headers?.["x-forwarded-for"]
+          ?.split(",")[0]
+          ?.trim() || "unknown";
+      const auth = await sessionAuthStore.get(extra.sessionId, clientIp);
       if (!auth) return getAuthError(serverUrl);
       try {
         const result = await UpdateChannel(
@@ -165,7 +177,11 @@ export const registerChannelTools = (server, sessionAuthStore, serverUrl) => {
       },
     },
     async ({ channelId }, extra) => {
-      const auth = sessionAuthStore.get(extra.sessionId);
+      const clientIp =
+        extra?.requestInfo?.headers?.["x-forwarded-for"]
+          ?.split(",")[0]
+          ?.trim() || "unknown";
+      const auth = await sessionAuthStore.get(extra.sessionId, clientIp);
       if (!auth) return getAuthError(serverUrl);
       try {
         const result = await DeleteChannel(

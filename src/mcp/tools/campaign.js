@@ -93,7 +93,11 @@ export const registerCampaignTools = (
       },
     },
     async ({ filter, pageSize, nextPageToken }, extra) => {
-      const auth = sessionAuthStore.get(extra.sessionId);
+      const clientIp =
+        extra?.requestInfo?.headers?.["x-forwarded-for"]
+          ?.split(",")[0]
+          ?.trim() || "unknown";
+      const auth = await sessionAuthStore.get(extra.sessionId, clientIp);
       if (!auth) return getAuthError(serverUrl);
       try {
         const result = await GetAllCampaigns(
@@ -125,7 +129,11 @@ export const registerCampaignTools = (
       },
     },
     async ({ campaignId }, extra) => {
-      const auth = sessionAuthStore.get(extra.sessionId);
+      const clientIp =
+        extra?.requestInfo?.headers?.["x-forwarded-for"]
+          ?.split(",")[0]
+          ?.trim() || "unknown";
+      const auth = await sessionAuthStore.get(extra.sessionId, clientIp);
       if (!auth) return getAuthError(serverUrl);
       try {
         const result = await GetCampaign(
@@ -168,7 +176,11 @@ export const registerCampaignTools = (
       },
     },
     async ({ space, entity, variantId, fields, isCreatedByURL }, extra) => {
-      const auth = sessionAuthStore.get(extra.sessionId);
+      const clientIp =
+        extra?.requestInfo?.headers?.["x-forwarded-for"]
+          ?.split(",")[0]
+          ?.trim() || "unknown";
+      const auth = await sessionAuthStore.get(extra.sessionId, clientIp);
       if (!auth) return getAuthError(serverUrl);
       try {
         const result = await CreateCampaign(
@@ -212,7 +224,11 @@ export const registerCampaignTools = (
       },
     },
     async ({ campaignId, formFields }, extra) => {
-      const auth = sessionAuthStore.get(extra.sessionId);
+      const clientIp =
+        extra?.requestInfo?.headers?.["x-forwarded-for"]
+          ?.split(",")[0]
+          ?.trim() || "unknown";
+      const auth = await sessionAuthStore.get(extra.sessionId, clientIp);
       if (!auth) return getAuthError(serverUrl);
       try {
         const result = await UpdateCampaign(
@@ -244,7 +260,11 @@ export const registerCampaignTools = (
       },
     },
     async ({ campaignId }, extra) => {
-      const auth = sessionAuthStore.get(extra.sessionId);
+      const clientIp =
+        extra?.requestInfo?.headers?.["x-forwarded-for"]
+          ?.split(",")[0]
+          ?.trim() || "unknown";
+      const auth = await sessionAuthStore.get(extra.sessionId, clientIp);
       if (!auth) return getAuthError(serverUrl);
       try {
         const result = await DeleteCampaign(

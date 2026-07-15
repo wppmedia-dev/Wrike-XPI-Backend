@@ -213,6 +213,30 @@ class RedisClient {
     }
   }
 
+  async setString(
+    key,
+    value,
+    ttlSeconds = parseInt(process.env.REDIS_DEFAULT_TTL) || 3600,
+  ) {
+    try {
+      if (!this.isConnected && !this.connectionFailed) {
+        await this.connect();
+      }
+
+      if (!this.client || !this.isConnected) {
+        return false;
+      }
+
+      await this.client.set(key, value);
+      if (ttlSeconds) {
+        await this.client.expire(key, ttlSeconds);
+      }
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
   async disconnect() {
     try {
       if (this.client) {
@@ -238,5 +262,16 @@ class RedisClient {
 
 // Create a singleton instance
 const redisClient = new RedisClient();
+
+// Auto-connect on module load so the connection status is visible at startup
+redisClient.connect().then((client) => {
+  if (client) {
+    console.log("Redis connected successfully");
+  } else {
+    console.log(
+      "Redis unavailable — check REDIS_HOST / REDIS_PORT / REDIS_PASSWORD",
+    );
+  }
+});
 
 export default redisClient;
