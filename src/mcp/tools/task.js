@@ -3,7 +3,7 @@ import { GetAllTasks } from "../../routes/task/handlers/getAllTasks";
 import { GetTask } from "../../routes/task/handlers/getTask";
 import { UpdateTask } from "../../routes/task/handlers/updateTask";
 import { DeleteTask } from "../../routes/task/handlers/deleteTask";
-import { getAuthError } from "./auth.js";
+import { getAuthError, resolveAuth, authTokenField } from "./auth.js";
 
 const serializeResult = (result) => {
   if (!result) return { success: true, data: null };
@@ -17,10 +17,9 @@ const serializeResult = (result) => {
 /**
  * Register all task-related MCP tools on the given server instance.
  * @param {import("@modelcontextprotocol/sdk/server/mcp.js").McpServer} server
- * @param {{get: Function}} sessionAuthStore
  * @param {string} serverUrl
  */
-export const registerTaskTools = (server, sessionAuthStore, serverUrl) => {
+export const registerTaskTools = (server, serverUrl) => {
   server.registerTool(
     "task_list_channel",
     {
@@ -32,6 +31,7 @@ export const registerTaskTools = (server, sessionAuthStore, serverUrl) => {
         "  Example: (taskstatus eq 'In Progress')\n" +
         "  Field keys from datahub_list_fields where isTaskField=true.",
       inputSchema: {
+        auth_token: authTokenField,
         channelId: z.string().describe("The Wrike ID of the parent channel"),
         filter: z.string().optional().describe("OData filter expression"),
         pageSize: z
@@ -45,12 +45,11 @@ export const registerTaskTools = (server, sessionAuthStore, serverUrl) => {
           .describe("Token for the next page of results"),
       },
     },
-    async ({ channelId, filter, pageSize, nextPageToken }, extra) => {
-      const clientIp =
-        extra?.requestInfo?.headers?.["x-forwarded-for"]
-          ?.split(",")[0]
-          ?.trim() || "unknown";
-      const auth = await sessionAuthStore.get(extra.sessionId, clientIp);
+    async (
+      { auth_token, channelId, filter, pageSize, nextPageToken },
+      extra,
+    ) => {
+      const auth = await resolveAuth(auth_token);
       if (!auth) return getAuthError(serverUrl);
       try {
         const result = await GetAllTasks(
@@ -92,6 +91,7 @@ export const registerTaskTools = (server, sessionAuthStore, serverUrl) => {
         "    (taskstatus eq 'In Progress' and campaignname eq 'Campaign X')\n" +
         "    startswith(taskname, 'Q1')",
       inputSchema: {
+        auth_token: authTokenField,
         campaignId: z
           .string()
           .describe("The Wrike folder ID of the parent campaign"),
@@ -112,12 +112,11 @@ export const registerTaskTools = (server, sessionAuthStore, serverUrl) => {
           .describe("Token for the next page of results"),
       },
     },
-    async ({ campaignId, filter, pageSize, nextPageToken }, extra) => {
-      const clientIp =
-        extra?.requestInfo?.headers?.["x-forwarded-for"]
-          ?.split(",")[0]
-          ?.trim() || "unknown";
-      const auth = await sessionAuthStore.get(extra.sessionId, clientIp);
+    async (
+      { auth_token, campaignId, filter, pageSize, nextPageToken },
+      extra,
+    ) => {
+      const auth = await resolveAuth(auth_token);
       if (!auth) return getAuthError(serverUrl);
       try {
         const result = await GetAllTasks(
@@ -141,19 +140,15 @@ export const registerTaskTools = (server, sessionAuthStore, serverUrl) => {
 
   server.registerTool(
     "task_get",
-
     {
       description: "Read a single task by its Wrike task ID.",
       inputSchema: {
+        auth_token: authTokenField,
         taskId: z.string().describe("The Wrike task ID"),
       },
     },
-    async ({ taskId }, extra) => {
-      const clientIp =
-        extra?.requestInfo?.headers?.["x-forwarded-for"]
-          ?.split(",")[0]
-          ?.trim() || "unknown";
-      const auth = await sessionAuthStore.get(extra.sessionId, clientIp);
+    async ({ auth_token, taskId }, extra) => {
+      const auth = await resolveAuth(auth_token);
       if (!auth) return getAuthError(serverUrl);
       try {
         const result = await GetTask(
@@ -182,6 +177,7 @@ export const registerTaskTools = (server, sessionAuthStore, serverUrl) => {
       description:
         "Update a task by its Wrike task ID. Provide formFields as a key-value object of field names to values.",
       inputSchema: {
+        auth_token: authTokenField,
         taskId: z.string().describe("The Wrike task ID"),
         formFields: z
           .record(z.any())
@@ -189,12 +185,8 @@ export const registerTaskTools = (server, sessionAuthStore, serverUrl) => {
           .describe("Key-value map of field names to new values"),
       },
     },
-    async ({ taskId, formFields }, extra) => {
-      const clientIp =
-        extra?.requestInfo?.headers?.["x-forwarded-for"]
-          ?.split(",")[0]
-          ?.trim() || "unknown";
-      const auth = await sessionAuthStore.get(extra.sessionId, clientIp);
+    async ({ auth_token, taskId, formFields }, extra) => {
+      const auth = await resolveAuth(auth_token);
       if (!auth) return getAuthError(serverUrl);
       try {
         const result = await UpdateTask(
@@ -222,15 +214,12 @@ export const registerTaskTools = (server, sessionAuthStore, serverUrl) => {
     {
       description: "Delete a task by its Wrike task ID.",
       inputSchema: {
+        auth_token: authTokenField,
         taskId: z.string().describe("The Wrike task ID"),
       },
     },
-    async ({ taskId }, extra) => {
-      const clientIp =
-        extra?.requestInfo?.headers?.["x-forwarded-for"]
-          ?.split(",")[0]
-          ?.trim() || "unknown";
-      const auth = await sessionAuthStore.get(extra.sessionId, clientIp);
+    async ({ auth_token, taskId }, extra) => {
+      const auth = await resolveAuth(auth_token);
       if (!auth) return getAuthError(serverUrl);
       try {
         const result = await DeleteTask(

@@ -3,7 +3,7 @@ import { GetAllChannels } from "../../routes/channel/handlers/getAllChannels";
 import { GetChannel } from "../../routes/channel/handlers/getChannel";
 import { UpdateChannel } from "../../routes/channel/handlers/updateChannel";
 import { DeleteChannel } from "../../routes/channel/handlers/deleteChannel";
-import { getAuthError } from "./auth.js";
+import { getAuthError, resolveAuth, authTokenField } from "./auth.js";
 
 const serializeResult = (result) => {
   if (!result) return { success: true, data: null };
@@ -16,13 +16,12 @@ const serializeResult = (result) => {
 
 /**
  * Register all channel-related MCP tools on the given server instance.
- * Auth is resolved per-session from the sessionAuthStore.
+ * Auth is resolved from the auth_token parameter passed to each tool.
  *
  * @param {import("@modelcontextprotocol/sdk/server/mcp.js").McpServer} server
- * @param {{get: Function}} sessionAuthStore
  * @param {string} serverUrl
  */
-export const registerChannelTools = (server, sessionAuthStore, serverUrl) => {
+export const registerChannelTools = (server, serverUrl) => {
   server.registerTool(
     "channel_list",
     {
@@ -43,6 +42,7 @@ export const registerChannelTools = (server, sessionAuthStore, serverUrl) => {
         "    (channelname eq 'TV Spot' and mediabuytype eq 'Programmatic')\n" +
         "    has(channelname, 'Digital')",
       inputSchema: {
+        auth_token: authTokenField,
         campaignId: z
           .string()
           .describe("The Wrike folder ID of the parent campaign"),
@@ -63,12 +63,11 @@ export const registerChannelTools = (server, sessionAuthStore, serverUrl) => {
           .describe("Token for the next page of results"),
       },
     },
-    async ({ campaignId, filter, pageSize, nextPageToken }, extra) => {
-      const clientIp =
-        extra?.requestInfo?.headers?.["x-forwarded-for"]
-          ?.split(",")[0]
-          ?.trim() || "unknown";
-      const auth = await sessionAuthStore.get(extra.sessionId, clientIp);
+    async (
+      { auth_token, campaignId, filter, pageSize, nextPageToken },
+      extra,
+    ) => {
+      const auth = await resolveAuth(auth_token);
       if (!auth) return getAuthError(serverUrl);
       try {
         const result = await GetAllChannels(
@@ -96,15 +95,12 @@ export const registerChannelTools = (server, sessionAuthStore, serverUrl) => {
     {
       description: "Read a single channel by its Wrike task/folder ID.",
       inputSchema: {
+        auth_token: authTokenField,
         channelId: z.string().describe("The Wrike ID of the channel"),
       },
     },
-    async ({ channelId }, extra) => {
-      const clientIp =
-        extra?.requestInfo?.headers?.["x-forwarded-for"]
-          ?.split(",")[0]
-          ?.trim() || "unknown";
-      const auth = await sessionAuthStore.get(extra.sessionId, clientIp);
+    async ({ auth_token, channelId }, extra) => {
+      const auth = await resolveAuth(auth_token);
       if (!auth) return getAuthError(serverUrl);
       try {
         const result = await GetChannel(
@@ -133,6 +129,7 @@ export const registerChannelTools = (server, sessionAuthStore, serverUrl) => {
       description:
         "Update a channel by its Wrike ID. Provide formFields as a key-value object of field names to values.",
       inputSchema: {
+        auth_token: authTokenField,
         channelId: z.string().describe("The Wrike ID of the channel"),
         formFields: z
           .record(z.any())
@@ -140,12 +137,8 @@ export const registerChannelTools = (server, sessionAuthStore, serverUrl) => {
           .describe("Key-value map of field names to new values"),
       },
     },
-    async ({ channelId, formFields }, extra) => {
-      const clientIp =
-        extra?.requestInfo?.headers?.["x-forwarded-for"]
-          ?.split(",")[0]
-          ?.trim() || "unknown";
-      const auth = await sessionAuthStore.get(extra.sessionId, clientIp);
+    async ({ auth_token, channelId, formFields }, extra) => {
+      const auth = await resolveAuth(auth_token);
       if (!auth) return getAuthError(serverUrl);
       try {
         const result = await UpdateChannel(
@@ -173,15 +166,12 @@ export const registerChannelTools = (server, sessionAuthStore, serverUrl) => {
     {
       description: "Delete a channel by its Wrike ID.",
       inputSchema: {
+        auth_token: authTokenField,
         channelId: z.string().describe("The Wrike ID of the channel"),
       },
     },
-    async ({ channelId }, extra) => {
-      const clientIp =
-        extra?.requestInfo?.headers?.["x-forwarded-for"]
-          ?.split(",")[0]
-          ?.trim() || "unknown";
-      const auth = await sessionAuthStore.get(extra.sessionId, clientIp);
+    async ({ auth_token, channelId }, extra) => {
+      const auth = await resolveAuth(auth_token);
       if (!auth) return getAuthError(serverUrl);
       try {
         const result = await DeleteChannel(

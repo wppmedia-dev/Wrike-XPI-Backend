@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getDatahubCustomFields } from "../../utils/wrike";
-import { getAuthError } from "./auth.js";
+import { getAuthError, resolveAuth, authTokenField } from "./auth.js";
 
 const normalizeFieldMap = (fieldMapping = {}) => {
   if (!fieldMapping || typeof fieldMapping !== "object") return {};
@@ -22,10 +22,9 @@ const normalizeFieldMap = (fieldMapping = {}) => {
  * campaign, channel, or task CRUD tools.
  *
  * @param {import("@modelcontextprotocol/sdk/server/mcp.js").McpServer} server
- * @param {{get: Function}} sessionAuthStore
  * @param {string} serverUrl
  */
-export const registerDatahubTools = (server, sessionAuthStore, serverUrl) => {
+export const registerDatahubTools = (server, serverUrl) => {
   server.registerTool(
     "datahub_list_fields",
 
@@ -36,18 +35,15 @@ export const registerDatahubTools = (server, sessionAuthStore, serverUrl) => {
         "(isCampaignField, isChannelField, isTaskField, isWritable, isReadable) before " +
         "invoking update or create operations.",
       inputSchema: {
+        auth_token: authTokenField,
         includeMetadata: z
           .boolean()
           .optional()
           .describe("Include raw metadata alongside field definitions"),
       },
     },
-    async ({ includeMetadata }, extra) => {
-      const clientIp =
-        extra?.requestInfo?.headers?.["x-forwarded-for"]
-          ?.split(",")[0]
-          ?.trim() || "unknown";
-      const auth = await sessionAuthStore.get(extra.sessionId, clientIp);
+    async ({ auth_token, includeMetadata }, extra) => {
+      const auth = await resolveAuth(auth_token);
       if (!auth) return getAuthError(serverUrl);
 
       try {

@@ -5,30 +5,52 @@ import {
 } from "../../middlewares/authentication";
 
 /**
- * Register authentication-related MCP tools (auth_login, auth_logout).
+ * Resolve auth from a direct XPI token.
+ * Returns null if no token is provided.
+ */
+export const resolveAuth = async (authToken) => {
+  if (authToken && authToken.trim()) {
+    return await ResolveAuthFromJWT(authToken.trim());
+  }
+  return null;
+};
+
+/**
+ * Common optional auth_token field for all tools.
+ */
+export const authTokenField = z
+  .string()
+  .optional()
+  .describe(
+    "XPI access token returned by auth_token_validator. " +
+      "Pass the same token here that you received from auth_token_validator. " +
+      "This is the primary authentication method and works with any MCP client.",
+  );
+
+/**
+ * Register authentication-related MCP tools (auth_token_validator, auth_logout).
  *
  * @param {import("@modelcontextprotocol/sdk/server/mcp.js").McpServer} server
- * @param {{get: Function, set: Function, delete: Function}} sessionAuthStore
  * @param {string} serverUrl - Base URL shown in auth instructions
  */
-export const registerAuthTools = (server, sessionAuthStore, serverUrl) => {
+export const registerAuthTools = (server, serverUrl) => {
   server.registerTool(
-    "auth_login",
+    "auth_token_validator",
 
     {
       description:
-        "Authenticate this MCP session. " +
-        `Open this URL for the user: ${serverUrl}/ ` +
-        "Tell the user to open it in their browser, log in with their Wrike account, then paste the XPI token here. " +
-        "Or the user can provide their XPI username and password directly. " +
-        "Call this first after connecting.",
+        "Authenticate with XPI.\n" +
+        `Ask the user to open this URL in their browser: ${serverUrl}/ ` +
+        "They can log in with their XPI account and will receive a token to paste here,\n" +
+        "or they can provide their XPI username and password directly.\n" +
+        "Once validated, pass the SAME token as the auth_token parameter to every other tool call.",
       inputSchema: z
         .object({
           token: z
             .string()
             .optional()
             .describe(
-              "XPI access token. The user opens the URL in a browser, logs in with their XPI account, then pastes the token here.",
+              "XPI access token. User opens the URL in a browser, logs in with Wrike, then pastes the token here.",
             ),
           username: z
             .string()
@@ -44,19 +66,16 @@ export const registerAuthTools = (server, sessionAuthStore, serverUrl) => {
               data.password &&
               data.password.trim().length > 0),
           {
-            message: "Provide either a token, or both username and password.",
+            message:
+              "Provide a token (recommended), or both username and password.",
           },
         )
         .describe(
-          "Authenticate with a token (from browser login) or username/password.",
+          "Validate an XPI token or authenticate with username/password. " +
+            "After validation, pass the token as auth_token to every other tool.",
         ),
     },
-    async ({ token, username, password }, extra) => {
-      const clientIp =
-        extra?.requestInfo?.headers?.["x-forwarded-for"]
-          ?.split(",")[0]
-          ?.trim() || "unknown";
-
+    async ({ token, username, password }) => {
       let auth;
       if (token && token.trim()) {
         auth = await ResolveAuthFromJWT(token.trim());
@@ -67,8 +86,6 @@ export const registerAuthTools = (server, sessionAuthStore, serverUrl) => {
         );
       }
 
-      await sessionAuthStore.set(extra.sessionId, auth, clientIp);
-
       return {
         content: [
           {
@@ -76,7 +93,16 @@ export const registerAuthTools = (server, sessionAuthStore, serverUrl) => {
             text: JSON.stringify(
               {
                 success: true,
-                message: `Authenticated successfully for environment: ${auth.environmentName}. You can now use all tools.`,
+                message: `Token validated successfully for environment: ${auth.environmentName}.`,
+                instruction:
+                  "Use this token as the auth_token parameter for all other tools: " +
+                    token?.trim() ||
+                  "Username/password authenticated — you can now use tools without auth_token.",
+                token_hint: token?.trim()
+                  ? "Pass auth_token=" +
+                    token.trim().substring(0, 20) +
+                    "... to every tool call."
+                  : "",
               },
               null,
               2,
@@ -96,12 +122,7 @@ export const registerAuthTools = (server, sessionAuthStore, serverUrl) => {
         reason: z.string().optional().describe("Optional reason for logout"),
       },
     },
-    async (_, extra) => {
-      const clientIp =
-        extra?.requestInfo?.headers?.["x-forwarded-for"]
-          ?.split(",")[0]
-          ?.trim() || "unknown";
-      await sessionAuthStore.delete(extra.sessionId, clientIp);
+    async () => {
       return {
         content: [
           {
@@ -132,22 +153,12 @@ export const getAuthError = (serverUrl) => ({
       text: JSON.stringify(
         {
           success: false,
-          message: "Authentication required. You must log in first.",
-          instructions: {
-            step1: {
-              action: "Open this URL in your browser:",
-              url: `${serverUrl}/`,
-            },
-            step2: {
-              action:
-                "Log in with your Wrike account. After successful login, you will see a token on the page.",
-            },
-            step3: {
-              action:
-                "Copy the full token and call the 'auth_login' tool with it:",
-              example: { token: "eyJhbGciOiJIUzI1NiIs..." },
-            },
-          },
+          message: "Authentication required.",
+          action: `Ask the user to open this URL in their browser: ${serverUrl}/`,
+          details:
+            "After logging in with Wrike, they will see a token. " +
+            "Ask them to paste the token here via auth_token_validator. " +
+            "Then pass that same token as auth_token to every tool call.",
         },
         null,
         2,

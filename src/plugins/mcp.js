@@ -18,8 +18,8 @@ const sessions = new Map();
  * Fastify plugin that exposes the MCP (Model Context Protocol) endpoint.
  *
  * The route is intentionally public. Authentication is handled by the
- * MCP auth_login tool and the sessionAuthStore, not by a request-level
- * onRequest hook.
+ * auth_token_validator tool — pass the validated token as auth_token
+ * to every tool call.
  *
  * POST /mcp  – JSON-RPC MCP endpoint (initialize, tools/list, tools/call)
  * GET  /mcp  – Health / readiness check

@@ -4,18 +4,12 @@ import { registerChannelTools } from "./tools/channel.js";
 import { registerTaskTools } from "./tools/task.js";
 import { registerDatahubTools } from "./tools/datahub.js";
 import { registerAuthTools } from "./tools/auth.js";
-import { sessionAuthStore } from "./sessionAuth.js";
-
-export { sessionAuthStore };
 
 /**
  * Create a fully-configured MCP server with all tools registered.
+ * Authentication is done via auth_token passed directly to each tool.
  *
- * Unlike the previous per-request pattern, this creates a SINGLE server
- * instance. Authentication is resolved per-session via the sessionAuthStore,
- * using the MCP session ID provided in the `extra` callback parameter.
- *
- * @param {object} fastify - Fastify instance (passed to create tool)
+ * @param {object} fastify - Fastify instance
  * @param {string} serverUrl - Base URL for auth instructions
  * @returns {McpServer}
  */
@@ -32,14 +26,14 @@ export const createMcpServer = (fastify, serverUrl) => {
     },
   );
 
-  // Auth tools (do NOT require pre-existing auth)
-  registerAuthTools(server, sessionAuthStore, serverUrl);
+  // Auth tools
+  registerAuthTools(server, serverUrl);
 
-  // All other tools resolve auth from the session store keyed by session ID
-  registerCampaignTools(server, sessionAuthStore, fastify, serverUrl);
-  registerChannelTools(server, sessionAuthStore, serverUrl);
-  registerTaskTools(server, sessionAuthStore, serverUrl);
-  registerDatahubTools(server, sessionAuthStore, serverUrl);
+  // All other tools
+  registerCampaignTools(server, fastify, serverUrl);
+  registerChannelTools(server, serverUrl);
+  registerTaskTools(server, serverUrl);
+  registerDatahubTools(server, serverUrl);
 
   return server;
 };

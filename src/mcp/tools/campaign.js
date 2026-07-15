@@ -4,7 +4,7 @@ import { GetCampaign } from "../../routes/campaign/handlers/getCampaign";
 import { CreateCampaign } from "../../routes/campaign/handlers/createCampaign";
 import { UpdateCampaign } from "../../routes/campaign/handlers/updateCampaign";
 import { DeleteCampaign } from "../../routes/campaign/handlers/deleteCampaign";
-import { getAuthError } from "./auth.js";
+import { getAuthError, resolveAuth, authTokenField } from "./auth.js";
 
 const serializeResult = (result) => {
   if (!result) return { success: true, data: null };
@@ -17,19 +17,13 @@ const serializeResult = (result) => {
 
 /**
  * Register all campaign-related MCP tools on the given server instance.
- * Auth is resolved per-session from the sessionAuthStore.
+ * Auth is resolved from the auth_token parameter passed to each tool.
  *
  * @param {import("@modelcontextprotocol/sdk/server/mcp.js").McpServer} server
- * @param {{get: Function}} sessionAuthStore
  * @param {object} fastify
  * @param {string} serverUrl
  */
-export const registerCampaignTools = (
-  server,
-  sessionAuthStore,
-  fastify,
-  serverUrl,
-) => {
+export const registerCampaignTools = (server, fastify, serverUrl) => {
   server.registerTool(
     "campaign_list",
 
@@ -73,6 +67,7 @@ export const registerCampaignTools = (
         "\n" +
         "  URL equivalent: filter=(agency eq 'EssenceMediacom' and campaignname eq 'Lacer - Pilexil - AO Diciembre')&pageSize=5",
       inputSchema: {
+        auth_token: authTokenField,
         filter: z
           .string()
           .optional()
@@ -92,12 +87,8 @@ export const registerCampaignTools = (
           .describe("Token for the next page of results"),
       },
     },
-    async ({ filter, pageSize, nextPageToken }, extra) => {
-      const clientIp =
-        extra?.requestInfo?.headers?.["x-forwarded-for"]
-          ?.split(",")[0]
-          ?.trim() || "unknown";
-      const auth = await sessionAuthStore.get(extra.sessionId, clientIp);
+    async ({ auth_token, filter, pageSize, nextPageToken }, extra) => {
+      const auth = await resolveAuth(auth_token);
       if (!auth) return getAuthError(serverUrl);
       try {
         const result = await GetAllCampaigns(
@@ -125,15 +116,12 @@ export const registerCampaignTools = (
     {
       description: "Read a single campaign by its Wrike folder ID.",
       inputSchema: {
+        auth_token: authTokenField,
         campaignId: z.string().describe("The Wrike folder ID of the campaign"),
       },
     },
-    async ({ campaignId }, extra) => {
-      const clientIp =
-        extra?.requestInfo?.headers?.["x-forwarded-for"]
-          ?.split(",")[0]
-          ?.trim() || "unknown";
-      const auth = await sessionAuthStore.get(extra.sessionId, clientIp);
+    async ({ auth_token, campaignId }, extra) => {
+      const auth = await resolveAuth(auth_token);
       if (!auth) return getAuthError(serverUrl);
       try {
         const result = await GetCampaign(
@@ -162,6 +150,7 @@ export const registerCampaignTools = (
       description:
         "Create a campaign using the existing request-form workflow. Requires space, entity, variantId, and optional fields.",
       inputSchema: {
+        auth_token: authTokenField,
         space: z.string().describe("Wrike space identifier"),
         entity: z.string().describe("Entity type for the request form"),
         variantId: z.number().int().describe("Variant ID for the request form"),
@@ -175,12 +164,11 @@ export const registerCampaignTools = (
           .describe("If true, returns a pre-fill URL instead of submitting"),
       },
     },
-    async ({ space, entity, variantId, fields, isCreatedByURL }, extra) => {
-      const clientIp =
-        extra?.requestInfo?.headers?.["x-forwarded-for"]
-          ?.split(",")[0]
-          ?.trim() || "unknown";
-      const auth = await sessionAuthStore.get(extra.sessionId, clientIp);
+    async (
+      { auth_token, space, entity, variantId, fields, isCreatedByURL },
+      extra,
+    ) => {
+      const auth = await resolveAuth(auth_token);
       if (!auth) return getAuthError(serverUrl);
       try {
         const result = await CreateCampaign(
@@ -216,6 +204,7 @@ export const registerCampaignTools = (
       description:
         "Update a campaign by its Wrike folder ID. Provide formFields as a key-value object of field names to values.",
       inputSchema: {
+        auth_token: authTokenField,
         campaignId: z.string().describe("The Wrike folder ID of the campaign"),
         formFields: z
           .record(z.any())
@@ -223,12 +212,8 @@ export const registerCampaignTools = (
           .describe("Key-value map of field names to new values"),
       },
     },
-    async ({ campaignId, formFields }, extra) => {
-      const clientIp =
-        extra?.requestInfo?.headers?.["x-forwarded-for"]
-          ?.split(",")[0]
-          ?.trim() || "unknown";
-      const auth = await sessionAuthStore.get(extra.sessionId, clientIp);
+    async ({ auth_token, campaignId, formFields }, extra) => {
+      const auth = await resolveAuth(auth_token);
       if (!auth) return getAuthError(serverUrl);
       try {
         const result = await UpdateCampaign(
@@ -256,15 +241,12 @@ export const registerCampaignTools = (
     {
       description: "Delete a campaign by its Wrike folder ID.",
       inputSchema: {
+        auth_token: authTokenField,
         campaignId: z.string().describe("The Wrike folder ID of the campaign"),
       },
     },
-    async ({ campaignId }, extra) => {
-      const clientIp =
-        extra?.requestInfo?.headers?.["x-forwarded-for"]
-          ?.split(",")[0]
-          ?.trim() || "unknown";
-      const auth = await sessionAuthStore.get(extra.sessionId, clientIp);
+    async ({ auth_token, campaignId }, extra) => {
+      const auth = await resolveAuth(auth_token);
       if (!auth) return getAuthError(serverUrl);
       try {
         const result = await DeleteCampaign(
