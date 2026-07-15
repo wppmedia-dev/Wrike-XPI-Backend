@@ -168,7 +168,7 @@ export const ValidateToken = async (req, reply, fastify) => {
 /**
  * Resolve a JWE token to { wrikeToken, environmentName }.
  * Reuses the existing verifyJWE + decrypt + refresh logic.
- * This is used by the MCP auth.login tool for session-based authentication.
+ * This is used by the MCP auth_login tool for session-based authentication.
  */
 const resolveAuth = async (token, dek) => {
   if (!token?.encrypted_access_token) throw new Error("No access token found");
