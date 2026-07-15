@@ -93,14 +93,7 @@ export const registerCampaignTools = (
       },
     },
     async ({ filter, pageSize, nextPageToken }, extra) => {
-      console.error("[campaign_list] Looking up sessionId:", extra.sessionId);
       const auth = sessionAuthStore.get(extra.sessionId);
-      console.error(
-        "[campaign_list] Auth found:",
-        !!auth,
-        "auth key:",
-        auth ? auth.environmentName : "null",
-      );
       if (!auth) return getAuthError(serverUrl);
       try {
         const result = await GetAllCampaigns(
