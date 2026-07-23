@@ -9,23 +9,15 @@ const { createMcpServer } = require("../mcp/index.js");
 /**
  * Fastify plugin that exposes the MCP (Model Context Protocol) endpoint.
  *
- * Auth is token-based (passed as auth_token to each tool call),
- * so transport sessions are only needed for MCP protocol compliance.
+ * Each POST request gets a fresh server + transport so multiple agents
+ * can connect simultaneously. Auth is token-based (passed as auth_token
+ * to each tool), so no session state is shared between requests.
  *
  * POST /mcp  – JSON-RPC MCP endpoint
  * GET  /mcp  – Health / readiness check
  */
 module.exports = async function (fastify, opts) {
   const serverUrl = process.env.APP_URL || "http://localhost:3000";
-
-  // Single shared session for all MCP protocol communication.
-  // Auth is per-token, not per-session, so one transport is sufficient.
-  const server = createMcpServer(fastify, serverUrl);
-  const transport = new StreamableHTTPServerTransport({
-    enableJsonResponse: true,
-    sessionIdGenerator: () => uuidv4(),
-  });
-  await server.connect(transport);
 
   // ── MCP POST handler ──────────────────────────────────────────────
   fastify.post("/mcp", async (req, reply) => {
@@ -41,6 +33,12 @@ module.exports = async function (fastify, opts) {
         req.raw.headers.accept = "application/json, text/event-stream";
       }
 
+      // Fresh server + transport per request — no shared session state
+      const server = createMcpServer(fastify, serverUrl);
+      const transport = new StreamableHTTPServerTransport({
+        enableJsonResponse: true,
+      });
+      await server.connect(transport);
       await transport.handleRequest(req.raw, reply.raw, req.body);
     } catch (err) {
       const code = err?.statusCode || 500;
