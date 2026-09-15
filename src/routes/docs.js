@@ -407,6 +407,10 @@ export const createMcpServer = async (fastify, serverUrl, auth) => {
               ],
             )}
             ${callout("info", "The address is Wrike's, not ours", "<code>WRIKE_MCP_URL=https://mcp.wrike.com/v2</code> (<code>.env</code>) is Wrike's own published MCP service.")}
+
+            <h3 class="pg-h3">Where the token actually lives</h3>
+            <p class="pg-p">There is no direct path from an external MCP client straight to Wrike — every request crosses through our server first. The Wrike OAuth token itself is encrypted at rest in Postgres (<code>user_tokens</code>), decrypted per request by <code>authentication.js</code>, and reused as the bearer credential when calling out to Wrike's MCP. It is never handed to the connecting assistant.</p>
+            ${callout("warn", "No shortcut exists", "An external client cannot skip our server and call mcp.wrike.com directly — it has no route to the token that authenticates that call.")}
             `,
             `
             <p class="pg-p">Think of our app as a <b>front desk</b>. An AI assistant asks the front desk for something, and the front desk decides how to get it done — two different ways:</p>
@@ -417,6 +421,7 @@ export const createMcpServer = async (fastify, serverUrl, auth) => {
             ${callout("tip", "Why not build everything ourselves?", "Wrike already maintains its own toolkit and keeps it current whenever Wrike changes. Borrowing it live means we never rebuild or maintain that part.")}
             ${callout("info", "No extra login", "Borrowing Wrike's toolkit reuses the same Wrike login you already gave us — nobody logs in twice, and your credentials are never shown to the assistant.")}
             <p class="pg-p">The assistant only ever sees <b>one</b> combined list of things it can do — it never has to know which side actually answered.</p>
+            ${callout("warn", "No shortcut exists", "The assistant has no way to reach Wrike directly, skipping our app — it never holds the key that would let it.")}
             `,
           )}`,
       },
@@ -460,6 +465,16 @@ description:
               "src/mcp/tools/task.js",
             )}
 
+            <h3 class="pg-h3">Three safeguards against name collisions</h3>
+            ${table(
+              ["Safeguard", "How it works"],
+              [
+                ["Rename on arrival", "<code>server.registerTool(&quot;wrike_&quot; + tool.name, ...)</code> — every borrowed tool is registered under a distinct prefixed name before the assistant ever sees a tool list."],
+                ["Explicit cross-reference", "Native descriptions name the exact <code>wrike_*</code> tool to compare against, not a vague pointer — the assistant can look it up."],
+                ["Conditional registration", "<code>wrike_*</code> tools only exist when <code>auth?.wrikeToken</code> is set and Wrike's MCP actually returned a tool list — when it's unreachable, there is nothing to conflict with."],
+              ],
+            )}
+
             <h3 class="pg-h3">Full tool roster</h3>
             ${table(
               ["XPI tool", "Wrike counterpart", "Reasoning"],
@@ -484,6 +499,9 @@ description:
             <h3 class="pg-h3">The note on each tool</h3>
             <p class="pg-p">On top of the rulebook, most of our tools carry their own short note — this is where the real decision detail lives.</p>
             ${callout("info", "Example — the note on “update a task”", `"Prefer this over Wrike's generic update tool, because that one writes raw technical field codes and skips our validation."`)}
+
+            <h3 class="pg-h3">Why the names never clash</h3>
+            <p class="pg-p">Every tool borrowed from Wrike is given a distinct name before the assistant ever sees it — so it's physically impossible for one of our tools and a Wrike tool to be confused for each other. And if Wrike's toolkit isn't reachable at that moment, its tools simply don't appear at all — there's nothing to clash with.</p>
 
             <h3 class="pg-h3">What each tool does</h3>
             ${table(
@@ -555,6 +573,17 @@ async ({ taskId }, extra) => {
               "src/mcp/tools/task.js",
             )}
             ${callout("warn", "Caveat", "Elicitation is a capability the connecting client must declare support for — this server cannot force it. Pair it with the destructiveHint annotation (already set) as a fallback.")}
+
+            <h3 class="pg-h3">Other asks, mapped to an extension point</h3>
+            ${table(
+              ["Ask", "Extension point", "Where"],
+              [
+                ["Cap deletes per session", "Handler code", "Add a counter check inside the handler, like <code>ids_convert</code>'s existing <code>MAX_IDS_PER_CALL</code> cap (<code>ids.js:16</code>)."],
+                ["Hide specific <code>wrike_*</code> tools", "<code>wrikeMcpProxy.js:189-209</code>", "Add a name-based filter on <code>tools</code> before the <code>.forEach</code> loop in <code>registerWrikeProxyTools</code>."],
+                ["Log every individual tool call", "<code>src/plugins/mcp.js</code>", "Currently one activity-log row per HTTP request (<code>recordActivity</code>, lines 82-105), not per tool call — needs a hook inside each handler or around <code>registerTool</code>."],
+                ["Extra approval on high-value fields (e.g. budget)", "① + ④ combined", "Describe the rule in <code>campaign_update</code>'s description, then gate an <code>elicitInput</code> call on whether <code>formFields.campaignbudget</code> is present."],
+              ],
+            )}
             `,
             `
             <div class="flow">
@@ -569,6 +598,18 @@ async ({ taskId }, extra) => {
             <p class="pg-p"><b>Lightest version (already true today):</b> delete actions already carry a sensitive-action flag. Any assistant that respects it already shows its own confirmation — no work needed, though it's a request, not a guarantee.</p>
             <p class="pg-p"><b>Fully enforced version:</b> before anything is deleted, the assistant is made to show the person a real yes/no prompt naming exactly what will be deleted. Only "yes" continues; anything else cancels and nothing happens.</p>
             ${callout("warn", "One honest limit", "The fully-enforced version only works if the connecting assistant knows how to display that kind of prompt. Most modern assistants do, but it isn't guaranteed for every one — which is why pairing it with the lighter “flag” approach is worth doing too.")}
+
+            <h3 class="pg-h3">Other future requests, and roughly where they'd land</h3>
+            ${table(
+              ["Request", "Roughly where it would be made"],
+              [
+                ["Limit how many things can be deleted at once", "Inside the specific delete action itself — a counter check, similar to how one existing tool already caps a bulk operation."],
+                ["Add a brand-new capability", "A new tool is written, wired into the same toolkit our existing tools already belong to, then given its own plain-language note the same way the others have."],
+                ["Hide certain Wrike tools from the assistant", "The place where Wrike's toolkit is borrowed and merged in — a short filter can leave specific ones out."],
+                ["Keep a record of every individual action taken", "Currently, one record is kept per connection, not per individual action — a more detailed log would need a small addition inside each action."],
+                ["Require extra approval for sensitive changes (e.g. budget)", "Combine options 1 and 4 — a note explaining the rule, plus a real pause-and-confirm step triggered only when a budget field is involved."],
+              ],
+            )}
             `,
           )}`,
       },
