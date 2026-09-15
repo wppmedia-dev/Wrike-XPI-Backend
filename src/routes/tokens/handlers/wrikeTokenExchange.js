@@ -11,8 +11,12 @@ import {
 
 export const WrikeTokenExchange = ({ code, environmentId, ip }, fastify) => {
   return new Promise(async (resolve, reject) => {
-    // Start database transaction for data consistency
-    const transaction = await models.sequelize.transaction();
+    // Transaction is opened later, right before the first write — it must
+    // not span the outbound Wrike API calls or the access check below, since
+    // holding a pooled connection idle for the length of an external HTTP
+    // round-trip is what was starving the (small) connection pool for every
+    // other request, including login.
+    let transaction;
 
     try {
       if (!code) return reject({ message: "Access Token must not be empty" });
@@ -51,7 +55,6 @@ export const WrikeTokenExchange = ({ code, environmentId, ip }, fastify) => {
 
       if (!wrikeUserId) {
         console.log("Invalid Wrike User!");
-        await transaction.rollback();
         return reject({ message: "Invalid Wrike User!" });
       }
 
@@ -77,7 +80,6 @@ export const WrikeTokenExchange = ({ code, environmentId, ip }, fastify) => {
         console.log(
           `Environment access denied for ${primaryEmail || "unknown caller"}: ${access.code} (${access.message})`,
         );
-        await transaction.rollback();
         return reject({
           statusCode: 403,
           message: PUBLIC_DENIAL_MESSAGE,
@@ -86,6 +88,10 @@ export const WrikeTokenExchange = ({ code, environmentId, ip }, fastify) => {
       }
 
       const accountId = profiles?.[0]?.accountId;
+
+      // Start database transaction for data consistency — from here on,
+      // only DB writes happen, no more outbound HTTP calls.
+      transaction = await models.sequelize.transaction();
 
       // Create or get user
       const userData = await Users.GetByWrikeId(wrikeUserId);
@@ -203,12 +209,18 @@ export const WrikeTokenExchange = ({ code, environmentId, ip }, fastify) => {
         },
       });
     } catch (err) {
-      // Rollback transaction on any error
-      await transaction.rollback();
-      console.log(
-        "Database transaction rolled back due to error:",
-        err?.message || err,
-      );
+      // Rollback only if the transaction was actually opened — errors from
+      // the pre-transaction steps (env lookup, Wrike API calls, access
+      // check) have no transaction to roll back.
+      if (transaction) {
+        await transaction.rollback();
+        console.log(
+          "Database transaction rolled back due to error:",
+          err?.message || err,
+        );
+      } else {
+        console.log(err?.message || err);
+      }
       reject(err);
     }
   });
