@@ -1,4 +1,4 @@
-import { encryptField } from "../../../../utils/crypto";
+import { encryptField, decryptField } from "../../../../utils/crypto";
 import { syncWrikeCredentialsFromDB } from "../../../../utils/wrikeCredentials";
 import { WrikeCredentials } from "../../../../controllers";
 
@@ -59,9 +59,20 @@ export const Update = (profile_id, { id }, body) => {
         xpi_space_name_datahub_id: xpi_space_name_datahub_id || null,
         campaign_space_id: campaign_space_id || null,
       };
-      if (client_id) updates.client_id = encryptField(client_id);
-      if (client_secret && client_secret != existing?.client_secret)
-        updates.client_secret = encryptField(client_secret);
+      if (client_id) {
+        const currentClientId = credential.client_id
+          ? decryptField(credential.client_id)
+          : null;
+        if (client_id !== currentClientId)
+          updates.client_id = encryptField(client_id);
+      }
+      if (client_secret) {
+        const currentClientSecret = credential.client_secret
+          ? decryptField(credential.client_secret)
+          : null;
+        if (client_secret !== currentClientSecret)
+          updates.client_secret = encryptField(client_secret);
+      }
       if (is_visible !== undefined) updates.is_visible = is_visible;
       if (is_active !== undefined) updates.is_active = is_active;
 

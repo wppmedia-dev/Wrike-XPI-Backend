@@ -1,5 +1,5 @@
 import { WrikeCredentials } from "../../../../controllers";
-import { encryptField } from "../../../../utils/crypto";
+import { encryptField, decryptField } from "../../../../utils/crypto";
 import { syncWrikeCredentialsFromDB } from "../../../../utils/wrikeCredentials";
 
 export const UpdateEnvironment = (portalUser, id, body) => {
@@ -57,20 +57,30 @@ export const UpdateEnvironment = (portalUser, id, body) => {
         updateData.environment_name = environment_name.trim();
       }
       if (client_id !== undefined) {
-        if (!client_id.trim())
+        const trimmedClientId = client_id.trim();
+        if (!trimmedClientId)
           return reject({
             statusCode: 400,
             message: "Client ID cannot be empty",
           });
-        updateData.client_id = encryptField(client_id.trim());
+        const currentClientId = env.client_id
+          ? decryptField(env.client_id)
+          : null;
+        if (trimmedClientId !== currentClientId)
+          updateData.client_id = encryptField(trimmedClientId);
       }
       if (client_secret !== undefined) {
-        if (!client_secret.trim())
+        const trimmedClientSecret = client_secret.trim();
+        if (!trimmedClientSecret)
           return reject({
             statusCode: 400,
             message: "Client Secret cannot be empty",
           });
-        updateData.client_secret = encryptField(client_secret.trim());
+        const currentClientSecret = env.client_secret
+          ? decryptField(env.client_secret)
+          : null;
+        if (trimmedClientSecret !== currentClientSecret)
+          updateData.client_secret = encryptField(trimmedClientSecret);
       }
       if (account_id !== undefined)
         updateData.account_id = account_id ? account_id.trim() : null;

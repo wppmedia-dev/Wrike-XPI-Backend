@@ -13,7 +13,9 @@ export const GetAll = () => {
         id: cred.id,
         environment_name: cred.environment_name,
         client_id: cred.client_id ? decryptField(cred.client_id) : null,
-        client_secret: cred.client_secret || null,
+        client_secret: cred.client_secret
+          ? decryptField(cred.client_secret)
+          : null,
         account_id: cred.account_id || null,
         xpi_api_modules_datahub_id: cred.xpi_api_modules_datahub_id || null,
         xpi_api_services_datahub_id: cred.xpi_api_services_datahub_id || null,
