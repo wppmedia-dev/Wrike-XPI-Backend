@@ -99,6 +99,21 @@ module.exports = async function (fastify, opts) {
         <span class="ep-desc">${desc}</span>
       </div>`;
 
+    // Two views of the same topic: v1 = code-level (file paths, line numbers,
+    // literal snippets), v2 = plain-language (no code, analogies). Each call
+    // gets its own scoped toggle so multiple switches can live on one page.
+    const viewSwitch = (v1Html, v2Html) => `
+      <div class="view-switch">
+        <div class="view-toggle" role="tablist">
+          <button type="button" class="view-btn active" data-view="v1"><span class="view-tag">V1</span> Code-level</button>
+          <button type="button" class="view-btn" data-view="v2"><span class="view-tag">V2</span> Plain language</button>
+        </div>
+        <div class="view-body">
+          <div class="view-panel active" data-view="v1">${v1Html}</div>
+          <div class="view-panel" data-view="v2">${v2Html}</div>
+        </div>
+      </div>`;
+
     const api = (rel) => `${esc(apiUrl)}${rel}`;
     const bearerExample = `curl -X GET "${apiUrl}/wrikexpi/campaign?pageSize=10" \\
   -H "Authorization: Bearer <access_token>"`;
@@ -341,6 +356,221 @@ module.exports = async function (fastify, opts) {
 
           <h2 class="pg-h2">Scopes</h2>
           <p class="pg-p">The endpoint operates within the scopes granted to the WrikeXPI application. Contact your administrator to review scopes for your workspace.</p>`,
+      },
+      {
+        id: "mcp/architecture",
+        group: "MCP Docs",
+        groupId: "mcp",
+        label: "Architecture",
+        keywords:
+          "architecture wrikexpi-mcp wrike mcp proxy hosted server client streamable http how it connects front desk",
+        html: `
+          <div class="pg-eyebrow">MCP Docs</div>
+          <h1 class="pg-title">How our MCP connects to Wrike's MCP</h1>
+          <p class="pg-lede">WrikeXPI runs two MCP roles at once: it is an MCP server any assistant can connect to, and internally, it is also an MCP client that connects out to Wrike's own hosted MCP server.</p>
+
+          ${viewSwitch(
+            `
+            <p class="pg-p">The server is created once in <code>src/mcp/index.js</code>, named <code>wrikexpi-mcp</code>, and registers five native tool groups plus — conditionally — a set of proxied Wrike tools:</p>
+            ${codeBlock(
+              "js",
+              `// src/mcp/index.js:53-90
+export const createMcpServer = async (fastify, serverUrl, auth) => {
+  const server = new McpServer({ name: "wrikexpi-mcp", ... });
+
+  registerCampaignTools(server, fastify, serverUrl, auth);
+  registerChannelTools(server, serverUrl, auth);
+  registerTaskTools(server, serverUrl, auth);
+  registerDatahubTools(server, serverUrl, auth);
+  registerIdsTools(server, serverUrl, auth);
+
+  // merges in Wrike's own hosted tools — no-op if unreachable
+  if (auth?.wrikeToken) {
+    await registerWrikeProxyTools(server, fastify, auth.wrikeToken);
+  }
+  return server;
+};`,
+              "src/mcp/index.js",
+            )}
+            <p class="pg-p">Reachable over real MCP Streamable HTTP, wired in <code>src/plugins/mcp.js</code>: <code>POST /mcp</code>, <code>POST /mcp/:environmentId</code>, and a <code>GET</code> health check. Auth is a bearer token resolved once per request via <code>resolveAuth</code> (<code>src/mcp/tools/auth.js</code>) — never a tool-call parameter.</p>
+
+            <h3 class="pg-h3">The Wrike proxy</h3>
+            <p class="pg-p"><code>src/mcp/wrikeMcpProxy.js</code> opens a second, outbound MCP connection — this server acting as a <em>client</em> — to Wrike's own hosted endpoint.</p>
+            ${table(
+              ["Step", "What happens", "Source"],
+              [
+                ["Connect", "Opens <code>StreamableHTTPClientTransport</code> to <code>process.env.WRIKE_MCP_URL</code>, authenticated with the same Wrike OAuth token already decrypted for REST calls.", "<code>wrikeMcpProxy.js:29-51</code>"],
+                ["Discover", "<code>client.listTools()</code> fetches Wrike's tool catalog. Cached in Redis for 300s.", "<code>wrikeMcpProxy.js:122-148</code>"],
+                ["Register", "Every returned tool is re-registered on our server, renamed <code>wrike_&lt;name&gt;</code>.", "<code>wrikeMcpProxy.js:189-209</code>"],
+                ["Forward", "A call to any <code>wrike_*</code> tool opens a fresh connection and runs <code>client.callTool(...)</code>, relaying the result back.", "<code>wrikeMcpProxy.js:155-176</code>"],
+                ["Fail safe", "Any error is caught and returns <code>[]</code> — native tools are unaffected.", "<code>wrikeMcpProxy.js:140-147</code>"],
+              ],
+            )}
+            ${callout("info", "The address is Wrike's, not ours", "<code>WRIKE_MCP_URL=https://mcp.wrike.com/v2</code> (<code>.env</code>) is Wrike's own published MCP service.")}
+            `,
+            `
+            <p class="pg-p">Think of our app as a <b>front desk</b>. An AI assistant asks the front desk for something, and the front desk decides how to get it done — two different ways:</p>
+            <ul class="ordered" style="list-style:disc; padding-left:22px;">
+              <li><b>Handle it itself</b>, using tools our team built for how we use Wrike — campaigns, channels, tasks.</li>
+              <li><b>Pass it straight through to Wrike</b>, using a direct connection to Wrike's own toolkit — the one Wrike builds and maintains.</li>
+            </ul>
+            ${callout("tip", "Why not build everything ourselves?", "Wrike already maintains its own toolkit and keeps it current whenever Wrike changes. Borrowing it live means we never rebuild or maintain that part.")}
+            ${callout("info", "No extra login", "Borrowing Wrike's toolkit reuses the same Wrike login you already gave us — nobody logs in twice, and your credentials are never shown to the assistant.")}
+            <p class="pg-p">The assistant only ever sees <b>one</b> combined list of things it can do — it never has to know which side actually answered.</p>
+            `,
+          )}`,
+      },
+      {
+        id: "mcp/instructions",
+        group: "MCP Docs",
+        groupId: "mcp",
+        label: "Instructions & tool roster",
+        keywords:
+          "instructions guidance mcp_instructions per-tool description conflict resolution wrike_ prefix tool roster overlap native proxied",
+        html: `
+          <div class="pg-eyebrow">MCP Docs</div>
+          <h1 class="pg-title">How the assistant is guided</h1>
+          <p class="pg-lede">There's no single master prompt. Guidance lives at two levels, and every native tool has an explicit relationship to its Wrike counterpart, if one exists.</p>
+
+          ${viewSwitch(
+            `
+            <h3 class="pg-h3">Layer 1 — server-level instructions</h3>
+            <p class="pg-p">One constant, <code>MCP_INSTRUCTIONS</code>, defined in <code>src/mcp/index.js:18-40</code>, passed as the SDK's <code>instructions</code> field at handshake time.</p>
+            ${codeBlock(
+              "text",
+              `HOW TO CHOOSE — avoid conflict
+- Let the resource decide the family, not the tool list: XPI-managed
+  resource -> XPI tool; a generic Wrike item/space/user/approval/
+  comment/etc. -> wrike_* tool.
+- Never call an XPI tool and a wrike_* tool for the same job.
+- If an expected wrike_* tool is missing, fall back to the XPI
+  toolset or tell the user it is unavailable.`,
+              "src/mcp/index.js:28-31",
+            )}
+            <h3 class="pg-h3">Layer 2 — per-tool instructions</h3>
+            <p class="pg-p">Each tool's own <code>description</code> string names its counterpart directly and explains why to prefer one over the other:</p>
+            ${codeBlock(
+              "js",
+              `// src/mcp/tools/task.js:220-226
+description:
+  "Update an XPI task by its Wrike task ID... " +
+  "Prefer this over wrike_update_items for XPI task data — " +
+  "wrike_update_items writes raw custom field IDs directly and " +
+  "bypasses XPI field mapping/validation."`,
+              "src/mcp/tools/task.js",
+            )}
+
+            <h3 class="pg-h3">Full tool roster</h3>
+            ${table(
+              ["XPI tool", "Wrike counterpart", "Reasoning"],
+              [
+                ["<code>datahub_list_fields</code>", "<i>none</i>", "The short-code field dictionary every other XPI tool depends on."],
+                ["<code>campaign_create</code>", "<code>wrike_create_project_folder_item</code>", "Goes through the request-form workflow XPI campaigns require."],
+                ["<code>*_update</code> (campaign/channel/task)", "<code>wrike_update_items</code>", "Applies field validation; the raw tool writes unvalidated custom-field IDs."],
+                ["<code>*_delete</code> (campaign/channel/task)", "<i>none</i>", "\"This is the ONLY delete operation exposed — Wrike's MCP tools do not provide a delete.\""],
+                ["<code>task_get</code> / <code>task_list_*</code>", "<code>wrike_get_item_details</code>, <code>wrike_get_items_children</code>", "Validates XPI task type and translates fields to short codes."],
+                ["<code>ids_convert</code>", "<i>none</i>", "Converts legacy API v2 IDs — pure XPI plumbing."],
+                ["<i>none</i>", "<code>wrike_get_approvals</code>, <code>wrike_*_comment</code>, <code>wrike_get_my_inbox</code>, <code>wrike_search_users</code>, <code>wrike_search_spaces</code>, attachments", "Ground XPI never modeled — comments, approvals, users, spaces."],
+              ],
+            )}
+            ${callout("tip", "The pattern", "XPI wins wherever it layers meaning onto a resource (short codes, validation, request-forms). Wrike wins wherever the resource is something XPI never modeled — comments, approvals, users, spaces.")}
+
+            <h3 class="pg-h3">Worked example</h3>
+            <p class="pg-p"><b>Request:</b> "Set task <code>MQAAAAELy_uV</code> to In Progress." (1) Server rule: resource is a task. (2) <code>task_update</code>'s own text names <code>wrike_update_items</code> and the risk. (3) <code>taskstatus</code> is a short code Wrike's tool can't interpret. <b>Result:</b> <code>task_update</code> is called; <code>wrike_update_items</code> is never touched.</p>
+            `,
+            `
+            <h3 class="pg-h3">The general rulebook</h3>
+            ${callout("info", "In plain words", `"Let the type of thing you're working with decide which toolkit to use — if it's an XPI campaign, channel, or task, use our tools; if it's a general Wrike item, comment, approval, or person, use Wrike's tools. Never use both for the same job."`)}
+            <h3 class="pg-h3">The note on each tool</h3>
+            <p class="pg-p">On top of the rulebook, most of our tools carry their own short note — this is where the real decision detail lives.</p>
+            ${callout("info", "Example — the note on “update a task”", `"Prefer this over Wrike's generic update tool, because that one writes raw technical field codes and skips our validation."`)}
+
+            <h3 class="pg-h3">What each tool does</h3>
+            ${table(
+              ["What it's for", "Type", "In plain words"],
+              [
+                ["Look up field names", "Our tool", "Gives the assistant the dictionary of field names our campaigns/tasks use."],
+                ["Create / update / delete a campaign, channel, or task", "Our tool", "Applies our validation and friendly names. Deleting has no Wrike equivalent at all."],
+                ["View a task, or list tasks", "Our tool", "Confirms the item is really one of ours and shows friendly field names."],
+                ["Convert an old ID", "Our tool", "Translates outdated links — nothing on Wrike's side does this."],
+                ["Search any Wrike item, approvals, comments, inbox, people, spaces, attachments", "Wrike's tool", "General Wrike actions we never built our own version of."],
+              ],
+            )}
+
+            <h3 class="pg-h3">Watching an overlap resolve</h3>
+            <p class="pg-p"><b>Request:</b> "Set this task to In Progress." Either toolkit could technically do it. The general rulebook says "let the type decide" — but that's not enough alone. Our tool's own note breaks the tie by naming the risk in Wrike's version. And "In Progress" is written using our friendly status name, which Wrike's tool can't interpret. <b>Result:</b> our tool handles it; Wrike's version is never touched.</p>
+            `,
+          )}`,
+      },
+      {
+        id: "mcp/extending",
+        group: "MCP Docs",
+        groupId: "mcp",
+        label: "Making a change",
+        keywords:
+          "extend extending future enhancement confirmation before delete elicitation elicitInput destructiveHint annotations customize add tool",
+        html: `
+          <div class="pg-eyebrow">MCP Docs</div>
+          <h1 class="pg-title">Where to make a future change</h1>
+          <p class="pg-lede">Four places, ranked lightest-touch to most involved. "Ask for confirmation before deleting something" is used below as the running example.</p>
+
+          ${viewSwitch(
+            `
+            ${table(
+              ["#", "Extension point", "Where"],
+              [
+                ["1", "Per-tool description text", "<code>src/mcp/tools/*.js</code> — edit the <code>description</code> string inside a <code>server.registerTool(...)</code> call."],
+                ["2", "Server-level instructions", "<code>src/mcp/index.js:18-40</code> — edit <code>MCP_INSTRUCTIONS</code>. Applies to every tool at once."],
+                ["3", "Tool annotations", "<code>annotations: { destructiveHint: true, ... }</code> — advisory metadata some MCP clients render their own warning UI from. Not enforced server-side."],
+                ["4", "Elicitation", "<code>server.elicitInput({ mode: 'form', ... })</code> — a real, enforced confirmation prompt. Not used anywhere in this codebase today; requires the connecting client to support it."],
+              ],
+            )}
+            <h3 class="pg-h3">Worked example — confirm before <code>task_delete</code></h3>
+            ${codeBlock(
+              "js",
+              `// src/mcp/tools/task.js — inside task_delete's handler
+async ({ taskId }, extra) => {
+  if (!auth) return getAuthError(serverUrl);
+
+  // NEW — ask for confirmation before deleting anything
+  const confirmation = await server.server.elicitInput({
+    mode: 'form',
+    message: \`Delete task \${taskId}? This cannot be undone.\`,
+    requestedSchema: {
+      type: 'object',
+      properties: {
+        confirm: { type: 'boolean', title: 'Yes, delete it' },
+      },
+      required: ['confirm'],
+    },
+  });
+
+  if (confirmation.action !== 'accept' || !confirmation.content?.confirm) {
+    return { content: [{ type: 'text', text: 'Delete cancelled.' }] };
+  }
+
+  // unchanged from here down
+  const result = await DeleteTask(auth.wrikeToken, { taskId }, auth.environmentName);
+  ...`,
+              "src/mcp/tools/task.js",
+            )}
+            ${callout("warn", "Caveat", "Elicitation is a capability the connecting client must declare support for — this server cannot force it. Pair it with the destructiveHint annotation (already set) as a fallback.")}
+            `,
+            `
+            <div class="flow">
+              <div class="flow-step"><span class="flow-n">1</span><strong>Smallest change</strong><p>Add a sentence to one tool's note — e.g. "double-check the name before deleting." Affects only that action.</p></div>
+              <div class="flow-step"><span class="flow-n">2</span><strong>Small change</strong><p>Add a rule to the general rulebook — e.g. "always confirm before deleting anything." Applies everywhere.</p></div>
+              <div class="flow-step"><span class="flow-n">3</span><strong>Small change</strong><p>Every delete already carries a "this is risky" flag. Some assistants show their own warning automatically from it.</p></div>
+              <div class="flow-step"><span class="flow-n">4</span><strong>A real, built-in step</strong><p>Genuinely pauses the action and asks the assistant to show a real "are you sure?" prompt — not just a note. Detailed below.</p></div>
+            </div>
+
+            <h3 class="pg-h3">How option 4 actually works</h3>
+            <p class="pg-p">This app's underlying system supports pausing a delete action and asking the connected assistant to show the person a real confirmation prompt before continuing.</p>
+            <p class="pg-p"><b>Lightest version (already true today):</b> delete actions already carry a sensitive-action flag. Any assistant that respects it already shows its own confirmation — no work needed, though it's a request, not a guarantee.</p>
+            <p class="pg-p"><b>Fully enforced version:</b> before anything is deleted, the assistant is made to show the person a real yes/no prompt naming exactly what will be deleted. Only "yes" continues; anything else cancels and nothing happens.</p>
+            ${callout("warn", "One honest limit", "The fully-enforced version only works if the connecting assistant knows how to display that kind of prompt. Most modern assistants do, but it isn't guaranteed for every one — which is why pairing it with the lighter “flag” approach is worth doing too.")}
+            `,
+          )}`,
       },
     ];
 
@@ -1065,6 +1295,7 @@ module.exports = async function (fastify, opts) {
     .pg-title { font-family: var(--display); font-size: 2.1rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.12; margin-bottom: 14px; }
     .pg-lede { color: var(--fg-dim); font-size: 1.06rem; max-width: 60ch; margin-bottom: 30px; }
     .pg-h2 { font-family: var(--display); font-size: 1.28rem; font-weight: 600; letter-spacing: -0.01em; margin: 38px 0 14px; padding-top: 6px; }
+    .pg-h3 { font-family: var(--display); font-size: 1.05rem; font-weight: 600; letter-spacing: -0.005em; margin: 26px 0 10px; }
     .pg-p { color: #334155; margin: 12px 0; }
     .pg-p em { color: var(--fg); font-style: normal; border-bottom: 1px dashed var(--border-strong); }
 
@@ -1184,6 +1415,19 @@ module.exports = async function (fastify, opts) {
     .client-tab.active { background: var(--card); color: var(--accent); box-shadow: 0 1px 3px rgba(15,23,42,0.12); }
     .client-panel { display: none; }
     .client-panel.active { display: block; animation: pageIn .22s ease; }
+
+    /* V1 (code-level) / V2 (plain-language) view switch — scoped per instance */
+    .view-switch { border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); margin: 18px 0; overflow: hidden; }
+    .view-toggle { display: flex; gap: 4px; background: var(--muted); border-bottom: 1px solid var(--border); padding: 4px; }
+    .view-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px; background: none; border: none; color: var(--fg-dim); font-family: var(--sans); font-weight: 600; font-size: 0.83rem; padding: 9px 14px; border-radius: 8px; cursor: pointer; transition: all .14s ease; }
+    .view-btn:hover { color: var(--fg); }
+    .view-btn.active { background: var(--card); color: var(--accent); box-shadow: 0 1px 3px rgba(15,23,42,0.12); }
+    .view-btn .view-tag { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.06em; padding: 1px 6px; border-radius: 5px; background: rgba(21,128,61,0.12); color: var(--accent-strong); }
+    .view-btn.active .view-tag { background: rgba(21,128,61,0.16); }
+    .view-body { padding: 20px 22px; }
+    .view-panel { display: none; }
+    .view-panel.active { display: block; animation: pageIn .22s ease; }
+    .view-panel .pg-p:first-child, .view-panel h3:first-child { margin-top: 0; }
     .field-label { font-family: var(--mono); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--fg-faint); display: block; margin: 14px 0 8px; }
     .select-wrap { position: relative; max-width: 380px; margin-bottom: 14px; }
     .select-wrap select { appearance: none; -webkit-appearance: none; width: 100%; background: var(--bg-elev); color: var(--fg); border: 1px solid var(--border-strong); font-family: var(--sans); font-size: 0.9rem; padding: 12px 40px 12px 14px; border-radius: 10px; cursor: pointer; }
@@ -1411,6 +1655,18 @@ module.exports = async function (fastify, opts) {
         document.querySelectorAll('.client-tab').forEach(function (t) { t.classList.toggle('active', t === tab); });
         var c = tab.getAttribute('data-client');
         document.querySelectorAll('.client-panel').forEach(function (p) { p.classList.toggle('active', p.getAttribute('data-client') === c); });
+      });
+
+      // V1 (code-level) / V2 (plain-language) view switch — scoped to its own
+      // .view-switch so multiple switches on one page toggle independently.
+      document.addEventListener('click', function (e) {
+        var vb = e.target.closest('.view-btn');
+        if (!vb) return;
+        var scope = vb.closest('.view-switch');
+        if (!scope) return;
+        scope.querySelectorAll('.view-btn').forEach(function (b) { b.classList.toggle('active', b === vb); });
+        var view = vb.getAttribute('data-view');
+        scope.querySelectorAll('.view-panel').forEach(function (p) { p.classList.toggle('active', p.getAttribute('data-view') === view); });
       });
 
       // live connection URL → commands

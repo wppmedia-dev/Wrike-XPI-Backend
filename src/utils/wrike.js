@@ -67,11 +67,23 @@ export const getWrikeTokens = async ({ code, env, refresh_token }) => {
       payload,
     );
 
-    if (result?.errorDescription) throw result;
+    // Wrike's OAuth error body uses "error" / "error_description", not
+    // "errorDescription" — check both so a rejected token request doesn't
+    // silently fall through as if it succeeded.
+    if (result?.errorDescription || result?.error) throw result;
 
     return result;
   } catch (err) {
-    console.log("Error while getting access token: ", err?.message ?? err);
+    // Log the full error/response, not just err.message — Wrike's OAuth
+    // error body (error, error_description, errorDescription) and fetch
+    // failures (cause, code) both live outside .message, and err?.message
+    // alone was swallowing the real reason.
+    console.log(
+      "Error while getting access token:",
+      err instanceof Error
+        ? { message: err.message, stack: err.stack, cause: err.cause }
+        : err,
+    );
     if (err && typeof err === "object" && err.statusCode == null) {
       err.statusCode = 403;
     }
