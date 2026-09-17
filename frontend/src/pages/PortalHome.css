@@ -1134,45 +1134,11 @@ div.dataTables_wrapper div.dataTables_paginate {
   margin-top: 1px;
 }
 
-.toggle-wrap {
-  position: relative;
-  width: 40px;
-  height: 22px;
-  flex-shrink: 0;
-}
-.toggle-wrap input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-  position: absolute;
-}
-.toggle-track {
-  position: absolute;
-  inset: 0;
-  background: var(--bg-surface-2);
-  border-radius: 11px;
-  cursor: pointer;
-  transition: var(--transition);
-  border: 1px solid var(--border);
-}
-.toggle-track::before {
-  content: "";
-  position: absolute;
-  width: 16px;
-  height: 16px;
-  left: 2px;
-  top: 2px;
-  background: #fff;
-  border-radius: 50%;
-  transition: transform 0.18s ease;
-}
-.toggle-wrap input:checked + .toggle-track {
-  background: var(--success);
-  border-color: var(--success);
-}
-.toggle-wrap input:checked + .toggle-track::before {
-  transform: translateX(18px);
-}
+/* The switch itself (toggle-wrap / toggle-track) is styled by the component
+   that renders it: frontend/src/components/ui/Toggle.css. It used to be
+   duplicated here, and this copy had lost the `display: inline-block` the
+   other one carries, which is the line that stops a <label> collapsing to a
+   dot inside a table cell. */
 
 /* Copy icons inside modals (redirect URL boxes) */
 #copySuccessUrlIcon,

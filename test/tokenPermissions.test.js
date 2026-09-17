@@ -347,7 +347,13 @@ console.log("\nDenial payload");
   check("names the tool", text.includes('"campaign_update"'), true);
   check("names the module and action", text.includes("update campaign"), true);
   check("carries the reason code", text.includes("MODULE_FORBIDDEN"), true);
-  check("says nothing changed", text.includes("nothing was changed"), true);
+  // Case-insensitive on purpose: the sentence opens the result, so it is
+  // capitalised, and the wording may be re-flowed without the meaning changing.
+  check(
+    "says nothing changed",
+    text.toLowerCase().includes("nothing was changed"),
+    true,
+  );
   check(
     "forbids routing around it",
     text.includes("Do not attempt the same change through a different tool"),

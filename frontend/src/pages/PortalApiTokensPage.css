@@ -1,0 +1,31 @@
+/* The portal's API Tokens page (frontend/src/pages/PortalApiTokensPage.tsx).
+ *
+ * Only what the shared table does not already own: the small form in the
+ * create modal. The table, its filters, its badges and the permissions popup
+ * are the admin console's own components, so their styling arrives with them
+ * rather than being copied here. */
+
+.ptk-note {
+  margin: 0 0 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.ptk-field {
+  display: block;
+}
+
+.ptk-field-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.ptk-field select {
+  width: 100%;
+}

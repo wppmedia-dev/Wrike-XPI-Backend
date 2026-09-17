@@ -43,6 +43,23 @@ export const MODULES = [
     actions: ALL,
   },
   {
+    key: "api_tokens",
+    label: "API Tokens",
+    description:
+      "The API tokens issued for the environments this user can see: their module permissions, their status and their expiry.",
+    // All four, one per portal route in src/routes/portal/apiTokens:
+    // read lists the tokens of the user's own environments, create starts the
+    // Wrike sign-in that issues one, update edits a token's module matrix or
+    // switches it on and off, delete switches it off. There is no hard delete:
+    // a token is the only copy of the credential inside it, so removing the
+    // row would silently break whoever is still calling with it.
+    //
+    // This module has no counterpart on the token-service side. It governs who
+    // may *administer* tokens from the portal, which is a different question
+    // from what a token may do (src/utils/tokenPermissionCatalog.js).
+    actions: ALL,
+  },
+  {
     key: "activity_logs",
     label: "Activity Logs",
     description:

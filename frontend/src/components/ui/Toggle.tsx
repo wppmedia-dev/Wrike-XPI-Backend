@@ -1,9 +1,10 @@
 import { useState } from "react";
+import "./Toggle.css";
 
 /* The switch control used in table cells, the edit modal and the access
- * drawer. Matches the existing .toggle-wrap / .toggle-track styling in
- * AdminDashboard.css.
- *
+ * drawer. Styled by its own stylesheet (./Toggle.css) rather than by the
+ * console that first used it: the portal renders this control too, and it does
+ * not load the admin console's CSS.
  * `onToggle` returns a promise; the switch shows a spinner while it is in
  * flight and reverts if it rejects. That optimistic-then-rollback behaviour
  * used to live in a jQuery change handler that mutated checkboxEl.checked and

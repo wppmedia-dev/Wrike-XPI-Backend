@@ -8,6 +8,7 @@ import {
   type ModuleDef,
   type PermissionCatalog,
   type PermissionMatrix,
+  type TokenPermissionEntry,
 } from "../lib/tokenPermissionsApi";
 import { progress, toast } from "../lib/notify";
 import "./TokenPermissions.css";
@@ -57,6 +58,34 @@ const MODULE_ICON: Record<string, string> = {
   amoeba: "fa-shapes",
 };
 
+/**
+ * Where the editor reads and writes.
+ *
+ * Injectable because the same widget serves two surfaces: the admin console,
+ * whose data comes from /api/v1/admin/tokens, and the portal, whose data comes
+ * from /api/v1/portal/api-tokens and is scoped server-side to the caller's own
+ * environments. The default is the admin API, so the console is unchanged,
+ * and there is still one matrix editor rather than two that drift.
+ *
+ * The object must be stable across renders (a module-scope constant): the load
+ * effect deliberately does not depend on it, or an inline literal would refetch
+ * on every render.
+ */
+export interface TokenPermissionsApi {
+  loadCatalog: () => Promise<PermissionCatalog>;
+  load: (tokenId: string) => Promise<TokenPermissionEntry>;
+  save: (
+    tokenId: string,
+    permissions: PermissionMatrix,
+  ) => Promise<TokenPermissionEntry>;
+}
+
+const ADMIN_API: TokenPermissionsApi = {
+  loadCatalog: getTokenPermissionCatalog,
+  load: getTokenPermissions,
+  save: setTokenPermissions,
+};
+
 interface Props {
   tokenId: string | null;
   /** Human-readable identification for the header, e.g. "PROD · IEAC7PRT". */
@@ -70,6 +99,8 @@ interface Props {
    * until the page was reloaded, so the row and the popup disagreed.
    */
   onSaved?: () => void;
+  /** Defaults to the admin console's API. */
+  api?: TokenPermissionsApi;
 }
 
 /**
@@ -90,6 +121,7 @@ export default function TokenPermissions({
   open,
   onClose,
   onSaved,
+  api = ADMIN_API,
 }: Props) {
   const [catalog, setCatalog] = useState<PermissionCatalog | null>(null);
   const [original, setOriginal] = useState<PermissionMatrix | null>(null);
@@ -106,7 +138,8 @@ export default function TokenPermissions({
     // while this dashboard is already loaded, and the token's own matrix can
     // be changed by another admin. Holding either in state for the life of
     // the page would show a matrix that is no longer true.
-    getTokenPermissionCatalog()
+    api
+      .loadCatalog()
       .then(setCatalog)
       .catch(() => {});
 
@@ -116,10 +149,10 @@ export default function TokenPermissions({
     (async () => {
       // The catalogue first: an unconfigured token's grid is built from it, so
       // the two can no longer be fetched independently.
-      const cat = await getTokenPermissionCatalog().catch(() => null);
+      const cat = await api.loadCatalog().catch(() => null);
       if (cat) setCatalog(cat);
 
-      const data = await getTokenPermissions(tokenId);
+      const data = await api.load(tokenId);
 
       // `configured: false` means nothing is stored, which means the token is
       // unrestricted, so the grid opens fully ticked, matching what the API
@@ -263,7 +296,7 @@ export default function TokenPermissions({
     setSaving(true);
     progress.start();
     try {
-      const saved = await setTokenPermissions(tokenId, draft);
+      const saved = await api.save(tokenId, draft);
       setOriginal(saved.matrix);
       setDraft(saved.matrix);
       setConfigured(saved.configured);

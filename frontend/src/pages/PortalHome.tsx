@@ -16,20 +16,23 @@ import {
   type PortalPermissionMatrix,
 } from "../lib/portalAuthApi";
 import { fetchAppConfig, DEFAULT_CONFIG, type AppConfig } from "../lib/appConfig";
+import type { AdminToken } from "../lib/tokenPermissionsApi";
 import { useHashPage } from "../lib/useHashPage";
 import EnvBadge from "../components/EnvBadge";
 import BuildTag from "../components/BuildTag";
 import PortalActivityPage from "./PortalActivityPage";
 import PortalCachePage from "./PortalCachePage";
+import PortalApiTokensPage from "./PortalApiTokensPage";
 import PortalEnvironmentAccess from "./PortalEnvironmentAccess";
 import { PortalEnvironmentsTable } from "./PortalEnvironmentsTable";
 import "./PortalHome.css";
 
-type PageId = "overview" | "environments" | "activity" | "cache";
+type PageId = "overview" | "environments" | "api-tokens" | "activity" | "cache";
 
 const PAGE_NAMES: Record<PageId, string> = {
   overview: "Overview",
   environments: "My Environments",
+  "api-tokens": "API Tokens",
   activity: "Activity Logs",
   cache: "Cache Settings",
 };
@@ -221,6 +224,7 @@ export default function PortalHome() {
 
   const canSeeOverview = can("overview", "read");
   const canSeeEnvironments = can("environments", "read");
+  const canSeeApiTokens = can("api_tokens", "read");
   const canSeeActivity = can("activity_logs", "read");
   const canSeeCache = can("cache", "read");
   const canSeeEnvironmentAccess = can("environment_access", "read");
@@ -229,7 +233,11 @@ export default function PortalHome() {
       shell then has no page to show, so it says so instead of rendering an
       empty frame. */
   const hasAnyAccess =
-    canSeeOverview || canSeeEnvironments || canSeeActivity || canSeeCache;
+    canSeeOverview ||
+    canSeeEnvironments ||
+    canSeeApiTokens ||
+    canSeeActivity ||
+    canSeeCache;
 
   /* ── Session guard (mirrors the EJS inline script exactly) ──────────── */
   useEffect(() => {
@@ -303,17 +311,25 @@ export default function PortalHome() {
   useEffect(() => {
     if (!permissionsLoaded) return;
 
+    /* Every page the shell can show, and the grant it needs. The type is what
+       keeps this honest: a page missing from the map reads as "not granted",
+       and the guard below then bounces it to another page, which is how the
+       API Tokens page first shipped (reachable from the nav, then straight
+       back to Overview). `Record<PageId, boolean>` is what turns a forgotten
+       entry into a compile error rather than a mysterious redirect. */
     const granted: Record<PageId, boolean> = {
       overview: canSeeOverview,
       environments: canSeeEnvironments,
+      "api-tokens": canSeeApiTokens,
       activity: canSeeActivity,
       cache: canSeeCache,
     };
     if (granted[activePage]) return;
 
-    const fallback = (["overview", "environments", "activity", "cache"] as PageId[]).find(
-      (page) => granted[page],
-    );
+    // Order matters: this is where a user with a stale link lands.
+    const fallback = (
+      ["overview", "environments", "api-tokens", "activity", "cache"] as PageId[]
+    ).find((page) => granted[page]);
     if (fallback) setActivePage(fallback);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -321,6 +337,7 @@ export default function PortalHome() {
     activePage,
     canSeeOverview,
     canSeeEnvironments,
+    canSeeApiTokens,
     canSeeActivity,
     canSeeCache,
   ]);
@@ -334,6 +351,23 @@ export default function PortalHome() {
   const [accessEnvId, setAccessEnvId] = useState<string | null>(null);
   const [accessEnvName, setAccessEnvName] = useState<string | null>(null);
   const [accessOpen, setAccessOpen] = useState(false);
+
+  /* The token whose activity log is being viewed. Set by the API Tokens
+     table's "Activity logs" action, cleared either from the chip on the log
+     page or by opening that page from the sidebar, so it never outlives the
+     visit that set it. */
+  const [activityToken, setActivityToken] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
+
+  /* The environment whose tokens are being viewed. Set by the Environments
+     table's "View tokens" action, cleared by the chip on the API Tokens page
+     or by opening that page from the sidebar. */
+  const [tokensEnvScope, setTokensEnvScope] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   function openAccessDrawer(env: PortalEnvironmentFull) {
     setAccessEnvId(env.id);
@@ -524,6 +558,35 @@ export default function PortalHome() {
     setMobileOpen(false);
   };
 
+  /**
+   * The API Tokens page's "Activity logs" row action: switch to the log with
+   * that one token's rows filtered in. Same flow as the admin console's
+   * (frontend/src/pages/AdminDashboard.tsx openTokenActivityLogs), including
+   * the removable chip on the log, and it is only offered at all when this
+   * user may read the log (the table drops the action when no handler is
+   * passed, so nobody is sent to a page the guard would bounce them off).
+   */
+  const openTokenActivityLogs = (row: AdminToken) => {
+    setActivityToken({
+      id: row.id,
+      label:
+        [row.environment_name, row.account_id].filter(Boolean).join(" · ") ||
+        row.id,
+    });
+    setActivePage("activity");
+  };
+
+  /**
+   * The Environments table's "View tokens" action: the tokens issued for one
+   * environment, with that filter already applied on arrival. The same pair of
+   * props the admin console hands its table (envScope + onClearEnvScope), so
+   * the chip behaves identically in both consoles.
+   */
+  const openTokensForEnv = (env: PortalEnvironmentFull) => {
+    setTokensEnvScope({ id: env.id, name: env.environment_name });
+    setActivePage("api-tokens");
+  };
+
   const handleRefresh = () => {
     setRefreshing(true);
     setDataRefreshKey((k) => k + 1);
@@ -616,6 +679,23 @@ export default function PortalHome() {
               <span className="nav-badge">{environments.length}</span>
             </div>
           )}
+          {canSeeApiTokens && (
+            <div
+              className={`nav-item${activePage === "api-tokens" ? " active" : ""}`}
+              onClick={() => {
+                // Opening the page from the sidebar means "all my tokens", so a
+                // scope set by an environment row's action does not persist
+                // under a nav click that did not ask for it.
+                setTokensEnvScope(null);
+                handleNav("api-tokens");
+              }}
+            >
+              <span className="ni">
+                <i className="fa-solid fa-key" />
+              </span>
+              <span className="nl">API Tokens</span>
+            </div>
+          )}
 
           {(canSeeCache || canSeeActivity) && (
             <div className="nav-group-label" style={{ marginTop: 6 }}>
@@ -636,7 +716,13 @@ export default function PortalHome() {
           {canSeeActivity && (
             <div
               className={`nav-item${activePage === "activity" ? " active" : ""}`}
-              onClick={() => handleNav("activity")}
+              onClick={() => {
+                // Opening the log from the sidebar means "the whole log", so a
+                // token scope set by a token row's action does not persist
+                // silently under a nav click that did not ask for it.
+                setActivityToken(null);
+                handleNav("activity");
+              }}
             >
               <span className="ni">
                 <i className="fa-solid fa-clock-rotate-left" />
@@ -853,13 +939,33 @@ export default function PortalHome() {
                   canUpdate={can("environments", "update")}
                   canDelete={can("environments", "delete")}
                   canSeeAccess={canSeeEnvironmentAccess}
+                  // The admin console's Environments table offers this too; a
+                  // portal user with api_tokens:read gets the same shortcut
+                  // (the server scopes the list to their own environments).
+                  canViewTokens={canSeeApiTokens}
                   onEdit={openEnvModal}
                   onDelete={(env) => handleDeleteEnvironment(env.id, env.environment_name)}
                   onManageAccess={openAccessDrawer}
+                  onViewTokens={openTokensForEnv}
                   onAdd={() => openEnvModal(null)}
                 />
               </div>
             </div>
+          </div>
+          )}
+
+          {/* ══════ API TOKENS PAGE ══════ */}
+          {canSeeApiTokens && (
+          <div className={`page${activePage === "api-tokens" ? " active" : ""}`} id="page-api-tokens">
+            <PortalApiTokensPage
+              canCreate={can("api_tokens", "create")}
+              canUpdate={can("api_tokens", "update")}
+              canDelete={can("api_tokens", "delete")}
+              // Only offered when this user may read the log at all.
+              onViewActivityLogs={canSeeActivity ? openTokenActivityLogs : undefined}
+              envScope={tokensEnvScope}
+              onClearEnvScope={() => setTokensEnvScope(null)}
+            />
           </div>
           )}
 
@@ -870,6 +976,8 @@ export default function PortalHome() {
               active={activePage === "activity"}
               environments={environments}
               refreshKey={dataRefreshKey}
+              tokenFilter={activityToken}
+              onClearTokenFilter={() => setActivityToken(null)}
             />
           </div>
           )}

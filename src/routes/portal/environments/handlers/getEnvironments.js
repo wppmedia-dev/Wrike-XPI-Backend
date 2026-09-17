@@ -1,17 +1,14 @@
-import { WrikeCredentials } from "../../../../controllers";
 import { decryptField } from "../../../../utils/crypto";
+import { scopedEnvironmentsFor } from "../../../../utils/portalScope";
 
 export const GetMyEnvironments = (portalUser) => {
   return new Promise(async (resolve, reject) => {
     try {
-      let environments;
-
-      // Admin role sees ALL environments; regular users see only those mapped to them
-      if (portalUser.role === "admin") {
-        environments = await WrikeCredentials.GetAllForPortal();
-      } else {
-        environments = await WrikeCredentials.GetByOwnerId(portalUser.id);
-      }
+      // Admin role sees ALL environments; regular users see only those mapped
+      // to them. The rule itself lives in src/utils/portalScope.js, shared with
+      // the API Tokens page so the two cannot disagree about what a user can
+      // see (a token list is scoped by exactly this).
+      const environments = await scopedEnvironmentsFor(portalUser);
 
       const data = (environments || []).map((env) => ({
         id: env.id,

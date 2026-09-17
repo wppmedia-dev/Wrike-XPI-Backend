@@ -178,10 +178,12 @@ export const tokenRoute = (fastify, opts, done) => {
           ...req.query,
           ...decodedData,
           ip: clientIp(req),
-          // The plain web login flows through here as well. An MCP client that
-          // registered no PKCE challenge relays its raw code back out and ends
-          // up on /exchange, so this label is the best available answer here.
-          clientName: "Login page",
+          // A caller that named itself in the signed state gets labelled with
+          // that name. The portal's "create token" action does exactly this, so
+          // a token it issued shows up as "Portal" in the admin console instead
+          // of being indistinguishable from a plain sign-in. Everything else
+          // came through the hosted login page, so that is what it is called.
+          clientName: String(decodedData?.client_name || "Login page"),
         },
         fastify,
       );

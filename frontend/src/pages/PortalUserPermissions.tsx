@@ -28,6 +28,9 @@ const actionLabel = (action: ActionName) => ACTION_LABEL[action] || action;
 const MODULE_ICON: Record<string, string> = {
   overview: "fa-chart-pie",
   environments: "fa-layer-group",
+  // The tokens a user's own environments have issued, which is why this sits
+  // beside Environments rather than among the admin-side modules.
+  api_tokens: "fa-key",
   environment_access: "fa-shield-halved",
   activity_logs: "fa-clock-rotate-left",
   cache: "fa-database",

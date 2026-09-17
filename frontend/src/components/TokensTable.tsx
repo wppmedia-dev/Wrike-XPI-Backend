@@ -7,15 +7,23 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import type { AdminToken } from "../../lib/tokenPermissionsApi";
-import { DataTable } from "../../components/ui/DataTable";
-import { useTable, type ColumnDef } from "../../components/ui/useTable";
-import { RowMenu } from "../../components/ui/RowMenu";
-import { CopyButton } from "../../components/ui/CopyButton";
-import { Toggle } from "../../components/ui/Toggle";
-import { Badge, type BadgeTone } from "../../components/ui/Badge";
-import AdminSelect from "../../components/AdminSelect";
-import { EMPTY, dateSortValue, formatDateTime } from "../../lib/format";
+import type { AdminToken } from "../lib/tokenPermissionsApi";
+import { DataTable } from "./ui/DataTable";
+import { useTable, type ColumnDef } from "./ui/useTable";
+import { RowMenu } from "./ui/RowMenu";
+import { CopyButton } from "./ui/CopyButton";
+import { Toggle } from "./ui/Toggle";
+import { Badge } from "./ui/Badge";
+import AdminSelect from "./AdminSelect";
+import { EMPTY, dateSortValue } from "../lib/format";
+import {
+  ACCESS_BADGE,
+  EXPIRY_WARNING_DAYS,
+  accessDetail,
+  accessLabel,
+  accessStateOf,
+  validityOf,
+} from "../lib/tokenDisplay";
 import "./TokensTable.css";
 
 /* The API Tokens table: one row per token record the token service has
@@ -59,12 +67,6 @@ interface FilterDef {
 
 /** Option value standing for "tokens that are not attached to an environment". */
 const NO_ENVIRONMENT = "\u0000none";
-
-/** Days before expiry at which a token is worth flagging: enough notice to
-    re-authenticate before whatever is using it starts failing. */
-const EXPIRY_WARNING_DAYS = 14;
-
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 const FILTER_DEFS: FilterDef[] = [
   {
@@ -162,87 +164,7 @@ const RANGE_MS: Record<string, number> = {
   "30d": 30 * 24 * 60 * 60 * 1000,
 };
 
-interface Validity {
-  tone: BadgeTone;
-  label: string;
-  detail: string;
-}
-
-/**
- * How long the token a caller holds will keep working.
- *
- * Two different things can stop a token: an admin switching it off (the Status
- * column) and its own expiry. This is only the second one, and it is a fact
- * about the credential rather than a setting, which is why it does not read as
- * a warning unless it is close.
- */
-const validityOf = (token: AdminToken): Validity => {
-  if (!token.token_expires_at) {
-    return {
-      tone: "neutral",
-      label: "Unknown",
-      detail: "No expiry was recorded for this token. It is checked when a caller uses it.",
-    };
-  }
-
-  const expiresAt = new Date(token.token_expires_at).getTime();
-  const days = Math.floor((expiresAt - Date.now()) / MS_PER_DAY);
-  const when = formatDateTime(token.token_expires_at);
-
-  if (days < 0) {
-    return {
-      tone: "danger",
-      label: "Expired",
-      detail: `Expired ${when}. Callers are refused until they sign in again.`,
-    };
-  }
-
-  if (days <= EXPIRY_WARNING_DAYS) {
-    return {
-      tone: "warning",
-      label: days === 0 ? "Expires today" : `${days} day${days === 1 ? "" : "s"} left`,
-      detail: `Expires ${when}.`,
-    };
-  }
-
-  return { tone: "neutral", label: `${days} days left`, detail: `Expires ${when}.` };
-};
-
-/**
- * The three states the Access column can be in, decided in one place so the
- * badge, the filter over it and the sort can never disagree.
- *
- * Full access is one state, not two. A token nobody has ever restricted and a
- * token an administrator has granted all of have the same access, and showing
- * them as "Unrestricted" and "22 of 22" next to each other made two identical
- * rows look different (and made a saved full matrix look like a narrowing).
- * Which of the two a token is, is provenance rather than access, so it belongs
- * in the tooltip and in the permissions popup, where the matrix itself is.
- */
-type AccessState = "unrestricted" | "restricted" | "none";
-
-const accessStateOf = (permissions: AdminToken["permissions"]): AccessState => {
-  const { granted, total } = permissions;
-  if (granted === total) return "unrestricted";
-  if (granted === 0) return "none";
-  return "restricted";
-};
-
-/** What the Access badge is claiming, spelled out, for its tooltip. */
-const accessDetail = (permissions: AdminToken["permissions"]) => {
-  const { configured, granted, total } = permissions;
-
-  switch (accessStateOf(permissions)) {
-    case "unrestricted":
-      return configured
-        ? `All ${total} permissions, granted explicitly. Open Permissions to narrow them.`
-        : `All ${total} permissions. No administrator has restricted this token, so it can call every module.`;
-    case "none":
-      return `No permissions. All ${total} are switched off for this token.`;
-    default:
-      return `${granted} of ${total} permissions. The rest are switched off for this token.`;
-  }
-};
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /** Case-insensitive substring over any of the given fields; a blank filter
     matches everything, so an untouched control never hides a row. */
@@ -308,8 +230,13 @@ export interface TokensTableProps {
   loading: boolean;
   onPermissions: (token: AdminToken) => void;
   onToggleStatus: (token: AdminToken, next: boolean) => void | Promise<void>;
-  /** Opens the Activity Log page scoped to this token. */
-  onActivityLogs: (token: AdminToken) => void;
+  /**
+   * Opens the Activity Log page scoped to this token. The row action appears
+   * only when this is passed: the admin console can do that, the portal can
+   * too (its activity API takes a token filter), and a third caller with no
+   * activity log to show simply leaves it out.
+   */
+  onActivityLogs?: (token: AdminToken) => void;
   /**
    * An environment the admin arrived here asking about, sent by the
    * Environments table's "View tokens" action. Applied to the environment
@@ -319,6 +246,26 @@ export interface TokensTableProps {
   envScope?: { id: string; name: string } | null;
   /** Tells the parent its scope is no longer applied. */
   onClearEnvScope?: () => void;
+  /**
+   * Called by the row menu's Deactivate item, when the caller has a delete
+   * route of its own. The portal does: DELETE /api/v1/portal/api-tokens/:id
+   * (a switch-off that keeps the record), gated by the api_tokens delete
+   * grant. The admin console has no such endpoint, so it leaves this out and
+   * the item stays on the status write below.
+   */
+  onDelete?: (token: AdminToken) => void | Promise<void>;
+  /**
+   * The api_tokens grants of whoever is looking at this table. Both default to
+   * true, which is what the admin console passes (unconditionally, by virtue
+   * of being the super-admin console). The portal passes its matrix, so a user
+   * granted read without update sees the Status column as a badge rather than
+   * a switch, and a user without delete finds no way to switch a token off.
+   * The server enforces the same grants again (requirePortalPermission in
+   * src/routes/portal/apiTokens), so a hidden control is never the only thing
+   * stopping the write.
+   */
+  canUpdate?: boolean;
+  canDelete?: boolean;
 }
 
 export function TokensTable({
@@ -329,7 +276,51 @@ export function TokensTable({
   onActivityLogs,
   envScope = null,
   onClearEnvScope,
+  onDelete,
+  canUpdate = true,
+  canDelete = true,
 }: TokensTableProps) {
+  /**
+   * The row menu's power item.
+   *
+   * Switching a token off and switching it back on are two different grants in
+   * the portal (delete and update), and two different endpoints whenever the
+   * caller has a delete route, so which item exists depends on both the
+   * direction and the grants. In the admin console, where `onDelete` is absent
+   * and both grants are unconditional, this collapses to exactly the
+   * Activate/Deactivate item it has always had.
+   */
+  const powerItemFor = (token: AdminToken) => {
+    if (token.is_active) {
+      if (onDelete) {
+        return {
+          label: "Deactivate",
+          icon: "fa-solid fa-power-off",
+          danger: true,
+          onSelect: () => onDelete(token),
+        };
+      }
+      if (canDelete) {
+        return {
+          label: "Deactivate",
+          icon: "fa-solid fa-power-off",
+          danger: true,
+          onSelect: () => onToggleStatus(token, false),
+        };
+      }
+      return null;
+    }
+
+    if (!canUpdate) return null;
+
+    return {
+      label: "Activate",
+      icon: "fa-solid fa-power-off",
+      danger: false,
+      onSelect: () => onToggleStatus(token, true),
+    };
+  };
+
   const columns = useMemo<ColumnDef<AdminToken>[]>(
     () => [
       {
@@ -397,34 +388,18 @@ export function TokensTable({
         // with full access rather than at zero.
         accessor: (token) => token.permissions.granted,
         cell: (token) => {
-          const { granted, total } = token.permissions;
           const state = accessStateOf(token.permissions);
+          const { granted, total } = token.permissions;
+          const { tone, icon } = ACCESS_BADGE[state];
 
           return (
             // Badge has no title prop, and the difference between a token that
             // was never restricted and one that was granted everything is a
             // fact about its history, not its access, so it lives here.
-            //
-            // One colour per state, on a scale an admin can read down the
-            // column without reading the words: green for every permission,
-            // amber for a narrowed set, red for none. Same ordering the
-            // Validity column uses, so the two columns colour the same way.
             <span title={accessDetail(token.permissions)}>
-              {state === "unrestricted" && (
-                <Badge tone="success" icon="fa-solid fa-unlock">
-                  Unrestricted
-                </Badge>
-              )}
-              {state === "none" && (
-                <Badge tone="danger" icon="fa-solid fa-ban">
-                  No access
-                </Badge>
-              )}
-              {state === "restricted" && (
-                <Badge tone="warning" icon="fa-solid fa-key">
-                  {granted} of {total}
-                </Badge>
-              )}
+              <Badge tone={tone} icon={icon}>
+                {accessLabel(state, granted, total)}
+              </Badge>
             </span>
           );
         },
@@ -436,7 +411,7 @@ export function TokensTable({
         // at the top of the list.
         accessor: (token) => dateSortValue(token.token_expires_at),
         cell: (token) => {
-          const validity = validityOf(token);
+          const validity = validityOf(token.token_expires_at);
           return (
             // Badge has no title prop, and the exact timestamp is what an
             // admin needs once the label tells them a token is worth a look.
@@ -451,15 +426,22 @@ export function TokensTable({
         header: "Status",
         width: "92px",
         sortable: false,
-        cell: (token) => (
-          <Toggle
-            size="sm"
-            checked={token.is_active}
-            title={token.is_active ? "Token is active" : "Token is switched off"}
-            ariaLabel={`Status for token ${token.id}`}
-            onToggle={(next) => onToggleStatus(token, next)}
-          />
-        ),
+        cell: (token) =>
+          canUpdate ? (
+            <Toggle
+              size="sm"
+              checked={token.is_active}
+              title={token.is_active ? "Token is active" : "Token is switched off"}
+              ariaLabel={`Status for token ${token.id}`}
+              onToggle={(next) => onToggleStatus(token, next)}
+            />
+          ) : (
+            // Read-only viewer: the state is still worth showing, it just is
+            // not theirs to change.
+            <Badge tone={token.is_active ? "success" : "danger"} dot>
+              {token.is_active ? "Active" : "Off"}
+            </Badge>
+          ),
       },
       {
         id: "actions",
@@ -468,51 +450,58 @@ export function TokensTable({
         align: "center",
         className: "tok-actions-col",
         headerClassName: "tok-actions-col",
-        cell: (token) => (
-          <RowMenu
-            label={`Actions for token ${token.id}`}
-            items={[
-              {
-                label: "Permissions",
-                icon: "fa-solid fa-shield-halved",
-                onSelect: () => onPermissions(token),
-              },
-              {
-                label: "Activity logs",
-                icon: "fa-solid fa-clock-rotate-left",
-                onSelect: () => onActivityLogs(token),
-              },
-              {
-                label: "Copy token ID",
-                icon: "fa-regular fa-copy",
-                onSelect: () => {
-                  navigator.clipboard?.writeText(token.id).catch(() => {});
+        cell: (token) => {
+          const power = powerItemFor(token);
+
+          return (
+            <RowMenu
+              label={`Actions for token ${token.id}`}
+              items={[
+                ...(canUpdate
+                  ? [
+                      {
+                        label: "Permissions",
+                        icon: "fa-solid fa-shield-halved",
+                        onSelect: () => onPermissions(token),
+                      },
+                    ]
+                  : []),
+                ...(onActivityLogs
+                  ? [
+                      {
+                        label: "Activity logs",
+                        icon: "fa-solid fa-clock-rotate-left",
+                        onSelect: () => onActivityLogs(token),
+                      },
+                    ]
+                  : []),
+                {
+                  label: "Copy token ID",
+                  icon: "fa-regular fa-copy",
+                  onSelect: () => {
+                    navigator.clipboard?.writeText(token.id).catch(() => {});
+                  },
                 },
-              },
-              {
-                // The username is the value a caller authenticates with and it
-                // is no longer a column (it repeats the account id, the
-                // environment and the email), so it stays reachable here.
-                label: "Copy username",
-                icon: "fa-regular fa-copy",
-                onSelect: () => {
-                  if (token.username) {
-                    navigator.clipboard?.writeText(token.username).catch(() => {});
-                  }
+                {
+                  // The username is the value a caller authenticates with and it
+                  // is no longer a column (it repeats the account id, the
+                  // environment and the email), so it stays reachable here.
+                  label: "Copy username",
+                  icon: "fa-regular fa-copy",
+                  onSelect: () => {
+                    if (token.username) {
+                      navigator.clipboard?.writeText(token.username).catch(() => {});
+                    }
+                  },
                 },
-              },
-              {
-                label: token.is_active ? "Deactivate" : "Activate",
-                icon: "fa-solid fa-power-off",
-                danger: token.is_active,
-                onSelect: () => onToggleStatus(token, !token.is_active),
-              },
-            ]}
-          />
-        ),
+                ...(power ? [power] : []),
+              ]}
+            />
+          );
+        },
       },
     ],
-    [onPermissions, onToggleStatus, onActivityLogs],
+    [onPermissions, onToggleStatus, onActivityLogs, onDelete, canUpdate, canDelete],
   );
 
   const [filters, setFilters] = useState<Record<FilterKey, string>>(EMPTY_FILTERS);

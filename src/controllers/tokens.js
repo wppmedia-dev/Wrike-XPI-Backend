@@ -266,6 +266,28 @@ export const GetRecord = async (id) => {
 };
 
 /**
+ * The attributes and joins every console-shaped token read needs, so the admin
+ * list and the portal's scoped list cannot return two different shapes for the
+ * same row. `where` is omitted for the full list.
+ */
+const findAdminRows = (where) =>
+  models.UserTokens.findAll({
+    attributes: ADMIN_ATTRIBUTES,
+    include: [
+      {
+        association: "environment",
+        attributes: ["environment_name", "is_visible"],
+      },
+      {
+        association: "creator",
+        attributes: ["id", "email", "full_name"],
+      },
+    ],
+    where,
+    order: [["created_at", "DESC"]],
+  });
+
+/**
  * Every token record, for the admin console's API Tokens list.
  *
  * The secrets a token exists to carry (encrypted_access_token,
@@ -279,23 +301,25 @@ export const GetRecord = async (id) => {
  * behaves. Switched-off (`is_active: false`) tokens stay visible, because the
  * switch is what this screen is for.
  */
-export const ListAll = async () => {
-  const userTokens = await models.UserTokens.findAll({
-    attributes: ADMIN_ATTRIBUTES,
-    include: [
-      {
-        association: "environment",
-        attributes: ["environment_name", "is_visible"],
-      },
-      {
-        association: "creator",
-        attributes: ["id", "email", "full_name"],
-      },
-    ],
-    order: [["created_at", "DESC"]],
-  });
+export const ListAll = async () => (await findAdminRows()).map(toAdminShape);
 
-  return userTokens.map(toAdminShape);
+/**
+ * Every token issued for the given environments, for the portal's API Tokens
+ * page (src/routes/portal/apiTokens). Same shape as ListAll, minus the rows
+ * the caller has no business seeing.
+ *
+ * An empty list of environments returns nothing, not everything. A portal user
+ * with no environments mapped has no tokens to look at, and a scope that
+ * silently widens to the whole table when it is empty is the kind of bug that
+ * only shows up as a screenshot in a support ticket.
+ */
+export const ListForEnvironments = async (envIds = []) => {
+  if (!envIds.length) return [];
+
+  const { Op } = models.Sequelize;
+  const rows = await findAdminRows({ env_id: { [Op.in]: envIds } });
+
+  return rows.map(toAdminShape);
 };
 
 /**

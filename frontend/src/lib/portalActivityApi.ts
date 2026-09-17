@@ -43,6 +43,10 @@ export interface PortalActivityConfig {
 
 export interface PortalActivityFilters {
   env_id?: string;
+  /** One token's rows only, the filter the API Tokens page's "Activity logs"
+      action applies. The server refuses to honour an id outside the caller's
+      own environments (src/routes/portal/activity/index.js). */
+  token_id?: string;
   actor_email?: string;
   surface?: PortalSurface;
   allowed?: boolean;
@@ -66,6 +70,7 @@ async function request<T>(token: string, path: string): Promise<T> {
 const qs = (filters: PortalActivityFilters): string =>
   toQueryString({
     env_id: filters.env_id,
+    token_id: filters.token_id,
     actor_email: filters.actor_email,
     surface: filters.surface,
     allowed: filters.allowed === undefined ? undefined : String(filters.allowed),
@@ -75,8 +80,15 @@ const qs = (filters: PortalActivityFilters): string =>
     offset: filters.offset,
   });
 
-export const getPortalActivitySummary = (token: string, envId?: string) =>
-  request<PortalActivitySummary>(token, `/summary${toQueryString({ env_id: envId })}`);
+export const getPortalActivitySummary = (
+  token: string,
+  envId?: string,
+  tokenId?: string,
+) =>
+  request<PortalActivitySummary>(
+    token,
+    `/summary${toQueryString({ env_id: envId, token_id: tokenId })}`,
+  );
 
 /** GET /api/v1/portal/activity-logs/config — how long rows are kept, so the
     page can show the same retention note the admin console does. */

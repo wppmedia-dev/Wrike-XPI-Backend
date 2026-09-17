@@ -1,20 +1,9 @@
-/* API Tokens table.
-   Tokens, radii and type come from AdminDashboard.css; nothing new is defined
-   here. Column-specific rules are `tok-` prefixed so they cannot collide with
-   the env- / pu- tables that share the DataTable styling. */
+/* API Tokens table, rendered by both consoles (the admin console's API Tokens
+   page and the portal's, see frontend/src/pages/PortalApiTokensPage.tsx).
+   Tokens, radii and type come from the shell's stylesheet; nothing new is
+   defined here. Column-specific rules are `tok-` prefixed so they cannot
+   collide with the env- / pu- tables that share the DataTable styling. */
 
-/* ── Room for the table ───────────────────────────────────────────────
-   Seven columns of identifiers is the widest list in the console, so this
-   page spends its width on the table rather than on padding: the card's
-   horizontal padding is nearly halved, for this page only. */
-#page-tokens .card-body {
-  padding: 16px 8px;
-}
-
-/* ── Advanced filters ─────────────────────────────────────────────────
-   A bar above the table (toggle, live count, clear) and a panel of one
-   control per column. Collapsed by default so the default view is the table,
-   not a form. */
 /* ── Advanced filters ─────────────────────────────────────────────────
    The control sits in the table's toolbar slot, immediately right of the
    search box, and the fields open in a popup under it, so the default view
@@ -370,11 +359,13 @@
 .tok-filter-sheet .tok-filter-popup-foot {
   padding-bottom: calc(11px + env(safe-area-inset-bottom));
 }
-/* Slightly tighter cells than the shared default: this is the widest table in
-   the console, and two pixels a side across eight columns is most of a
-   column's width back. */
-#page-tokens .dt2-table thead th,
-#page-tokens .dt2-table tbody td {
+/* Slightly tighter cells than the shared default: seven columns of
+   identifiers is the widest list in either console, and two pixels a side
+   across eight columns is most of a column's width back. Scoped to the table
+   rather than to a page id, so the portal gets the same treatment without a
+   second copy of this file. */
+.tok-table .dt2-table thead th,
+.tok-table .dt2-table tbody td {
   padding-left: 12px;
   padding-right: 12px;
 }
