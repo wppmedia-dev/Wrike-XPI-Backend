@@ -3,12 +3,27 @@
    here. Column-specific rules are `tok-` prefixed so they cannot collide with
    the env- / pu- tables that share the DataTable styling. */
 
+/* ── Room for the table ───────────────────────────────────────────────
+   Seven columns of identifiers is the widest list in the console, so this
+   page spends its width on the table rather than on padding: the card's
+   horizontal padding is nearly halved, for this page only. */
+#page-tokens .card-body {
+  padding: 16px 8px;
+}
+
+/* Nothing in this table is prose — environment names, account ids, emails,
+   UUIDs, timestamps — so nothing wraps. On a narrow viewport the table
+   scrolls sideways (DataTable's own .dt2-scroll) instead of breaking a UUID
+   or an email across two lines, which is what made the rows look ragged. */
+.tok-table tbody td {
+  white-space: nowrap;
+}
+
 .tok-table .tok-name-cell {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 3px;
-  white-space: nowrap;
 }
 
 .tok-table .tok-id-row {
@@ -20,25 +35,11 @@
   height: 22px;
 }
 
-/* UUIDs (environment and token). Monospace and quiet, like the env table's
-   env-id-code, but allowed to break — a token id is longer than the column
-   and truncating it mid-UUID would make it unreadable rather than compact. */
+/* The token UUID under the environment name. Monospace and quiet, like the
+   env table's env-id-code. */
 .tok-table .tok-id-code {
   font-size: 11px;
   color: var(--text-muted);
-  overflow-wrap: anywhere;
-}
-
-/* The Basic-auth username carries the environment id, the account id and the
-   email, so it is long by construction. Wrapped rather than truncated: it is
-   the value a caller has to match, and half of it is no use. */
-.tok-table .tok-user {
-  display: inline-block;
-  max-width: 260px;
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--text-secondary);
-  overflow-wrap: anywhere;
 }
 
 .tok-table .tok-creator {
@@ -46,10 +47,6 @@
   flex-direction: column;
   gap: 2px;
   min-width: 0;
-}
-
-.tok-table .tok-creator > span:first-child {
-  overflow-wrap: anywhere;
 }
 
 .tok-table .tok-creator-name {

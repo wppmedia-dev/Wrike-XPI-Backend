@@ -36,23 +36,24 @@ export function TokensTable({
   const columns = useMemo<ColumnDef<AdminToken>[]>(
     () => [
       {
-        id: "environment_name",
-        header: "Environment",
+        id: "token",
+        header: "Token",
         accessor: (token) => token.environment_name,
-        cell: (token) =>
-          token.environment_name ? (
-            <div className="tok-name-cell">
-              <strong>{token.environment_name}</strong>
-              {token.env_id && (
-                <div className="action-cell tok-id-row">
-                  <code className="tok-id-code">{token.env_id}</code>
-                  <CopyButton value={token.env_id} title="Copy environment ID" />
-                </div>
-              )}
+        // Environment name and the token's own id in one cell, the way the
+        // Environments table shows an environment: the id is what identifies
+        // the row for support (and what its permissions are keyed on), so it
+        // stays visible and copyable without costing a 36-character column.
+        cell: (token) => (
+          <div className="tok-name-cell">
+            <strong>
+              {token.environment_name || <span className="text-muted">{EMPTY}</span>}
+            </strong>
+            <div className="action-cell tok-id-row">
+              <code className="tok-id-code">{token.id}</code>
+              <CopyButton value={token.id} title="Copy token ID" />
             </div>
-          ) : (
-            <span className="text-muted">{EMPTY}</span>
-          ),
+          </div>
+        ),
       },
       {
         id: "account_id",
@@ -60,30 +61,6 @@ export function TokensTable({
         accessor: (token) => token.account_id,
         cell: (token) =>
           token.account_id ? token.account_id : <span className="text-muted">{EMPTY}</span>,
-      },
-      {
-        id: "username",
-        header: "Username",
-        accessor: (token) => token.username,
-        cell: (token) =>
-          token.username ? (
-            <span className="tok-user" title={token.username}>
-              {token.username}
-            </span>
-          ) : (
-            <span className="text-muted">{EMPTY}</span>
-          ),
-      },
-      {
-        id: "id",
-        header: "Token ID",
-        accessor: (token) => token.id,
-        cell: (token) => (
-          <div className="action-cell tok-id-row">
-            <code className="tok-id-code">{token.id}</code>
-            <CopyButton value={token.id} title="Copy token ID" />
-          </div>
-        ),
       },
       {
         id: "creator",
@@ -135,13 +112,6 @@ export function TokensTable({
         },
       },
       {
-        id: "created_at",
-        header: "Created",
-        accessor: (token) => dateSortValue(token.created_at),
-        cell: (token) => formatDateTime(token.created_at),
-        searchable: false,
-      },
-      {
         id: "updated_at",
         header: "Last Updated",
         accessor: (token) => dateSortValue(token.updated_at),
@@ -187,6 +157,18 @@ export function TokensTable({
                 },
               },
               {
+                // The username is the value a caller authenticates with and it
+                // is no longer a column (it repeats the account id, the
+                // environment and the email), so it stays reachable here.
+                label: "Copy username",
+                icon: "fa-regular fa-copy",
+                onSelect: () => {
+                  if (token.username) {
+                    navigator.clipboard?.writeText(token.username).catch(() => {});
+                  }
+                },
+              },
+              {
                 label: token.is_active ? "Deactivate" : "Activate",
                 icon: "fa-solid fa-power-off",
                 danger: token.is_active,
@@ -213,7 +195,7 @@ export function TokensTable({
       caption="API Tokens"
       loading={loading}
       className="tok-table"
-      searchPlaceholder="Search tokens by environment, account, user…"
+      searchPlaceholder="Search by environment, account or user…"
       empty={
         <div className="dt2-empty">
           <div className="dt2-empty-icon">
