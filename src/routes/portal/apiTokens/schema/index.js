@@ -9,10 +9,30 @@
  * availability is the update grant's business.
  */
 
+import { TOKEN_FILTER_QUERY } from "../../../admin/tokens/schema";
+
 const ID_PARAM = {
   type: "object",
   required: ["id"],
   properties: { id: { type: "string", format: "uuid" } },
+};
+
+/**
+ * GET /portal/api-tokens: the same filters the admin console sends, from one
+ * definition (src/routes/admin/tokens/schema), because a filter that means one
+ * thing in the console and another in the portal is a bug nobody reports.
+ *
+ * The rows are scoped to the caller's environments before any filter is
+ * applied (src/utils/portalScope.js), so these parameters narrow what the
+ * caller may see and never widen it.
+ */
+export const ListSchema = {
+  schema: {
+    querystring: {
+      type: "object",
+      properties: TOKEN_FILTER_QUERY,
+    },
+  },
 };
 
 // PUT /portal/api-tokens/:id/permissions: whole-matrix replace.

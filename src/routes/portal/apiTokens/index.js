@@ -4,13 +4,19 @@ import {
   isEnvironmentInScope,
   scopedEnvironmentIdsFor,
 } from "../../../utils/portalScope";
+import { parseTokenFilters } from "../../../utils/tokenFilters";
 import { summarisePermissions } from "../../../utils/tokenPermissionSummary";
 import {
   verifyPortalJWT,
   requirePasswordChanged,
   requirePortalPermission,
 } from "../../../middlewares/portalAuth";
-import { IdParamSchema, SetPermissionsSchema, SetStatusSchema } from "./schema";
+import {
+  IdParamSchema,
+  ListSchema,
+  SetPermissionsSchema,
+  SetStatusSchema,
+} from "./schema";
 
 /**
  * API tokens, managed from the portal: /api/v1/portal/api-tokens.
@@ -93,26 +99,28 @@ export const portalApiTokensRoute = (fastify, opts, done) => {
   };
 
   // GET /portal/api-tokens
-  fastify.get("/", { preHandler: canRead }, async (req, reply) => {
-    try {
-      const envIds = await scopedEnvironmentIdsFor(req.portalUser);
-      const tokens = await Tokens.ListForEnvironments(envIds);
-      const matrices = await TokenPermissions.GetMatrixForTokens(
-        tokens.map((token) => token.id),
-      );
+  // GET /portal/api-tokens: this user's tokens, filtered server-side.
+  //
+  // The scope comes first and the filters second: the environments decide
+  // which rows this caller may see at all, and the filters then narrow that
+  // set. Nothing a query parameter says can widen the scope.
+  fastify.get(
+    "/",
+    { ...ListSchema, preHandler: canRead },
+    async (req, reply) => {
+      try {
+        const envIds = await scopedEnvironmentIdsFor(req.portalUser);
+        const data = await Tokens.ListForConsole({
+          envIds,
+          filters: parseTokenFilters(req.query),
+        });
 
-      return ok(
-        reply,
-        tokens.map((token) => ({
-          ...token,
-          permissions: summarisePermissions(matrices[token.id]),
-        })),
-        "Tokens retrieved",
-      );
-    } catch (err) {
-      return fail(reply, err);
-    }
-  });
+        return ok(reply, data, "Tokens retrieved");
+      } catch (err) {
+        return fail(reply, err);
+      }
+    },
+  );
 
   // GET /portal/api-tokens/catalog
   fastify.get("/catalog", { preHandler: canRead }, async (req, reply) =>

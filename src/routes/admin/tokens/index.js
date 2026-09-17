@@ -1,9 +1,14 @@
 import { verifyAdminJWT } from "../../../middlewares/adminAuth";
 import { Tokens, TokenPermissions } from "../../../controllers";
 import { catalog } from "../../../utils/tokenPermissionCatalog";
-import { summarisePermissions } from "../../../utils/tokenPermissionSummary";
+import { parseTokenFilters } from "../../../utils/tokenFilters";
 
-import { IdParamSchema, SetPermissionsSchema, SetStatusSchema } from "./schema";
+import {
+  IdParamSchema,
+  ListSchema,
+  SetPermissionsSchema,
+  SetStatusSchema,
+} from "./schema";
 
 /**
  * Admin API behind /api/v1/admin/tokens: the console's view of the token
@@ -30,22 +35,20 @@ export const adminTokensRoute = (fastify, opts, done) => {
       message: err?.message || err || "Request failed",
     });
 
-  // GET /admin/tokens: every token, with the permission summary the list
-  // column shows. One extra query for all of them, not one per row.
-  fastify.get("/", guard, async (req, reply) => {
+  // GET /admin/tokens: the console's list, filtered server-side.
+  //
+  // The filters arrive as query parameters (./schema) and are applied in the
+  // controller, so the response is the rows that match rather than a table the
+  // browser narrowed. `data` is an object: the matching tokens, the picker's
+  // environments and the unfiltered total, all of which the list needs and
+  // none of which it can derive from a filtered array.
+  fastify.get("/", { ...ListSchema, ...guard }, async (req, reply) => {
     try {
-      const tokens = await Tokens.ListAll();
-      const matrices = await TokenPermissions.GetMatrixForTokens(
-        tokens.map((token) => token.id),
-      );
+      const data = await Tokens.ListForConsole({
+        filters: parseTokenFilters(req.query),
+      });
 
-      return ok(
-        reply,
-        tokens.map((token) => ({
-          ...token,
-          permissions: summarisePermissions(matrices[token.id]),
-        })),
-      );
+      return ok(reply, data, "Tokens retrieved");
     } catch (err) {
       return fail(reply, err);
     }

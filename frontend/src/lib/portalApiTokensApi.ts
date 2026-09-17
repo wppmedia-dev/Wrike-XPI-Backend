@@ -1,9 +1,12 @@
 import { portalFetch } from "./portalAuthApi";
-import type {
-  AdminToken,
-  PermissionCatalog,
-  PermissionMatrix,
-  TokenPermissionEntry,
+import {
+  NO_ENVIRONMENT,
+  type AdminToken,
+  type PermissionCatalog,
+  type PermissionMatrix,
+  type TokenListQuery,
+  type TokenListResult,
+  type TokenPermissionEntry,
 } from "./tokenPermissionsApi";
 
 /**
@@ -40,16 +43,36 @@ import type {
 export type PortalApiToken = AdminToken;
 
 /**
- * GET /api/v1/portal/api-tokens — the tokens of the caller's environments.
+ * GET /api/v1/portal/api-tokens — the tokens of the caller's environments,
+ * filtered server-side by the same query the admin console sends.
+ *
+ * The scope is applied before the filters, on the server, so nothing a filter
+ * says can widen what this user may see.
  */
 export const listPortalApiTokens = async (
   token: string,
-): Promise<PortalApiToken[]> => {
-  const res = await portalFetch("/api/v1/portal/api-tokens/", token);
+  query: TokenListQuery = {},
+): Promise<TokenListResult> => {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value) params.set(key, value);
+  }
+  const encoded = params.toString();
+
+  const res = await portalFetch(
+    `/api/v1/portal/api-tokens/${encoded ? `?${encoded}` : ""}`,
+    token,
+  );
   const body = await res.json().catch(() => null);
-  if (!body?.success || !Array.isArray(body.data)) return [];
-  return body.data as PortalApiToken[];
+  if (!body?.success || !body.data) {
+    throw new Error(body?.message || "Could not load tokens");
+  }
+  return body.data as TokenListResult;
 };
+
+/** Re-exported so the portal's table reads the same sentinel the console's
+    does, without importing the admin client wholesale. */
+export { NO_ENVIRONMENT };
 
 /** GET /api/v1/portal/api-tokens/catalog — the module vocabulary to draw. */
 export const getPortalTokenCatalog = async (
