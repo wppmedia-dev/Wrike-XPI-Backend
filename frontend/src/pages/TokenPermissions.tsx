@@ -63,6 +63,13 @@ interface Props {
   tokenLabel: string | null;
   open: boolean;
   onClose: () => void;
+  /**
+   * Called after a matrix is stored. The list behind this popup shows an Access
+   * badge derived from that matrix, and nothing else would refresh it: without
+   * this, saving a token's permissions left its row still reading "Unrestricted"
+   * until the page was reloaded, so the row and the popup disagreed.
+   */
+  onSaved?: () => void;
 }
 
 /**
@@ -77,7 +84,13 @@ interface Props {
  * explains why, because an empty grid would read as "this token can do nothing"
  * while the API went on answering every call.
  */
-export default function TokenPermissions({ tokenId, tokenLabel, open, onClose }: Props) {
+export default function TokenPermissions({
+  tokenId,
+  tokenLabel,
+  open,
+  onClose,
+  onSaved,
+}: Props) {
   const [catalog, setCatalog] = useState<PermissionCatalog | null>(null);
   const [original, setOriginal] = useState<PermissionMatrix | null>(null);
   const [draft, setDraft] = useState<PermissionMatrix | null>(null);
@@ -255,6 +268,9 @@ export default function TokenPermissions({ tokenId, tokenLabel, open, onClose }:
       setDraft(saved.matrix);
       setConfigured(saved.configured);
       toast(`Permissions saved${tokenLabel ? ` for ${tokenLabel}` : ""}`, "success");
+      // After the toast, so a slow reload can never delay the confirmation of
+      // the save itself.
+      onSaved?.();
     } catch (err: any) {
       toast(err?.message || "Could not save permissions", "error");
     } finally {

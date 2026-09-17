@@ -208,6 +208,42 @@ const validityOf = (token: AdminToken): Validity => {
   return { tone: "neutral", label: `${days} days left`, detail: `Expires ${when}.` };
 };
 
+/**
+ * The three states the Access column can be in, decided in one place so the
+ * badge, the filter over it and the sort can never disagree.
+ *
+ * Full access is one state, not two. A token nobody has ever restricted and a
+ * token an administrator has granted all of have the same access, and showing
+ * them as "Unrestricted" and "22 of 22" next to each other made two identical
+ * rows look different (and made a saved full matrix look like a narrowing).
+ * Which of the two a token is, is provenance rather than access, so it belongs
+ * in the tooltip and in the permissions popup, where the matrix itself is.
+ */
+type AccessState = "unrestricted" | "restricted" | "none";
+
+const accessStateOf = (permissions: AdminToken["permissions"]): AccessState => {
+  const { granted, total } = permissions;
+  if (granted === total) return "unrestricted";
+  if (granted === 0) return "none";
+  return "restricted";
+};
+
+/** What the Access badge is claiming, spelled out, for its tooltip. */
+const accessDetail = (permissions: AdminToken["permissions"]) => {
+  const { configured, granted, total } = permissions;
+
+  switch (accessStateOf(permissions)) {
+    case "unrestricted":
+      return configured
+        ? `All ${total} permissions, granted explicitly. Open Permissions to narrow them.`
+        : `All ${total} permissions. No administrator has restricted this token, so it can call every module.`;
+    case "none":
+      return `No permissions. All ${total} are switched off for this token.`;
+    default:
+      return `${granted} of ${total} permissions. The rest are switched off for this token.`;
+  }
+};
+
 /** Case-insensitive substring over any of the given fields; a blank filter
     matches everything, so an untouched control never hides a row. */
 const matchesText = (needle: string, ...fields: (string | null)[]) => {
@@ -230,10 +266,10 @@ const matchesFilters = (token: AdminToken, filters: Record<FilterKey, string>) =
   if (!matchesText(filters.account, token.account_id)) return false;
   if (!matchesText(filters.creator, token.creator_email, token.creator_name)) return false;
 
-  const { configured, granted } = token.permissions;
-  if (filters.access === "unrestricted" && configured) return false;
-  if (filters.access === "restricted" && (!configured || granted === 0)) return false;
-  if (filters.access === "none" && !(configured && granted === 0)) return false;
+  // Through the same helper the badge uses, so choosing "Unrestricted" can
+  // never hide a row whose badge says Unrestricted, or show one whose badge
+  // says something else.
+  if (filters.access && accessStateOf(token.permissions) !== filters.access) return false;
 
   if (filters.validity) {
     const expiresAt = token.token_expires_at
@@ -356,32 +392,40 @@ export function TokensTable({
         id: "access",
         header: "Access",
         // Sorts on the number granted, so the most restricted tokens group
-        // together instead of the alphabetical order of their labels.
-        accessor: (token) =>
-          token.permissions.configured ? token.permissions.granted : token.permissions.total,
+        // together instead of the alphabetical order of their labels. A token
+        // nobody has restricted is summarised as fully granted, so it sorts
+        // with full access rather than at zero.
+        accessor: (token) => token.permissions.granted,
         cell: (token) => {
-          const { configured, granted, total } = token.permissions;
-
-          if (!configured) {
-            return (
-              <Badge tone="neutral" icon="fa-solid fa-unlock" >
-                Unrestricted
-              </Badge>
-            );
-          }
-
-          if (granted === 0) {
-            return (
-              <Badge tone="danger" icon="fa-solid fa-ban">
-                No access
-              </Badge>
-            );
-          }
+          const { granted, total } = token.permissions;
+          const state = accessStateOf(token.permissions);
 
           return (
-            <Badge tone="info" icon="fa-solid fa-key">
-              {granted} of {total}
-            </Badge>
+            // Badge has no title prop, and the difference between a token that
+            // was never restricted and one that was granted everything is a
+            // fact about its history, not its access, so it lives here.
+            //
+            // One colour per state, on a scale an admin can read down the
+            // column without reading the words: green for every permission,
+            // amber for a narrowed set, red for none. Same ordering the
+            // Validity column uses, so the two columns colour the same way.
+            <span title={accessDetail(token.permissions)}>
+              {state === "unrestricted" && (
+                <Badge tone="success" icon="fa-solid fa-unlock">
+                  Unrestricted
+                </Badge>
+              )}
+              {state === "none" && (
+                <Badge tone="danger" icon="fa-solid fa-ban">
+                  No access
+                </Badge>
+              )}
+              {state === "restricted" && (
+                <Badge tone="warning" icon="fa-solid fa-key">
+                  {granted} of {total}
+                </Badge>
+              )}
+            </span>
           );
         },
       },
