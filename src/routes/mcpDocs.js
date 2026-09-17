@@ -50,7 +50,7 @@ module.exports = async function (fastify, opts) {
       },
       {
         title: "You're connected",
-        text: "That's it. Your assistant can now securely work with your Wrike campaigns whenever you ask it to.",
+        text: "That's it. Your assistant can now securely work with your Wrike campaigns whenever you ask it to. What it can do depends on your token's module permissions — an administrator can restrict which of them are available to it.",
         icon: `<path d="M20 6 9 17l-5-5"></path>`,
       },
     ];

@@ -6,6 +6,9 @@ import { registerDatahubTools } from "./tools/datahub.js";
 import { registerIdsTools } from "./tools/ids.js";
 import { registerWrikeProxyTools } from "./wrikeMcpProxy.js";
 import wrikeIconDataUri from "./wrikeIcon.js";
+import { TokenPermissions } from "../controllers";
+import { denialFor } from "../utils/tokenPermissionMap";
+import { permissionDenied, resolveToolRoute } from "./tools/permission.js";
 
 /**
  * Top-level instructions surfaced to the connected agent during handshake.
@@ -39,6 +42,11 @@ CONFIRMING WRITE OPERATIONS — every update and delete is gated
 - Never state or imply that a change was made until a call carrying confirm: true has actually returned successfully.
 - Creating a campaign (campaign_create) is not gated — it destroys nothing and has no prior state to preview.
 
+MODULE PERMISSIONS — a token may be narrower than the tool list
+- The tool list is what the *surface* can do. What your token is *allowed* to do is granted per module (campaign, channel, task, master data, amoeba, Wrike MCP tools) and per action (read, create, update, delete), and a token nobody has restricted can do everything.
+- A tool call outside those grants returns FORBIDDEN with isError: true, naming the module and action that is missing. That is a final answer, not a transient one: retrying, or reaching for a different tool that would achieve the same change (for example wrike_update_items instead of campaign_update), is not permitted.
+- When you get FORBIDDEN: report the missing module and action to the user and stop. An administrator can change it in the admin portal; you cannot, and nothing was changed.
+
 MECHANICS
 - Authentication is already resolved per request; never pass tokens or credentials.
 - Read each tool's schema before calling; arguments are validated.
@@ -49,6 +57,47 @@ MECHANICS
 - Respect limits and pagination: wrike_* tools cap results (e.g. 200 newest comments, pageSize on search_items) and return truncation/next-page signals — page through or narrow the query as each tool's description explains.`;
 
 /**
+ * Wrap server.registerTool so every tool checks the calling token's module
+ * permissions before its handler runs.
+ *
+ * A wrapper rather than a guard inside each handler because this is the one
+ * point every tool funnels through: all sixteen native tools *and* the whole
+ * dynamically-named wrike_* family register via this single method, and the
+ * server is rebuilt per HTTP request, so the per-request auth (which carries
+ * the token id) is safe to close over. It also keeps the confirmation gate's
+ * invariant intact — test/mcpConfirmation.test.js scans the tool files for
+ * those guards, and no tool file gains a second concern from this change.
+ *
+ * Denies on a failed lookup as well as on a denied rule: a permission check
+ * that cannot be answered must not quietly become a grant, and the REST gate
+ * (src/middlewares/tokenPermissions.js) makes the same choice.
+ */
+const installPermissionGate = (server, auth) => {
+  const registerTool = server.registerTool.bind(server);
+
+  server.registerTool = (name, config, handler) =>
+    registerTool(name, config, async (args, extra) => {
+      const route = resolveToolRoute(name, config?.annotations);
+      if (!route) return handler(args, extra);
+
+      try {
+        const entry = await TokenPermissions.GetMatrixCached(auth?.tokenId);
+        const code = denialFor(entry, route);
+        if (code) return permissionDenied({ toolName: name, ...route, code });
+      } catch (err) {
+        console.error(new Date().toISOString(), err);
+        return permissionDenied({
+          toolName: name,
+          ...route,
+          code: "PERMISSION_CHECK_FAILED",
+        });
+      }
+
+      return handler(args, extra);
+    });
+};
+
+/**
  * Create a fully-configured MCP server with all tools registered.
  * Authentication is resolved once per HTTP request (bearer token, see
  * src/plugins/mcp.js) and passed in as `auth` — tools no longer accept
@@ -56,7 +105,7 @@ MECHANICS
  *
  * @param {object} fastify - Fastify instance
  * @param {string} serverUrl - Base URL for auth error messages
- * @param {{wrikeToken: string, environmentName: string}} auth - Resolved auth for this request
+ * @param {{wrikeToken: string, environmentName: string, envId: string, tokenId: string}} auth - Resolved auth for this request
  * @returns {Promise<McpServer>}
  */
 export const createMcpServer = async (fastify, serverUrl, auth) => {
@@ -82,7 +131,9 @@ export const createMcpServer = async (fastify, serverUrl, auth) => {
       instructions: MCP_INSTRUCTIONS,
     },
   );
-
+  // Wraps registerTool before anything registers, so the native tools below
+  // and the proxied wrike_* tools further down are all covered by one gate.
+  installPermissionGate(server, auth);
   registerCampaignTools(server, fastify, serverUrl, auth);
   registerChannelTools(server, serverUrl, auth);
   registerTaskTools(server, serverUrl, auth);

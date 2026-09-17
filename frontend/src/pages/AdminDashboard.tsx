@@ -26,24 +26,32 @@ import {
   type CacheEntry,
   type PortalUser,
 } from "../lib/adminApi";
+import {
+  listTokens,
+  setTokenStatus,
+  type AdminToken,
+} from "../lib/tokenPermissionsApi";
 import EnvironmentAccess from "./EnvironmentAccess";
 import PortalUserPermissions from "./PortalUserPermissions";
+import TokenPermissions from "./TokenPermissions";
 import ActivityLog from "./ActivityLog";
 import MfaSettings from "./MfaSettings";
 import { EnvironmentsTable } from "./admin/EnvironmentsTable";
 import { PortalUsersTable } from "./admin/PortalUsersTable";
+import { TokensTable } from "./admin/TokensTable";
 import EnvBadge from "../components/EnvBadge";
 import BuildTag from "../components/BuildTag";
 import { CopyButton } from "../components/ui/CopyButton";
 import { ActiveBadge } from "../components/ui/Badge";
 import { MaskedValue } from "../components/ui/MaskedValue";
 import { copyToClipboard, formatDateTime } from "../lib/format";
-import { escHtml, toast } from "../lib/notify";
+import { confirmDanger, escHtml, toast } from "../lib/notify";
 import "./AdminDashboard.css";
 
 type PageId =
   | "overview"
   | "environments"
+  | "tokens"
   | "users"
   | "settings"
   | "cache-settings"
@@ -52,6 +60,7 @@ type PageId =
 const PAGE_NAMES: Record<PageId, string> = {
   overview: "Overview",
   environments: "Environments",
+  tokens: "API Tokens",
   users: "Users",
   settings: "Settings",
   "cache-settings": "Cache Settings",
@@ -223,6 +232,7 @@ export default function AdminDashboard() {
     window.NProgress?.configure({ showSpinner: false, minimum: 0.15 });
     loadEnvironments();
     loadPortalUsers();
+    loadTokens();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -455,6 +465,71 @@ export default function AdminDashboard() {
       if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
     };
   }, [redirectModalOpen]);
+
+  /* ── API tokens ───────────────────────────────────────────────────── */
+  const [tokens, setTokens] = useState<AdminToken[]>([]);
+  // Mirrors envLoaded / puLoaded: the table shows its loading skeleton until
+  // the first fetch resolves, so it never flashes "no tokens" at an admin
+  // whose tokens are simply still in flight.
+  const [tokLoaded, setTokLoaded] = useState(false);
+
+  // Per-token module permission modal — opened from a token row. Held here
+  // (rather than inside the table) for the same reason the portal-user one
+  // is: the table stays presentational and the modal sits as a sibling of
+  // #main, above everything.
+  const [tokPermsTokenId, setTokPermsTokenId] = useState<string | null>(null);
+  const [tokPermsLabel, setTokPermsLabel] = useState<string | null>(null);
+  const [tokPermsOpen, setTokPermsOpen] = useState(false);
+
+  function openTokenPermissions(token: AdminToken) {
+    setTokPermsTokenId(token.id);
+    setTokPermsLabel(
+      [token.environment_name, token.account_id].filter(Boolean).join(" · ") || token.id,
+    );
+    setTokPermsOpen(true);
+  }
+
+  const loadTokens = async () => {
+    try {
+      const data = await listTokens();
+      setTokens(data);
+    } catch (err: any) {
+      toast(err?.message || "Failed to load API tokens", "error");
+    } finally {
+      setTokLoaded(true);
+    }
+  };
+
+  /**
+   * The Active switch and the row menu's Activate/Deactivate both land here.
+   * Switching a token OFF asks first: it takes effect on the next request, so
+   * whatever integration is using it starts failing 401 immediately, and that
+   * is worth one confirmation. Switching one back on asks nothing.
+   */
+  async function handleTokenToggle(token: AdminToken, next: boolean) {
+    if (!next) {
+      const confirmed = await confirmDanger({
+        title: "Deactivate this token?",
+        html: `Callers using <strong>${escHtml(
+          token.account_id || token.id,
+        )}</strong> on <strong>${escHtml(
+          token.environment_name || "this environment",
+        )}</strong> will start getting 401s on their next request.`,
+        confirmText: "Deactivate",
+      });
+      if (!confirmed) return;
+    }
+
+    try {
+      await setTokenStatus(token.id, next);
+      setTokens((prev) =>
+        prev.map((t) => (t.id === token.id ? { ...t, is_active: next } : t)),
+      );
+      toast(next ? "Token activated" : "Token deactivated", "success");
+    } catch (err: any) {
+      toast(err?.message || "Could not change the token status", "error");
+    }
+  }
 
   /* ── Portal users ─────────────────────────────────────────────────── */
   const [puUsers, setPuUsers] = useState<PortalUser[]>([]);
@@ -890,6 +965,7 @@ export default function AdminDashboard() {
     setMobileOpen(false);
 
     if (pageId === "users") loadPortalUsers();
+    if (pageId === "tokens") loadTokens();
     if (pageId === "cache-settings") loadCacheEntries(cacheSearchPatternRef.current);
   }
 
@@ -900,6 +976,8 @@ export default function AdminDashboard() {
       refreshPromise = loadCacheEntries(cacheSearchPatternRef.current);
     } else if (activePage === "users") {
       refreshPromise = loadPortalUsers();
+    } else if (activePage === "tokens") {
+      refreshPromise = loadTokens();
     } else if (activePage === "activity-log") {
       // The Activity Log owns its own fetch (rows + summary) — bump its key
       // and let the child reload the current page.
@@ -1015,6 +1093,17 @@ export default function AdminDashboard() {
               <i className="fa-solid fa-users" />
             </span>
             <span className="nl">Users</span>
+          </div>
+
+          <div
+            className={`nav-item${activePage === "tokens" ? " active" : ""}`}
+            onClick={() => handleNav("tokens")}
+          >
+            <span className="ni">
+              <i className="fa-solid fa-key" />
+            </span>
+            <span className="nl">API Tokens</span>
+            <span className="nav-badge">{tokens.length}</span>
           </div>
 
           <div className="nav-group-label" style={{ marginTop: 6 }}>
@@ -1284,6 +1373,28 @@ export default function AdminDashboard() {
             </div>
           </div>
 
+          {/* ══════ API TOKENS PAGE ══════ */}
+          <div className={`page${activePage === "tokens" ? " active" : ""}`} id="page-tokens">
+            <div className="section-header">
+              <div>
+                <div className="section-title">API Tokens</div>
+                <div className="section-subtitle">
+                  Every token this service has issued, and the modules each one may call
+                </div>
+              </div>
+            </div>
+            <div className="card">
+              <div className="card-body">
+                <TokensTable
+                  tokens={tokens}
+                  loading={!tokLoaded}
+                  onPermissions={openTokenPermissions}
+                  onToggleStatus={handleTokenToggle}
+                />
+              </div>
+            </div>
+          </div>
+
           {/* ══════ SETTINGS PAGE ══════ */}
           <div className={`page${activePage === "settings" ? " active" : ""}`} id="page-settings">
             <div className="section-header">
@@ -1360,6 +1471,14 @@ export default function AdminDashboard() {
         username={permsUsername}
         open={permsOpen}
         onClose={() => setPermsOpen(false)}
+      />
+
+      {/* ═══════════ API TOKEN: PERMISSIONS MODAL ═══════════ */}
+      <TokenPermissions
+        tokenId={tokPermsTokenId}
+        tokenLabel={tokPermsLabel}
+        open={tokPermsOpen}
+        onClose={() => setTokPermsOpen(false)}
       />
 
       {/* ═══════════ PU: ADD USER MODAL ═══════════ */}

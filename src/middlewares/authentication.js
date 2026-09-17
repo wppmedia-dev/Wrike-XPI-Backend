@@ -186,8 +186,13 @@ export const ValidateToken = async (req, reply, fastify) => {
       });
     }
 
-    // Store the decrypted token for route handlers.
+    // Store the decrypted token for route handlers, and the row id of the
+    // token it came from. The id is what the per-token module gate keys its
+    // lookup on (src/middlewares/tokenPermissions.js), and it is set here, on
+    // the far side of the environment gate, so a request that was refused
+    // above never looks like an authenticated one to that gate.
     req.wrikeToken = accessToken;
+    req.tokenId = token.id;
   } catch (err) {
     console.error(new Date().toISOString(), err);
     reply.code(401).send({
@@ -228,8 +233,11 @@ const resolveAuth = async (token, dek) => {
     wrikeToken: accessToken,
     environmentName: token.environment_name,
     // Carried so the MCP layer can scope the environment access check to the
-    // same environment the token belongs to (src/plugins/mcp.js).
+    // same environment the token belongs to (src/plugins/mcp.js), and so the
+    // per-tool permission gate knows which token's matrix to read
+    // (src/mcp/index.js installPermissionGate).
     envId: token.env_id,
+    tokenId: token.id,
   };
 };
 

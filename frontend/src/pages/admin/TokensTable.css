@@ -1,0 +1,96 @@
+/* API Tokens table.
+   Tokens, radii and type come from AdminDashboard.css; nothing new is defined
+   here. Column-specific rules are `tok-` prefixed so they cannot collide with
+   the env- / pu- tables that share the DataTable styling. */
+
+.tok-table .tok-name-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.tok-table .tok-id-row {
+  gap: 4px;
+}
+
+.tok-table .tok-id-row .icon-btn {
+  width: 22px;
+  height: 22px;
+}
+
+/* UUIDs (environment and token). Monospace and quiet, like the env table's
+   env-id-code, but allowed to break — a token id is longer than the column
+   and truncating it mid-UUID would make it unreadable rather than compact. */
+.tok-table .tok-id-code {
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* The Basic-auth username carries the environment id, the account id and the
+   email, so it is long by construction. Wrapped rather than truncated: it is
+   the value a caller has to match, and half of it is no use. */
+.tok-table .tok-user {
+  display: inline-block;
+  max-width: 260px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.tok-table .tok-creator {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tok-table .tok-creator > span:first-child {
+  overflow-wrap: anywhere;
+}
+
+.tok-table .tok-creator-name {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Actions column stays put while the rest of a wide table scrolls
+   horizontally underneath it (same treatment as env-actions-col /
+   pu-actions-col, which are declared in AdminDashboard.css for the tables
+   that live on that page). */
+.tok-actions-col {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  box-shadow: -8px 0 8px -8px rgba(15, 23, 42, 0.12);
+}
+
+th.tok-actions-col {
+  background: var(--bg-surface);
+}
+
+td.tok-actions-col {
+  background: var(--bg-card);
+  text-align: center;
+}
+
+/* The sticky cell keeps its resting background on row hover, so it doesn't
+   flash the hover tint while the rest of the row highlights. */
+.dt2-table tbody tr:hover td.tok-actions-col {
+  background: var(--bg-card);
+}
+
+.tok-actions-col .icon-btn {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  font-size: 16px;
+  border: none;
+}
+
+.tok-actions-col .icon-btn:hover {
+  border-color: transparent;
+}

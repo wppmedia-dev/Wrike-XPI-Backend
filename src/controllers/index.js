@@ -5,4 +5,5 @@ export * as AdminAuth from "./adminAuth";
 export * as PortalAuth from "./portalAuth";
 export * as EnvironmentAccess from "./environmentAccess";
 export * as PortalPermissions from "./portalPermissions";
+export * as TokenPermissions from "./tokenPermissions";
 export * as ActivityLog from "./activityLog";

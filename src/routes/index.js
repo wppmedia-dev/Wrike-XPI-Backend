@@ -10,27 +10,19 @@ import { adminApiRoute } from "./admin";
 import { portalApiRoute } from "./portal";
 // Auth Middleware
 import { ValidateToken } from "../middlewares/authentication";
+import { requireTokenPermission } from "../middlewares/tokenPermissions";
 import { log as logActivity } from "../utils/activityLog";
 import {
   captureRequest,
   buildResponseSnapshot,
   categoryForUrl,
 } from "../utils/capture";
-
-// GET/HEAD read; everything else is a write. Only used to label the activity
-// log's `action` column — matches the read/create/update/delete vocabulary
-// used elsewhere in the console without depending on it.
-const ACTION_BY_METHOD = {
-  GET: "read",
-  HEAD: "read",
-  OPTIONS: "read",
-  POST: "create",
-  PUT: "update",
-  PATCH: "update",
-  DELETE: "delete",
-};
-const actionForMethod = (method) =>
-  ACTION_BY_METHOD[String(method || "").toUpperCase()] || null;
+// GET/HEAD read; everything else is a write, matching the read/create/update/
+// delete vocabulary the console and the per-token permission matrix use. The
+// activity log labels each request with it, and the module gate decides from
+// it, so it lives with that gate rather than here — a log that disagreed with
+// the gate about what "update" means would be worse than either being wrong.
+import { actionForMethod } from "../utils/tokenPermissionMap";
 
 // MCP Plugin
 import mcpPlugin from "../plugins/mcp";
@@ -114,6 +106,18 @@ export const PrivateRouters = (fastify, opts, done) => {
     ValidateToken(req, reply, fastify),
   );
 
+  // Module-level scope for the token that just authenticated: which of the
+  // five API modules it may touch, and with which verb. One hook covers every
+  // route registered below — including the nested listings — because the
+  // module comes from the path and the action from the method.
+  //
+  // A separate hook rather than more lines inside ValidateToken, so a 401
+  // (this is not a valid token) and a 403 (this token may not do this) stay
+  // distinguishable in the code and in the audit trail.
+  fastify.addHook("onRequest", (req, reply) =>
+    requireTokenPermission(req, reply),
+  );
+
   // Store the response body for everything EXCEPT the 200/201 success path —
   // most rows are those, so skipping them keeps the table lean while still
   // capturing the payloads that matter (gate denials, 4xx/5xx, etc.).
@@ -142,6 +146,10 @@ export const PrivateRouters = (fastify, opts, done) => {
   // never reached, so this falls back to the response status alone).
   fastify.addHook("onResponse", (req, reply, done) => {
     const access = req.access;
+    // Set by the module gate above when — and only when — it refused the
+    // request, so a denied module is recorded as denied with its own code
+    // instead of inheriting the environment gate's clean bill of health.
+    const denied = req.tokenPermission;
     const resource = req.routeOptions?.url || req.raw?.url || req.url;
 
     logActivity({
@@ -152,8 +160,11 @@ export const PrivateRouters = (fastify, opts, done) => {
       action: actionForMethod(req.method),
       resource,
       method: req.method,
-      allowed: access ? !!access.allowed : reply.statusCode < 400,
-      code: access?.code || (reply.statusCode >= 400 ? "AUTH_FAILED" : null),
+      allowed: access ? !!access.allowed && !denied : reply.statusCode < 400,
+      code:
+        access?.code ||
+        denied?.code ||
+        (reply.statusCode >= 400 ? "AUTH_FAILED" : null),
       statusCode: reply.statusCode,
       ip: access?.ip || req.ip || null,
       category: categoryForUrl(resource),
