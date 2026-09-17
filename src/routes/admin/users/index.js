@@ -20,6 +20,11 @@ import {
   AssignEnvSchema,
   RevokeEnvSchema,
 } from "../../portal/users/schema";
+import {
+  IdParamSchema,
+  SetPermissionsSchema,
+  UpdateUserSchema,
+} from "./schema";
 
 // Admin-facing portal user management — uses verifyAdminJWT (admin_users token).
 export const adminPortalUsersRoute = (fastify, opts, done) => {
@@ -123,51 +128,63 @@ export const adminPortalUsersRoute = (fastify, opts, done) => {
   });
 
   // GET /admin/portal-users/:id/permissions
-  fastify.get("/:id/permissions", guard, async (req, reply) => {
-    try {
-      const data = await PortalPermissions.GetMatrix(req.params.id);
-      return reply.code(200).send({ success: true, data });
-    } catch (err) {
-      return reply.code(err?.statusCode || 400).send({
-        success: false,
-        message: err?.message || err,
-      });
-    }
-  });
+  fastify.get(
+    "/:id/permissions",
+    { ...IdParamSchema, ...guard },
+    async (req, reply) => {
+      try {
+        const data = await PortalPermissions.GetMatrix(req.params.id);
+        return reply.code(200).send({ success: true, data });
+      } catch (err) {
+        return reply.code(err?.statusCode || 400).send({
+          success: false,
+          message: err?.message || err,
+        });
+      }
+    },
+  );
 
   // PUT /admin/portal-users/:id/permissions — replaces the whole matrix
-  fastify.put("/:id/permissions", guard, async (req, reply) => {
-    try {
-      const data = await PortalPermissions.SetMatrix(
-        req.adminUser.id,
-        req.params.id,
-        req.body?.permissions,
-      );
-      return reply.code(200).send({
-        success: true,
-        message: "Permissions updated.",
-        data,
-      });
-    } catch (err) {
-      return reply.code(err?.statusCode || 400).send({
-        success: false,
-        message: err?.message || err,
-      });
-    }
-  });
+  fastify.put(
+    "/:id/permissions",
+    { ...SetPermissionsSchema, ...guard },
+    async (req, reply) => {
+      try {
+        const data = await PortalPermissions.SetMatrix(
+          req.adminUser.id,
+          req.params.id,
+          req.body?.permissions,
+        );
+        return reply.code(200).send({
+          success: true,
+          message: "Permissions updated.",
+          data,
+        });
+      } catch (err) {
+        return reply.code(err?.statusCode || 400).send({
+          success: false,
+          message: err?.message || err,
+        });
+      }
+    },
+  );
 
   // GET /admin/portal-users/:id/environments
-  fastify.get("/:id/environments", guard, async (req, reply) => {
-    try {
-      const envs = await PortalAuth.GetUserEnvironments(req.params.id);
-      return reply.code(200).send({ success: true, data: envs });
-    } catch (err) {
-      return reply.code(err?.statusCode || 400).send({
-        success: false,
-        message: err?.message || err,
-      });
-    }
-  });
+  fastify.get(
+    "/:id/environments",
+    { ...IdParamSchema, ...guard },
+    async (req, reply) => {
+      try {
+        const envs = await PortalAuth.GetUserEnvironments(req.params.id);
+        return reply.code(200).send({ success: true, data: envs });
+      } catch (err) {
+        return reply.code(err?.statusCode || 400).send({
+          success: false,
+          message: err?.message || err,
+        });
+      }
+    },
+  );
 
   // POST /admin/portal-users/:id/environments
   fastify.post(
@@ -190,7 +207,7 @@ export const adminPortalUsersRoute = (fastify, opts, done) => {
   );
 
   // PUT /admin/portal-users/:id  (update profile — no password)
-  fastify.put("/:id", guard, async (req, reply) => {
+  fastify.put("/:id", { ...UpdateUserSchema, ...guard }, async (req, reply) => {
     try {
       const result = await UpdateUser(req.adminUser, req.params, req.body);
       return reply.code(result?.statusCode || 200).send({

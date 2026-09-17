@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { TokenConnectModal } from "../components/TokenConnectModal";
 import { TokensTable } from "../components/TokensTable";
 import { confirmDanger, toast } from "../lib/notify";
 import { getPortalToken } from "../lib/portalAuthApi";
@@ -16,7 +17,6 @@ import {
 } from "../lib/portalApiTokensApi";
 import type { AdminToken } from "../lib/tokenPermissionsApi";
 import TokenPermissions, { type TokenPermissionsApi } from "./TokenPermissions";
-import "./PortalApiTokensPage.css";
 
 /* The portal's API Tokens page.
  *
@@ -92,8 +92,7 @@ export default function PortalApiTokensPage({
 
   const [connectOpen, setConnectOpen] = useState(false);
   const [environments, setEnvironments] = useState<PortalTokenEnvironment[]>([]);
-  const [connectEnvId, setConnectEnvId] = useState("");
-  const [connecting, setConnecting] = useState(false);
+  const [loadingEnvironments, setLoadingEnvironments] = useState(false);
 
   const [permsTokenId, setPermsTokenId] = useState<string | null>(null);
   const [permsLabel, setPermsLabel] = useState<string | null>(null);
@@ -136,30 +135,23 @@ export default function PortalApiTokensPage({
     setConnectOpen(true);
     if (!token || environments.length) return;
 
+    setLoadingEnvironments(true);
     try {
-      const list = await listPortalTokenEnvironments(token);
-      setEnvironments(list);
-      const first = list.find((env) => env.is_active) || list[0];
-      setConnectEnvId(first?.id || "");
+      setEnvironments(await listPortalTokenEnvironments(token));
     } catch (err: any) {
       toast(err?.message || "Could not load your environments", "error");
+    } finally {
+      setLoadingEnvironments(false);
     }
   };
 
-  const startConnect = async () => {
-    if (!token || !connectEnvId) return;
-    setConnecting(true);
-    try {
-      // Nothing is minted yet: issuing a token means exchanging a Wrike
-      // authorization code, which only a person signing in can produce. The
-      // API validates the environment and hands back the consent URL, and the
-      // credentials are shown once on the page Wrike sends the browser back to.
-      const { url } = await connectPortalApiToken(token, connectEnvId);
-      window.location.href = url;
-    } catch (err: any) {
-      toast(err?.message || "Could not start the Wrike sign-in", "error");
-      setConnecting(false);
-    }
+  /** Starts the Wrike sign-in for one environment and hands the modal the URL
+      to send the browser to. Module scope would do, but this needs the session
+      token, so it is built once per render and the modal reads it at call
+      time (it only keeps the environments list in its own state). */
+  const connectToken = async (envId: string) => {
+    if (!token) throw new Error("Your session has expired");
+    return connectPortalApiToken(token, envId);
   };
 
   /**
@@ -270,85 +262,18 @@ export default function PortalApiTokensPage({
         </div>
       </div>
 
-      {/* ════════════ CREATE TOKEN: ENVIRONMENT PICKER ════════════ */}
-      <div
-        className={`modal-backdrop${connectOpen ? " open" : ""}`}
-        onClick={(e) => {
-          if (e.target === e.currentTarget) setConnectOpen(false);
-        }}
-      >
-        <div
-          className="modal"
-          role="dialog"
-          aria-modal="true"
-          style={{ maxWidth: 460 }}
-        >
-          <div className="modal-header">
-            <div className="modal-title">
-              <i className="fa-solid fa-key" /> Create API Token
-            </div>
-            <button
-              type="button"
-              className="modal-close"
-              onClick={() => setConnectOpen(false)}
-            >
-              <i className="fa-solid fa-xmark" />
-            </button>
-          </div>
-          <div className="modal-body">
-            <p className="ptk-note">
-              Choose the environment this token is for. You will be sent to Wrike
-              to sign in, and the credentials are shown once, right after that,
-              on the page you land on. Nothing is issued until you sign in.
-            </p>
-
-            <label className="ptk-field">
-              <span className="ptk-field-label">Environment</span>
-              <select
-                value={connectEnvId}
-                onChange={(e) => setConnectEnvId(e.target.value)}
-                disabled={!environments.length}
-              >
-                {environments.length === 0 && (
-                  <option value="">No environments available</option>
-                )}
-                {environments.map((env) => (
-                  <option key={env.id} value={env.id}>
-                    {env.environment_name}
-                    {env.is_active ? "" : " (inactive)"}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <div className="modal-footer">
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={() => setConnectOpen(false)}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={!connectEnvId || connecting}
-              onClick={startConnect}
-            >
-              {connecting ? (
-                <>
-                  <i className="fa-solid fa-spinner fa-spin" /> Redirecting…
-                </>
-              ) : (
-                <>
-                  <i className="fa-solid fa-arrow-up-right-from-square" /> Continue
-                  to Wrike
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
+      {/* ════════════ CREATE TOKEN ════════════
+          The same modal the admin console opens, so "Create token" means one
+          thing in both places: it loads this console's environments (already
+          scoped to the caller) and hands the modal the consent URL to send the
+          browser to. */}
+      <TokenConnectModal
+        open={connectOpen}
+        onClose={() => setConnectOpen(false)}
+        environments={environments}
+        loadingEnvironments={loadingEnvironments}
+        connect={connectToken}
+      />
 
       {/* ════════════ TOKEN: MODULE PERMISSIONS ════════════ */}
       <TokenPermissions
@@ -358,6 +283,10 @@ export default function PortalApiTokensPage({
         onClose={() => setPermsTokenId(null)}
         onSaved={load}
         api={PORTAL_PERMISSIONS_API}
+        // Viewing a matrix is part of reading a token; changing it is the
+        // update grant. Without that grant the popup still opens, and the
+        // server refuses the save if it is attempted anyway.
+        readOnly={!canUpdate}
       />
     </>
   );

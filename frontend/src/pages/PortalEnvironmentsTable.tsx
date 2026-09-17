@@ -26,10 +26,15 @@ export interface PortalEnvironmentsTableProps {
       admin console's Environments table offers: straight to the tokens issued
       for this environment, already filtered to it. */
   canViewTokens: boolean;
+  /** activity_logs:read — shows the "Activity logs" row action, again matching
+      the admin console. Offered only with the grant, because the log page and
+      its API are behind it and a row action that 403s is a trap. */
+  canSeeActivity: boolean;
   onEdit: (env: PortalEnvironmentFull) => void;
   onDelete: (env: PortalEnvironmentFull) => void;
   onManageAccess: (env: PortalEnvironmentFull) => void;
   onViewTokens: (env: PortalEnvironmentFull) => void;
+  onViewActivityLogs: (env: PortalEnvironmentFull) => void;
   onAdd: () => void;
 }
 
@@ -45,10 +50,12 @@ export function PortalEnvironmentsTable({
   canDelete,
   canSeeAccess,
   canViewTokens,
+  canSeeActivity,
   onEdit,
   onDelete,
   onManageAccess,
   onViewTokens,
+  onViewActivityLogs,
   onAdd,
 }: PortalEnvironmentsTableProps) {
   const columns = useMemo<ColumnDef<PortalEnvironmentFull>[]>(() => {
@@ -112,7 +119,7 @@ export function PortalEnvironmentsTable({
     // Actions column only exists at all if there's at least one action this
     // user can take — an empty RowMenu with zero items would just be a
     // trigger that opens nothing.
-    if (canUpdate || canDelete || canSeeAccess || canViewTokens) {
+    if (canUpdate || canDelete || canSeeAccess || canViewTokens || canSeeActivity) {
       cols.push({
         id: "actions",
         header: "Actions",
@@ -142,6 +149,17 @@ export function PortalEnvironmentsTable({
                       label: "View tokens",
                       icon: "fa-solid fa-key",
                       onSelect: () => onViewTokens(env),
+                    },
+                  ]
+                : []),
+              ...(canSeeActivity
+                ? [
+                    {
+                      // The same question about the past: what has been called
+                      // on this environment, with its filter pre-applied.
+                      label: "Activity logs",
+                      icon: "fa-solid fa-clock-rotate-left",
+                      onSelect: () => onViewActivityLogs(env),
                     },
                   ]
                 : []),
@@ -176,10 +194,12 @@ export function PortalEnvironmentsTable({
     canDelete,
     canSeeAccess,
     canViewTokens,
+    canSeeActivity,
     onEdit,
     onDelete,
     onManageAccess,
     onViewTokens,
+    onViewActivityLogs,
   ]);
 
   const table = useTable({

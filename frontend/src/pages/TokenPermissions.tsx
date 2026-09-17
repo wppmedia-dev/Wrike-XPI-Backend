@@ -101,6 +101,18 @@ interface Props {
   onSaved?: () => void;
   /** Defaults to the admin console's API. */
   api?: TokenPermissionsApi;
+  /**
+   * Show the matrix without letting it be changed.
+   *
+   * A caller with read but not update (the portal, where those are separate
+   * grants) still needs to see what a token is allowed to do: that is the
+   * question the token list raises. Hidden actions and disabled controls both
+   * say "you cannot do this"; only the second one answers "so what can it do?"
+   * at the same time. Nothing here is a security boundary either way: the
+   * write is refused by requirePortalPermission on the server, not by this
+   * component declining to send it.
+   */
+  readOnly?: boolean;
 }
 
 /**
@@ -122,6 +134,7 @@ export default function TokenPermissions({
   onClose,
   onSaved,
   api = ADMIN_API,
+  readOnly = false,
 }: Props) {
   const [catalog, setCatalog] = useState<PermissionCatalog | null>(null);
   const [original, setOriginal] = useState<PermissionMatrix | null>(null);
@@ -346,10 +359,21 @@ export default function TokenPermissions({
 
           {!loading && (
             <>
-              <p className="tkp-hint">
-                Which API modules this token may call, and with which verb. A module it can write
-                to needs read as well. The checkboxes keep that pair consistent.
-              </p>
+              {readOnly ? (
+                <div className="tkp-notice" role="note">
+                  <i className="fa-solid fa-eye" aria-hidden="true" />
+                  <div>
+                    <strong>Read-only.</strong> These are the modules this token may call, and
+                    with which verb. Changing them needs the update permission on API Tokens,
+                    which your account does not have.
+                  </div>
+                </div>
+              ) : (
+                <p className="tkp-hint">
+                  Which API modules this token may call, and with which verb. A module it can write
+                  to needs read as well. The checkboxes keep that pair consistent.
+                </p>
+              )}
 
               {configured === false && (
                 <div className="tkp-notice" role="note">
@@ -357,12 +381,17 @@ export default function TokenPermissions({
                   <div>
                     <strong>Every module is allowed by default.</strong> Nothing is stored for
                     this token yet, so it can call all of them, which is why every box starts
-                    ticked. Saving stores this as its matrix: untick what it must not do, or set
-                    every row to <em>No access</em> to switch it off completely.
+                    {readOnly ? " ticked." : (
+                      <>
+                        {" "}ticked. Saving stores this as its matrix: untick what it must not do,
+                        or set every row to <em>No access</em> to switch it off completely.
+                      </>
+                    )}
                   </div>
                 </div>
               )}
 
+              {!readOnly && (
               <div className="tkp-global" role="group" aria-label="Set access for every module">
                 <span className="tkp-global-label">Quick set, all modules</span>
                 <div className="tkp-global-switch">
@@ -395,6 +424,7 @@ export default function TokenPermissions({
                   </button>
                 </div>
               </div>
+              )}
 
               <div
                 className="tkp-matrix"
@@ -437,6 +467,7 @@ export default function TokenPermissions({
                                 <input
                                   type="checkbox"
                                   checked={checked}
+                                  disabled={readOnly}
                                   onChange={() => toggleCell(mod.key, action)}
                                   aria-label={`${actionLabel(action)} on ${mod.label}`}
                                 />
@@ -458,13 +489,17 @@ export default function TokenPermissions({
                       })}
 
                       <div className="tkp-matrix-cell">
-                        <button
-                          type="button"
-                          className="tkp-rowtoggle"
-                          onClick={() => toggleModuleRow(mod.key, allOn)}
-                        >
-                          {allOn ? "None" : "All"}
-                        </button>
+                        {/* No bulk switch for a read-only viewer: an All/None
+                            button that does nothing is worse than no button. */}
+                        {!readOnly && (
+                          <button
+                            type="button"
+                            className="tkp-rowtoggle"
+                            onClick={() => toggleModuleRow(mod.key, allOn)}
+                          >
+                            {allOn ? "None" : "All"}
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -480,20 +515,22 @@ export default function TokenPermissions({
           </span>
           <div className="tkp-footer-actions">
             <button type="button" className="btn btn-ghost" onClick={onClose}>
-              Cancel
+              {readOnly ? "Close" : "Cancel"}
             </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={!dirty || saving || loading}
-              onClick={save}
-            >
-              <i
-                className={`fa-solid ${saving ? "fa-spinner fa-spin" : "fa-check"}`}
-                aria-hidden="true"
-              />
-              &nbsp;Save permissions
-            </button>
+            {!readOnly && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={!dirty || saving || loading}
+                onClick={save}
+              >
+                <i
+                  className={`fa-solid ${saving ? "fa-spinner fa-spin" : "fa-check"}`}
+                  aria-hidden="true"
+                />
+                &nbsp;Save permissions
+              </button>
+            )}
           </div>
         </div>
       </div>

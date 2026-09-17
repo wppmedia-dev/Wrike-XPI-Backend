@@ -369,6 +369,14 @@ export default function PortalHome() {
     name: string;
   } | null>(null);
 
+  /* The environment whose activity log is being viewed. Set by the
+     Environments table's "Activity logs" action. The log's own environment
+     filter is a first-class control, so this pre-selects it rather than adding
+     a second way to see the same scope. */
+  const [activityEnv, setActivityEnv] = useState<{ id: string; name: string } | null>(
+    null,
+  );
+
   function openAccessDrawer(env: PortalEnvironmentFull) {
     setAccessEnvId(env.id);
     setAccessEnvName(env.environment_name);
@@ -587,6 +595,17 @@ export default function PortalHome() {
     setActivePage("api-tokens");
   };
 
+  /**
+   * The Environments table's "Activity logs" action: the log filtered to one
+   * environment. Offered only with activity_logs:read (the table drops the
+   * action when no handler is passed), because the page and its API are behind
+   * that grant and a row action that 403s would sign the user out.
+   */
+  const openEnvActivityLogs = (env: PortalEnvironmentFull) => {
+    setActivityEnv({ id: env.id, name: env.environment_name });
+    setActivePage("activity");
+  };
+
   const handleRefresh = () => {
     setRefreshing(true);
     setDataRefreshKey((k) => k + 1);
@@ -718,9 +737,11 @@ export default function PortalHome() {
               className={`nav-item${activePage === "activity" ? " active" : ""}`}
               onClick={() => {
                 // Opening the log from the sidebar means "the whole log", so a
-                // token scope set by a token row's action does not persist
-                // silently under a nav click that did not ask for it.
+                // token or environment scope left over from a row action does
+                // not persist silently under a nav click that did not ask for
+                // it.
                 setActivityToken(null);
+                setActivityEnv(null);
                 handleNav("activity");
               }}
             >
@@ -943,10 +964,15 @@ export default function PortalHome() {
                   // portal user with api_tokens:read gets the same shortcut
                   // (the server scopes the list to their own environments).
                   canViewTokens={canSeeApiTokens}
+                  // Only with the grant: the log page and its API sit behind
+                  // activity_logs:read, and portalFetch signs a user out on a
+                  // 403, so offering this without it would be a trap.
+                  canSeeActivity={canSeeActivity}
                   onEdit={openEnvModal}
                   onDelete={(env) => handleDeleteEnvironment(env.id, env.environment_name)}
                   onManageAccess={openAccessDrawer}
                   onViewTokens={openTokensForEnv}
+                  onViewActivityLogs={openEnvActivityLogs}
                   onAdd={() => openEnvModal(null)}
                 />
               </div>
@@ -978,6 +1004,7 @@ export default function PortalHome() {
               refreshKey={dataRefreshKey}
               tokenFilter={activityToken}
               onClearTokenFilter={() => setActivityToken(null)}
+              envScope={activityEnv}
             />
           </div>
           )}
