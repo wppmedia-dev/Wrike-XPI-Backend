@@ -11,6 +11,9 @@ export interface PortalActivityRow {
   id: string;
   env_id: string | null;
   environment_name: string | null;
+  /** The token row this call was made with, when the call carried one. Null on
+      rows written before the column existed. */
+  token_id: string | null;
   surface: PortalSurface;
   actor_email: string | null;
   action: string | null;

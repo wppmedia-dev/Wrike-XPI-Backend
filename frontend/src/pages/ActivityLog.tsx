@@ -11,6 +11,7 @@ import {
 import type { AdminEnvironment } from "../lib/adminApi";
 import { toast } from "../lib/notify";
 import AdminSelect from "../components/AdminSelect";
+import { CopyButton } from "../components/ui/CopyButton";
 import "./ActivityLog.css";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
@@ -427,6 +428,7 @@ export default function ActivityLog({
               <tr>
                 <th scope="col">Time</th>
                 <th scope="col">Caller</th>
+                <th scope="col">Token</th>
                 <th scope="col">Surface</th>
                 <th scope="col">Called</th>
                 <th scope="col">IP</th>
@@ -437,7 +439,7 @@ export default function ActivityLog({
               {loading &&
                 Array.from({ length: 6 }).map((_, i) => (
                   <tr className="ea-skeleton-row" key={i}>
-                    <td colSpan={6}>
+                    <td colSpan={7}>
                       <div className="ea-skeleton" />
                     </td>
                   </tr>
@@ -466,6 +468,21 @@ export default function ActivityLog({
                           <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" />
                           Unresolved
                         </span>
+                      )}
+                    </td>
+                    <td className="al-token">
+                      {row.token_id ? (
+                        <span className="al-token-cell">
+                          {/* The id, not the credential: this is the row in the
+                              Tokens list, which is what the permissions are
+                              keyed on and what a support question names. */}
+                          <code className="al-token-code" title={row.token_id}>
+                            {row.token_id}
+                          </code>
+                          <CopyButton value={row.token_id} title="Copy token ID" />
+                        </span>
+                      ) : (
+                        <span className="al-muted">—</span>
                       )}
                     </td>
                     <td>
@@ -603,6 +620,22 @@ export default function ActivityLog({
                 <div>
                   <dt>Environment</dt>
                   <dd>{detailRow.environment_name || "—"}</dd>
+                </div>
+                <div>
+                  <dt>Token</dt>
+                  <dd>
+                    {detailRow.token_id ? (
+                      <span className="al-token-cell">
+                        <code className="al-token-code">{detailRow.token_id}</code>
+                        <CopyButton
+                          value={detailRow.token_id}
+                          title="Copy token ID"
+                        />
+                      </span>
+                    ) : (
+                      <span className="al-muted">—</span>
+                    )}
+                  </dd>
                 </div>
                 <div>
                   <dt>IP address</dt>
