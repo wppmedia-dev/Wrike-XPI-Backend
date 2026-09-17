@@ -60,7 +60,7 @@ const memorySet = (key, value, ttlMs = L1_TTL_MS) => {
  * being down is not an error: redisClient degrades to null, so the request
  * falls through to the loader and still succeeds.
  *
- * A falsy tokenId skips the cache entirely and just runs the loader — there
+ * A falsy tokenId skips the cache entirely and just runs the loader. There
  * is nothing to key on, and callers that got this far should not be denied a
  * decision because of it.
  */
@@ -89,7 +89,7 @@ export const cachedMatrix = async (tokenId, loader) => {
 
 /**
  * Drop one token's cached matrix, L1 and L2. Called by the controller after a
- * save — including the very first one, when the cached answer being replaced
+ * save, including the very first one, when the cached answer being replaced
  * is "this token has no rows, so it is unrestricted".
  *
  * Never throws: a Redis outage must not fail an admin's save. The write has

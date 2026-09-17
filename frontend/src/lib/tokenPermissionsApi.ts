@@ -3,7 +3,7 @@ import { adminFetch } from "./authApi";
 /* ── Types ──────────────────────────────────────────────────────────────
    Mirrors /api/v1/admin/tokens and its permissions sub-routes
    (src/routes/admin/tokens/index.js). Module/action vocabulary is *fetched*,
-   not declared here — src/utils/tokenPermissionCatalog.js is the single
+   not declared here. src/utils/tokenPermissionCatalog.js is the single
    authority, so a module added there grows this UI with no frontend edit. */
 
 export type ActionName = "read" | "create" | "update" | "delete";
@@ -12,7 +12,7 @@ export interface ModuleDef {
   key: string;
   label: string;
   description: string;
-  /** Actions this module can actually express — others render disabled. */
+  /** Actions this module can actually express. Others render disabled. */
   actions: ActionName[];
 }
 
@@ -23,7 +23,7 @@ export interface PermissionCatalog {
   modules: ModuleDef[];
 }
 
-/** One row of the API Tokens list. Carries no secret material by design —
+/** One row of the API Tokens list. Carries no secret material by design:
  * the token's own credential (encrypted access/refresh token, salt, wrapped
  * DEK) is never selected by the server, so there is nothing here to leak. */
 export interface AdminToken {
@@ -49,7 +49,7 @@ export interface AdminToken {
 
 /**
  * A token's matrix plus the flag that says whether anyone has ever restricted
- * it. `configured: false` means the token can do everything — not "nothing" —
+ * it. `configured: false` means the token can do everything, not "nothing",
  * so the popup has to show the difference rather than a grid of empty ticks.
  */
 export interface TokenPermissionEntry {
@@ -96,7 +96,7 @@ export const setTokenStatus = (tokenId: string, is_active: boolean) =>
 
 /* ── Shaping helpers ───────────────────────────────────────────────── */
 
-/** Granted cells out of the ones the catalogue actually declares — drives the
+/** Granted cells out of the ones the catalogue actually declares. Drives the
  * "3 of 18 granted" summary and the Access column's badge. */
 export const grantedCount = (
   permissions: PermissionMatrix | null,

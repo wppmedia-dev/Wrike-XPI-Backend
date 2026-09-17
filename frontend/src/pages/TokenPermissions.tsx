@@ -5,6 +5,7 @@ import {
   grantedCount,
   setTokenPermissions,
   type ActionName,
+  type ModuleDef,
   type PermissionCatalog,
   type PermissionMatrix,
 } from "../lib/tokenPermissionsApi";
@@ -20,10 +21,33 @@ const ACTION_LABEL: Record<ActionName, string> = {
 
 /** Column order used until the catalogue lands (and if it never does). The
     catalogue's own `actions` list is what actually decides the columns once
-    it arrives — see `actions` below. */
+    it arrives. See `actions` below. */
 const DEFAULT_ACTIONS: ActionName[] = ["read", "create", "update", "delete"];
 
 const actionLabel = (action: ActionName) => ACTION_LABEL[action] || action;
+
+/**
+ * Every action every module declares, granted.
+ *
+ * This is not a preset the admin can pick. It is what a token with no stored
+ * matrix can actually do right now, so it is what its grid has to open with.
+ * Showing an empty grid instead read as "this token can do nothing" while the
+ * API happily answered every call, which is the one thing the popup must never
+ * appear to say.
+ */
+const fullMatrix = (modules: ModuleDef[]): PermissionMatrix =>
+  Object.fromEntries(
+    modules.map((mod) => {
+      const row: Record<ActionName, boolean> = {
+        read: false,
+        create: false,
+        update: false,
+        delete: false,
+      };
+      for (const action of mod.actions) row[action] = true;
+      return [mod.key, row];
+    }),
+  );
 
 const MODULE_ICON: Record<string, string> = {
   campaign: "fa-bullhorn",
@@ -42,16 +66,16 @@ interface Props {
 }
 
 /**
- * Module-permission editor for one API token — Read/Create/Update/Delete per
+ * Module-permission editor for one API token: Read, Create, Update and Delete per
  * module, opened from that token's row. Sibling of PortalUserPermissions and
  * deliberately the same widget: same grid, same quick-set, same read-implies
  * rules, so an admin who has used one has used both.
  *
- * The one thing it has to do that the portal version doesn't is explain the
- * default. An unconfigured token is *unrestricted*, so an empty grid would
- * read as "this token can do nothing" when it is the exact opposite; the
- * notice above the matrix says which state the token is in, and disappears
- * the moment a save makes it governed.
+ * The one thing it has to do that the portal version doesn't is represent the
+ * default honestly. An unconfigured token is *unrestricted*, so its grid opens
+ * with every box ticked, which is the access it really has, and a notice
+ * explains why, because an empty grid would read as "this token can do nothing"
+ * while the API went on answering every call.
  */
 export default function TokenPermissions({ tokenId, tokenLabel, open, onClose }: Props) {
   const [catalog, setCatalog] = useState<PermissionCatalog | null>(null);
@@ -75,12 +99,25 @@ export default function TokenPermissions({ tokenId, tokenLabel, open, onClose }:
 
     if (!tokenId) return;
     setLoading(true);
-    getTokenPermissions(tokenId)
-      .then((data) => {
-        setOriginal(data.matrix);
-        setDraft(data.matrix);
-        setConfigured(data.configured);
-      })
+
+    (async () => {
+      // The catalogue first: an unconfigured token's grid is built from it, so
+      // the two can no longer be fetched independently.
+      const cat = await getTokenPermissionCatalog().catch(() => null);
+      if (cat) setCatalog(cat);
+
+      const data = await getTokenPermissions(tokenId);
+
+      // `configured: false` means nothing is stored, which means the token is
+      // unrestricted, so the grid opens fully ticked, matching what the API
+      // will actually do. Saving then stores exactly that, or whatever the
+      // admin changes it to.
+      const shown = data.configured ? data.matrix : fullMatrix(cat?.modules || []);
+
+      setConfigured(data.configured);
+      setOriginal(shown);
+      setDraft(shown);
+    })()
       .catch((err) => {
         toast(err?.message || "Could not load token permissions", "error");
         setOriginal(null);
@@ -102,7 +139,7 @@ export default function TokenPermissions({ tokenId, tokenLabel, open, onClose }:
 
   const modules = catalog?.modules || [];
 
-  /* The columns ARE the server's action vocabulary — not a second copy of it.
+  /* The columns ARE the server's action vocabulary, not a second copy of it.
      If the catalogue ever adds or reorders an action, the grid follows with
      no edit here. DEFAULT_ACTIONS only covers the moment before it arrives. */
   const actions: ActionName[] = catalog?.actions?.length ? catalog.actions : DEFAULT_ACTIONS;
@@ -160,7 +197,7 @@ export default function TokenPermissions({ tokenId, tokenLabel, open, onClose }:
   /**
    * One switch for every module at once: No access, Read only, or Full
    * access. "Full" means each module's own maximum, not literally every
-   * action on every module — Channel and Task have no create endpoint, so
+   * action on every module. Channel and Task have no create endpoint, so
    * "Full" gives them read/update/delete, which is all a token could use.
    */
   const applyGlobalPreset = (preset: "off" | "read" | "full") => {
@@ -184,7 +221,7 @@ export default function TokenPermissions({ tokenId, tokenLabel, open, onClose }:
 
   /**
    * Which global preset the whole matrix currently matches exactly, or null
-   * when modules disagree — the common case once an admin starts
+   * when modules disagree, which is the common case once an admin starts
    * customising. Null means no segment lights up, rather than guessing at the
    * closest one.
    */
@@ -262,16 +299,17 @@ export default function TokenPermissions({ tokenId, tokenLabel, open, onClose }:
             <>
               <p className="tkp-hint">
                 Which API modules this token may call, and with which verb. A module it can write
-                to needs read as well — the checkboxes keep that pair consistent.
+                to needs read as well. The checkboxes keep that pair consistent.
               </p>
 
               {configured === false && (
                 <div className="tkp-notice" role="note">
                   <i className="fa-solid fa-unlock" aria-hidden="true" />
                   <div>
-                    <strong>This token is unrestricted.</strong> It can call every module until a
-                    matrix is saved here — saving is what starts governing it. To cut it off
-                    completely, set every row to <em>No access</em>.
+                    <strong>Every module is allowed by default.</strong> Nothing is stored for
+                    this token yet, so it can call all of them, which is why every box starts
+                    ticked. Saving stores this as its matrix: untick what it must not do, or set
+                    every row to <em>No access</em> to switch it off completely.
                   </div>
                 </div>
               )}

@@ -3,7 +3,7 @@ import { denialFor, resolveRoute } from "../utils/tokenPermissionMap";
 import { PUBLIC_DENIAL_MESSAGE } from "../utils/environmentAccess";
 
 /**
- * The module-level gate for API tokens — the server-side counterpart to the
+ * The module-level gate for API tokens: the server-side counterpart to the
  * admin console's per-token permission popup
  * (src/utils/tokenPermissionCatalog.js defines the vocabulary,
  * src/controllers/tokenPermissions.js stores it,
@@ -11,14 +11,14 @@ import { PUBLIC_DENIAL_MESSAGE } from "../utils/environmentAccess";
  *
  * Registered once for the whole private router (src/routes/index.js) instead
  * of per route, because the module is a property of the path and the action
- * is a property of the method — both already known before any handler runs. A
+ * is a property of the method, and both are known before any handler runs. A
  * per-route guard would be repeated on ~25 routes and would be the thing
  * somebody forgets when adding the 26th.
  *
  * Runs after ValidateToken, which is what put req.tokenId there. The
  * environment gate (allow list, IP, security switches) has already passed by
- * this point: this answers a second, narrower question — may *this token* do
- * *this thing* — rather than replacing the first one.
+ * this point: this answers a second, narrower question. May *this token* do
+ * *this thing*? It does not replace the first one.
  */
 export const requireTokenPermission = async (req, reply) => {
   // No token id means ValidateToken did not get this far, which means it has
@@ -32,7 +32,7 @@ export const requireTokenPermission = async (req, reply) => {
   try {
     // Cached (src/utils/tokenPermissionCache.js), so this is not a query per
     // request in the steady state. The admin console edits permission data
-    // through the controller, which invalidates — so the worst case is the L1
+    // through the controller, which invalidates, so the worst case is the L1
     // window on another instance, not a matrix nobody saved.
     req.tokenMatrix = await TokenPermissions.GetMatrixCached(req.tokenId);
   } catch (err) {

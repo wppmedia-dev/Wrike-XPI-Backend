@@ -4,7 +4,7 @@
  * Which token made the call.
  *
  * Until now a row could say which environment and which Wrike user called,
- * but not which of that environment's tokens — so "show me this token's
+ * but not which of that environment's tokens, so "show me this token's
  * history" could only be answered by an approximation (environment + email),
  * which stops being true as soon as an account holds more than one token.
  * The admin console now links here from a token row, so the column is
@@ -23,7 +23,7 @@ module.exports = {
       references: { model: "user_tokens", key: "id" },
       onUpdate: "CASCADE",
       // A token is normally soft-deleted (user_tokens.deleted_at), so this
-      // only fires on a hard delete — at which point nulling the reference is
+      // only fires on a hard delete, at which point nulling the reference is
       // right: the history stays, minus a pointer to a row that is gone.
       onDelete: "SET NULL",
     });

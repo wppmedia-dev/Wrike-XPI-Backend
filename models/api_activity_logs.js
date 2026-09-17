@@ -22,7 +22,7 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: DataTypes.UUIDV4,
       },
       env_id: { type: DataTypes.UUID, allowNull: true },
-      environment_name: { type: DataTypes.STRING(255), allowNull: true }, // Which token made the call — null for rows written before this column
+      environment_name: { type: DataTypes.STRING(255), allowNull: true }, // Which token made the call. Null for rows written before this column
       // existed, for the public token-service routes, and for any call that
       // fails before a token is identified. See
       // migrations/20260917000001-add-token-id-to-api-activity-logs.js.

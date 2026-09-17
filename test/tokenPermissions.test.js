@@ -3,7 +3,7 @@
    allow/deny decision itself.
    Run from the repo root:  node test/tokenPermissions.test.js
 
-   No database, Redis or Wrike account required — everything under test is
+   No database, Redis or Wrike account required. Everything under test is
    deliberately pure (src/utils/tokenPermissionCatalog.js,
    src/utils/tokenPermissionMap.js, src/mcp/tools/permission.js), which is the
    point of keeping the decisions out of the middleware and the MCP wrapper.
@@ -87,7 +87,7 @@ console.log("\nCatalogue");
     "false,false,false,false",
   );
 
-  // Unknown modules and undeclared actions are discarded, never stored — a
+  // Unknown modules and undeclared actions are discarded, never stored. A
   // row that said otherwise must not survive a save.
   const normalised = catalog.normaliseMatrix({
     campaign: { read: true, create: true },
@@ -297,8 +297,8 @@ console.log("\nMCP tools → module/action");
   });
 
   // The mapper's verb list must agree with the confirmation gate's about what
-  // counts as a write. Both match the *subject* of a proxied tool — its
-  // remote, verb-first name — which is the name the proxy hands to
+  // counts as a write. Both match the *subject* of a proxied tool (its
+  // remote, verb-first name), which is the name the proxy hands to
   // isMutatingTool (src/mcp/wrikeMcpProxy.js) and the name left over after the
   // mapper strips the wrike_ prefix. Native tools are annotation-driven
   // instead, which test/mcpConfirmation.test.js covers by scanning their files

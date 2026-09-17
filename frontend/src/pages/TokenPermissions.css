@@ -130,7 +130,7 @@
 }
 
 /* The unrestricted state, said out loud. Without this an unconfigured token
-   renders as a grid of empty ticks, which reads as "no access" — the exact
+   renders as a grid of empty ticks, which reads as "no access", the exact
    opposite of what an unconfigured token can do. It disappears after the
    first save, because then there is nothing left to warn about. */
 .tkp-notice {
@@ -226,7 +226,7 @@
 }
 
 /* ── Matrix ─────────────────────────────────────────────────────────── */
-/* CSS grid, not a <table> — five modules and four actions is small enough
+/* CSS grid, not a <table>. Five modules and four actions is small enough
    that a grid gives cleaner alignment and an easy "All/None" final column.
 
    The action-column count is not hardcoded: the component sets

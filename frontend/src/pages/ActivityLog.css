@@ -149,7 +149,7 @@
   outline-offset: 2px;
 }
 
-/* The token scope — set by the API Tokens table's "Activity logs" row action
+/* The token scope, set by the API Tokens table's "Activity logs" row action
    rather than by anything on this page, so it reads as an applied filter
    (accent tint, removable) instead of as one more control. */
 .al-token-chip {

@@ -5,7 +5,7 @@
  * carrying its own Read/Create/Update/Delete grant.
  *
  * The rows are the *exception*, not the rule. A token with no rows here is
- * unrestricted — that is what keeps every token issued before this table
+ * unrestricted, and that is what keeps every token issued before this table
  * existed working, and what makes the first save from the admin console the
  * moment a token becomes governed. So "no row for this module" deliberately
  * does not mean denied on its own; src/controllers/tokenPermissions.js
@@ -29,7 +29,7 @@ module.exports = {
       },
       // Validated against the module list in
       // src/utils/tokenPermissionCatalog.js in the controller, rather than a
-      // DB enum — adding a module is then a code change, not a migration.
+      // DB enum, so adding a module is a code change, not a migration.
       module: {
         type: Sequelize.STRING(64),
         allowNull: false,

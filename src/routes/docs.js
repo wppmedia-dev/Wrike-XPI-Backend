@@ -935,7 +935,7 @@ async ({ taskId }, extra) => {
               ],
               [
                 "<code>mcp_proxy</code>",
-                "MCP only — the <code>wrike_*</code> tools",
+                "MCP only: the <code>wrike_*</code> tools",
                 "read, create, update, delete",
               ],
             ],
@@ -948,7 +948,7 @@ async ({ taskId }, extra) => {
           ${callout(
             "tip",
             "Nested listings follow what they return",
-            "<code>GET /wrikexpi/campaign/{id}/channel</code> returns channels, so it needs <code>channel</code> read — not <code>campaign</code> read. Switching a module off therefore closes every route that serves it.",
+            "<code>GET /wrikexpi/campaign/{id}/channel</code> returns channels, so it needs <code>channel</code> read, not <code>campaign</code> read. Switching a module off therefore closes every route that serves it.",
           )}
 
           <h2 class="pg-h2">Denied requests</h2>
@@ -969,7 +969,7 @@ async ({ taskId }, extra) => {
 
           <h2 class="pg-h2">The default, and what changes</h2>
           <ul class="bullets">
-            <li>A token nobody has configured is <b>unrestricted</b> — it can call every module. Restrictions are set per token in the admin portal.</li>
+            <li>A token nobody has configured is <b>unrestricted</b>, so it can call every module. Restrictions are set per token in the admin portal.</li>
             <li>Once a token is configured, its matrix is the whole story: a module with nothing ticked is denied, <code>read</code> included.</li>
             <li>A change takes effect on the next request. A short-lived cache can delay enforcement by up to 30 seconds on other instances.</li>
             <li>Switching a token off (<code>is_active: false</code>) rejects every request with <code>401</code>, whatever its matrix says.</li>

@@ -473,7 +473,7 @@ export default function AdminDashboard() {
   // whose tokens are simply still in flight.
   const [tokLoaded, setTokLoaded] = useState(false);
 
-  // Per-token module permission modal — opened from a token row. Held here
+  // Per-token module permission modal, opened from a token row. Held here
   // (rather than inside the table) for the same reason the portal-user one
   // is: the table stays presentational and the modal sits as a sibling of
   // #main, above everything.
@@ -537,7 +537,7 @@ export default function AdminDashboard() {
 
   // Token whose activity log is being viewed. Set by the API Tokens table's
   // "Activity logs" action, cleared either from the chip on the Activity Log
-  // page or by opening that page from the sidebar — where the same click
+  // page or by opening that page from the sidebar, where the same click
   // means "the whole log", not "the last token I looked at".
   const [activityToken, setActivityToken] = useState<{
     id: string;
@@ -547,6 +547,19 @@ export default function AdminDashboard() {
   function openTokenActivityLogs(token: AdminToken) {
     setActivityToken({ id: token.id, label: tokenLabel(token) });
     handleNav("activity-log");
+  }
+
+  // Environment the API Tokens page should open scoped to, set by the
+  // Environments table's "View tokens" action. A fresh object per click, so
+  // asking for the same environment twice re-applies the filter even if the
+  // admin cleared it in between.
+  const [tokensEnvScope, setTokensEnvScope] = useState<{ id: string; name: string } | null>(
+    null,
+  );
+
+  function openTokensForEnv(env: { id: string; environment_name: string }) {
+    setTokensEnvScope({ id: env.id, name: env.environment_name });
+    handleNav("tokens");
   }
 
   const [puUsers, setPuUsers] = useState<PortalUser[]>([]);
@@ -1114,7 +1127,13 @@ export default function AdminDashboard() {
 
           <div
             className={`nav-item${activePage === "tokens" ? " active" : ""}`}
-            onClick={() => handleNav("tokens")}
+            onClick={() => {
+              // From the sidebar this means every token, so an environment
+              // scope left over from an Environments row is dropped here rather
+              // than persisting behind a nav item that just says "API Tokens".
+              setTokensEnvScope(null);
+              handleNav("tokens");
+            }}
           >
             <span className="ni">
               <i className="fa-solid fa-key" />
@@ -1363,6 +1382,7 @@ export default function AdminDashboard() {
                   onDuplicate={(env) => openDuplicateModal(env.id)}
                   onDelete={(env) => confirmDeleteEnvironment(env.id, env.environment_name)}
                   onOpenAccess={(env) => openAccessDrawer(env.id, env.environment_name)}
+                  onViewTokens={openTokensForEnv}
                   onToggle={handleEnvToggle}
                 />
               </div>
@@ -1414,6 +1434,8 @@ export default function AdminDashboard() {
                   onPermissions={openTokenPermissions}
                   onToggleStatus={handleTokenToggle}
                   onActivityLogs={openTokenActivityLogs}
+                  envScope={tokensEnvScope}
+                  onClearEnvScope={() => setTokensEnvScope(null)}
                 />
               </div>
             </div>
