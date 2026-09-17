@@ -110,25 +110,18 @@ export const setTokenStatus = (tokenId: string, is_active: boolean) =>
 
 /**
  * Delete a token, which is a switch-off: DELETE /admin/tokens/:id deactivates
- * the row and keeps it, the same thing setTokenStatus(false) does. Kept as its
- * own call so the row menu's Deactivate and the Status switch are visibly two
- * different decisions, and so the portal and the console reach the same
- * outcome through the same verb.
+ * the row and keeps it, the same thing setTokenStatus(false) does. It is its own
+ * call so the portal's delete grant and this console's delete verb reach the
+ * same outcome through the same route, whether the caller arrives from the
+ * Status switch or from a script that only has the endpoint.
  */
 export const deactivateToken = (tokenId: string) =>
   request<{ id: string; is_active: boolean }>(`/${tokenId}`, { method: "DELETE" });
 
-/**
- * Create a token: returns the Wrike consent URL to send the browser to for the
- * chosen environment, labelled "Admin console" in the list. Nothing is minted
- * until somebody signs in, which is why this cannot return a token.
- */
-export const connectToken = (envId: string) =>
-  request<{ url: string; environment_name: string | null }>("/connect", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ env_id: envId }),
-  });
+/* There is deliberately no createToken here. A token is minted by the token
+   service's root login page or by an MCP client's OAuth flow, both of which
+   exchange a Wrike authorization code, and neither of which a console can
+   stand in for. */
 
 /* ── Shaping helpers ───────────────────────────────────────────────── */
 

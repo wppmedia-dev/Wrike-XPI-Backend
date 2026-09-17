@@ -179,10 +179,10 @@ export const tokenRoute = (fastify, opts, done) => {
           ...decodedData,
           ip: clientIp(req),
           // A caller that named itself in the signed state gets labelled with
-          // that name. The portal's "create token" action does exactly this, so
-          // a token it issued shows up as "Portal" in the admin console instead
-          // of being indistinguishable from a plain sign-in. Everything else
-          // came through the hosted login page, so that is what it is called.
+          // that name, which is how an MCP client's OAuth flow shows up as
+          // itself in the admin console's Client column instead of being
+          // indistinguishable from a plain sign-in. Nothing else sets it any
+          // more: the consoles used to, and have no way to mint a token at all.
           clientName: String(decodedData?.client_name || "Login page"),
         },
         fastify,
