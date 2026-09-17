@@ -166,65 +166,13 @@ export const GetAllByUserId = async (id) => {
   }
 };
 
-export const GetByUserAccountEnvId = async (id, accountId, environmentId) => {
-  try {
-    if (!id) {
-      throw {
-        statusCode: 420,
-        message: "Id must not be empty!",
-      };
-    }
-
-    if (!accountId) {
-      throw {
-        statusCode: 420,
-        message: "Account Id must not be empty!",
-      };
-    }
-
-    if (!environmentId)
-      throw {
-        statusCode: 420,
-        message: "Env Id must not be empty!",
-      };
-
-    let where = {
-      created_by: id,
-      is_active: true,
-    };
-
-    if (accountId) where["account_id"] = accountId;
-    if (environmentId) where["env_id"] = environmentId;
-
-    const userTokens = await models.UserTokens.findOne({
-      attributes: [
-        "id",
-        "encrypted_access_token",
-        "encrypted_refresh_token",
-        "env_id",
-      ],
-      include: [
-        {
-          association: "environment",
-          attributes: ["environment_name"],
-        },
-      ],
-      where,
-      order: [["created_at", "DESC"]],
-    });
-
-    return {
-      id: userTokens?.id,
-      encrypted_access_token: userTokens?.encrypted_access_token,
-      encrypted_refresh_token: userTokens?.encrypted_refresh_token,
-      env_id: userTokens?.env_id,
-      environment_name: userTokens?.environment?.environment_name,
-    };
-  } catch (err) {
-    throw err;
-  }
-};
-
+// There is deliberately no "find the token for this user, account and
+// environment" helper any more. Choosing an existing row and rewriting it is
+// what used to kill a caller's working token whenever the same person signed in
+// again, because the DEK that decrypts a stored Wrike credential lives inside
+// the token that was issued with it (see
+// src/routes/tokens/handlers/wrikeTokenExchange.js). Every mint gets its own
+// row; nothing looks one up by identity.
 export const GetAll = async ({ limit = 10, offset = 0 }) => {
   try {
     const userTokens = await models.UserTokens.findAll({
@@ -260,6 +208,10 @@ const toAdminShape = (token) => ({
   environment_name: token?.environment?.environment_name || null,
   environment_visible: token?.environment?.is_visible ?? null,
   is_active: token.is_active,
+  // What the token was issued to. Two tokens can share an environment, an
+  // account and a creator, so this is often the only thing besides the id that
+  // tells them apart.
+  client_name: token.client_name || null,
   // When the token the caller holds stops being accepted. Null on rows that
   // predate the column and on any row whose mint was never recorded.
   token_expires_at: token.token_expires_at || null,
@@ -275,6 +227,7 @@ const ADMIN_ATTRIBUTES = [
   "username",
   "env_id",
   "is_active",
+  "client_name",
   "token_expires_at",
   "created_at",
   "updated_at",
@@ -282,7 +235,7 @@ const ADMIN_ATTRIBUTES = [
 
 /**
  * One token record for the admin console, without GetById's `is_active: true`
- * filter — reaching a token that is currently switched off is the whole point
+ * filter. Reaching a token that is currently switched off is the whole point
  * of the status toggle and the permissions popup, and GetById would report
  * every one of those as missing.
  *
@@ -315,8 +268,8 @@ export const GetRecord = async (id) => {
 /**
  * Every token record, for the admin console's API Tokens list.
  *
- * The secrets a token exists to carry — encrypted_access_token,
- * encrypted_refresh_token, salt, wrapped_dek — are deliberately not selected.
+ * The secrets a token exists to carry (encrypted_access_token,
+ * encrypted_refresh_token, salt, wrapped_dek) are deliberately not selected.
  * An admin identifies a token by its row id, which is also what its module
  * permissions are keyed on; nothing here needs the credential itself, and
  * nothing here should be able to leak it into a response body or a log.
@@ -350,7 +303,7 @@ export const ListAll = async () => {
  *
  * Deliberately not routed through Update above. That version exists for the
  * token-refresh path and stamps `updated_by` from `options.profile_id`, which
- * is always an `auth.users` id there — the column is a foreign key to that
+ * is always an `auth.users` id there, and the column is a foreign key to that
  * table. An admin flipping this switch is an `admin_users` row, so the same
  * call would hand Postgres an id that table has never seen and the write
  * would fail on the constraint (verified against the live schema, not

@@ -68,6 +68,12 @@ module.exports = (sequelize, DataTypes) => {
       is_active: {
         type: DataTypes.BOOLEAN,
       },
+      client_name: {
+        type: DataTypes.STRING(100),
+        allowNull: true,
+        comment:
+          'What the token was issued to (client name, "MCP client" or "Login page")',
+      },
       created_at: {
         type: DataTypes.DATE,
       },

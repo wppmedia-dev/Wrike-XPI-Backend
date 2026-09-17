@@ -9,7 +9,7 @@ export const IdParamSchema = {
   },
 };
 
-// PUT /admin/tokens/:id/permissions — whole-matrix replace.
+// PUT /admin/tokens/:id/permissions: whole-matrix replace.
 //
 // `permissions` is deliberately left open rather than spelled out as
 // module-by-action properties: the vocabulary lives in
@@ -35,7 +35,7 @@ export const SetPermissionsSchema = {
   },
 };
 
-// PUT /admin/tokens/:id/status — the Active/Inactive switch in the list.
+// PUT /admin/tokens/:id/status: the Active/Inactive switch in the list.
 export const SetStatusSchema = {
   schema: {
     params: {
