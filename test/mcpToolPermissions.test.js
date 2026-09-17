@@ -171,8 +171,13 @@ const runGateChecks = async () => {
     );
 
     // …with two named exceptions, both of which read no record.
-    await checkAllowed("datahub_list_fields", t, "datahub_list_fields", read);
-    await checkAllowed("ids_convert", t, "ids_convert", read);
+    // The two helpers whose names carry no verb, datahub_list_fields and
+    // ids_convert, are governed too: they used to be exempt, and the cost of
+    // that was an admin switching every action off and still finding two
+    // working tools. They are reads on the MCP row, so a token with no mcp_proxy
+    // read is refused them as well.
+    await checkDenied("datahub_list_fields", t, "datahub_list_fields", read);
+    await checkDenied("ids_convert", t, "ids_convert", read);
   }
 
   console.log("\nThe refusal a caller gets");
@@ -207,6 +212,11 @@ const runGateChecks = async () => {
 
     await checkAllowed("campaign_delete", t, "campaign_delete", destructive);
     await checkAllowed("campaign_create", t, "campaign_create", write);
+
+    // The helpers need the MCP row's read, which this token has: a tool an
+    // agent needs is a grant an admin makes, and this is where they make it.
+    await checkAllowed("datahub_list_fields", t, "datahub_list_fields", read);
+    await checkAllowed("ids_convert", t, "ids_convert", read);
 
     // Read on the proxy row is not write: the four actions stay separate on
     // the MCP surface exactly as they do over REST.
@@ -309,10 +319,10 @@ const runGateChecks = async () => {
 };
 
 /* ── Coverage of the tool files themselves ────────────────────────────────
-   The scan is the part that keeps the two exceptions honest: every native tool
-   a tool file registers has to resolve to a module/action, or be named in
-   UNGOVERNED_TOOLS. A new tool is therefore governed by default, and being
-   ungoverned has to be written down. */
+   The scan is what keeps this honest: every native tool a tool file registers
+   has to resolve to a module and an action, and nothing is allowed to be
+   exempt. A new tool is governed by default, so an exemption would have to be
+   argued for here rather than inherited by having an unfamiliar name. */
 
 const runCoverageChecks = () => {
   console.log("\nEvery registered tool resolves to something");
@@ -340,15 +350,16 @@ const runCoverageChecks = () => {
     ungoverned.push(name);
   }
 
+  check("nothing is exempt from the matrix", ungoverned.join(","), "");
   check(
-    "the only ungoverned tools are the two named helpers",
-    ungoverned.sort().join(","),
-    "datahub_list_fields,ids_convert",
-  );
-  check(
-    "and they are the ones the exemption list holds",
-    [...mcp.UNGOVERNED_TOOLS].sort().join(","),
-    "datahub_list_fields,ids_convert",
+    "the two verbless helpers read the MCP row like everything else",
+    ["datahub_list_fields", "ids_convert"]
+      .map((name) => {
+        const route = mcp.resolveToolRoute(name, { readOnlyHint: true });
+        return `${route.module}/${route.action}`;
+      })
+      .join(","),
+    "mcp_proxy/read,mcp_proxy/read",
   );
 
   // Each of the four actions is reachable through the gate for at least one
