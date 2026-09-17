@@ -12,6 +12,7 @@ const ROW_ATTRS = [
   "id",
   "env_id",
   "environment_name",
+  "token_id",
   "surface",
   "actor_email",
   "action",
@@ -31,6 +32,7 @@ export const Record = async (entry) => {
   return models.ApiActivityLogs.create({
     env_id: entry.envId || null,
     environment_name: entry.environmentName || null,
+    token_id: entry.tokenId || null,
     surface: entry.surface,
     actor_email: entry.actorEmail || null,
     action: entry.action || null,
@@ -52,6 +54,7 @@ export const Record = async (entry) => {
  */
 export const List = async ({
   envId,
+  tokenId,
   actorEmail,
   surface,
   allowed,
@@ -62,6 +65,9 @@ export const List = async ({
 } = {}) => {
   const where = {};
   if (envId) where.env_id = envId;
+  // Exact match, not a like: a token id is a UUID, and "show me everything
+  // this token did" means that token, not anything whose id contains it.
+  if (tokenId) where.token_id = tokenId;
   if (actorEmail)
     where.actor_email = { [Op.iLike]: `%${actorEmail.trim().toLowerCase()}%` };
   if (surface) where.surface = surface;
@@ -92,9 +98,10 @@ export const List = async ({
 };
 
 /** Quick counts for the console's summary strip. */
-export const Summary = async ({ envId, since } = {}) => {
+export const Summary = async ({ envId, tokenId, since } = {}) => {
   const where = {};
   if (envId) where.env_id = envId;
+  if (tokenId) where.token_id = tokenId;
   if (since) where.created_at = { [Op.gte]: new Date(since) };
 
   const [total, denied] = await Promise.all([

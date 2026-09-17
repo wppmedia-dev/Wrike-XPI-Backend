@@ -108,6 +108,14 @@ interface Props {
   active: boolean;
   /** Incremented by the top-bar Refresh button to force a reload. */
   refreshKey?: number;
+  /**
+   * Scope the whole page to one token — set by the API Tokens table's
+   * "Activity logs" row action. `label` is only for the chip; the server
+   * filters on `id` alone.
+   */
+  tokenFilter?: { id: string; label: string } | null;
+  /** Clears the token scope, returning the page to the whole log. */
+  onClearTokenFilter?: () => void;
 }
 
 /**
@@ -116,7 +124,13 @@ interface Props {
  * kept forever. Every row here ages out on its own; see the retention note
  * in the header, sourced from the same config the background sweep reads.
  */
-export default function ActivityLog({ environments, active, refreshKey = 0 }: Props) {
+export default function ActivityLog({
+  environments,
+  active,
+  refreshKey = 0,
+  tokenFilter = null,
+  onClearTokenFilter,
+}: Props) {
   const [config, setConfig] = useState<ActivityConfig | null>(null);
   const [summary, setSummary] = useState<ActivitySummary | null>(null);
   const [rows, setRows] = useState<ActivityRow[]>([]);
@@ -134,6 +148,10 @@ export default function ActivityLog({ environments, active, refreshKey = 0 }: Pr
   const loadedOnce = useRef(false);
   const searchDebounce = useRef<number | null>(null);
 
+  // Narrowed to a plain string so the effect below depends on the value
+  // rather than on the object identity of the prop.
+  const tokenFilterId = tokenFilter?.id || undefined;
+
   const load = useCallback(
     async (nextOffset = offset) => {
       setLoading(true);
@@ -141,13 +159,17 @@ export default function ActivityLog({ environments, active, refreshKey = 0 }: Pr
         const [list, sum] = await Promise.all([
           listActivity({
             env_id: envFilter || undefined,
+            token_id: tokenFilterId,
             surface: surfaceFilter || undefined,
             allowed: resultFilter ? resultFilter === "allowed" : undefined,
             actor_email: emailFilter.trim() || undefined,
             limit: pageSize,
             offset: nextOffset,
           }),
-          getActivitySummary(envFilter || undefined),
+          getActivitySummary({
+            env_id: envFilter || undefined,
+            token_id: tokenFilterId,
+          }),
         ]);
         setRows(list.rows);
         setTotal(list.total);
@@ -160,7 +182,7 @@ export default function ActivityLog({ environments, active, refreshKey = 0 }: Pr
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [envFilter, surfaceFilter, resultFilter, emailFilter, pageSize],
+    [envFilter, surfaceFilter, resultFilter, emailFilter, pageSize, tokenFilterId],
   );
 
   useEffect(() => {
@@ -171,7 +193,7 @@ export default function ActivityLog({ environments, active, refreshKey = 0 }: Pr
     }
     load(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, envFilter, surfaceFilter, resultFilter, pageSize]);
+  }, [active, envFilter, surfaceFilter, resultFilter, pageSize, tokenFilterId]);
 
   // Top-bar Refresh — reload the current page (keeps filters + page) and the
   // summary stats without resetting the view.
@@ -260,6 +282,27 @@ export default function ActivityLog({ environments, active, refreshKey = 0 }: Pr
       </div>
 
       <div className="al-filterbar">
+        {/* The token scope, shown before the other filters because it is the
+            one the admin did not set from this page — and removable right
+            here, so arriving from a token row never traps them. */}
+        {tokenFilter && (
+          <span className="al-token-chip" title={`Filtered to ${tokenFilter.label}`}>
+            <i className="fa-solid fa-key" aria-hidden="true" />
+            <span className="al-token-chip-label">{tokenFilter.label}</span>
+            {onClearTokenFilter && (
+              <button
+                type="button"
+                className="al-token-chip-clear"
+                onClick={onClearTokenFilter}
+                aria-label="Clear the token filter"
+                title="Clear the token filter"
+              >
+                <i className="fa-solid fa-xmark" aria-hidden="true" />
+              </button>
+            )}
+          </span>
+        )}
+
         <div className="al-search">
           <i className="fa-solid fa-magnifying-glass" aria-hidden="true" />
           <input

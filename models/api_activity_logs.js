@@ -22,7 +22,15 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: DataTypes.UUIDV4,
       },
       env_id: { type: DataTypes.UUID, allowNull: true },
-      environment_name: { type: DataTypes.STRING(255), allowNull: true },
+      environment_name: { type: DataTypes.STRING(255), allowNull: true }, // Which token made the call — null for rows written before this column
+      // existed, for the public token-service routes, and for any call that
+      // fails before a token is identified. See
+      // migrations/20260917000001-add-token-id-to-api-activity-logs.js.
+      token_id: {
+        type: DataTypes.UUID,
+        allowNull: true,
+        comment: "user_tokens.id of the token that made the call",
+      },
       surface: { type: DataTypes.ENUM("rest", "mcp"), allowNull: false },
       actor_email: { type: DataTypes.STRING(320), allowNull: true },
       action: { type: DataTypes.STRING(16), allowNull: true },

@@ -4,6 +4,9 @@ export const ListSchema = {
       type: "object",
       properties: {
         env_id: { type: "string", format: "uuid" },
+        // Set by the API Tokens table's "Activity logs" row action, so the
+        // log opens filtered to one token instead of its whole environment.
+        token_id: { type: "string", format: "uuid" },
         actor_email: { type: "string", maxLength: 320 },
         surface: { type: "string", enum: ["rest", "mcp"] },
         allowed: { type: "string", enum: ["true", "false"] },
@@ -22,6 +25,7 @@ export const SummarySchema = {
       type: "object",
       properties: {
         env_id: { type: "string", format: "uuid" },
+        token_id: { type: "string", format: "uuid" },
         since: { type: "string" },
       },
     },

@@ -483,9 +483,7 @@ export default function AdminDashboard() {
 
   function openTokenPermissions(token: AdminToken) {
     setTokPermsTokenId(token.id);
-    setTokPermsLabel(
-      [token.environment_name, token.account_id].filter(Boolean).join(" · ") || token.id,
-    );
+    setTokPermsLabel(tokenLabel(token));
     setTokPermsOpen(true);
   }
 
@@ -532,6 +530,25 @@ export default function AdminDashboard() {
   }
 
   /* ── Portal users ─────────────────────────────────────────────────── */
+  // Identifies a token in the UI without ever showing its credential: the
+  // environment it acts for and the account it belongs to.
+  const tokenLabel = (token: AdminToken) =>
+    [token.environment_name, token.account_id].filter(Boolean).join(" · ") || token.id;
+
+  // Token whose activity log is being viewed. Set by the API Tokens table's
+  // "Activity logs" action, cleared either from the chip on the Activity Log
+  // page or by opening that page from the sidebar — where the same click
+  // means "the whole log", not "the last token I looked at".
+  const [activityToken, setActivityToken] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
+
+  function openTokenActivityLogs(token: AdminToken) {
+    setActivityToken({ id: token.id, label: tokenLabel(token) });
+    handleNav("activity-log");
+  }
+
   const [puUsers, setPuUsers] = useState<PortalUser[]>([]);
   // Mirrors envLoaded: the table shows its loading skeleton until the first
   // fetch resolves, so it never flashes the "no portal users" empty state.
@@ -1132,7 +1149,13 @@ export default function AdminDashboard() {
 
           <div
             className={`nav-item${activePage === "activity-log" ? " active" : ""}`}
-            onClick={() => handleNav("activity-log")}
+            onClick={() => {
+              // Opening it from the sidebar means the whole log, so a token
+              // scope left over from a token row is dropped here rather than
+              // silently persisting behind a nav item that says "Activity Log".
+              setActivityToken(null);
+              handleNav("activity-log");
+            }}
           >
             <span className="ni">
               <i className="fa-solid fa-clock-rotate-left" />
@@ -1390,6 +1413,7 @@ export default function AdminDashboard() {
                   loading={!tokLoaded}
                   onPermissions={openTokenPermissions}
                   onToggleStatus={handleTokenToggle}
+                  onActivityLogs={openTokenActivityLogs}
                 />
               </div>
             </div>
@@ -1450,6 +1474,8 @@ export default function AdminDashboard() {
               environments={environments}
               active={activePage === "activity-log"}
               refreshKey={activityRefreshKey}
+              tokenFilter={activityToken}
+              onClearTokenFilter={() => setActivityToken(null)}
             />
           </div>
         </div>

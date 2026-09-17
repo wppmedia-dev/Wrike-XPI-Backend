@@ -11,6 +11,145 @@
   padding: 16px 8px;
 }
 
+/* ── Advanced filters ─────────────────────────────────────────────────
+   A bar above the table (toggle, live count, clear) and a panel of one
+   control per column. Collapsed by default so the default view is the table,
+   not a form. */
+.tok-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.tok-filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.tok-filter-toggle i {
+  font-size: 11px;
+}
+
+.tok-filter-toggle:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface-2);
+}
+
+.tok-filter-toggle.is-open {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.tok-filter-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* How many filters are applied — visible while the panel is collapsed, which
+   is the state where a filter is easiest to forget about. */
+.tok-filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #ffffff;
+  background: var(--accent);
+  border-radius: 999px;
+}
+
+.tok-filter-summary {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.tok-filter-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    color 0.12s ease,
+    background-color 0.12s ease;
+}
+
+.tok-filter-clear:hover {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.tok-filter-clear:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* auto-fit rather than a fixed column count: six controls, whatever the
+   width, wrapping to as many rows as the viewport needs. */
+.tok-filter-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  padding: 14px;
+  margin-bottom: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.tok-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tok-filter-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.tok-filter-field > * {
+  width: 100%;
+}
+
+/* One step down from the form default: these sit six-to-a-row in a panel,
+   not one to a modal. */
+.tok-filter-field .form-control {
+  font-size: 13px;
+  padding: 8px 11px;
+}
+
 /* Nothing in this table is prose — environment names, account ids, emails,
    UUIDs, timestamps — so nothing wraps. On a narrow viewport the table
    scrolls sideways (DataTable's own .dt2-scroll) instead of breaking a UUID
