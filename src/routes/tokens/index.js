@@ -53,6 +53,10 @@ export const tokenRoute = (fastify, opts, done) => {
     logActivity({
       envId: null,
       environmentName: null,
+      // Only set by a handler that has actually identified the calling token
+      // (see /view-tokens). The exchange and callback routes cannot: the
+      // token row is being created by the request being logged.
+      tokenId: req.tokenId || null,
       surface: "rest",
       actorEmail: null,
       action: actionForMethod(req.method),
@@ -1255,6 +1259,11 @@ export const tokenRoute = (fastify, opts, done) => {
           message: "Invalid Token",
         });
       }
+
+      // The caller's own token id, so this lookup is attributed to it in the
+      // activity log — the onResponse hook above reads it back off the
+      // request.
+      req.tokenId = tid;
 
       const userToken = await Tokens.GetById(tid);
 

@@ -20,27 +20,48 @@ export const adminActivityRoute = (fastify, opts, done) => {
 
   // So the console can show "kept for 30 days" instead of a magic number.
   fastify.get("/config", guard, async (req, reply) =>
-    reply.code(200).send({ success: true, data: { retention_days: retentionDays() } }),
+    reply
+      .code(200)
+      .send({ success: true, data: { retention_days: retentionDays() } }),
   );
 
-  fastify.get("/summary", { ...SummarySchema, ...guard }, async (req, reply) => {
-    try {
-      const data = await ActivityLog.Summary({
-        envId: req.query.env_id,
-        since: req.query.since,
-      });
-      return reply.code(200).send({ success: true, data });
-    } catch (err) {
-      return fail(reply, err);
-    }
-  });
+  fastify.get(
+    "/summary",
+    { ...SummarySchema, ...guard },
+    async (req, reply) => {
+      try {
+        const data = await ActivityLog.Summary({
+          envId: req.query.env_id,
+          // Kept alongside the list filter so the summary strip above a
+          // token-filtered list counts that token's calls, not every call in
+          // the environment.
+          tokenId: req.query.token_id,
+          since: req.query.since,
+        });
+        return reply.code(200).send({ success: true, data });
+      } catch (err) {
+        return fail(reply, err);
+      }
+    },
+  );
 
   fastify.get("/", { ...ListSchema, ...guard }, async (req, reply) => {
     try {
-      const { env_id, actor_email, surface, allowed, from, to, limit, offset } = req.query;
+      const {
+        env_id,
+        token_id,
+        actor_email,
+        surface,
+        allowed,
+        from,
+        to,
+        limit,
+        offset,
+      } = req.query;
 
       const data = await ActivityLog.List({
         envId: env_id,
+        tokenId: token_id,
         actorEmail: actor_email,
         surface,
         allowed: allowed === undefined ? undefined : allowed === "true",

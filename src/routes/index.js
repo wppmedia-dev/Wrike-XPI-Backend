@@ -155,6 +155,9 @@ export const PrivateRouters = (fastify, opts, done) => {
     logActivity({
       envId: req.envId || null,
       environmentName: req.environmentName || null,
+      // Which token called — set once ValidateToken has proved one, and the
+      // key the console's per-token activity view filters on.
+      tokenId: req.tokenId || null,
       surface: "rest",
       actorEmail: req.callerEmail || null,
       action: actionForMethod(req.method),
