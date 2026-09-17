@@ -23,11 +23,11 @@ const actionForMethod = (method) =>
 
 export const tokenRoute = (fastify, opts, done) => {
   // Token-service calls (OAuth exchange/callback/profile) are logged to the
-  // audit log too — category "token" — so token traffic is visible beside
+  // audit log too, category "token", so token traffic is visible beside
   // API/MCP calls. Anything secret in these calls (authorization codes,
   // refresh tokens, state) is redacted by captureRequest before storage.
-  // Store the response body for everything EXCEPT the 200/201 success path —
-  // most rows are those, so skipping them keeps the table lean while still
+  // Store the response body for everything EXCEPT the 200/201 success path.
+  // Most rows are those, so skipping them keeps the table lean while still
   // capturing the payloads that matter (OAuth errors, 4xx/5xx, etc.).
   fastify.addHook("onSend", (req, reply, payload, done) => {
     try {
@@ -100,7 +100,13 @@ export const tokenRoute = (fastify, opts, done) => {
   fastify.get("/exchange", WrikeTokenExchangeSchema, async (req, reply) => {
     try {
       const result = await WrikeTokenExchange(
-        { ...req.query, ip: clientIp(req) },
+        {
+          ...req.query,
+          ip: clientIp(req),
+          // Nothing here knows who is asking. This route is reached from the
+          // hosted login page, so that is what the token gets called.
+          clientName: "Login page",
+        },
         fastify,
       );
 
@@ -134,7 +140,7 @@ export const tokenRoute = (fastify, opts, done) => {
           // MCP OAuth flow (/oauth/authorize set code_challenge in state): wrap
           // Wrike's raw code in a short-lived signed JWT carrying the PKCE
           // challenge, so /oauth/token can verify code_verifier before ever
-          // spending it — the MCP client never sees Wrike's raw code.
+          // spending it. The MCP client never sees Wrike's raw code.
           if (decodedData.code_challenge) {
             const wrappedCode = fastify.jwt.sign(
               {
@@ -143,6 +149,10 @@ export const tokenRoute = (fastify, opts, done) => {
                 code_challenge: decodedData.code_challenge,
                 code_challenge_method: decodedData.code_challenge_method,
                 redirect_uri: decodedData.redirectUri,
+                // Carried through so the mint can name the token after the
+                // client that asked for it. The state this came out of already
+                // holds it and the client never sees it.
+                client_id: decodedData.client_id || null,
               },
               { expiresIn: "60s" },
             );
@@ -164,7 +174,15 @@ export const tokenRoute = (fastify, opts, done) => {
       }
 
       const result = await WrikeTokenExchange(
-        { ...req.query, ...decodedData, ip: clientIp(req) },
+        {
+          ...req.query,
+          ...decodedData,
+          ip: clientIp(req),
+          // The plain web login flows through here as well. An MCP client that
+          // registered no PKCE challenge relays its raw code back out and ends
+          // up on /exchange, so this label is the best available answer here.
+          clientName: "Login page",
+        },
         fastify,
       );
 
@@ -1261,7 +1279,7 @@ export const tokenRoute = (fastify, opts, done) => {
       }
 
       // The caller's own token id, so this lookup is attributed to it in the
-      // activity log — the onResponse hook above reads it back off the
+      // activity log. The onResponse hook above reads it back off the
       // request.
       req.tokenId = tid;
 

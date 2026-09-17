@@ -9,10 +9,15 @@ import {
   PUBLIC_DENIAL_MESSAGE,
 } from "../../../utils/environmentAccess";
 import { tokenExpiryFrom, TOKEN_TTL_DAYS } from "../../../utils/tokenTtl";
+import { usernameFor } from "../../../utils/tokenUsername";
+import { v4 as uuidv4 } from "uuid";
 
-export const WrikeTokenExchange = ({ code, environmentId, ip }, fastify) => {
+export const WrikeTokenExchange = (
+  { code, environmentId, ip, clientName },
+  fastify,
+) => {
   return new Promise(async (resolve, reject) => {
-    // Transaction is opened later, right before the first write — it must
+    // Transaction is opened later, right before the first write. It must
     // not span the outbound Wrike API calls or the access check below, since
     // holding a pooled connection idle for the length of an external HTTP
     // round-trip is what was starving the (small) connection pool for every
@@ -61,12 +66,12 @@ export const WrikeTokenExchange = ({ code, environmentId, ip }, fastify) => {
 
       console.log("Fetched Wrike user data");
 
-      // Environment-level access scope — same gate ValidateToken applies to
+      // Environment-level access scope: same gate ValidateToken applies to
       // every subsequent API call, run here BEFORE any credentials or token
       // record are created. Without this, a caller who is not on the
       // environment's allow list could still complete the OAuth exchange and
-      // walk away with valid, persistent XPI credentials for it — the
-      // allow list would only start blocking them on their first API call.
+      // walk away with valid, persistent XPI credentials for it, leaving the
+      // allow list to start blocking them only on their first API call.
       const access = await evaluateAccess({
         envId: environmentId,
         email: primaryEmail,
@@ -76,7 +81,7 @@ export const WrikeTokenExchange = ({ code, environmentId, ip }, fastify) => {
 
       if (!access.allowed) {
         // Detailed reasoning stays server-side only (server log here, full
-        // decision in the admin console) — the caller gets the generic
+        // decision in the admin console). The caller gets the generic
         // denial message below, never the allow-list mechanics.
         console.log(
           `Environment access denied for ${primaryEmail || "unknown caller"}: ${access.code} (${access.message})`,
@@ -90,7 +95,7 @@ export const WrikeTokenExchange = ({ code, environmentId, ip }, fastify) => {
 
       const accountId = profiles?.[0]?.accountId;
 
-      // Start database transaction for data consistency — from here on,
+      // Start database transaction for data consistency. From here on,
       // only DB writes happen, no more outbound HTTP calls.
       transaction = await models.sequelize.transaction();
 
@@ -113,8 +118,25 @@ export const WrikeTokenExchange = ({ code, environmentId, ip }, fastify) => {
 
       console.log("Fetched exising user data from DB");
 
-      // Generate username from email + account_id
-      const username = `${accountId}-${environmentId}-${primaryEmail}`;
+      // One row per token, never one row per user and environment.
+      //
+      // The DEK that decrypts a token's stored Wrike credential travels inside
+      // the token itself (the JWE carries `d` inline). Reusing a row therefore
+      // means re-encrypting that credential under a new DEK, and the older
+      // token is left pointing at ciphertext it can no longer decrypt: it dies
+      // the moment the second one is issued. Separate rows are also what lets
+      // two tokens for the same environment carry different permissions.
+      const tokenId = uuidv4();
+
+      // Named after its own id, so the username is unique to this token and
+      // still says who it belongs to. See src/utils/tokenUsername.js for why
+      // the id has to be part of it at all.
+      const username = usernameFor({
+        accountId,
+        environmentId,
+        email: primaryEmail,
+        tokenId,
+      });
 
       // Generate random strong password
       const password = crypto.generateSecurePassword();
@@ -136,61 +158,35 @@ export const WrikeTokenExchange = ({ code, environmentId, ip }, fastify) => {
         .encrypt(Buffer.from(refresh_token), dek)
         .toString("base64");
 
-      // Get existing user token if any
-      const userTokenData = await Tokens.GetByUserAccountEnvId(
-        userId,
-        accountId,
-        environmentId,
-      );
-      let userTokenId = userTokenData?.id;
-
-      console.log("Retrieved exising user token data");
-
       // When the token minted below dies. Computed once, here, so the row and
       // the signature cannot disagree about it, and stored on the row because
-      // nothing reads the JWE's own payload back — without this, "when does
-      // this integration stop working?" has no answer until it does.
+      // nothing reads the JWE's own payload back: without this, "when does this
+      // integration stop working?" has no answer until it does.
       const tokenExpiresAt = tokenExpiryFrom();
 
-      // Update or create token record
-      if (userTokenId) {
-        await Tokens.Update(
-          userId,
-          userTokenId,
-          {
-            encrypted_access_token: encryptedAccessToken,
-            encrypted_refresh_token: encryptedRefreshToken,
-            username,
-            password_hash: passwordHash,
-            salt: salt.toString("base64"),
-            wrapped_dek: wrappedDEK.toString("base64"),
-            token_expires_at: tokenExpiresAt,
-          },
-          { transaction },
-        );
+      const newUserTokenData = await Tokens.Insert(
+        userId,
+        {
+          id: tokenId,
+          account_id: accountId,
+          env_id: environmentId,
+          encrypted_access_token: encryptedAccessToken,
+          encrypted_refresh_token: encryptedRefreshToken,
+          username,
+          password_hash: passwordHash,
+          salt: salt.toString("base64"),
+          wrapped_dek: wrappedDEK.toString("base64"),
+          is_active: true,
+          // Null when the caller did not say what it is. Guessing here would
+          // put a label on a row that the console presents as fact.
+          client_name: clientName || null,
+          token_expires_at: tokenExpiresAt,
+        },
+        { transaction },
+      );
+      const userTokenId = newUserTokenData?.id;
 
-        console.log("Updated user token meta data");
-      } else {
-        const newUserTokenData = await Tokens.Insert(
-          userId,
-          {
-            account_id: accountId,
-            env_id: environmentId,
-            encrypted_access_token: encryptedAccessToken,
-            encrypted_refresh_token: encryptedRefreshToken,
-            username,
-            password_hash: passwordHash,
-            salt: salt.toString("base64"),
-            wrapped_dek: wrappedDEK.toString("base64"),
-            is_active: true,
-            token_expires_at: tokenExpiresAt,
-          },
-          { transaction },
-        );
-        userTokenId = newUserTokenData?.id;
-
-        console.log("Inserted a new token meta data");
-      }
+      console.log("Inserted a new token record", userTokenId);
 
       // Sign the XPI token. It carries the token-record id (t) and the DEK
       // (d, base64) inline. The DEK is not secret from whoever holds this
@@ -219,7 +215,7 @@ export const WrikeTokenExchange = ({ code, environmentId, ip }, fastify) => {
         },
       });
     } catch (err) {
-      // Rollback only if the transaction was actually opened — errors from
+      // Rollback only if the transaction was actually opened. Errors from
       // the pre-transaction steps (env lookup, Wrike API calls, access
       // check) have no transaction to roll back.
       if (transaction) {

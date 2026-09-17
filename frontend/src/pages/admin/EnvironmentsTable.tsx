@@ -132,7 +132,7 @@ export function EnvironmentsTable({
               },
               {
                 // Straight to the tokens issued for this environment, already
-                // filtered to it — the question "what is using this
+                // filtered to it. That is the question "what is using this
                 // environment?" asked from the environment's own row.
                 label: "View tokens",
                 icon: "fa-solid fa-key",

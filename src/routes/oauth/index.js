@@ -41,6 +41,26 @@ const resolveRegisteredRedirectUris = (fastify, clientId) => {
   }
 };
 
+// The display name a client registered at /register, read back out of the
+// signed client_id it was given. This is what labels the token that client ends
+// up minting, and the only thing that distinguishes two tokens a user holds for
+// the same environment in the admin console.
+//
+// Verification can fail for reasons that are not the client's fault and an
+// unlabelled token is perfectly usable, so every failure returns null rather
+// than throwing: a missing label must never be a reason to refuse a token.
+const clientNameFrom = (fastify, clientId) => {
+  if (!clientId) return null;
+  try {
+    const decoded = fastify.jwt.verify(clientId);
+    const name = decoded?.client_name;
+    if (typeof name !== "string") return null;
+    return name.trim().slice(0, 100) || null;
+  } catch {
+    return null;
+  }
+};
+
 const renderEnvironmentPicker = ({ visibleCreds, query }) => {
   const hiddenFields = Object.entries(query)
     .filter(([key]) => key !== "environment_id" && key !== "environmentId")
@@ -117,8 +137,31 @@ const renderEnvironmentPicker = ({ visibleCreds, query }) => {
       border: none;
       border-radius: 12px;
       cursor: pointer;
+      position: relative;
+      transition: background 0.15s;
     }
-    button:hover { background: #45a049; }
+    button:hover:not(:disabled) { background: #45a049; }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+    /* Submitting this form leaves the page: the browser waits on the server,
+       which then redirects to Wrike. That wait is long enough to be felt, and
+       an unchanged button reads as a click that did nothing, so people click
+       it again. Same treatment as the console's Sign In button: hide the
+       label and draw a spinner over it, so the button keeps its size. */
+    button.loading { color: transparent; pointer-events: none; }
+    button.loading::after {
+      content: "";
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      top: 50%;
+      left: 50%;
+      margin: -8px 0 0 -8px;
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.65s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -134,9 +177,33 @@ const renderEnvironmentPicker = ({ visibleCreds, query }) => {
           ${options}
         </select>
       </div>
-      <button type="submit">Continue</button>
+      <button type="submit" id="continueBtn">Continue</button>
     </form>
   </div>
+  <script>
+    // Only runs once the form actually passes validation, so the spinner can
+    // never get stuck on a form the browser refused to submit (the select is
+    // required, and its own message is the feedback in that case).
+    (function () {
+      var form = document.querySelector("form");
+      var button = document.getElementById("continueBtn");
+
+      form.addEventListener("submit", function () {
+        button.classList.add("loading");
+        button.disabled = true;
+        button.setAttribute("aria-busy", "true");
+      });
+
+      // Coming back through the browser's cache restores the page as it was
+      // left, spinner and all. Put the button back so it can be used again.
+      window.addEventListener("pageshow", function (event) {
+        if (!event.persisted) return;
+        button.classList.remove("loading");
+        button.disabled = false;
+        button.removeAttribute("aria-busy");
+      });
+    })();
+  </script>
 </body>
 </html>`;
 };
@@ -299,6 +366,12 @@ export const oauthRoute = (fastify, opts, done) => {
             code: decoded.wrikeCode,
             environmentId: decoded.environmentId,
             ip: clientIp(req),
+            // What to call the token this mints in the admin console. The
+            // registered client name where there is one, otherwise a generic
+            // label that is at least honest: reaching this line means something
+            // completed a PKCE flow, so it is an MCP client.
+            clientName:
+              clientNameFrom(fastify, decoded.client_id) || "MCP client",
           },
           fastify,
         );
@@ -317,7 +390,8 @@ export const oauthRoute = (fastify, opts, done) => {
         }
         try {
           // Re-validates (and, if near expiry, transparently refreshes the
-          // underlying Wrike token server-side) — see authentication.js resolveAuth().
+          // underlying Wrike token server-side). See authentication.js
+          // resolveAuth().
           await ResolveAuthFromJWT(refresh_token);
         } catch {
           return reply.code(400).send({ error: "invalid_grant" });
@@ -325,7 +399,7 @@ export const oauthRoute = (fastify, opts, done) => {
 
         // The JWE is its own refresh handle: it already self-refreshes the
         // underlying Wrike access token server-side, so no separate refresh
-        // token needs to be minted — we just echo it back with a fresh TTL.
+        // token needs to be minted. It is echoed back with a fresh TTL.
         return reply.code(200).send({
           access_token: refresh_token,
           token_type: "Bearer",
@@ -337,7 +411,7 @@ export const oauthRoute = (fastify, opts, done) => {
     } catch (err) {
       if (err?.statusCode === 403) {
         // Environment allow list rejected this caller (see
-        // WrikeTokenExchange -> evaluateAccess) — a real OAuth2 error code,
+        // WrikeTokenExchange -> evaluateAccess): a real OAuth2 error code,
         // not a malformed/expired grant.
         return reply.code(403).send({
           error: "access_denied",
@@ -373,7 +447,7 @@ export const oauthRoute = (fastify, opts, done) => {
     }
 
     // Stateless DCR: client_id is a signed JWT embedding the registered
-    // redirect_uris — verified later at /authorize and /token, no DB row.
+    // redirect_uris, verified later at /authorize and /token. No DB row.
     const client_id = fastify.jwt.sign(
       { redirect_uris, client_name: client_name || null },
       { expiresIn: "3650d" },

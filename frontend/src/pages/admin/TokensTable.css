@@ -393,6 +393,31 @@
   gap: 3px;
 }
 
+/* Environment name and, beside it, what the token was issued to. A person can
+   hold several tokens in one environment, so this is what stops two rows named
+   PROD from reading as duplicates. */
+.tok-table .tok-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tok-table .tok-client {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 7px;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .tok-table .tok-id-row {
   gap: 4px;
 }

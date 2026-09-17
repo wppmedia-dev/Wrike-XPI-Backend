@@ -36,6 +36,14 @@ export interface AdminToken {
   environment_visible: boolean | null;
   is_active: boolean;
   /**
+   * What the token was issued to, as far as the mint could tell: the name an
+   * MCP client registered under, the generic "MCP client", "Login page" for
+   * the hosted login, or null for a row written before this was recorded. Two
+   * tokens can share an environment, an account and a creator, so this is
+   * often the only thing besides the id that tells them apart.
+   */
+  client_name: string | null;
+  /**
    * When the token the caller holds stops being accepted. The JWE carries its
    * own expiry, and this is that value recorded server-side at mint time (see
    * src/utils/tokenTtl.js). Null only for rows whose mint was never recorded.

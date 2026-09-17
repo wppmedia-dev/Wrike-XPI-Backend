@@ -6,7 +6,7 @@ import { ListSchema, SummarySchema } from "./schema";
 /**
  * Read-only admin API over the API/MCP call activity log
  * (src/utils/activityLog.js writes it; src/controllers/activityLog.js
- * stores it). Nothing here writes a row — the log only ever grows through
+ * stores it). Nothing here writes a row: the log only ever grows through
  * real traffic, and only ever shrinks through the retention sweep.
  */
 export const adminActivityRoute = (fastify, opts, done) => {
