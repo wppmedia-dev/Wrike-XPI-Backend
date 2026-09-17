@@ -1,19 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
-import { TokenConnectModal } from "../components/TokenConnectModal";
 import { TokensTable } from "../components/TokensTable";
 import { confirmDanger, toast } from "../lib/notify";
 import { getPortalToken } from "../lib/portalAuthApi";
 import {
-  connectPortalApiToken,
   deactivatePortalApiToken,
   getPortalTokenCatalog,
   getPortalTokenPermissions,
   listPortalApiTokens,
-  listPortalTokenEnvironments,
   savePortalTokenPermissions,
   setPortalTokenStatus,
   type PortalApiToken,
-  type PortalTokenEnvironment,
 } from "../lib/portalApiTokensApi";
 import type { AdminToken } from "../lib/tokenPermissionsApi";
 import TokenPermissions, { type TokenPermissionsApi } from "./TokenPermissions";
@@ -33,13 +29,15 @@ import TokenPermissions, { type TokenPermissionsApi } from "./TokenPermissions";
  *     (src/utils/portalScope.js, the same rule the Environments page uses), so
  *     this page has no environment scope chip and no "all environments" view.
  *   - Grants. The api_tokens matrix decides which controls exist: read shows
- *     the page, create the Create button, update Permissions and the Status
- *     switch, delete the Activate/Deactivate row action. requirePortalPermission
- *     in src/routes/portal/apiTokens enforces the same four again, so a hidden
+ *     the page, update the Permissions popup's editor, delete the Status switch
+ *     and the Activate/Deactivate row action. requirePortalPermission in
+ *     src/routes/portal/apiTokens enforces the same grants again, so a hidden
  *     control is never the only thing standing in a request's way.
- *   - Create. The admin console mints tokens through the sign-in flows it
- *     already runs; here it is an explicit action, because issuing a token is
- *     what a user comes to this page for.
+ *   - Create. There is none, here or in the admin console. A token is minted by
+ *     the token service's root login page or by an MCP client's OAuth flow, and
+ *     both of those exchange a Wrike authorization code that only a person
+ *     signing in can produce. A console can start that sign-in but can never
+ *     finish it, so a Create button would only ever be a redirect.
  */
 
 /**
@@ -60,7 +58,6 @@ const PORTAL_PERMISSIONS_API: TokenPermissionsApi = {
 
 interface Props {
   /** The api_tokens grants from the portal permission matrix. */
-  canCreate: boolean;
   canUpdate: boolean;
   canDelete: boolean;
   /** Called by the "Activity logs" row action: the shell switches to the
@@ -78,7 +75,6 @@ interface Props {
 }
 
 export default function PortalApiTokensPage({
-  canCreate,
   canUpdate,
   canDelete,
   onViewActivityLogs,
@@ -89,10 +85,6 @@ export default function PortalApiTokensPage({
 
   const [tokens, setTokens] = useState<PortalApiToken[]>([]);
   const [loading, setLoading] = useState(false);
-
-  const [connectOpen, setConnectOpen] = useState(false);
-  const [environments, setEnvironments] = useState<PortalTokenEnvironment[]>([]);
-  const [loadingEnvironments, setLoadingEnvironments] = useState(false);
 
   const [permsTokenId, setPermsTokenId] = useState<string | null>(null);
   const [permsLabel, setPermsLabel] = useState<string | null>(null);
@@ -124,78 +116,41 @@ export default function PortalApiTokensPage({
   };
 
   /**
-   * Opens the create flow, and loads the environment picker the first time.
+   * Switching a token back ON, which the table labels "Reactivate".
    *
-   * Fetched lazily from this module's own endpoints rather than taken from the
-   * Environments page: a user granted api_tokens without environments:read
-   * would otherwise get a 403 from an unrelated module, and the portal signs a
-   * user out on a 403.
+   * Only that direction, because that is the only one this page can reach:
+   * taking a token out of service is the delete action and goes through
+   * handleDeactivate below, which is where the table sends the switch's OFF
+   * position when it is given an onDelete (this page gives it one). Asking for
+   * a confirmation here would never be seen.
    */
-  const openConnect = async () => {
-    setConnectOpen(true);
-    if (!token || environments.length) return;
-
-    setLoadingEnvironments(true);
-    try {
-      setEnvironments(await listPortalTokenEnvironments(token));
-    } catch (err: any) {
-      toast(err?.message || "Could not load your environments", "error");
-    } finally {
-      setLoadingEnvironments(false);
-    }
-  };
-
-  /** Starts the Wrike sign-in for one environment and hands the modal the URL
-      to send the browser to. Module scope would do, but this needs the session
-      token, so it is built once per render and the modal reads it at call
-      time (it only keeps the environments list in its own state). */
-  const connectToken = async (envId: string) => {
-    if (!token) throw new Error("Your session has expired");
-    return connectPortalApiToken(token, envId);
-  };
-
-  /**
-   * The write the table hands back to this page: the Status switch, and the
-   * matching Activate/Deactivate row action.
-   *
-   * Switching a token off is confirmed first, because whoever is calling with
-   * it starts getting 401s on their next request and there is nothing on this
-   * side to warn them. Switching one back on asks nothing.
-   */
-  const handleToggleStatus = async (row: AdminToken, next: boolean) => {
+  const handleActivate = async (row: AdminToken) => {
     if (!token) return;
 
-    if (!next) {
-      const confirmed = await confirmDanger({
-        title: "Switch this token off?",
-        html: `Callers using <strong>${row.username || row.id}</strong> on <strong>${
-          row.environment_name || "this environment"
-        }</strong> will start getting 401s on their next request.`,
-        confirmText: "Switch off",
-      });
-      if (!confirmed) return;
-    }
-
     try {
-      await setPortalTokenStatus(token, row.id, next);
+      await setPortalTokenStatus(token, row.id, true);
       // Patched locally rather than refetched: one boolean changed, and a
       // reload here would make the switch feel like it bounced.
       setTokens((prev) =>
         prev.map((item) =>
-          item.id === row.id ? { ...item, is_active: next } : item,
+          item.id === row.id ? { ...item, is_active: true } : item,
         ),
       );
-      toast(next ? "Token activated" : "Token deactivated", "success");
+      toast("Token reactivated", "success");
     } catch (err: any) {
-      toast(err?.message || "Could not change the token status", "error");
+      toast(err?.message || "Could not reactivate the token", "error");
     }
   };
 
   /**
-   * The delete action. A switch-off, not a row removal: the row holds the only
-   * copy of the encrypted Wrike credential, so deleting it would break whoever
-   * is still calling with that token with no record of why. The admin console
-   * has no hard delete either.
+   * Switching a token off, and the delete action: the same write, two doors.
+   *
+   * A switch-off, not a row removal. The row holds the only copy of the
+   * encrypted Wrike credential, so deleting it would break whoever is still
+   * calling with that token with no record of why. The admin console has no
+   * hard delete either. It goes through DELETE /:id so the server checks the
+   * delete grant, which is the grant that decides whether this caller may take
+   * a token out of service at all.
    */
   const handleDeactivate = async (row: AdminToken) => {
     if (!token) return;
@@ -228,16 +183,9 @@ export default function PortalApiTokensPage({
         <div>
           <div className="section-title">API Tokens</div>
           <div className="section-subtitle">
-            {canCreate
-              ? "Tokens issued for your environments"
-              : "The tokens issued for your environments"}
+            Tokens issued for your environments
           </div>
         </div>
-        {canCreate && (
-          <button className="btn btn-primary" onClick={openConnect}>
-            <i className="fa-solid fa-plus" /> Create token
-          </button>
-        )}
       </div>
 
       <div className="card">
@@ -246,34 +194,20 @@ export default function PortalApiTokensPage({
             tokens={tokens}
             loading={loading}
             onPermissions={openPermissions}
-            onToggleStatus={handleToggleStatus}
+            onToggleStatus={handleActivate}
             onActivityLogs={onViewActivityLogs}
             envScope={envScope}
             onClearEnvScope={onClearEnvScope}
             // Delete has an endpoint of its own here (DELETE /api/v1/portal/
-            // api-tokens/:id, a switch-off that keeps the record), so the row
-            // menu's Deactivate uses it rather than the status write: a user
-            // granted delete but not update can then switch a token off and
-            // not back on, which is what their matrix says.
+            // api-tokens/:id, a switch-off that keeps the record), so both
+            // directions of the switch go through it: the delete grant is what
+            // decides whether this caller may take an integration out of
+            // service, and it is the same lever that brings it back.
             onDelete={handleDeactivate}
-            canUpdate={canUpdate}
             canDelete={canDelete}
           />
         </div>
       </div>
-
-      {/* ════════════ CREATE TOKEN ════════════
-          The same modal the admin console opens, so "Create token" means one
-          thing in both places: it loads this console's environments (already
-          scoped to the caller) and hands the modal the consent URL to send the
-          browser to. */}
-      <TokenConnectModal
-        open={connectOpen}
-        onClose={() => setConnectOpen(false)}
-        environments={environments}
-        loadingEnvironments={loadingEnvironments}
-        connect={connectToken}
-      />
 
       {/* ════════════ TOKEN: MODULE PERMISSIONS ════════════ */}
       <TokenPermissions

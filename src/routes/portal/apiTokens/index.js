@@ -1,9 +1,7 @@
 import { Tokens, TokenPermissions } from "../../../controllers";
-import { findRedirectionURL } from "../../../utils/wrikeRedirect";
 import { catalog } from "../../../utils/tokenPermissionCatalog";
 import {
   isEnvironmentInScope,
-  scopedEnvironmentsFor,
   scopedEnvironmentIdsFor,
 } from "../../../utils/portalScope";
 import { summarisePermissions } from "../../../utils/tokenPermissionSummary";
@@ -12,12 +10,7 @@ import {
   requirePasswordChanged,
   requirePortalPermission,
 } from "../../../middlewares/portalAuth";
-import {
-  ConnectSchema,
-  IdParamSchema,
-  SetPermissionsSchema,
-  SetStatusSchema,
-} from "./schema";
+import { IdParamSchema, SetPermissionsSchema, SetStatusSchema } from "./schema";
 
 /**
  * API tokens, managed from the portal: /api/v1/portal/api-tokens.
@@ -27,33 +20,30 @@ import {
  * portal user administers exactly the tokens belonging to their own
  * environments and nothing else.
  *
- * Every route carries one of the four grants of the `api_tokens` module from
+ * Every route carries one of the three grants of the `api_tokens` module from
  * src/utils/portalPermissionCatalog.js:
  *
- *   GET    /              read    list the tokens of my environments
- *   GET    /catalog       read    the module vocabulary the matrix editor draws
- *   GET    /environments  read    my environments, to choose one at create time
- *   GET    /:id/permissions read  one token's matrix, uncached
- *   POST   /connect       create  start the Wrike sign-in that issues one
- *   PUT    /:id/permissions update edit a token's module matrix
- *   PUT    /:id/status    update  switch a token on or off
- *   DELETE /:id           delete  switch a token off
+ *   GET    /                 read   list the tokens of my environments
+ *   GET    /catalog          read   the module vocabulary the matrix editor draws
+ *   GET    /:id/permissions  read   one token's matrix, uncached
+ *   PUT    /:id/permissions  update edit a token's module matrix
+ *   PUT    /:id/status       delete switch a token off, or back on
+ *   DELETE /:id              delete switch a token off
  *
- * The reads beyond the list exist so this page never has to call another
- * module's endpoints. The create picker could have asked the Environments page's
- * API for the list, but a user granted api_tokens without environments:read
- * would then get a 403 from an unrelated module, and portalFetch treats 403 as
- * an expired session and signs them out. Everything this page needs is served
- * from here, under this module's own grant.
+ * There is no create route, and no create grant. A token is minted in exactly
+ * two places: the token service's root login page, and an MCP client's OAuth
+ * flow. Both of them exchange a Wrike authorization code for one, which is
+ * something only a person signing in can produce, so a console can offer a
+ * button that starts that sign-in but never a route that issues a token. The
+ * button existed for a while and was removed: a control that cannot do the
+ * thing it is named after is worse than no control.
  *
- * Create cannot mint a token on its own. Issuing one means exchanging a Wrike
- * authorization code, which only a person signing in to Wrike can produce, so
- * this route does the part it can: it validates the environment and hands back
- * the consent URL to send the browser to. The mint itself happens on the way
- * back, in the token service's existing callback, and the credentials are shown
- * once on that page. The token is then attributed to the environment it was
- * requested for, and labelled "Portal" in the admin console so an admin can
- * tell where it came from.
+ * Availability is the delete grant's business in both directions. Switching a
+ * token off and switching it back on are one lever with two positions, and a
+ * caller trusted to take an integration out of service is the same caller who
+ * has to be able to put it back; splitting that across two grants produced a
+ * state nobody could explain (switchable off, never on). Update is what the
+ * matrix is for.
  *
  * Delete is a switch-off, not a row removal. The row is the only copy of the
  * encrypted Wrike credential inside it, so deleting it would break whoever is
@@ -61,16 +51,9 @@ import {
  * admin console has no hard delete either.
  */
 
-/** What the token the portal issues is labelled as in the admin console. */
-export const PORTAL_TOKEN_CLIENT_NAME = "Portal";
-
 export const portalApiTokensRoute = (fastify, opts, done) => {
   const authGuard = [verifyPortalJWT, requirePasswordChanged];
   const canRead = [...authGuard, requirePortalPermission("api_tokens", "read")];
-  const canCreate = [
-    ...authGuard,
-    requirePortalPermission("api_tokens", "create"),
-  ];
   const canUpdate = [
     ...authGuard,
     requirePortalPermission("api_tokens", "update"),
@@ -136,28 +119,6 @@ export const portalApiTokensRoute = (fastify, opts, done) => {
     ok(reply, catalog()),
   );
 
-  // GET /portal/api-tokens/environments
-  fastify.get("/environments", { preHandler: canRead }, async (req, reply) => {
-    try {
-      const environments = await scopedEnvironmentsFor(req.portalUser);
-
-      // Names and ids only. This list exists to populate a picker, and the
-      // environments module is where credentials are read (with its own
-      // grant) for anyone who is allowed to see them.
-      return ok(
-        reply,
-        environments.map((env) => ({
-          id: env.id,
-          environment_name: env.environment_name,
-          is_active: !!env.is_active,
-        })),
-        "Environments retrieved",
-      );
-    } catch (err) {
-      return fail(reply, err);
-    }
-  });
-
   // GET /portal/api-tokens/:id/permissions
   fastify.get(
     "/:id/permissions",
@@ -170,45 +131,6 @@ export const portalApiTokensRoute = (fastify, opts, done) => {
         // is stored right now, and the cached copy exists for the request-path
         // gate, not for a screen someone is about to change.
         return ok(reply, await TokenPermissions.GetMatrix(req.params.id));
-      } catch (err) {
-        return fail(reply, err);
-      }
-    },
-  );
-
-  // POST /portal/api-tokens/connect
-  fastify.post(
-    "/connect",
-    { ...ConnectSchema, preHandler: canCreate },
-    async (req, reply) => {
-      try {
-        const { env_id: envId } = req.body;
-
-        const envIds = await scopedEnvironmentIdsFor(req.portalUser);
-        if (!isEnvironmentInScope(envIds, envId)) {
-          throw {
-            statusCode: 403,
-            message: "Forbidden: that environment is not yours to use",
-          };
-        }
-
-        // Builds the Wrike consent URL for this environment, with our callback
-        // as the redirect target: the same URL the root login page sends a
-        // browser to. `extra.client_name` rides inside the signed state and is
-        // what labels the token once the callback mints it.
-        const { redirectUrl, selectedEnvironment } = findRedirectionURL(
-          {
-            environmentId: envId,
-            extra: { client_name: PORTAL_TOKEN_CLIENT_NAME },
-          },
-          fastify,
-        );
-
-        return ok(
-          reply,
-          { url: redirectUrl, environment_name: selectedEnvironment || null },
-          "Sign in to Wrike to issue this token",
-        );
       } catch (err) {
         return fail(reply, err);
       }
@@ -246,10 +168,12 @@ export const portalApiTokensRoute = (fastify, opts, done) => {
     },
   );
 
-  // PUT /portal/api-tokens/:id/status
+  // PUT /portal/api-tokens/:id/status — the delete grant, in both directions:
+  // the switch that takes a token out of service is the same switch that puts
+  // it back, and update is what the matrix is for.
   fastify.put(
     "/:id/status",
-    { ...SetStatusSchema, preHandler: canUpdate },
+    { ...SetStatusSchema, preHandler: canDelete },
     async (req, reply) => {
       try {
         await scopedToken(req.portalUser, req.params.id);

@@ -984,7 +984,6 @@ export default function PortalHome() {
           {canSeeApiTokens && (
           <div className={`page${activePage === "api-tokens" ? " active" : ""}`} id="page-api-tokens">
             <PortalApiTokensPage
-              canCreate={can("api_tokens", "create")}
               canUpdate={can("api_tokens", "update")}
               canDelete={can("api_tokens", "delete")}
               // Only offered when this user may read the log at all.

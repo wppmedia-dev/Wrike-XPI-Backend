@@ -463,7 +463,14 @@ export default function TokenPermissions({
                         return (
                           <div className="tkp-matrix-cell" key={action}>
                             {supported ? (
-                              <label className="tkp-tick-wrap">
+                              // `-ro` mirrors `disabled` on the input. The input
+                              // alone stops the click but changes nothing on
+                              // screen: the tick keeps its contrast, its hover
+                              // and the pointer of this wrapper, so the grid
+                              // goes on inviting a click nothing answers.
+                              <label
+                                className={`tkp-tick-wrap${readOnly ? " tkp-tick-wrap-ro" : ""}`}
+                              >
                                 <input
                                   type="checkbox"
                                   checked={checked}

@@ -1,23 +1,9 @@
 import { verifyAdminJWT } from "../../../middlewares/adminAuth";
 import { Tokens, TokenPermissions } from "../../../controllers";
-import { GetById } from "../../../controllers/wrikeCredentials";
-import { findRedirectionURL } from "../../../utils/wrikeRedirect";
 import { catalog } from "../../../utils/tokenPermissionCatalog";
 import { summarisePermissions } from "../../../utils/tokenPermissionSummary";
 
-import {
-  ConnectSchema,
-  IdParamSchema,
-  SetPermissionsSchema,
-  SetStatusSchema,
-} from "./schema";
-
-/**
- * What a token created from this console is labelled as in the list. The
- * portal's sign-in labels its own "Portal", so an admin can tell at a glance
- * which door a token came through.
- */
-export const ADMIN_TOKEN_CLIENT_NAME = "Admin console";
+import { IdParamSchema, SetPermissionsSchema, SetStatusSchema } from "./schema";
 
 /**
  * Admin API behind /api/v1/admin/tokens: the console's view of the token
@@ -71,44 +57,14 @@ export const adminTokensRoute = (fastify, opts, done) => {
     ok(reply, catalog()),
   );
 
-  // POST /admin/tokens/connect: start the Wrike sign-in that issues a token.
+  // POST /admin/tokens/connect used to live here, and does not any more.
   //
-  // The admin console had no way to issue one at all: tokens arrived only when
-  // somebody signed in through the login page or an MCP client's OAuth flow.
-  // This route does the part a server can do on its own — it validates the
-  // environment and hands back the consent URL to send the browser to — and
-  // the mint itself happens on the way back, in the token service's existing
-  // callback, which shows the credentials once.
-  fastify.post(
-    "/connect",
-    { ...ConnectSchema, ...guard },
-    async (req, reply) => {
-      try {
-        const { env_id: envId } = req.body;
-
-        const environment = await GetById(envId);
-        if (!environment?.environment_name) {
-          throw { statusCode: 404, message: "Environment not found." };
-        }
-
-        const { redirectUrl, selectedEnvironment } = findRedirectionURL(
-          {
-            environmentId: envId,
-            extra: { client_name: ADMIN_TOKEN_CLIENT_NAME },
-          },
-          fastify,
-        );
-
-        return ok(
-          reply,
-          { url: redirectUrl, environment_name: selectedEnvironment || null },
-          "Sign in to Wrike to issue this token",
-        );
-      } catch (err) {
-        return fail(reply, err);
-      }
-    },
-  );
+  // A token is minted in exactly two places: the token service's root login
+  // page, and an MCP client's OAuth flow. Both exchange a Wrike authorization
+  // code for one, and only a person signing in can produce that code, so a
+  // console can start that sign-in but can never issue a token itself. The
+  // route existed only to serve a Create button that redirected to Wrike, which
+  // is not a create feature.
 
   // GET /admin/tokens/:id/permissions: uncached on purpose, see above.
   fastify.get(
@@ -170,11 +126,12 @@ export const adminTokensRoute = (fastify, opts, done) => {
     },
   );
 
-  // DELETE /admin/tokens/:id: the same switch-off the list's Deactivate item
-  // performs, given its own verb so the row menu has a delete action and not
-  // just a status write. There is no hard delete on purpose: the row holds the
-  // only copy of the encrypted Wrike credential, so removing it would break
-  // whoever is still calling with that token with no record of why.
+  // DELETE /admin/tokens/:id: the switch-off the console's Status column
+  // performs when a token is turned off, given its own verb so the write is a
+  // real DELETE and the portal can be held to the same route. There is no hard
+  // delete on purpose: the row holds the only copy of the encrypted Wrike
+  // credential, so removing it would break whoever is still calling with that
+  // token with no record of why.
   fastify.delete("/:id", { ...IdParamSchema, ...guard }, async (req, reply) => {
     try {
       const record = await Tokens.GetRecord(req.params.id);

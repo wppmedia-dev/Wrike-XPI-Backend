@@ -1,28 +1,15 @@
 /**
  * Request validation for /api/v1/portal/api-tokens.
  *
- * Same shape as the admin console's token schemas, with one addition: the
- * portal's create action needs the environment to issue a token for, and that
- * environment has to be one the caller can see (checked in the route, not
- * here, since it needs a database lookup).
+ * There is no create schema: this API has no create route (see the note at the
+ * top of ./index.js). The environment picker that used to need one is gone
+ * with it.
  */
 
 const ID_PARAM = {
   type: "object",
   required: ["id"],
   properties: { id: { type: "string", format: "uuid" } },
-};
-
-// POST /portal/api-tokens/connect: which environment to issue a token for.
-export const ConnectSchema = {
-  schema: {
-    body: {
-      type: "object",
-      required: ["env_id"],
-      properties: { env_id: { type: "string", format: "uuid" } },
-      additionalProperties: false,
-    },
-  },
 };
 
 // PUT /portal/api-tokens/:id/permissions: whole-matrix replace.

@@ -3,10 +3,13 @@
 
    Two things are being protected here.
 
-   First, the vocabulary. `api_tokens` is a module whose four actions each map
+   First, the vocabulary. `api_tokens` is a module whose three actions each map
    to a real portal route (src/routes/portal/apiTokens/index.js), so a missing
    action would be a route nobody can be granted, and an extra one would be a
-   tick in the console that means nothing.
+   tick in the console that means nothing. There is no create action and no
+   create route: a token is minted by the root login page or an MCP client's
+   OAuth flow, which exchange a Wrike authorization code only a person signing
+   in can produce, so neither console can issue one.
 
    Second, the scope. A portal user's token list is filtered by the same rule as
    their environment list (src/utils/portalScope.js). The dangerous failure is a
@@ -17,6 +20,10 @@
    password-changed check and exactly one permission gate, and every admin
    token route carries the admin check. A route added later without its gate is
    the one mistake nobody notices, because it works for whoever tests it.
+
+   Fourth, the direction of a status change. Both directions are the delete
+   action, so the status route carries the delete gate and the status route
+   itself refuses a caller the delete grant would refuse.
 
    Run from the repo root:  node test/portalApiTokens.test.js
 
@@ -66,14 +73,19 @@ section("api_tokens in the portal catalogue");
 checkTrue("the module exists", !!apiTokens);
 check("it is labelled for the console", apiTokens?.label, "API Tokens");
 check(
-  "it offers all four actions, one per portal route",
-  catalogue.ACTIONS.every((action) => apiTokens?.actions.includes(action)),
-  true,
+  "it offers the three actions its routes implement",
+  apiTokens?.actions.join(","),
+  "read,update,delete",
+);
+check(
+  "it offers no create action, because no route can mint a token",
+  apiTokens?.actions.includes("create"),
+  false,
 );
 check(
   "it declares no action the catalogue does not know",
   apiTokens?.actions.length,
-  4,
+  3,
 );
 checkTrue(
   "it describes itself, so the matrix does not show an empty row",
@@ -89,17 +101,17 @@ checkTrue("an empty matrix includes it", "api_tokens" in empty);
 check("it starts switched off", empty.api_tokens.read, false);
 
 const normalised = catalogue.normaliseMatrix({
-  api_tokens: { read: true, create: true, update: true, delete: true },
+  api_tokens: { read: true, update: true, delete: true },
   not_a_module: { read: true },
 });
-check(
-  "all four grants survive normalisation",
-  normalised.api_tokens.read,
-  true,
-);
-check("create survives", normalised.api_tokens.create, true);
+check("every grant survives normalisation", normalised.api_tokens.read, true);
 check("update survives", normalised.api_tokens.update, true);
 check("delete survives", normalised.api_tokens.delete, true);
+check(
+  "a create grant is not invented: the module has no such action, so a\n   submitted create tick normalises to off",
+  normalised.api_tokens.create,
+  false,
+);
 checkTrue("an invented module is dropped", !("not_a_module" in normalised));
 
 const partial = catalogue.normaliseMatrix({ api_tokens: { read: true } });
@@ -187,13 +199,21 @@ const runRouteChecks = async () => {
       "GET /api/v1/portal/api-tokens",
       "GET /api/v1/portal/api-tokens/:id/permissions",
       "GET /api/v1/portal/api-tokens/catalog",
-      "GET /api/v1/portal/api-tokens/environments",
-      "POST /api/v1/portal/api-tokens/connect",
       "PUT /api/v1/portal/api-tokens/:id/permissions",
       "PUT /api/v1/portal/api-tokens/:id/status",
     ]
       .sort()
       .join(" | "),
+  );
+  check(
+    "and there is no create route, because no console can mint a token",
+    portalKeys.filter((key) => key.includes("connect")).length,
+    0,
+  );
+  check(
+    "nor an environments route, which only the picker needed",
+    portalKeys.filter((key) => key.includes("environments")).length,
+    0,
   );
 
   const activity = await routesOf(
@@ -219,12 +239,13 @@ const runRouteChecks = async () => {
     admin.filter((route) => route.guards !== 1).length,
     0,
   );
-  checkTrue(
-    "the admin console can create a token",
-    adminKeys.includes("POST /api/v1/admin/tokens/connect"),
+  check(
+    "nor create one, which the console has no way to do either",
+    adminKeys.filter((key) => key.includes("connect")).length,
+    0,
   );
   checkTrue(
-    "and delete one, which is the deactivate switch-off",
+    "but it can delete one, which is the deactivate switch-off",
     adminKeys.includes("DELETE /api/v1/admin/tokens/:id"),
   );
 };

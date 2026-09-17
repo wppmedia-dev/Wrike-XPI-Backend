@@ -46,18 +46,18 @@ export const MODULES = [
     key: "api_tokens",
     label: "API Tokens",
     description:
-      "The API tokens issued for the environments this user can see: their module permissions, their status and their expiry.",
-    // All four, one per portal route in src/routes/portal/apiTokens:
-    // read lists the tokens of the user's own environments, create starts the
-    // Wrike sign-in that issues one, update edits a token's module matrix or
-    // switches it on and off, delete switches it off. There is no hard delete:
-    // a token is the only copy of the credential inside it, so removing the
-    // row would silently break whoever is still calling with it.
+      "The API tokens issued for the environments this user can see: what each one is allowed to do, and whether it is switched on.",
+    // Three actions, one per route in src/routes/portal/apiTokens: read lists
+    // the tokens of the user's own environments, update edits a token's module
+    // matrix, delete switches one off and back on.
     //
-    // This module has no counterpart on the token-service side. It governs who
-    // may *administer* tokens from the portal, which is a different question
-    // from what a token may do (src/utils/tokenPermissionCatalog.js).
-    actions: ALL,
+    // No create, deliberately. A token is minted in exactly two places, and
+    // neither of them is a console: the token service's root login page, and an
+    // MCP client's OAuth flow. Both exchange a Wrike authorization code for it,
+    // which only a person signing in can produce, so there is no create route
+    // to grant. An unticked Create box would have been a promise nothing could
+    // keep, and a ticked one would have bought a button that could not do it.
+    actions: ["read", "update", "delete"],
   },
   {
     key: "activity_logs",

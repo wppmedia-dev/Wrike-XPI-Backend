@@ -93,6 +93,25 @@
   transform: translateX(16px);
 }
 
+/* ── Off, under the pointer (compact variant only) ────────────────────
+   Switching one back ON is the direction that gets asked for: it is the fix
+   for an integration that started returning 401, the other direction is the
+   interruption. A switch that is OFF is also the only place that fix is
+   offered, so hovering it tints the track toward the same green the ON state
+   carries: the way back is legible before the click rather than only after it.
+   Only OFF, because an ON switch already reads as on and a second hover colour
+   there would mean nothing. Scoped to the compact variant, which is the one
+   used in table cells; the toggles in modals and drawers keep their plain
+   hover, as those rows carry their own labels saying what they do. */
+.toggle-wrap.toggle-wrap-sm input:not(:checked):not(:disabled):hover + .toggle-track {
+  /* The fallback matters: this stylesheet is shared by both consoles, and each
+     defines --success-soft in its own page scope. An undefined custom property
+     in `background` is invalid at computed-value time, which would drop the
+     track to transparent on any page that had not defined it. */
+  background: var(--success-soft, rgba(0, 130, 98, 0.12));
+  border-color: var(--success, #008262);
+}
+
 /* ── Pending state ────────────────────────────────────────────────────
    While a toggle's write is in flight: dim the knob and show a tiny spinner at
    the pill's centre, so a click gives instant localised feedback instead of a

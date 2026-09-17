@@ -17,6 +17,11 @@ import type {
  *
  * Every call here is scoped server-side to the environments the logged-in user
  * can see, so there is no environment filter to pass and none to get wrong.
+ *
+ * There is no create call, and no route for one: a token is minted by the token
+ * service's root login page or by an MCP client's OAuth flow, both of which
+ * exchange a Wrike authorization code that only a person signing in can
+ * produce. Neither console can stand in for that person.
  */
 /**
  * One row of the portal's token list.
@@ -30,14 +35,9 @@ import type {
  */
 export type PortalApiToken = AdminToken;
 
-/** The picker's option set: an environment this user may issue a token for. */
-export interface PortalTokenEnvironment {
-  id: string;
-  environment_name: string;
-  is_active: boolean;
-}
-
-/** GET /api/v1/portal/api-tokens — the tokens of the caller's environments. */
+/**
+ * GET /api/v1/portal/api-tokens — the tokens of the caller's environments.
+ */
 export const listPortalApiTokens = async (
   token: string,
 ): Promise<PortalApiToken[]> => {
@@ -45,16 +45,6 @@ export const listPortalApiTokens = async (
   const body = await res.json().catch(() => null);
   if (!body?.success || !Array.isArray(body.data)) return [];
   return body.data as PortalApiToken[];
-};
-
-/** GET /api/v1/portal/api-tokens/environments — the create picker's options. */
-export const listPortalTokenEnvironments = async (
-  token: string,
-): Promise<PortalTokenEnvironment[]> => {
-  const res = await portalFetch("/api/v1/portal/api-tokens/environments", token);
-  const body = await res.json().catch(() => null);
-  if (!body?.success || !Array.isArray(body.data)) return [];
-  return body.data as PortalTokenEnvironment[];
 };
 
 /** GET /api/v1/portal/api-tokens/catalog — the module vocabulary to draw. */
@@ -81,30 +71,6 @@ export const getPortalTokenPermissions = async (
   return body.data as TokenPermissionEntry;
 };
 
-/**
- * POST /api/v1/portal/api-tokens/connect — create.
- *
- * Returns the Wrike consent URL to send the browser to. Issuing a token means
- * exchanging a Wrike authorization code, which only a person signing in can
- * produce, so this is as far as the API goes; the mint happens on the way back
- * through the token service's callback, which shows the credentials once.
- */
-export const connectPortalApiToken = async (
-  token: string,
-  envId: string,
-): Promise<{ url: string; environment_name: string | null }> => {
-  const res = await portalFetch("/api/v1/portal/api-tokens/connect", token, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ env_id: envId }),
-  });
-  const body = await res.json().catch(() => null);
-  if (!body?.success || !body.data?.url) {
-    throw new Error(body?.message || "Could not start the Wrike sign-in");
-  }
-  return body.data;
-};
-
 /** PUT /api/v1/portal/api-tokens/:id/permissions — update. */
 export const savePortalTokenPermissions = async (
   token: string,
@@ -125,7 +91,14 @@ export const savePortalTokenPermissions = async (
   return body.data as TokenPermissionEntry;
 };
 
-/** PUT /api/v1/portal/api-tokens/:id/status — update. */
+/**
+ * PUT /api/v1/portal/api-tokens/:id/status — the token's availability.
+ *
+ * Guarded by the delete grant on the server, in both directions: taking a token
+ * out of service and putting it back are the same lever with two positions, and
+ * a caller trusted with one has to be trusted with the other. The update grant
+ * is what the module matrix below is for.
+ */
 export const setPortalTokenStatus = async (
   token: string,
   tokenId: string,

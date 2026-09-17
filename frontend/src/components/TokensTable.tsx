@@ -247,24 +247,26 @@ export interface TokensTableProps {
   /** Tells the parent its scope is no longer applied. */
   onClearEnvScope?: () => void;
   /**
-   * Called by the row menu's Deactivate item, when the caller has a delete
-   * route of its own. The portal does: DELETE /api/v1/portal/api-tokens/:id
-   * (a switch-off that keeps the record), gated by the api_tokens delete
-   * grant. The admin console has no such endpoint, so it leaves this out and
-   * the item stays on the status write below.
+   * Called by the Status switch when a token goes out of service, when the
+   * caller has a delete route of its own. Both consoles do: the portal at
+   * DELETE /api/v1/portal/api-tokens/:id, the admin at
+   * DELETE /api/v1/admin/tokens/:id. A caller with no such endpoint falls back
+   * to the status write below, which drives both directions.
    */
   onDelete?: (token: AdminToken) => void | Promise<void>;
   /**
-   * The api_tokens grants of whoever is looking at this table. Both default to
-   * true, which is what the admin console passes (unconditionally, by virtue
+   * The api_tokens delete grant of whoever is looking at this table. Defaults
+   * to true, which is what the admin console passes (unconditionally, by virtue
    * of being the super-admin console). The portal passes its matrix, so a user
-   * granted read without update sees the Status column as a badge rather than
-   * a switch, and a user without delete finds no way to switch a token off.
-   * The server enforces the same grants again (requirePortalPermission in
+   * granted read without delete sees the Status column as a badge rather than a
+   * switch. The server enforces the same grant again (requirePortalPermission in
    * src/routes/portal/apiTokens), so a hidden control is never the only thing
    * stopping the write.
+   *
+   * There is no update grant here, because this table has no update to guard:
+   * the matrix itself is edited in the permissions popup, which takes its own
+   * read-only flag.
    */
-  canUpdate?: boolean;
   canDelete?: boolean;
 }
 
@@ -277,49 +279,31 @@ export function TokensTable({
   envScope = null,
   onClearEnvScope,
   onDelete,
-  canUpdate = true,
   canDelete = true,
 }: TokensTableProps) {
   /**
-   * The row menu's power item.
+   * Switching a token off, through whichever route this caller has.
    *
-   * Switching a token off and switching it back on are two different grants in
-   * the portal (delete and update), and two different endpoints whenever the
-   * caller has a delete route, so which item exists depends on both the
-   * direction and the grants. In the admin console, where `onDelete` is absent
-   * and both grants are unconditional, this collapses to exactly the
-   * Activate/Deactivate item it has always had.
+   * Both directions hang off the delete grant, because they are one lever with
+   * two positions: a caller trusted to take an integration out of service is
+   * the same caller who has to be able to put it back. Splitting them across
+   * two grants produced a state nobody could explain, a token that could be
+   * switched off and never on.
+   *
+   * The Status switch is the ONLY control for that lever. The row menu used to
+   * carry a second one, a Deactivate/Activate item calling the same two
+   * endpoints, so every caller had two ways to do one thing and neither was
+   * better than the other. The switch is the one that stays, because it shows
+   * the current state as well as offering the other one.
+   *
+   * The portal has a delete endpoint, and that is the grant the server checks
+   * for a token going out of service, so the switch has to reach the same route
+   * the menu item did: routing it through the status write instead would have
+   * asked a delete-only caller for an update grant they were never given. A
+   * caller with no delete endpoint falls back to the status write.
    */
-  const powerItemFor = (token: AdminToken) => {
-    if (token.is_active) {
-      if (onDelete) {
-        return {
-          label: "Deactivate",
-          icon: "fa-solid fa-power-off",
-          danger: true,
-          onSelect: () => onDelete(token),
-        };
-      }
-      if (canDelete) {
-        return {
-          label: "Deactivate",
-          icon: "fa-solid fa-power-off",
-          danger: true,
-          onSelect: () => onToggleStatus(token, false),
-        };
-      }
-      return null;
-    }
-
-    if (!canUpdate) return null;
-
-    return {
-      label: "Activate",
-      icon: "fa-solid fa-power-off",
-      danger: false,
-      onSelect: () => onToggleStatus(token, true),
-    };
-  };
+  const switchOff = (token: AdminToken) =>
+    onDelete ? onDelete(token) : onToggleStatus(token, false);
 
   const columns = useMemo<ColumnDef<AdminToken>[]>(
     () => [
@@ -426,18 +410,29 @@ export function TokensTable({
         header: "Status",
         width: "92px",
         sortable: false,
+        /* The only control for a token's status, both directions, and the only
+           one its grant has to cover (see switchOff above). A caller without
+           the grant gets the state as a badge instead: the switch is not drawn
+           and the server refuses the write anyway. */
         cell: (token) =>
-          canUpdate ? (
+          canDelete ? (
             <Toggle
               size="sm"
               checked={token.is_active}
-              title={token.is_active ? "Token is active" : "Token is switched off"}
+              title={
+                token.is_active
+                  ? "Deactivate this token"
+                  : "Reactivate this token"
+              }
               ariaLabel={`Status for token ${token.id}`}
-              onToggle={(next) => onToggleStatus(token, next)}
+              onToggle={(next) =>
+                next ? onToggleStatus(token, true) : switchOff(token)
+              }
             />
           ) : (
-            // Read-only viewer: the state is still worth showing, it just is
-            // not theirs to change.
+            // Read-only for this direction: the state is still worth showing,
+            // it just is not theirs to change. A switch that silently does
+            // nothing would be worse than a badge that says what is true.
             <Badge tone={token.is_active ? "success" : "danger"} dot>
               {token.is_active ? "Active" : "Off"}
             </Badge>
@@ -450,60 +445,57 @@ export function TokensTable({
         align: "center",
         className: "tok-actions-col",
         headerClassName: "tok-actions-col",
-        cell: (token) => {
-          const power = powerItemFor(token);
-
-          return (
-            <RowMenu
-              label={`Actions for token ${token.id}`}
-              items={[
-                {
-                  // Shown to anyone who can see this table at all, which means
-                  // read. Whether it can be changed is the popup's business
-                  // (it takes readOnly), because "you may not edit this" and
-                  // "you may not look at this" are different answers, and a
-                  // reader with no way to open the matrix has to guess what a
-                  // token can do. The write is refused server-side regardless.
-                  label: "Permissions",
-                  icon: "fa-solid fa-shield-halved",
-                  onSelect: () => onPermissions(token),
+        // No power item: a token's status belongs to the Status column's switch
+        // and nowhere else (see switchOff above).
+        cell: (token) => (
+          <RowMenu
+            label={`Actions for token ${token.id}`}
+            items={[
+              {
+                // Shown to anyone who can see this table at all, which means
+                // read. Whether it can be changed is the popup's business
+                // (it takes readOnly), because "you may not edit this" and
+                // "you may not look at this" are different answers, and a
+                // reader with no way to open the matrix has to guess what a
+                // token can do. The write is refused server-side regardless.
+                label: "Permissions",
+                icon: "fa-solid fa-shield-halved",
+                onSelect: () => onPermissions(token),
+              },
+              ...(onActivityLogs
+                ? [
+                    {
+                      label: "Activity logs",
+                      icon: "fa-solid fa-clock-rotate-left",
+                      onSelect: () => onActivityLogs(token),
+                    },
+                  ]
+                : []),
+              {
+                label: "Copy token ID",
+                icon: "fa-regular fa-copy",
+                onSelect: () => {
+                  navigator.clipboard?.writeText(token.id).catch(() => {});
                 },
-                ...(onActivityLogs
-                  ? [
-                      {
-                        label: "Activity logs",
-                        icon: "fa-solid fa-clock-rotate-left",
-                        onSelect: () => onActivityLogs(token),
-                      },
-                    ]
-                  : []),
-                {
-                  label: "Copy token ID",
-                  icon: "fa-regular fa-copy",
-                  onSelect: () => {
-                    navigator.clipboard?.writeText(token.id).catch(() => {});
-                  },
+              },
+              {
+                // The username is the value a caller authenticates with and it
+                // is no longer a column (it repeats the account id, the
+                // environment and the email), so it stays reachable here.
+                label: "Copy username",
+                icon: "fa-regular fa-copy",
+                onSelect: () => {
+                  if (token.username) {
+                    navigator.clipboard?.writeText(token.username).catch(() => {});
+                  }
                 },
-                {
-                  // The username is the value a caller authenticates with and it
-                  // is no longer a column (it repeats the account id, the
-                  // environment and the email), so it stays reachable here.
-                  label: "Copy username",
-                  icon: "fa-regular fa-copy",
-                  onSelect: () => {
-                    if (token.username) {
-                      navigator.clipboard?.writeText(token.username).catch(() => {});
-                    }
-                  },
-                },
-                ...(power ? [power] : []),
-              ]}
-            />
-          );
-        },
+              },
+            ]}
+          />
+        ),
       },
     ],
-    [onPermissions, onToggleStatus, onActivityLogs, onDelete, canUpdate, canDelete],
+    [onPermissions, onToggleStatus, onActivityLogs, onDelete, canDelete],
   );
 
   const [filters, setFilters] = useState<Record<FilterKey, string>>(EMPTY_FILTERS);

@@ -27,7 +27,6 @@ import {
   type PortalUser,
 } from "../lib/adminApi";
 import {
-  connectToken,
   deactivateToken,
   listTokens,
   setTokenStatus,
@@ -39,7 +38,6 @@ import TokenPermissions from "./TokenPermissions";
 import ActivityLog from "./ActivityLog";
 import MfaSettings from "./MfaSettings";
 import { EnvironmentsTable } from "./admin/EnvironmentsTable";
-import { TokenConnectModal } from "../components/TokenConnectModal";
 import { PortalUsersTable } from "./admin/PortalUsersTable";
 import { TokensTable } from "../components/TokensTable";
 import EnvBadge from "../components/EnvBadge";
@@ -502,10 +500,16 @@ export default function AdminDashboard() {
   };
 
   /**
-   * The Active switch and the row menu's Activate/Deactivate both land here.
+   * The API Tokens table's Status switch, in both directions.
+   *
    * Switching a token OFF asks first: it takes effect on the next request, so
    * whatever integration is using it starts failing 401 immediately, and that
    * is worth one confirmation. Switching one back on asks nothing.
+   *
+   * The OFF direction only lands here for a caller with no delete route of its
+   * own. This console has one (DELETE /admin/tokens/:id, see
+   * handleTokenDeactivate below), so the table sends the switch's OFF position
+   * there instead, and that is the path an admin takes.
    */
   async function handleTokenToggle(token: AdminToken, next: boolean) {
     if (!next) {
@@ -526,7 +530,7 @@ export default function AdminDashboard() {
       setTokens((prev) =>
         prev.map((t) => (t.id === token.id ? { ...t, is_active: next } : t)),
       );
-      toast(next ? "Token activated" : "Token deactivated", "success");
+      toast(next ? "Token reactivated" : "Token deactivated", "success");
     } catch (err: any) {
       toast(err?.message || "Could not change the token status", "error");
     }
@@ -576,16 +580,13 @@ export default function AdminDashboard() {
     handleNav("tokens");
   }
 
-  // Whether the create-token modal is open. Its environment picker is this
-  // console's own environment list, which is already loaded for the
-  // Environments page and is unscoped for an admin.
-  const [tokenConnectOpen, setTokenConnectOpen] = useState(false);
-
   /**
-   * The API Tokens table's Deactivate item, which is the delete verb and not
-   * the status write: both end with the token switched off and kept, but only
-   * this one goes through DELETE /admin/tokens/:id, so the console exercises
-   * the same route the portal's delete does.
+   * The Status switch's OFF position, which is the delete action and not the
+   * status write: both end with the token switched off and kept, but only this
+   * one goes through DELETE /admin/tokens/:id, so the console exercises the
+   * same verb the portal's delete uses. Which route the switch reaches is the
+   * table's business (./TokensTable): given an onDelete, it sends both the
+   * switch and the delete there.
    */
   async function handleTokenDeactivate(token: AdminToken) {
     const confirmed = await confirmDanger({
@@ -1472,9 +1473,6 @@ export default function AdminDashboard() {
                   Every token this service has issued, and the modules each one may call
                 </div>
               </div>
-              <button className="btn btn-primary" onClick={() => setTokenConnectOpen(true)}>
-                <i className="fa-solid fa-plus" /> Create token
-              </button>
             </div>
             <div className="card">
               <div className="card-body">
@@ -1486,8 +1484,8 @@ export default function AdminDashboard() {
                   onActivityLogs={openTokenActivityLogs}
                   envScope={tokensEnvScope}
                   onClearEnvScope={() => setTokensEnvScope(null)}
-                  // The delete verb is the Deactivate item; the Status switch
-                  // stays on the status write. Same outcome, two decisions.
+                  // The switch's OFF position is the delete verb, so it goes
+                  // through the delete route the portal also uses.
                   onDelete={(token) => handleTokenDeactivate(token)}
                 />
               </div>
@@ -1584,14 +1582,6 @@ export default function AdminDashboard() {
         // The Access column is derived from the matrix this popup saves, so the
         // list has to be re-read or the row would keep showing its old badge.
         onSaved={loadTokens}
-      />
-
-      {/* ═══════════ API TOKEN: CREATE ═══════════ */}
-      <TokenConnectModal
-        open={tokenConnectOpen}
-        onClose={() => setTokenConnectOpen(false)}
-        environments={environments}
-        connect={connectToken}
       />
 
       {/* ═══════════ PU: ADD USER MODAL ═══════════ */}
