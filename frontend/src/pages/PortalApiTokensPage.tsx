@@ -96,7 +96,7 @@ export default function PortalApiTokensPage({
     try {
       setTokens(await listPortalApiTokens(token));
     } catch (err: any) {
-      toast(err?.message || "Could not load API tokens", "error");
+      toast(err?.message || "Could not load tokens", "error");
     } finally {
       setLoading(false);
     }
@@ -169,7 +169,7 @@ export default function PortalApiTokensPage({
     <>
       <div className="section-header">
         <div>
-          <div className="section-title">API Tokens</div>
+          <div className="section-title">Tokens</div>
           <div className="section-subtitle">
             Tokens issued for your environments
           </div>

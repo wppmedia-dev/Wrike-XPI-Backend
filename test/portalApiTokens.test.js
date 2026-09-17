@@ -1,5 +1,6 @@
-/* Covers the API Tokens module of the portal permission matrix and the scope
-   that decides which tokens a portal user may see.
+/* Covers the `api_tokens` module of the portal permission matrix and the scope
+   that decides which tokens a portal user may see. The module key is
+   `api_tokens` and its console label is "Token management".
 
    Two things are being protected here.
 
@@ -74,7 +75,7 @@ const apiTokens = catalogue.MODULES.find((mod) => mod.key === "api_tokens");
 section("api_tokens in the portal catalogue");
 
 checkTrue("the module exists", !!apiTokens);
-check("it is labelled for the console", apiTokens?.label, "API Tokens");
+check("it is labelled for the console", apiTokens?.label, "Token management");
 check(
   "it offers the two actions its routes implement",
   apiTokens?.actions.join(","),

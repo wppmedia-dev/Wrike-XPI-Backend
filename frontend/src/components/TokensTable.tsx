@@ -26,7 +26,7 @@ import {
 } from "../lib/tokenDisplay";
 import "./TokensTable.css";
 
-/* The API Tokens table: one row per token record the token service has
+/* The Tokens table: one row per token record the token service has
  * issued, with the module permissions that govern it reachable from the row
  * itself (the modal is owned by AdminDashboard, exactly as the portal-user
  * permissions modal is).
@@ -815,7 +815,7 @@ export function TokensTable({
   return (
     <DataTable
       table={table}
-      caption="API Tokens"
+      caption="Tokens"
       loading={loading}
       className="tok-table"
       searchPlaceholder="Search by environment, account or user…"
@@ -840,7 +840,7 @@ export function TokensTable({
               <div className="dt2-empty-icon">
                 <i className="fa-solid fa-key" aria-hidden="true" />
               </div>
-              <h3>No API tokens yet</h3>
+              <h3>No tokens yet</h3>
               <p>
                 Tokens appear here as soon as a user generates one from the environment login
                 page.

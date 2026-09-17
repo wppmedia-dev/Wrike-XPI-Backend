@@ -339,7 +339,7 @@ export default function TokenPermissions({
               <i className="fa-solid fa-key" />
             </span>
             <div>
-              <div className="tkp-head-name">API Token Permissions</div>
+              <div className="tkp-head-name">Token Permissions</div>
               <div className="tkp-head-token">{tokenLabel || tokenId || "—"}</div>
             </div>
           </div>
@@ -364,7 +364,7 @@ export default function TokenPermissions({
                   <i className="fa-solid fa-eye" aria-hidden="true" />
                   <div>
                     <strong>Read-only.</strong> These are the modules this token may call, and
-                    with which verb. Changing them needs the update permission on API Tokens,
+                    with which verb. Changing them needs the update permission on Token management,
                     which your account does not have.
                   </div>
                 </div>
