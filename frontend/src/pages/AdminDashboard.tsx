@@ -38,7 +38,7 @@ import ActivityLog from "./ActivityLog";
 import MfaSettings from "./MfaSettings";
 import { EnvironmentsTable } from "./admin/EnvironmentsTable";
 import { PortalUsersTable } from "./admin/PortalUsersTable";
-import { TokensTable } from "./admin/TokensTable";
+import { TokensTable } from "../components/TokensTable";
 import EnvBadge from "../components/EnvBadge";
 import BuildTag from "../components/BuildTag";
 import { CopyButton } from "../components/ui/CopyButton";

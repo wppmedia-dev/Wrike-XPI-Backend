@@ -1001,77 +1001,9 @@
       /* Row ⋯ menu styles now live with the component that renders them:
          components/ui/RowMenu.css */
 
-      /* Environments-table Visibility/Status switches — a compact variant of
-         the full-size .toggle-wrap control (which stays as-is in the edit
-         modal / access drawer), sized to sit neatly in a table cell. The knob
-         is 16px so the control reads at the same icon scale as the 16px
-         flat action icons in the same row.
-
-         The compound selector is deliberate: rows emit
-         class="toggle-wrap toggle-wrap-sm", so a plain .toggle-wrap-sm (0,1,0)
-         would LOSE the width/height race to the base .toggle-wrap rule, which
-         is declared later in this file with equal specificity.
-         .toggle-wrap.toggle-wrap-sm (0,2,0) wins it outright.
-
-         Geometry (box-sizing: border-box): 36x20 wrapper; the 1px borders on
-         .toggle-track leave a 34x18 inner area, so the 14px knob needs
-         top:2px ((18-14)/2) to be dead-centre, and from its base left:2px the
-         checked knob travels innerWidth(34)-knob(14)-2px insets = 18px →
-         translateX(16px). vertical-align:middle keeps the whole control
-         centred in the cell rather than resting on the text baseline. */
-      .toggle-wrap.toggle-wrap-sm {
-        width: 36px;
-        height: 20px;
-        vertical-align: middle;
-      }
-      .toggle-wrap-sm .toggle-track::before {
-        width: 14px;
-        height: 14px;
-        top: 2px;
-      }
-      /* The base rule .toggle-wrap input:checked + .toggle-track::before
-         (translateX(18px)) is declared later with the SAME specificity as a
-         plain .toggle-wrap-sm ... version, so it wins the cascade. The extra
-         .toggle-wrap bumps this to (0,4,0) so the compact 16px travel wins. */
-      .toggle-wrap.toggle-wrap-sm input:checked + .toggle-track::before {
-        transform: translateX(16px);
-      }
-
-      /* Pending-state feedback while a Visibility/Status toggle's PATCH is
-         in flight: dim the knob and show a tiny spinner at the pill's centre
-         so the click gives instant, localised feedback instead of a silent
-         wait (there is no full-table refresh anymore). */
-      .toggle-wrap.toggle-busy {
-        cursor: progress;
-      }
-      .toggle-wrap.toggle-busy input {
-        pointer-events: none;
-      }
-      .toggle-wrap.toggle-busy .toggle-track {
-        opacity: 0.8;
-      }
-      .toggle-wrap.toggle-busy .toggle-track::before {
-        opacity: 0.35;
-      }
-      .toggle-wrap.toggle-busy .toggle-track::after {
-        content: "";
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        width: 10px;
-        height: 10px;
-        margin: -5px 0 0 -5px;
-        border: 2px solid rgba(255, 255, 255, 0.55);
-        border-top-color: #fff;
-        border-radius: 50%;
-        animation: toggle-busy-spin 0.7s linear infinite;
-        pointer-events: none;
-      }
-      @keyframes toggle-busy-spin {
-        to {
-          transform: rotate(360deg);
-        }
-      }
+      /* Visibility/Status switches now live with the component that renders
+         them: components/ui/Toggle.css — the portal renders the same control
+         and never loads this stylesheet. */
 
       /* Ensure table scrolls only horizontally for wide content */
       .dataTables_wrapper .dataTables_scroll {
@@ -1649,53 +1581,7 @@
         margin-top: 1px;
       }
 
-      .toggle-wrap {
-        /* A <label> is inline by default, so width/height are ignored unless
-           a flex/grid ancestor forces it to a block box — true in the modal,
-           false in a plain table <td>, which is why the switch collapsed to
-           a dot there. inline-block makes it size correctly everywhere. */
-        display: inline-block;
-        position: relative;
-        width: 40px;
-        height: 22px;
-        flex-shrink: 0;
-      }
-      .toggle-wrap input {
-        opacity: 0;
-        width: 0;
-        height: 0;
-        position: absolute;
-      }
-
-      .toggle-track {
-        position: absolute;
-        inset: 0;
-        background: var(--bg-surface-2);
-        border-radius: 11px;
-        cursor: pointer;
-        transition: var(--transition);
-        border: 1px solid var(--border);
-      }
-
-      .toggle-track::before {
-        content: "";
-        position: absolute;
-        width: 16px;
-        height: 16px;
-        left: 2px;
-        top: 2px;
-        background: #fff;
-        border-radius: 50%;
-        transition: transform 0.18s ease;
-      }
-
-      .toggle-wrap input:checked + .toggle-track {
-        background: var(--success);
-        border-color: var(--success);
-      }
-      .toggle-wrap input:checked + .toggle-track::before {
-        transform: translateX(18px);
-      }
+      /* The switch itself is styled by components/ui/Toggle.css. */
 
       /* ─── Redirect URL Box ────────────────────────────────── */
       .redirect-url-box {

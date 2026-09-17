@@ -88,9 +88,23 @@ interface Props {
   environments: PortalActivityEnvironment[];
   /** Incremented by the shell's top-bar Refresh button to force a reload. */
   refreshKey?: number;
+  /**
+   * One token's activity only, set by the API Tokens page's "Activity logs"
+   * row action. Same shape and same behaviour as the admin console's token
+   * scope (frontend/src/pages/ActivityLog.tsx), including the removable chip,
+   * so arriving from a token row never traps the user in that filter.
+   */
+  tokenFilter?: { id: string; label: string } | null;
+  onClearTokenFilter?: () => void;
 }
 
-export default function PortalActivityPage({ active, environments, refreshKey = 0 }: Props) {
+export default function PortalActivityPage({
+  active,
+  environments,
+  refreshKey = 0,
+  tokenFilter = null,
+  onClearTokenFilter,
+}: Props) {
   const token = getPortalToken();
 
   const [config, setConfig] = useState<PortalActivityConfig | null>(null);
@@ -112,6 +126,10 @@ export default function PortalActivityPage({ active, environments, refreshKey = 
   const emailPrimed = useRef(false);
   const searchDebounce = useRef<number | null>(null);
 
+  // Read by the fetch callbacks, which is why it is a plain value here rather
+  // than read off the prop at call time.
+  const tokenFilterId = tokenFilter?.id || undefined;
+
   const load = useCallback(
     async (nextOffset = offset) => {
       if (!token) return;
@@ -121,13 +139,14 @@ export default function PortalActivityPage({ active, environments, refreshKey = 
         const [list, sum] = await Promise.all([
           listPortalActivity(token, {
             env_id: envFilter || undefined,
+            token_id: tokenFilterId,
             surface: surfaceFilter || undefined,
             allowed: resultFilter ? resultFilter === "allowed" : undefined,
             actor_email: emailFilter.trim() || undefined,
             limit: pageSize,
             offset: nextOffset,
           }),
-          getPortalActivitySummary(token, envFilter || undefined),
+          getPortalActivitySummary(token, envFilter || undefined, tokenFilterId),
         ]);
         setRows(list.rows);
         setTotal(list.total);
@@ -140,7 +159,7 @@ export default function PortalActivityPage({ active, environments, refreshKey = 
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [token, envFilter, surfaceFilter, resultFilter, emailFilter, pageSize],
+    [token, envFilter, surfaceFilter, resultFilter, emailFilter, pageSize, tokenFilterId],
   );
 
   useEffect(() => {
@@ -151,7 +170,7 @@ export default function PortalActivityPage({ active, environments, refreshKey = 
     }
     load(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, token, envFilter, surfaceFilter, resultFilter, pageSize]);
+  }, [active, token, envFilter, surfaceFilter, resultFilter, pageSize, tokenFilterId]);
 
   // Top-bar Refresh — reload the current page (keeping filters and page) and
   // the summary stats without resetting the view.
@@ -254,6 +273,27 @@ export default function PortalActivityPage({ active, environments, refreshKey = 
       </div>
 
       <div className="pal-filterbar">
+        {/* The token scope, first because it is the one nobody set from this
+            page, and removable right here so arriving from a token row never
+            traps them in it. Mirrors the admin console's al-token-chip. */}
+        {tokenFilter && (
+          <span className="pal-token-chip" title={`Filtered to ${tokenFilter.label}`}>
+            <i className="fa-solid fa-key" aria-hidden="true" />
+            <span className="pal-token-chip-label">{tokenFilter.label}</span>
+            {onClearTokenFilter && (
+              <button
+                type="button"
+                className="pal-token-chip-clear"
+                onClick={onClearTokenFilter}
+                aria-label="Clear the token filter"
+                title="Clear the token filter"
+              >
+                <i className="fa-solid fa-xmark" aria-hidden="true" />
+              </button>
+            )}
+          </span>
+        )}
+
         <div className="pal-search">
           <i className="fa-solid fa-magnifying-glass" aria-hidden="true" />
           <input

@@ -178,8 +178,10 @@ export const WrikeTokenExchange = (
           wrapped_dek: wrappedDEK.toString("base64"),
           is_active: true,
           // Null when the caller did not say what it is. Guessing here would
-          // put a label on a row that the console presents as fact.
-          client_name: clientName || null,
+          // put a label on a row that the console presents as fact. Truncated
+          // because the column is a STRING(100) and one of the callers passes a
+          // value that came in from outside.
+          client_name: clientName ? String(clientName).slice(0, 100) : null,
           token_expires_at: tokenExpiresAt,
         },
         { transaction },

@@ -22,9 +22,14 @@ export interface PortalEnvironmentsTableProps {
   /** environment_access:read — shows the "API access scope" row action,
       matching the admin table's shield-icon button (see AdminDashboard.tsx). */
   canSeeAccess: boolean;
+  /** api_tokens:read — shows the "View tokens" row action, the same one the
+      admin console's Environments table offers: straight to the tokens issued
+      for this environment, already filtered to it. */
+  canViewTokens: boolean;
   onEdit: (env: PortalEnvironmentFull) => void;
   onDelete: (env: PortalEnvironmentFull) => void;
   onManageAccess: (env: PortalEnvironmentFull) => void;
+  onViewTokens: (env: PortalEnvironmentFull) => void;
   onAdd: () => void;
 }
 
@@ -39,9 +44,11 @@ export function PortalEnvironmentsTable({
   canUpdate,
   canDelete,
   canSeeAccess,
+  canViewTokens,
   onEdit,
   onDelete,
   onManageAccess,
+  onViewTokens,
   onAdd,
 }: PortalEnvironmentsTableProps) {
   const columns = useMemo<ColumnDef<PortalEnvironmentFull>[]>(() => {
@@ -105,7 +112,7 @@ export function PortalEnvironmentsTable({
     // Actions column only exists at all if there's at least one action this
     // user can take — an empty RowMenu with zero items would just be a
     // trigger that opens nothing.
-    if (canUpdate || canDelete || canSeeAccess) {
+    if (canUpdate || canDelete || canSeeAccess || canViewTokens) {
       cols.push({
         id: "actions",
         header: "Actions",
@@ -123,6 +130,18 @@ export function PortalEnvironmentsTable({
                       label: "API Access Scope",
                       icon: "fa-solid fa-shield-halved",
                       onSelect: () => onManageAccess(env),
+                    },
+                  ]
+                : []),
+              ...(canViewTokens
+                ? [
+                    {
+                      // The question "what is using this environment?" asked
+                      // from the environment's own row, exactly as the admin
+                      // console's Environments table asks it.
+                      label: "View tokens",
+                      icon: "fa-solid fa-key",
+                      onSelect: () => onViewTokens(env),
                     },
                   ]
                 : []),
@@ -152,7 +171,16 @@ export function PortalEnvironmentsTable({
     }
 
     return cols;
-  }, [canUpdate, canDelete, canSeeAccess, onEdit, onDelete, onManageAccess]);
+  }, [
+    canUpdate,
+    canDelete,
+    canSeeAccess,
+    canViewTokens,
+    onEdit,
+    onDelete,
+    onManageAccess,
+    onViewTokens,
+  ]);
 
   const table = useTable({
     data: environments,

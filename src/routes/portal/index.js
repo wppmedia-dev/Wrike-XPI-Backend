@@ -5,6 +5,7 @@ import { portalEnvironmentsRoute } from "./environments";
 import { portalActivityRoute } from "./activity";
 import { portalCacheRoute } from "./cache";
 import { portalEnvironmentAccessRoute } from "./environmentAccess";
+import { portalApiTokensRoute } from "./apiTokens";
 
 // Page handlers
 const PortalIndexPage = (req, reply) => reply.redirect("/portal/login");
@@ -76,6 +77,7 @@ export const portalApiRoute = (fastify, opts, done) => {
   fastify.register(portalEnvironmentAccessRoute, {
     prefix: "/environment-access",
   });
+  fastify.register(portalApiTokensRoute, { prefix: "/api-tokens" });
 
   done();
 };

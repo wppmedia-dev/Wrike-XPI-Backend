@@ -1,6 +1,7 @@
 import { verifyAdminJWT } from "../../../middlewares/adminAuth";
 import { Tokens, TokenPermissions } from "../../../controllers";
-import { MODULES, catalog } from "../../../utils/tokenPermissionCatalog";
+import { catalog } from "../../../utils/tokenPermissionCatalog";
+import { summarisePermissions } from "../../../utils/tokenPermissionSummary";
 
 import { IdParamSchema, SetPermissionsSchema, SetStatusSchema } from "./schema";
 
@@ -29,28 +30,6 @@ export const adminTokensRoute = (fastify, opts, done) => {
       message: err?.message || err || "Request failed",
     });
 
-  // Every module × action a token can be granted, so a summary can read
-  // "3 of 18" without the frontend counting the catalogue itself.
-  const totalGrants = MODULES.reduce((n, mod) => n + mod.actions.length, 0);
-
-  const summarise = (entry) => {
-    if (!entry?.configured) {
-      // Unrestricted is not "0 granted". A token nobody has restricted can do
-      // all of it, and the list has to say so, otherwise a freshly issued
-      // token reads as powerless, which is the opposite of the truth.
-      return { configured: false, granted: totalGrants, total: totalGrants };
-    }
-
-    let granted = 0;
-    for (const mod of MODULES) {
-      for (const action of mod.actions) {
-        if (entry.matrix?.[mod.key]?.[action]) granted += 1;
-      }
-    }
-
-    return { configured: true, granted, total: totalGrants };
-  };
-
   // GET /admin/tokens: every token, with the permission summary the list
   // column shows. One extra query for all of them, not one per row.
   fastify.get("/", guard, async (req, reply) => {
@@ -64,7 +43,7 @@ export const adminTokensRoute = (fastify, opts, done) => {
         reply,
         tokens.map((token) => ({
           ...token,
-          permissions: summarise(matrices[token.id]),
+          permissions: summarisePermissions(matrices[token.id]),
         })),
       );
     } catch (err) {
