@@ -883,6 +883,99 @@ async ({ taskId }, extra) => {
           </ul>`,
       },
       {
+        id: "api/permissions",
+        group: "XPI API Docs",
+        groupId: "api",
+        label: "Token permissions",
+        keywords:
+          "permission permissions scope scopes module modules access restricted restrict grant forbidden 403 read create update delete",
+        html: `
+          <div class="pg-eyebrow">XPI API Docs</div>
+          <h1 class="pg-title">Token permissions</h1>
+          <p class="pg-lede">A token can be restricted to specific modules and actions. Unrestricted is the default.</p>
+
+          <h2 class="pg-h2">How it works</h2>
+          <p class="pg-p">Every token carries a permission matrix: one row per module, one column per action. A request is allowed when the cell matching its module and action is granted. The module comes from the path; the action comes from the HTTP method.</p>
+          ${table(
+            ["Method", "Action"],
+            [
+              ["<code>GET</code> / <code>HEAD</code>", "<code>read</code>"],
+              ["<code>POST</code>", "<code>create</code>"],
+              ["<code>PUT</code> / <code>PATCH</code>", "<code>update</code>"],
+              ["<code>DELETE</code>", "<code>delete</code>"],
+            ],
+          )}
+          ${table(
+            ["Module", "Where it applies", "Actions"],
+            [
+              [
+                "<code>campaign</code>",
+                "<code>/wrikexpi/campaign</code>",
+                "read, create, update, delete",
+              ],
+              [
+                "<code>channel</code>",
+                "<code>/wrikexpi/channel</code>",
+                "read, update, delete",
+              ],
+              [
+                "<code>task</code>",
+                "<code>/wrikexpi/task</code>",
+                "read, update, delete",
+              ],
+              [
+                "<code>master</code>",
+                "<code>/wrikexpi/v1.0</code>",
+                "read, create, update, delete",
+              ],
+              [
+                "<code>amoeba</code>",
+                "<code>/wrikexpi/amoeba</code>",
+                "read, create, update, delete",
+              ],
+              [
+                "<code>mcp_proxy</code>",
+                "MCP only — the <code>wrike_*</code> tools",
+                "read, create, update, delete",
+              ],
+            ],
+          )}
+          ${callout(
+            "tip",
+            "A write always includes read",
+            "Granting create, update or delete implies read, and the console sets it for you: a caller that cannot see a module has no business changing it.",
+          )}
+          ${callout(
+            "tip",
+            "Nested listings follow what they return",
+            "<code>GET /wrikexpi/campaign/{id}/channel</code> returns channels, so it needs <code>channel</code> read — not <code>campaign</code> read. Switching a module off therefore closes every route that serves it.",
+          )}
+
+          <h2 class="pg-h2">Denied requests</h2>
+          <p class="pg-p">A call outside the matrix stops before it reaches Wrike and returns <code>403</code>:</p>
+          ${codeBlock(
+            "json",
+            `{
+  "success": false,
+  "message": "You are not authorized to access this resource.",
+  "error": {
+    "code": "MODULE_FORBIDDEN",
+    "module": "campaign",
+    "action": "update"
+  }
+}`,
+          )}
+          <p class="pg-p">The same matrix governs MCP tool calls made with that token, so restricting a module cannot be sidestepped by calling over MCP instead.</p>
+
+          <h2 class="pg-h2">The default, and what changes</h2>
+          <ul class="bullets">
+            <li>A token nobody has configured is <b>unrestricted</b> — it can call every module. Restrictions are set per token in the admin portal.</li>
+            <li>Once a token is configured, its matrix is the whole story: a module with nothing ticked is denied, <code>read</code> included.</li>
+            <li>A change takes effect on the next request. A short-lived cache can delay enforcement by up to 30 seconds on other instances.</li>
+            <li>Switching a token off (<code>is_active: false</code>) rejects every request with <code>401</code>, whatever its matrix says.</li>
+          </ul>`,
+      },
+      {
         id: "api/filtering",
         group: "XPI API Docs",
         groupId: "api",
@@ -1221,8 +1314,14 @@ async ({ taskId }, extra) => {
                 "<code>400</code>",
                 "Invalid request — bad filter, missing field, or unsupported operator.",
               ],
-              ["<code>401</code>", "Missing or invalid bearer token."],
-              ["<code>403</code>", "Not authorized to access the service."],
+              [
+                "<code>401</code>",
+                "Missing or invalid bearer token, or a token that has been switched off.",
+              ],
+              [
+                "<code>403</code>",
+                "Not authorized to access the service, or this token is not permitted to perform that action on that module (<code>MODULE_FORBIDDEN</code> — see <b>Token permissions</b>).",
+              ],
               ["<code>500</code>", "Unexpected server error."],
             ],
           )}

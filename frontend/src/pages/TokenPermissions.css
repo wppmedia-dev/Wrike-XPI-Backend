@@ -1,0 +1,489 @@
+/* Per-token module permission editor.
+   Tokens, radii and type come from AdminDashboard.css; nothing new is defined
+   here. Every class is `tkp-` prefixed so it can never collide with the shell
+   it opens over, or with the `pup-` portal-user popup it sits beside. */
+
+.tkp-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 240;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(2px);
+  visibility: hidden;
+  opacity: 0;
+  transition:
+    opacity 0.16s ease,
+    visibility 0.16s ease;
+}
+
+.tkp-backdrop.open {
+  visibility: visible;
+  opacity: 1;
+}
+
+.tkp-modal {
+  width: 100%;
+  max-width: 580px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  transform: scale(0.97) translateY(8px);
+  transition: transform 0.16s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tkp-backdrop.open .tkp-modal {
+  transform: none;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────── */
+
+.tkp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.tkp-head-title {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.tkp-head-icon {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.tkp-head-name {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.tkp-head-token {
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.tkp-close {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.tkp-close:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.tkp-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ── Body ───────────────────────────────────────────────────────────── */
+
+.tkp-body {
+  padding: 16px 18px;
+  overflow-y: auto;
+}
+
+.tkp-hint {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  margin: 0 0 12px;
+}
+
+/* The unrestricted state, said out loud. Without this an unconfigured token
+   renders as a grid of empty ticks, which reads as "no access" — the exact
+   opposite of what an unconfigured token can do. It disappears after the
+   first save, because then there is nothing left to warn about. */
+.tkp-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  background: var(--warning-soft);
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-md);
+}
+
+.tkp-notice i {
+  color: var(--warning);
+  font-size: 13px;
+  margin-top: 1px;
+}
+
+.tkp-notice strong {
+  color: var(--text-primary);
+}
+
+/* ── Quick set ──────────────────────────────────────────────────────── */
+
+.tkp-global {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.tkp-global-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.tkp-global-switch {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.tkp-global-seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.tkp-global-seg i {
+  font-size: 11px;
+}
+
+.tkp-global-seg:hover {
+  background: var(--bg-surface);
+}
+
+.tkp-global-seg[aria-pressed="true"] {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.tkp-global-seg:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ── Matrix ─────────────────────────────────────────────────────────── */
+/* CSS grid, not a <table> — five modules and four actions is small enough
+   that a grid gives cleaner alignment and an easy "All/None" final column.
+
+   The action-column count is not hardcoded: the component sets
+   --tkp-action-cols from the server's action catalogue, so a vocabulary that
+   gains an action re-lays out this grid instead of overflowing it. */
+
+.tkp-matrix {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.tkp-matrix-head,
+.tkp-matrix-row {
+  display: grid;
+  grid-template-columns: 1fr repeat(var(--tkp-action-cols, 4), 58px) 48px;
+  align-items: center;
+  column-gap: 4px;
+}
+
+.tkp-matrix-head {
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 6px;
+}
+
+.tkp-matrix-head-cell {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.tkp-matrix-row {
+  padding: 9px 6px;
+  border-bottom: 1px solid var(--border-light);
+  transition: background-color 0.12s ease;
+}
+
+.tkp-matrix-row:last-child {
+  border-bottom: none;
+}
+
+.tkp-matrix-row:hover {
+  background: var(--bg-surface);
+}
+
+.tkp-module {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding-right: 6px;
+}
+
+.tkp-module-icon {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  background: var(--bg-surface-2);
+  color: var(--text-secondary);
+}
+
+.tkp-module-text {
+  min-width: 0;
+}
+
+.tkp-module-label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.tkp-module-desc {
+  font-size: 11px;
+  line-height: 1.4;
+  /* text-secondary, not text-muted: muted fails the 4.5:1 text floor at this
+     size, which made the line read as barely there. */
+  color: var(--text-secondary);
+  margin-top: 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tkp-matrix-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Custom tick: the native checkbox stays the real control (keyboard, forms,
+   screen readers) and is visually replaced, never removed. */
+.tkp-tick-wrap {
+  display: inline-flex;
+  cursor: pointer;
+}
+
+.tkp-tick-wrap input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.tkp-tick {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  /* A visible box, but not a near-black outline in a compact grid: the same
+     hue as text-secondary softened, which clears the ~3:1 UI-element floor
+     without shouting. */
+  border: 1.5px solid rgba(71, 85, 105, 0.65);
+  background: var(--bg-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: transparent;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.tkp-tick-wrap input:checked + .tkp-tick {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+  /* A soft ring around the checked state: makes "on" register at a glance
+     across a whole row of small boxes instead of needing a fill comparison. */
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.tkp-tick-wrap:hover .tkp-tick {
+  border-color: var(--accent);
+  background: var(--bg-card);
+}
+
+.tkp-tick-wrap input:checked:hover + .tkp-tick {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.tkp-tick-wrap input:focus-visible + .tkp-tick {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tkp-na {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.tkp-rowtoggle {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  padding: 4px 5px;
+  border-radius: var(--radius-sm);
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.tkp-rowtoggle:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.tkp-rowtoggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ── Loading ────────────────────────────────────────────────────────── */
+
+.tkp-skeleton-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tkp-skeleton {
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    90deg,
+    var(--bg-surface) 0%,
+    var(--bg-surface-2) 50%,
+    var(--bg-surface) 100%
+  );
+  background-size: 200% 100%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tkp-skeleton {
+    animation: tkpShimmer 1.2s linear infinite;
+  }
+
+  @keyframes tkpShimmer {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+}
+
+/* ── Footer ─────────────────────────────────────────────────────────── */
+
+.tkp-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-surface);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  flex-shrink: 0;
+}
+
+.tkp-footer-count {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.tkp-footer-actions {
+  display: flex;
+  gap: 8px;
+}
+
+@media (max-width: 480px) {
+  .tkp-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .tkp-footer-actions {
+    justify-content: flex-end;
+  }
+}
