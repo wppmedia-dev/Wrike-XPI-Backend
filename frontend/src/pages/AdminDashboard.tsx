@@ -61,7 +61,7 @@ type PageId =
 const PAGE_NAMES: Record<PageId, string> = {
   overview: "Overview",
   environments: "Environments",
-  tokens: "API Tokens",
+  tokens: "Tokens",
   users: "Users",
   settings: "Settings",
   "cache-settings": "Cache Settings",
@@ -467,7 +467,7 @@ export default function AdminDashboard() {
     };
   }, [redirectModalOpen]);
 
-  /* ── API tokens ───────────────────────────────────────────────────── */
+  /* ── Tokens ───────────────────────────────────────────────────────── */
   const [tokens, setTokens] = useState<AdminToken[]>([]);
   // Mirrors envLoaded / puLoaded: the table shows its loading skeleton until
   // the first fetch resolves, so it never flashes "no tokens" at an admin
@@ -493,7 +493,7 @@ export default function AdminDashboard() {
       const data = await listTokens();
       setTokens(data);
     } catch (err: any) {
-      toast(err?.message || "Failed to load API tokens", "error");
+      toast(err?.message || "Failed to load tokens", "error");
     } finally {
       setTokLoaded(true);
     }
@@ -1176,7 +1176,7 @@ export default function AdminDashboard() {
             onClick={() => {
               // From the sidebar this means every token, so an environment
               // scope left over from an Environments row is dropped here rather
-              // than persisting behind a nav item that just says "API Tokens".
+              // than persisting behind a nav item that just says "Tokens".
               setTokensEnvScope(null);
               handleNav("tokens");
             }}
@@ -1184,7 +1184,7 @@ export default function AdminDashboard() {
             <span className="ni">
               <i className="fa-solid fa-key" />
             </span>
-            <span className="nl">API Tokens</span>
+            <span className="nl">Tokens</span>
             <span className="nav-badge">{tokens.length}</span>
           </div>
 
@@ -1464,11 +1464,11 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* ══════ API TOKENS PAGE ══════ */}
+          {/* ══════ TOKENS PAGE ══════ */}
           <div className={`page${activePage === "tokens" ? " active" : ""}`} id="page-tokens">
             <div className="section-header">
               <div>
-                <div className="section-title">API Tokens</div>
+                <div className="section-title">Tokens</div>
                 <div className="section-subtitle">
                   Every token this service has issued, and the modules each one may call
                 </div>
@@ -1573,7 +1573,7 @@ export default function AdminDashboard() {
         onClose={() => setPermsOpen(false)}
       />
 
-      {/* ═══════════ API TOKEN: PERMISSIONS MODAL ═══════════ */}
+      {/* ═══════════ TOKEN: PERMISSIONS MODAL ═══════════ */}
       <TokenPermissions
         tokenId={tokPermsTokenId}
         tokenLabel={tokPermsLabel}

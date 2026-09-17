@@ -44,9 +44,9 @@ export const MODULES = [
   },
   {
     key: "api_tokens",
-    label: "API Tokens",
+    label: "Token management",
     description:
-      "The API tokens issued for the environments this user can see, and what each one is allowed to do.",
+      "The tokens issued for the environments this user can see: what each one is allowed to do, and whether it is switched on.",
     // Two actions, one per route in src/routes/portal/apiTokens: read lists the
     // tokens of the user's own environments, update edits a token's module
     // matrix.

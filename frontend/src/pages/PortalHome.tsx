@@ -32,7 +32,7 @@ type PageId = "overview" | "environments" | "api-tokens" | "activity" | "cache";
 const PAGE_NAMES: Record<PageId, string> = {
   overview: "Overview",
   environments: "My Environments",
-  "api-tokens": "API Tokens",
+  "api-tokens": "Tokens",
   activity: "Activity Logs",
   cache: "Cache Settings",
 };
@@ -712,7 +712,7 @@ export default function PortalHome() {
               <span className="ni">
                 <i className="fa-solid fa-key" />
               </span>
-              <span className="nl">API Tokens</span>
+              <span className="nl">Tokens</span>
             </div>
           )}
 
@@ -980,7 +980,7 @@ export default function PortalHome() {
           </div>
           )}
 
-          {/* ══════ API TOKENS PAGE ══════ */}
+          {/* ══════ TOKENS PAGE ══════ */}
           {canSeeApiTokens && (
           <div className={`page${activePage === "api-tokens" ? " active" : ""}`} id="page-api-tokens">
             <PortalApiTokensPage
