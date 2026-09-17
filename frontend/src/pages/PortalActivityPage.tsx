@@ -11,6 +11,7 @@ import {
 } from "../lib/portalActivityApi";
 import { formatDateTime } from "../lib/format";
 import AdminSelect from "../components/AdminSelect";
+import { CopyButton } from "../components/ui/CopyButton";
 import "./PortalActivityPage.css";
 
 /* The portal Activity Log.
@@ -422,6 +423,7 @@ export default function PortalActivityPage({
               <tr>
                 <th scope="col">Time</th>
                 <th scope="col">Caller</th>
+                <th scope="col">Token</th>
                 <th scope="col">Surface</th>
                 <th scope="col">Called</th>
                 <th scope="col">IP</th>
@@ -432,7 +434,7 @@ export default function PortalActivityPage({
               {loading &&
                 Array.from({ length: 6 }).map((_, i) => (
                   <tr className="pal-skeleton-row" key={`skeleton-${i}`}>
-                    <td colSpan={6}>
+                    <td colSpan={7}>
                       <div className="pal-skeleton" />
                     </td>
                   </tr>
@@ -463,6 +465,21 @@ export default function PortalActivityPage({
                           <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" />
                           Unresolved
                         </span>
+                      )}
+                    </td>
+                    {/* The id of the token this call was made with, from the
+                        caller's own environments: the same id the Tokens page
+                        lists and the id the token filter above takes. */}
+                    <td className="pal-token">
+                      {row.token_id ? (
+                        <span className="pal-token-cell">
+                          <code className="pal-token-code" title={row.token_id}>
+                            {row.token_id}
+                          </code>
+                          <CopyButton value={row.token_id} title="Copy token ID" />
+                        </span>
+                      ) : (
+                        <span className="pal-muted">—</span>
                       )}
                     </td>
                     <td>
@@ -614,6 +631,22 @@ export default function PortalActivityPage({
                 <div>
                   <dt>Environment</dt>
                   <dd>{detailRow.environment_name || "—"}</dd>
+                </div>
+                <div>
+                  <dt>Token</dt>
+                  <dd>
+                    {detailRow.token_id ? (
+                      <span className="pal-token-cell">
+                        <code className="pal-token-code">{detailRow.token_id}</code>
+                        <CopyButton
+                          value={detailRow.token_id}
+                          title="Copy token ID"
+                        />
+                      </span>
+                    ) : (
+                      <span className="pal-muted">—</span>
+                    )}
+                  </dd>
                 </div>
                 <div>
                   <dt>IP address</dt>

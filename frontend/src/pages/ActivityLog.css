@@ -558,6 +558,23 @@
   color: var(--text-secondary);
 }
 
+/* The token a call was made with. The id in full rather than a short prefix:
+   it is what support asks for and what the token's permissions are keyed on,
+   and a truncated one only ever gets copied from the copy button anyway. The
+   table scrolls sideways (src/pages/ActivityLog.css .ea-scroll), so the column
+   costs width rather than legibility. */
+.al-token-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.al-token-code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
 .al-muted {
   color: var(--text-muted);
 }

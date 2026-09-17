@@ -421,6 +421,23 @@
   color: var(--text-secondary);
 }
 
+/* The token a call was made with, from the caller's own environments. The id in
+   full rather than a short prefix: it is what support asks for and what the
+   token's permissions are keyed on. Mirrors .al-token-cell in the console's
+   log (src/pages/ActivityLog.css), because the two screens differ in scope, not
+   in what a row means. */
+.pal-token-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pal-token-code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
 .pal-muted {
   color: var(--text-muted);
 }
