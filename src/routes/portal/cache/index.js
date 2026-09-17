@@ -9,6 +9,12 @@ import {
   requirePasswordChanged,
   requirePortalPermission,
 } from "../../../middlewares/portalAuth";
+import {
+  BulkDeleteSchema,
+  DeleteKeySchema,
+  DetailQuerySchema,
+  ListQuerySchema,
+} from "../../admin/cache/schema";
 
 /**
  * Portal API over cached Redis keys — browse/inspect (read) plus single-key
@@ -43,7 +49,7 @@ export const portalCacheRoute = (fastify, opts, done) => {
   };
 
   // GET /portal/cache?pattern=*&limit=200
-  fastify.get("/", canRead, async (req, reply) => {
+  fastify.get("/", { ...ListQuerySchema, ...canRead }, async (req, reply) => {
     try {
       const patternInput = String(req.query?.pattern || "").trim();
       const keyFilter = await cacheKeyFilterFor(req.portalUser);
@@ -67,110 +73,129 @@ export const portalCacheRoute = (fastify, opts, done) => {
   });
 
   // GET /portal/cache/detail?key=cache:key
-  fastify.get("/detail", canRead, async (req, reply) => {
-    try {
-      const key = String(req.query?.key || "").trim();
-      if (!key) {
-        return reply.code(400).send({ success: false, message: "Missing key" });
-      }
+  fastify.get(
+    "/detail",
+    { ...DetailQuerySchema, ...canRead },
+    async (req, reply) => {
+      try {
+        const key = String(req.query?.key || "").trim();
+        if (!key) {
+          return reply
+            .code(400)
+            .send({ success: false, message: "Missing key" });
+        }
 
-      const keyFilter = await cacheKeyFilterFor(req.portalUser);
-      if (!keyFilter(key)) {
-        return reply.code(403).send({
+        const keyFilter = await cacheKeyFilterFor(req.portalUser);
+        if (!keyFilter(key)) {
+          return reply.code(403).send({
+            success: false,
+            message: "Forbidden: you do not have access to this cache entry",
+          });
+        }
+
+        const data = await getCacheDetail(key);
+
+        return reply.code(200).send({
+          success: true,
+          message: "Cache detail fetched",
+          data,
+        });
+      } catch (err) {
+        return reply.code(err?.statusCode || 400).send({
           success: false,
-          message: "Forbidden: you do not have access to this cache entry",
+          message: err?.message || "Failed to fetch cache detail",
         });
       }
-
-      const data = await getCacheDetail(key);
-
-      return reply.code(200).send({
-        success: true,
-        message: "Cache detail fetched",
-        data,
-      });
-    } catch (err) {
-      return reply.code(err?.statusCode || 400).send({
-        success: false,
-        message: err?.message || "Failed to fetch cache detail",
-      });
-    }
-  });
+    },
+  );
 
   // DELETE /portal/cache?key=cache:key
-  fastify.delete("/", canDelete, async (req, reply) => {
-    try {
-      const key = String(req.query?.key || "").trim();
-      if (!key) {
-        return reply.code(400).send({ success: false, message: "Missing key" });
-      }
+  fastify.delete(
+    "/",
+    { ...DeleteKeySchema, ...canDelete },
+    async (req, reply) => {
+      try {
+        const key = String(req.query?.key || "").trim();
+        if (!key) {
+          return reply
+            .code(400)
+            .send({ success: false, message: "Missing key" });
+        }
 
-      const keyFilter = await cacheKeyFilterFor(req.portalUser);
-      if (!keyFilter(key)) {
-        return reply.code(403).send({
+        const keyFilter = await cacheKeyFilterFor(req.portalUser);
+        if (!keyFilter(key)) {
+          return reply.code(403).send({
+            success: false,
+            message: "Forbidden: you do not have access to this cache entry",
+          });
+        }
+
+        const deleted = await redisClient.delMany([key]);
+
+        return reply.code(200).send({
+          success: true,
+          message:
+            deleted > 0 ? "Cache entry deleted" : "Cache entry not found",
+          data: { key, deleted: deleted > 0 },
+        });
+      } catch (err) {
+        return reply.code(err?.statusCode || 400).send({
           success: false,
-          message: "Forbidden: you do not have access to this cache entry",
+          message: err?.message || "Failed to delete cache entry",
         });
       }
-
-      const deleted = await redisClient.delMany([key]);
-
-      return reply.code(200).send({
-        success: true,
-        message: deleted > 0 ? "Cache entry deleted" : "Cache entry not found",
-        data: { key, deleted: deleted > 0 },
-      });
-    } catch (err) {
-      return reply.code(err?.statusCode || 400).send({
-        success: false,
-        message: err?.message || "Failed to delete cache entry",
-      });
-    }
-  });
+    },
+  );
 
   // POST /portal/cache/bulk-delete { keys: ["key1", "key2"] }
-  fastify.post("/bulk-delete", canDelete, async (req, reply) => {
-    try {
-      const keys = Array.isArray(req.body?.keys)
-        ? req.body.keys.map((item) => String(item || "").trim()).filter(Boolean)
-        : [];
+  fastify.post(
+    "/bulk-delete",
+    { ...BulkDeleteSchema, ...canDelete },
+    async (req, reply) => {
+      try {
+        const keys = Array.isArray(req.body?.keys)
+          ? req.body.keys
+              .map((item) => String(item || "").trim())
+              .filter(Boolean)
+          : [];
 
-      if (keys.length === 0) {
-        return reply.code(400).send({
+        if (keys.length === 0) {
+          return reply.code(400).send({
+            success: false,
+            message: "At least one cache key is required",
+          });
+        }
+
+        // Fail the whole batch rather than deleting part of it: a request that
+        // names even one key outside this caller's set is refused outright, and
+        // the response deliberately does not echo back which key it was.
+        const keyFilter = await cacheKeyFilterFor(req.portalUser);
+        if (keys.some((key) => !keyFilter(key))) {
+          return reply.code(403).send({
+            success: false,
+            message:
+              "Forbidden: you do not have access to one or more of those cache entries",
+          });
+        }
+
+        const deletedCount = await redisClient.delMany(keys);
+
+        return reply.code(200).send({
+          success: true,
+          message: `${deletedCount} cache key(s) deleted`,
+          data: {
+            requested: keys.length,
+            deleted: deletedCount,
+          },
+        });
+      } catch (err) {
+        return reply.code(err?.statusCode || 400).send({
           success: false,
-          message: "At least one cache key is required",
+          message: err?.message || "Failed to bulk delete cache entries",
         });
       }
-
-      // Fail the whole batch rather than deleting part of it: a request that
-      // names even one key outside this caller's set is refused outright, and
-      // the response deliberately does not echo back which key it was.
-      const keyFilter = await cacheKeyFilterFor(req.portalUser);
-      if (keys.some((key) => !keyFilter(key))) {
-        return reply.code(403).send({
-          success: false,
-          message:
-            "Forbidden: you do not have access to one or more of those cache entries",
-        });
-      }
-
-      const deletedCount = await redisClient.delMany(keys);
-
-      return reply.code(200).send({
-        success: true,
-        message: `${deletedCount} cache key(s) deleted`,
-        data: {
-          requested: keys.length,
-          deleted: deletedCount,
-        },
-      });
-    } catch (err) {
-      return reply.code(err?.statusCode || 400).send({
-        success: false,
-        message: err?.message || "Failed to bulk delete cache entries",
-      });
-    }
-  });
+    },
+  );
 
   done();
 };

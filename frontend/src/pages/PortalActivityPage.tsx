@@ -96,6 +96,13 @@ interface Props {
    */
   tokenFilter?: { id: string; label: string } | null;
   onClearTokenFilter?: () => void;
+  /**
+   * Scope the page to one environment, set by the Environments table's
+   * "Activity logs" row action. Like the admin console, no chip for this one:
+   * the environment filter below is a first-class control here, so the scope
+   * shows up selected and clearable exactly as if it had been picked by hand.
+   */
+  envScope?: { id: string; name: string } | null;
 }
 
 export default function PortalActivityPage({
@@ -104,6 +111,7 @@ export default function PortalActivityPage({
   refreshKey = 0,
   tokenFilter = null,
   onClearTokenFilter,
+  envScope = null,
 }: Props) {
   const token = getPortalToken();
 
@@ -129,6 +137,16 @@ export default function PortalActivityPage({
   // Read by the fetch callbacks, which is why it is a plain value here rather
   // than read off the prop at call time.
   const tokenFilterId = tokenFilter?.id || undefined;
+
+  // Follows the shell rather than just initialising: arriving from an
+  // environment row pre-selects that environment here, and the shell clearing
+  // the scope (opening this page from the sidebar means "the whole log") puts
+  // the filter back to every environment. Keyed on the prop's identity, so a
+  // filter the user picks on this page is left alone until the shell asks for
+  // something else.
+  useEffect(() => {
+    setEnvFilter(envScope?.id || "");
+  }, [envScope]);
 
   const load = useCallback(
     async (nextOffset = offset) => {

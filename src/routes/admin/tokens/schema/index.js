@@ -9,6 +9,22 @@ export const IdParamSchema = {
   },
 };
 
+// POST /admin/tokens/connect: which environment to issue a token for.
+//
+// The portal's copy of this lives in src/routes/portal/apiTokens/schema — the
+// two differ in what they do with the answer (the portal checks the caller's
+// scope first), not in what they accept.
+export const ConnectSchema = {
+  schema: {
+    body: {
+      type: "object",
+      required: ["env_id"],
+      properties: { env_id: { type: "string", format: "uuid" } },
+      additionalProperties: false,
+    },
+  },
+};
+
 // PUT /admin/tokens/:id/permissions: whole-matrix replace.
 //
 // `permissions` is deliberately left open rather than spelled out as

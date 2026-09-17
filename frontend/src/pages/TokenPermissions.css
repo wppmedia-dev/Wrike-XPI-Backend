@@ -386,6 +386,19 @@
   outline-offset: 2px;
 }
 
+/* Read-only viewer (a caller with read but not update — see the `readOnly`
+   prop): the ticks still show the matrix, but they are not a control, so they
+   drop the pointer, the hover response and the focus ring rather than
+   pretending to be clickable. */
+.tkp-tick-wrap input:disabled + .tkp-tick,
+.tkp-tick-wrap input:disabled:hover + .tkp-tick {
+  cursor: default;
+}
+.tkp-tick-wrap input:disabled:not(:checked) + .tkp-tick {
+  background: var(--bg-surface);
+  border-color: var(--border);
+}
+
 .tkp-na {
   color: var(--text-muted);
   font-size: 13px;

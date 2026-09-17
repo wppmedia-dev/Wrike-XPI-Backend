@@ -27,6 +27,8 @@ import {
   type PortalUser,
 } from "../lib/adminApi";
 import {
+  connectToken,
+  deactivateToken,
   listTokens,
   setTokenStatus,
   type AdminToken,
@@ -37,6 +39,7 @@ import TokenPermissions from "./TokenPermissions";
 import ActivityLog from "./ActivityLog";
 import MfaSettings from "./MfaSettings";
 import { EnvironmentsTable } from "./admin/EnvironmentsTable";
+import { TokenConnectModal } from "../components/TokenConnectModal";
 import { PortalUsersTable } from "./admin/PortalUsersTable";
 import { TokensTable } from "../components/TokensTable";
 import EnvBadge from "../components/EnvBadge";
@@ -544,8 +547,19 @@ export default function AdminDashboard() {
     label: string;
   } | null>(null);
 
+  // Environment whose activity log is being viewed, set by the Environments
+  // table's "Activity logs" action. The Activity Log page's environment filter
+  // is a first-class control there, so this pre-selects it rather than adding
+  // a second way to see the same scope.
+  const [activityEnv, setActivityEnv] = useState<{ id: string; name: string } | null>(null);
+
   function openTokenActivityLogs(token: AdminToken) {
     setActivityToken({ id: token.id, label: tokenLabel(token) });
+    handleNav("activity-log");
+  }
+
+  function openEnvActivityLogs(env: { id: string; environment_name: string }) {
+    setActivityEnv({ id: env.id, name: env.environment_name });
     handleNav("activity-log");
   }
 
@@ -560,6 +574,37 @@ export default function AdminDashboard() {
   function openTokensForEnv(env: { id: string; environment_name: string }) {
     setTokensEnvScope({ id: env.id, name: env.environment_name });
     handleNav("tokens");
+  }
+
+  // Whether the create-token modal is open. Its environment picker is this
+  // console's own environment list, which is already loaded for the
+  // Environments page and is unscoped for an admin.
+  const [tokenConnectOpen, setTokenConnectOpen] = useState(false);
+
+  /**
+   * The API Tokens table's Deactivate item, which is the delete verb and not
+   * the status write: both end with the token switched off and kept, but only
+   * this one goes through DELETE /admin/tokens/:id, so the console exercises
+   * the same route the portal's delete does.
+   */
+  async function handleTokenDeactivate(token: AdminToken) {
+    const confirmed = await confirmDanger({
+      title: "Deactivate this token?",
+      html: `Callers using <strong>${escHtml(token.username || token.id)}</strong> on <strong>${escHtml(
+        token.environment_name || "this environment",
+      )}</strong> will start getting 401s on their next request.`,
+      confirmText: "Deactivate",
+    });
+    if (!confirmed) return;
+
+    try {
+      await deactivateToken(token.id);
+      const data = await listTokens();
+      setTokens(data);
+      toast("Token deactivated", "success");
+    } catch (err: any) {
+      toast(err?.message || "Could not deactivate the token", "error");
+    }
   }
 
   const [puUsers, setPuUsers] = useState<PortalUser[]>([]);
@@ -1145,7 +1190,6 @@ export default function AdminDashboard() {
           <div className="nav-group-label" style={{ marginTop: 6 }}>
             Settings
           </div>
-
           <div
             className={`nav-item${activePage === "settings" ? " active" : ""}`}
             onClick={() => handleNav("settings")}
@@ -1169,10 +1213,12 @@ export default function AdminDashboard() {
           <div
             className={`nav-item${activePage === "activity-log" ? " active" : ""}`}
             onClick={() => {
-              // Opening it from the sidebar means the whole log, so a token
-              // scope left over from a token row is dropped here rather than
-              // silently persisting behind a nav item that says "Activity Log".
+              // Opening it from the sidebar means the whole log, so a token or
+              // environment scope left over from a row action is dropped here
+              // rather than silently persisting behind a nav item that says
+              // "Activity Log".
               setActivityToken(null);
+              setActivityEnv(null);
               handleNav("activity-log");
             }}
           >
@@ -1383,6 +1429,7 @@ export default function AdminDashboard() {
                   onDelete={(env) => confirmDeleteEnvironment(env.id, env.environment_name)}
                   onOpenAccess={(env) => openAccessDrawer(env.id, env.environment_name)}
                   onViewTokens={openTokensForEnv}
+                  onActivityLogs={openEnvActivityLogs}
                   onToggle={handleEnvToggle}
                 />
               </div>
@@ -1425,6 +1472,9 @@ export default function AdminDashboard() {
                   Every token this service has issued, and the modules each one may call
                 </div>
               </div>
+              <button className="btn btn-primary" onClick={() => setTokenConnectOpen(true)}>
+                <i className="fa-solid fa-plus" /> Create token
+              </button>
             </div>
             <div className="card">
               <div className="card-body">
@@ -1436,6 +1486,9 @@ export default function AdminDashboard() {
                   onActivityLogs={openTokenActivityLogs}
                   envScope={tokensEnvScope}
                   onClearEnvScope={() => setTokensEnvScope(null)}
+                  // The delete verb is the Deactivate item; the Status switch
+                  // stays on the status write. Same outcome, two decisions.
+                  onDelete={(token) => handleTokenDeactivate(token)}
                 />
               </div>
             </div>
@@ -1498,6 +1551,7 @@ export default function AdminDashboard() {
               refreshKey={activityRefreshKey}
               tokenFilter={activityToken}
               onClearTokenFilter={() => setActivityToken(null)}
+              envScope={activityEnv}
             />
           </div>
         </div>
@@ -1530,6 +1584,14 @@ export default function AdminDashboard() {
         // The Access column is derived from the matrix this popup saves, so the
         // list has to be re-read or the row would keep showing its old badge.
         onSaved={loadTokens}
+      />
+
+      {/* ═══════════ API TOKEN: CREATE ═══════════ */}
+      <TokenConnectModal
+        open={tokenConnectOpen}
+        onClose={() => setTokenConnectOpen(false)}
+        environments={environments}
+        connect={connectToken}
       />
 
       {/* ═══════════ PU: ADD USER MODAL ═══════════ */}

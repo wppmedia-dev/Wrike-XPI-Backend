@@ -13,6 +13,11 @@
    scope that widens when it should be empty: an empty environment list must
    return no tokens, not every token in the table.
 
+   Third, the guards. Every portal token route carries the session check, the
+   password-changed check and exactly one permission gate, and every admin
+   token route carries the admin check. A route added later without its gate is
+   the one mistake nobody notices, because it works for whoever tests it.
+
    Run from the repo root:  node test/portalApiTokens.test.js
 
    The first sections need nothing but Node. The live section needs the
@@ -23,12 +28,16 @@ require("@babel/register")({
 });
 process.on("unhandledRejection", () => {});
 
+const Fastify = require("fastify");
 const models = require("../models");
 const catalogue = require("../src/utils/portalPermissionCatalog");
 const scope = require("../src/utils/portalScope");
 const Tokens = require("../src/controllers/tokens");
 const ActivityLog = require("../src/controllers/activityLog");
 const WrikeCredentials = require("../src/controllers/wrikeCredentials");
+const portalTokens = require("../src/routes/portal/apiTokens");
+const portalActivity = require("../src/routes/portal/activity");
+const adminTokens = require("../src/routes/admin/tokens");
 
 let pass = 0;
 let fail = 0;
@@ -127,11 +136,103 @@ check(
 
 /* ----------------------------------------------------------------- live -- */
 
+/* ---------------------------------------------------------------- guards -- */
+
+/** Registers a route plugin on a throwaway instance and lists what it added:
+    method, url, and how many preHandler guards each route carries. */
+const routesOf = async (plugin, prefix) => {
+  const app = Fastify();
+  const routes = [];
+
+  app.addHook("onRoute", (route) => {
+    // HEAD is Fastify's own companion to GET, not a route anyone writes.
+    if (route.method === "HEAD") return;
+    routes.push({
+      key: `${route.method} ${route.url}`,
+      guards: (route.preHandler || []).length,
+    });
+  });
+
+  app.register(plugin, { prefix });
+  await app.ready();
+  return routes;
+};
+
+/** The guarded routes as "METHOD path" strings, for membership checks. */
+const keysOf = (routes) => routes.map((route) => route.key).sort();
+
+const runRouteChecks = async () => {
+  section("route guards");
+
+  const portal = await routesOf(
+    portalTokens.portalApiTokensRoute,
+    "/api/v1/portal/api-tokens",
+  );
+  const portalKeys = keysOf(portal);
+
+  // Every portal token route: session, password-changed, one permission gate.
+  check(
+    "every portal token route carries three guards",
+    portal.filter((route) => route.guards !== 3).length,
+    0,
+  );
+  check(
+    "the portal token routes are the ones the module promises",
+    portalKeys.join(" | "),
+    [
+      "DELETE /api/v1/portal/api-tokens/:id",
+      // No trailing slash: Fastify strips it, which is exactly why this list is
+      // compared against what the router actually registered rather than
+      // against the paths as written in the source.
+      "GET /api/v1/portal/api-tokens",
+      "GET /api/v1/portal/api-tokens/:id/permissions",
+      "GET /api/v1/portal/api-tokens/catalog",
+      "GET /api/v1/portal/api-tokens/environments",
+      "POST /api/v1/portal/api-tokens/connect",
+      "PUT /api/v1/portal/api-tokens/:id/permissions",
+      "PUT /api/v1/portal/api-tokens/:id/status",
+    ]
+      .sort()
+      .join(" | "),
+  );
+
+  const activity = await routesOf(
+    portalActivity.portalActivityRoute,
+    "/api/v1/portal/activity-logs",
+  );
+  check(
+    "every portal activity route carries three guards",
+    activity.filter((route) => route.guards !== 3).length,
+    0,
+  );
+
+  const admin = await routesOf(
+    adminTokens.adminTokensRoute,
+    "/api/v1/admin/tokens",
+  );
+  const adminKeys = keysOf(admin);
+
+  // Admin routes have one guard (verifyAdminJWT): the console has no module
+  // matrix of its own, so a second gate would be the wrong shape.
+  check(
+    "every admin token route carries its admin check",
+    admin.filter((route) => route.guards !== 1).length,
+    0,
+  );
+  checkTrue(
+    "the admin console can create a token",
+    adminKeys.includes("POST /api/v1/admin/tokens/connect"),
+  );
+  checkTrue(
+    "and delete one, which is the deactivate switch-off",
+    adminKeys.includes("DELETE /api/v1/admin/tokens/:id"),
+  );
+};
+
 const runLiveChecks = async () => {
   section("live database");
 
   await models.sequelize.authenticate();
-
   // The widening bug: no environments must mean no tokens, not all of them.
   const none = await Tokens.ListForEnvironments([]);
   check("an empty scope returns no tokens", none.length, 0);
@@ -242,6 +343,7 @@ const runLiveChecks = async () => {
 
 (async () => {
   try {
+    await runRouteChecks();
     await runLiveChecks();
   } catch (err) {
     if (

@@ -457,15 +457,17 @@ export function TokensTable({
             <RowMenu
               label={`Actions for token ${token.id}`}
               items={[
-                ...(canUpdate
-                  ? [
-                      {
-                        label: "Permissions",
-                        icon: "fa-solid fa-shield-halved",
-                        onSelect: () => onPermissions(token),
-                      },
-                    ]
-                  : []),
+                {
+                  // Shown to anyone who can see this table at all, which means
+                  // read. Whether it can be changed is the popup's business
+                  // (it takes readOnly), because "you may not edit this" and
+                  // "you may not look at this" are different answers, and a
+                  // reader with no way to open the matrix has to guess what a
+                  // token can do. The write is refused server-side regardless.
+                  label: "Permissions",
+                  icon: "fa-solid fa-shield-halved",
+                  onSelect: () => onPermissions(token),
+                },
                 ...(onActivityLogs
                   ? [
                       {

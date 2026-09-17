@@ -24,6 +24,8 @@ export interface EnvironmentsTableProps {
   onOpenAccess: (env: AdminEnvironment) => void;
   /** Opens the API Tokens page scoped to this environment. */
   onViewTokens: (env: AdminEnvironment) => void;
+  /** Opens the Activity Log scoped to this environment. */
+  onActivityLogs: (env: AdminEnvironment) => void;
   onToggle: (
     env: AdminEnvironment,
     field: "is_active" | "is_visible",
@@ -40,6 +42,7 @@ export function EnvironmentsTable({
   onDelete,
   onOpenAccess,
   onViewTokens,
+  onActivityLogs,
   onToggle,
   onAdd,
 }: EnvironmentsTableProps) {
@@ -139,6 +142,13 @@ export function EnvironmentsTable({
                 onSelect: () => onViewTokens(env),
               },
               {
+                // The same question about the past: what has been called on
+                // this environment, with its filter already applied.
+                label: "Activity logs",
+                icon: "fa-solid fa-clock-rotate-left",
+                onSelect: () => onActivityLogs(env),
+              },
+              {
                 label: "Edit",
                 icon: "fa-solid fa-pen-to-square",
                 onSelect: () => onEdit(env),
@@ -159,7 +169,7 @@ export function EnvironmentsTable({
         ),
       },
     ],
-    [onEdit, onDuplicate, onDelete, onOpenAccess, onViewTokens, onToggle],
+    [onEdit, onDuplicate, onDelete, onOpenAccess, onViewTokens, onActivityLogs, onToggle],
   );
 
   const table = useTable({
