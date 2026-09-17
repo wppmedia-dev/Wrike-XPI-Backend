@@ -97,7 +97,9 @@ const FILTER_DEFS: FilterDef[] = [
     param: "token_id",
     label: "Token ID",
     kind: "text",
-    placeholder: "Full or partial id",
+    // The whole id, not a fragment: an identifier is either the one that was
+    // asked for or it is not (src/utils/searchMatch.js).
+    placeholder: "Full token id",
   },
   {
     // The one column that narrows a list where everything else looks alike:
@@ -943,7 +945,7 @@ export function TokensTable({
       caption="Tokens"
       loading={loading}
       className="tok-table"
-      searchPlaceholder="Search by environment, account or user…"
+      searchPlaceholder="Search by name, account, user or id…"
       toolbar={filterControl}
         empty={
           activeFilterCount > 0 ? (
