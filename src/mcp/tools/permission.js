@@ -78,25 +78,6 @@ const MODULE_BY_PREFIX = {
 };
 
 /**
- * The only two tools with no module and no action, because there is nothing
- * for a module to own.
- *
- * datahub_list_fields reads Datahub field definitions for a list of slugs and
- * never touches a record; ids_convert turns a legacy API v2 id into a v4 one
- * and never touches a resource. Neither reads or writes anything a module
- * governs, and both are prerequisites for calls that *are* governed: a task
- * token needs ids_convert to call task_get. Attributing them to a module would
- * pick that module arbitrarily, and a token restricted to tasks would then be
- * unable to resolve a task id.
- *
- * Named here rather than inferred, and asserted by
- * test/mcpToolPermissions.test.js against the names the tool files actually
- * register: being exempt is a decision somebody made, not a default a new tool
- * inherits by having an unfamiliar name.
- */
-export const UNGOVERNED_TOOLS = new Set(["datahub_list_fields", "ids_convert"]);
-
-/**
  * Wrike's own MCP tools, proxied one-to-one as `wrike_*`.
  *
  * Their names come from Wrike at runtime, so they cannot be attributed to one
@@ -140,19 +121,24 @@ const actionForTool = (subject, annotations) => {
 /**
  * The module and action a tool call needs, or null when nothing governs it.
  *
- * Null is returned only for the two helpers in UNGOVERNED_TOOLS above.
- * Everything else is governed, including a tool nobody has classified yet:
- * an unrecognised name falls to the mcp_proxy row rather than to no row at
- * all. That direction matters. This function's answer decides whether the gate
- * runs at all (src/mcp/index.js), so an unmapped name used to mean "allowed for
- * every token, including a token restricted to reading one module", which is
- * the wrong way for an unfamiliar name to behave. Failing closed costs a
- * restricted token one admin grant for a tool nobody has classified; failing
- * open costs the restriction itself.
+ * Null now means only one thing: there is no tool name to resolve. Every tool
+ * the server registers is governed, including the two helpers whose names
+ * carry no verb — datahub_list_fields and ids_convert declare themselves
+ * read-only, so the fallback below reads them as mcp_proxy/read.
  *
- * A new native family should still get a MODULE_BY_PREFIX entry, so the
- * console shows its own row instead of the MCP one. "some_future_tool" in
- * test/tokenPermissions.test.js is the case that pins this down.
+ * They used to be exempt, on the argument that neither touches a record: one
+ * reads Datahub field definitions, the other converts a legacy id. The argument
+ * was fine and the consequence was not. An admin who switched every action off
+ * still had two working tools, which is not what "off" means, and the only way
+ * to notice was to read this file. A helper that a token needs is a grant an
+ * admin makes — one tick on the MCP row, visible in the console — rather than
+ * an exemption nobody can see.
+ *
+ * An unrecognised name still falls to the mcp_proxy row rather than to no row,
+ * so an unfamiliar name is never the same thing as an allowed one. A new native
+ * family should get a MODULE_BY_PREFIX entry, so the console shows its own row
+ * instead of the MCP one; "some_future_tool" in test/tokenPermissions.test.js
+ * pins that down.
  *
  * @param {string} name - registered tool name, e.g. "campaign_update"
  * @param {{readOnlyHint?: boolean, destructiveHint?: boolean}} [annotations]
@@ -171,10 +157,6 @@ export const resolveToolRoute = (name, annotations) => {
     };
   }
 
-  // Exempt by name, before the prefix lookup, so an entry here cannot be
-  // overridden by a prefix rule added later.
-  if (UNGOVERNED_TOOLS.has(toolName)) return null;
-
   const [prefix, ...rest] = toolName.split("_");
   const module = MODULE_BY_PREFIX[prefix];
   if (module) {
@@ -184,8 +166,8 @@ export const resolveToolRoute = (name, annotations) => {
     return { module, action: actionForTool(rest.join("_"), annotations) };
   }
 
-  // Unclassified: the MCP row, with the verb read off the whole name or, if
-  // the name says nothing, off the tool's own annotations.
+  // No module of its own: the MCP row, with the verb read off the whole name
+  // or, if the name says nothing, off the tool's own annotations.
   return {
     module: WRIKE_PROXY_MODULE,
     action: actionForTool(toolName, annotations),

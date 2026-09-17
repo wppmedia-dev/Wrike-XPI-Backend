@@ -363,8 +363,10 @@ console.log("\nMCP tools → module/action");
     ["channel_update", write, "channel/update"],
     ["task_list_campaign", readOnly, "task/read"],
     ["task_delete", destructive, "task/delete"],
-    ["datahub_list_fields", readOnly, "not governed"],
-    ["ids_convert", readOnly, "not governed"],
+    // The two helpers are governed by the MCP row, not exempt from it. Their
+    // names carry no verb, so their own read-only annotation decides.
+    ["datahub_list_fields", readOnly, "mcp_proxy/read"],
+    ["ids_convert", readOnly, "mcp_proxy/read"],
     ["wrike_search_items", readOnly, "mcp_proxy/read"],
     ["wrike_create_task_item", write, "mcp_proxy/create"],
     ["wrike_update_items", write, "mcp_proxy/update"],
