@@ -71,8 +71,13 @@ MECHANICS
  * Denies on a failed lookup as well as on a denied rule: a permission check
  * that cannot be answered must not quietly become a grant, and the REST gate
  * (src/middlewares/tokenPermissions.js) makes the same choice.
+ *
+ * Exported so test/mcpToolPermissions.test.js can drive it directly: this is
+ * the enforcement itself, and a test of the mapping alone would still pass if
+ * the wrapper were never installed (see createMcpServer below) or looked up the
+ * wrong token.
  */
-const installPermissionGate = (server, auth) => {
+export const installPermissionGate = (server, auth) => {
   const registerTool = server.registerTool.bind(server);
 
   server.registerTool = (name, config, handler) =>

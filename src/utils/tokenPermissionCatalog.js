@@ -72,7 +72,7 @@ export const MODULES = [
     key: "mcp_proxy",
     label: "Wrike MCP Tools",
     description:
-      "Wrike's own MCP tools, proxied as wrike_*. These are raw Wrike objects (items, spaces, approvals, comments, users, attachments) rather than XPI modules. Applies to MCP callers only; the REST API never resolves to this row.",
+      "Wrike's own MCP tools, proxied as wrike_*, plus anything else the MCP surface exposes that no XPI module owns. These are raw Wrike objects (items, spaces, approvals, comments, users, attachments) rather than XPI modules. Applies to MCP callers only; the REST API never resolves to this row.",
     actions: ALL,
   },
 ];

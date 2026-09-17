@@ -935,7 +935,7 @@ async ({ taskId }, extra) => {
               ],
               [
                 "<code>mcp_proxy</code>",
-                "MCP only: the <code>wrike_*</code> tools",
+                "MCP only: the <code>wrike_*</code> tools, and any MCP tool no module owns",
                 "read, create, update, delete",
               ],
             ],

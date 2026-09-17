@@ -285,7 +285,13 @@ console.log("\nMCP tools → module/action");
     // from its verb, and defaults to read when the verb says nothing.
     ["wrike_update_items", undefined, "mcp_proxy/update"],
     ["wrike_search_items", undefined, "mcp_proxy/read"],
-    ["some_future_tool", write, "not governed"],
+    // Unclassified names fail CLOSED: to the MCP row, not to no row, because
+    // an unmapped name that skipped the gate would be allowed for a token
+    // restricted to one module's reads. See test/mcpToolPermissions.test.js,
+    // which drives the gate itself rather than this table.
+    ["some_future_tool", write, "mcp_proxy/update"],
+    ["some_future_tool", readOnly, "mcp_proxy/read"],
+    ["some_future_delete_thing", destructive, "mcp_proxy/delete"],
   ];
 
   cases.forEach(([name, annotations, expected]) => {
