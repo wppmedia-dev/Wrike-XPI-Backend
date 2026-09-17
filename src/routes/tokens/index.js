@@ -9,17 +9,12 @@ import { log as logActivity } from "../../utils/activityLog";
 import { captureRequest, buildResponseSnapshot } from "../../utils/capture";
 import { clientIp } from "../../utils/environmentAccess";
 
-const ACTION_BY_METHOD = {
-  GET: "read",
-  HEAD: "read",
-  OPTIONS: "read",
-  POST: "create",
-  PUT: "update",
-  PATCH: "update",
-  DELETE: "delete",
-};
-const actionForMethod = (method) =>
-  ACTION_BY_METHOD[String(method || "").toUpperCase()] || null;
+// The action label comes from the same authority the permission gate reads
+// (src/utils/tokenPermissionMap.js). This surface is ungoverned by the matrix,
+// but the audit log has to agree with the gate about what "update" means, or a
+// row would describe a call differently from the decision made about it. This
+// file used to carry its own copy of the table.
+import { actionForMethod } from "../../utils/tokenPermissionMap";
 
 export const tokenRoute = (fastify, opts, done) => {
   // Token-service calls (OAuth exchange/callback/profile) are logged to the
