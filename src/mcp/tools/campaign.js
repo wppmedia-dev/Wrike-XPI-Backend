@@ -5,6 +5,12 @@ import { CreateCampaign } from "../../routes/campaign/handlers/createCampaign";
 import { UpdateCampaign } from "../../routes/campaign/handlers/updateCampaign";
 import { DeleteCampaign } from "../../routes/campaign/handlers/deleteCampaign";
 import { getAuthError } from "./auth.js";
+import {
+  CONFIRMATION_TOOL_NOTE,
+  confirmField,
+  confirmationRequest,
+  isConfirmed,
+} from "./confirmation.js";
 
 const serializeResult = (result) => {
   if (!result) return { success: true, data: null };
@@ -235,7 +241,8 @@ export const registerCampaignTools = (server, fastify, serverUrl, auth) => {
         "{ campaignbudget: 50000, campaignenddate: '2026-12-31' }. Only keys " +
         "marked isWritable are applied; Datahub-linked custom fields are " +
         "resolved to record ids automatically; dates must be YYYY-MM-DD. " +
-        "Prefer this over wrike_update_items for XPI campaign data.",
+        "Prefer this over wrike_update_items for XPI campaign data." +
+        CONFIRMATION_TOOL_NOTE,
       inputSchema: {
         campaignId: z
           .string()
@@ -249,17 +256,28 @@ export const registerCampaignTools = (server, fastify, serverUrl, auth) => {
           .record(z.any())
           .default({})
           .describe("Key-value map of field names to new values"),
+        confirm: confirmField("update to this campaign"),
       },
       annotations: {
         title: "Update Campaign",
         readOnlyHint: false,
-        destructiveHint: false,
+        destructiveHint: true,
         idempotentHint: true,
         openWorldHint: true,
       },
     },
-    async ({ campaignId, formFields }, extra) => {
+    async ({ campaignId, formFields, confirm }, extra) => {
       if (!auth) return getAuthError(serverUrl);
+      if (!isConfirmed(confirm)) {
+        return confirmationRequest({
+          toolName: "campaign_update",
+          action: "update this campaign",
+          target: `campaign ${campaignId}`,
+          arguments: { campaignId, formFields },
+          warning:
+            "Approving this overwrites the current values of the fields listed above.",
+        });
+      }
       try {
         const result = await UpdateCampaign(
           auth.wrikeToken,
@@ -284,7 +302,10 @@ export const registerCampaignTools = (server, fastify, serverUrl, auth) => {
     "campaign_delete",
 
     {
-      description: "Delete a campaign by its Wrike folder ID.",
+      description:
+        "Delete a campaign by its Wrike folder ID. Deleting a campaign cannot be " +
+        "undone from this server." +
+        CONFIRMATION_TOOL_NOTE,
       inputSchema: {
         campaignId: z
           .string()
@@ -294,6 +315,7 @@ export const registerCampaignTools = (server, fastify, serverUrl, auth) => {
               "(letters/digits, may include - or _). NOT the campaign name. Copy the " +
               "exact id from a list/get result.",
           ),
+        confirm: confirmField("delete of this campaign"),
       },
       annotations: {
         title: "Delete Campaign",
@@ -303,8 +325,18 @@ export const registerCampaignTools = (server, fastify, serverUrl, auth) => {
         openWorldHint: true,
       },
     },
-    async ({ campaignId }, extra) => {
+    async ({ campaignId, confirm }, extra) => {
       if (!auth) return getAuthError(serverUrl);
+      if (!isConfirmed(confirm)) {
+        return confirmationRequest({
+          toolName: "campaign_delete",
+          action: "delete this campaign",
+          target: `campaign ${campaignId}`,
+          arguments: { campaignId },
+          warning:
+            "Deleting is permanent — there is no undo for this operation.",
+        });
+      }
       try {
         const result = await DeleteCampaign(
           auth.wrikeToken,

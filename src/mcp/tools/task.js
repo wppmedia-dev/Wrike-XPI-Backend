@@ -4,6 +4,12 @@ import { GetTask } from "../../routes/task/handlers/getTask";
 import { UpdateTask } from "../../routes/task/handlers/updateTask";
 import { DeleteTask } from "../../routes/task/handlers/deleteTask";
 import { getAuthError } from "./auth.js";
+import {
+  CONFIRMATION_TOOL_NOTE,
+  confirmField,
+  confirmationRequest,
+  isConfirmed,
+} from "./confirmation.js";
 
 const serializeResult = (result) => {
   if (!result) return { success: true, data: null };
@@ -223,7 +229,8 @@ export const registerTaskTools = (server, serverUrl, auth) => {
         "{ taskstatus: 'In Progress' }. Only writable XPI task keys are applied; dates " +
         "must be YYYY-MM-DD; Datahub-linked values are translated automatically.\n\n" +
         "Prefer this over wrike_update_items for XPI task data — wrike_update_items " +
-        "writes raw custom field IDs directly and bypasses XPI field mapping/validation.",
+        "writes raw custom field IDs directly and bypasses XPI field mapping/validation." +
+        CONFIRMATION_TOOL_NOTE,
       inputSchema: {
         taskId: z
           .string()
@@ -237,17 +244,28 @@ export const registerTaskTools = (server, serverUrl, auth) => {
           .record(z.any())
           .default({})
           .describe("Key-value map of field names to new values"),
+        confirm: confirmField("update to this task"),
       },
       annotations: {
         title: "Update Task",
         readOnlyHint: false,
-        destructiveHint: false,
+        destructiveHint: true,
         idempotentHint: true,
         openWorldHint: true,
       },
     },
-    async ({ taskId, formFields }, extra) => {
+    async ({ taskId, formFields, confirm }, extra) => {
       if (!auth) return getAuthError(serverUrl);
+      if (!isConfirmed(confirm)) {
+        return confirmationRequest({
+          toolName: "task_update",
+          action: "update this task",
+          target: `task ${taskId}`,
+          arguments: { taskId, formFields },
+          warning:
+            "Approving this overwrites the current values of the fields listed above.",
+        });
+      }
       try {
         const result = await UpdateTask(
           auth.wrikeToken,
@@ -275,7 +293,8 @@ export const registerTaskTools = (server, serverUrl, auth) => {
       description:
         "Delete an XPI task by its Wrike task ID. This is the ONLY delete operation " +
         "exposed by this server — Wrike's own MCP tools do not provide a delete, so " +
-        "do not look for a wrike_* delete alternative.",
+        "do not look for a wrike_* delete alternative." +
+        CONFIRMATION_TOOL_NOTE,
       inputSchema: {
         taskId: z
           .string()
@@ -285,6 +304,7 @@ export const registerTaskTools = (server, serverUrl, auth) => {
               "(letters/digits, may include - or _). NOT the task title. Copy the exact " +
               "id from a task list/get result.",
           ),
+        confirm: confirmField("delete of this task"),
       },
       annotations: {
         title: "Delete Task",
@@ -294,8 +314,18 @@ export const registerTaskTools = (server, serverUrl, auth) => {
         openWorldHint: true,
       },
     },
-    async ({ taskId }, extra) => {
+    async ({ taskId, confirm }, extra) => {
       if (!auth) return getAuthError(serverUrl);
+      if (!isConfirmed(confirm)) {
+        return confirmationRequest({
+          toolName: "task_delete",
+          action: "delete this task",
+          target: `task ${taskId}`,
+          arguments: { taskId },
+          warning:
+            "Deleting is permanent — there is no undo for this operation.",
+        });
+      }
       try {
         const result = await DeleteTask(
           auth.wrikeToken,

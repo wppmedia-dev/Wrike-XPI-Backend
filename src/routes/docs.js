@@ -374,7 +374,7 @@ module.exports = async function (fastify, opts) {
             <p class="pg-p">The server is created once in <code>src/mcp/index.js</code>, named <code>wrikexpi-mcp</code>, and registers five native tool groups plus — conditionally — a set of proxied Wrike tools:</p>
             ${codeBlock(
               "js",
-              `// src/mcp/index.js:53-90
+              `// src/mcp/index.js:62-99
 export const createMcpServer = async (fastify, serverUrl, auth) => {
   const server = new McpServer({ name: "wrikexpi-mcp", ... });
 
@@ -399,11 +399,36 @@ export const createMcpServer = async (fastify, serverUrl, auth) => {
             ${table(
               ["Step", "What happens", "Source"],
               [
-                ["Connect", "Opens <code>StreamableHTTPClientTransport</code> to <code>process.env.WRIKE_MCP_URL</code>, authenticated with the same Wrike OAuth token already decrypted for REST calls.", "<code>wrikeMcpProxy.js:29-51</code>"],
-                ["Discover", "<code>client.listTools()</code> fetches Wrike's tool catalog. Cached in Redis for 300s.", "<code>wrikeMcpProxy.js:122-148</code>"],
-                ["Register", "Every returned tool is re-registered on our server, renamed <code>wrike_&lt;name&gt;</code>.", "<code>wrikeMcpProxy.js:189-209</code>"],
-                ["Forward", "A call to any <code>wrike_*</code> tool opens a fresh connection and runs <code>client.callTool(...)</code>, relaying the result back.", "<code>wrikeMcpProxy.js:155-176</code>"],
-                ["Fail safe", "Any error is caught and returns <code>[]</code> — native tools are unaffected.", "<code>wrikeMcpProxy.js:140-147</code>"],
+                [
+                  "Connect",
+                  "Opens <code>StreamableHTTPClientTransport</code> to <code>process.env.WRIKE_MCP_URL</code>, authenticated with the same Wrike OAuth token already decrypted for REST calls.",
+                  "<code>wrikeMcpProxy.js:38-60</code>",
+                ],
+                [
+                  "Discover",
+                  "<code>client.listTools()</code> fetches Wrike's tool catalog. Cached in Redis for 300s.",
+                  "<code>wrikeMcpProxy.js:131-157</code>",
+                ],
+                [
+                  "Register",
+                  "Every returned tool is re-registered on our server, renamed <code>wrike_&lt;name&gt;</code>.",
+                  "<code>wrikeMcpProxy.js:204-262</code>",
+                ],
+                [
+                  "Gate",
+                  "A tool that writes (per Wrike's annotations, or its <code>create_*</code>/<code>update_*</code>/<code>delete_*</code> name) refuses the first call and returns a preview until <code>confirm: true</code> arrives. The flag is stripped before forwarding, so Wrike never sees it.",
+                  "<code>wrikeMcpProxy.js:236-251</code>, <code>src/mcp/tools/confirmation.js</code>",
+                ],
+                [
+                  "Forward",
+                  "A call to any <code>wrike_*</code> tool opens a fresh connection and runs <code>client.callTool(...)</code>, relaying the result back.",
+                  "<code>wrikeMcpProxy.js:164-185</code>",
+                ],
+                [
+                  "Fail safe",
+                  "Any error is caught and returns <code>[]</code> — native tools are unaffected.",
+                  "<code>wrikeMcpProxy.js:149-153</code>",
+                ],
               ],
             )}
             ${callout("info", "The address is Wrike's, not ours", "<code>WRIKE_MCP_URL=https://mcp.wrike.com/v2</code> (<code>.env</code>) is Wrike's own published MCP service.")}
@@ -440,7 +465,7 @@ export const createMcpServer = async (fastify, serverUrl, auth) => {
           ${viewSwitch(
             `
             <h3 class="pg-h3">Layer 1 — server-level instructions</h3>
-            <p class="pg-p">One constant, <code>MCP_INSTRUCTIONS</code>, defined in <code>src/mcp/index.js:18-40</code>, passed as the SDK's <code>instructions</code> field at handshake time.</p>
+            <p class="pg-p">One constant, <code>MCP_INSTRUCTIONS</code>, defined in <code>src/mcp/index.js:18-49</code>, passed as the SDK's <code>instructions</code> field at handshake time.</p>
             ${codeBlock(
               "text",
               `HOW TO CHOOSE — avoid conflict
@@ -469,9 +494,18 @@ description:
             ${table(
               ["Safeguard", "How it works"],
               [
-                ["Rename on arrival", "<code>server.registerTool(&quot;wrike_&quot; + tool.name, ...)</code> — every borrowed tool is registered under a distinct prefixed name before the assistant ever sees a tool list."],
-                ["Explicit cross-reference", "Native descriptions name the exact <code>wrike_*</code> tool to compare against, not a vague pointer — the assistant can look it up."],
-                ["Conditional registration", "<code>wrike_*</code> tools only exist when <code>auth?.wrikeToken</code> is set and Wrike's MCP actually returned a tool list — when it's unreachable, there is nothing to conflict with."],
+                [
+                  "Rename on arrival",
+                  "<code>server.registerTool(&quot;wrike_&quot; + tool.name, ...)</code> — every borrowed tool is registered under a distinct prefixed name before the assistant ever sees a tool list.",
+                ],
+                [
+                  "Explicit cross-reference",
+                  "Native descriptions name the exact <code>wrike_*</code> tool to compare against, not a vague pointer — the assistant can look it up.",
+                ],
+                [
+                  "Conditional registration",
+                  "<code>wrike_*</code> tools only exist when <code>auth?.wrikeToken</code> is set and Wrike's MCP actually returned a tool list — when it's unreachable, there is nothing to conflict with.",
+                ],
               ],
             )}
 
@@ -479,13 +513,41 @@ description:
             ${table(
               ["XPI tool", "Wrike counterpart", "Reasoning"],
               [
-                ["<code>datahub_list_fields</code>", "<i>none</i>", "The short-code field dictionary every other XPI tool depends on."],
-                ["<code>campaign_create</code>", "<code>wrike_create_project_folder_item</code>", "Goes through the request-form workflow XPI campaigns require."],
-                ["<code>*_update</code> (campaign/channel/task)", "<code>wrike_update_items</code>", "Applies field validation; the raw tool writes unvalidated custom-field IDs."],
-                ["<code>*_delete</code> (campaign/channel/task)", "<i>none</i>", "\"This is the ONLY delete operation exposed — Wrike's MCP tools do not provide a delete.\""],
-                ["<code>task_get</code> / <code>task_list_*</code>", "<code>wrike_get_item_details</code>, <code>wrike_get_items_children</code>", "Validates XPI task type and translates fields to short codes."],
-                ["<code>ids_convert</code>", "<i>none</i>", "Converts legacy API v2 IDs — pure XPI plumbing."],
-                ["<i>none</i>", "<code>wrike_get_approvals</code>, <code>wrike_*_comment</code>, <code>wrike_get_my_inbox</code>, <code>wrike_search_users</code>, <code>wrike_search_spaces</code>, attachments", "Ground XPI never modeled — comments, approvals, users, spaces."],
+                [
+                  "<code>datahub_list_fields</code>",
+                  "<i>none</i>",
+                  "The short-code field dictionary every other XPI tool depends on.",
+                ],
+                [
+                  "<code>campaign_create</code>",
+                  "<code>wrike_create_project_folder_item</code>",
+                  "Goes through the request-form workflow XPI campaigns require.",
+                ],
+                [
+                  "<code>*_update</code> (campaign/channel/task)",
+                  "<code>wrike_update_items</code>",
+                  "Applies field validation; the raw tool writes unvalidated custom-field IDs.",
+                ],
+                [
+                  "<code>*_delete</code> (campaign/channel/task)",
+                  "<i>none</i>",
+                  '"This is the ONLY delete operation exposed — Wrike\'s MCP tools do not provide a delete."',
+                ],
+                [
+                  "<code>task_get</code> / <code>task_list_*</code>",
+                  "<code>wrike_get_item_details</code>, <code>wrike_get_items_children</code>",
+                  "Validates XPI task type and translates fields to short codes.",
+                ],
+                [
+                  "<code>ids_convert</code>",
+                  "<i>none</i>",
+                  "Converts legacy API v2 IDs — pure XPI plumbing.",
+                ],
+                [
+                  "<i>none</i>",
+                  "<code>wrike_get_approvals</code>, <code>wrike_*_comment</code>, <code>wrike_get_my_inbox</code>, <code>wrike_search_users</code>, <code>wrike_search_spaces</code>, attachments",
+                  "Ground XPI never modeled — comments, approvals, users, spaces.",
+                ],
               ],
             )}
             ${callout("tip", "The pattern", "XPI wins wherever it layers meaning onto a resource (short codes, validation, request-forms). Wrike wins wherever the resource is something XPI never modeled — comments, approvals, users, spaces.")}
@@ -507,11 +569,31 @@ description:
             ${table(
               ["What it's for", "Type", "In plain words"],
               [
-                ["Look up field names", "Our tool", "Gives the assistant the dictionary of field names our campaigns/tasks use."],
-                ["Create / update / delete a campaign, channel, or task", "Our tool", "Applies our validation and friendly names. Deleting has no Wrike equivalent at all."],
-                ["View a task, or list tasks", "Our tool", "Confirms the item is really one of ours and shows friendly field names."],
-                ["Convert an old ID", "Our tool", "Translates outdated links — nothing on Wrike's side does this."],
-                ["Search any Wrike item, approvals, comments, inbox, people, spaces, attachments", "Wrike's tool", "General Wrike actions we never built our own version of."],
+                [
+                  "Look up field names",
+                  "Our tool",
+                  "Gives the assistant the dictionary of field names our campaigns/tasks use.",
+                ],
+                [
+                  "Create / update / delete a campaign, channel, or task",
+                  "Our tool",
+                  "Applies our validation and friendly names. Deleting has no Wrike equivalent at all.",
+                ],
+                [
+                  "View a task, or list tasks",
+                  "Our tool",
+                  "Confirms the item is really one of ours and shows friendly field names.",
+                ],
+                [
+                  "Convert an old ID",
+                  "Our tool",
+                  "Translates outdated links — nothing on Wrike's side does this.",
+                ],
+                [
+                  "Search any Wrike item, approvals, comments, inbox, people, spaces, attachments",
+                  "Wrike's tool",
+                  "General Wrike actions we never built our own version of.",
+                ],
               ],
             )}
 
@@ -530,20 +612,73 @@ description:
         html: `
           <div class="pg-eyebrow">MCP Docs</div>
           <h1 class="pg-title">Where to make a future change</h1>
-          <p class="pg-lede">Four places, ranked lightest-touch to most involved. "Ask for confirmation before deleting something" is used below as the running example.</p>
+          <p class="pg-lede">Five places, ranked lightest-touch to most involved. "Ask for confirmation before deleting something" is used below as the running example.</p>
 
           ${viewSwitch(
             `
             ${table(
               ["#", "Extension point", "Where"],
               [
-                ["1", "Per-tool description text", "<code>src/mcp/tools/*.js</code> — edit the <code>description</code> string inside a <code>server.registerTool(...)</code> call."],
-                ["2", "Server-level instructions", "<code>src/mcp/index.js:18-40</code> — edit <code>MCP_INSTRUCTIONS</code>. Applies to every tool at once."],
-                ["3", "Tool annotations", "<code>annotations: { destructiveHint: true, ... }</code> — advisory metadata some MCP clients render their own warning UI from. Not enforced server-side."],
-                ["4", "Elicitation", "<code>server.elicitInput({ mode: 'form', ... })</code> — a real, enforced confirmation prompt. Not used anywhere in this codebase today; requires the connecting client to support it."],
+                [
+                  "1",
+                  "Per-tool description text",
+                  "<code>src/mcp/tools/*.js</code> — edit the <code>description</code> string inside a <code>server.registerTool(...)</code> call.",
+                ],
+                [
+                  "2",
+                  "Server-level instructions",
+                  "<code>src/mcp/index.js:18-49</code> — edit <code>MCP_INSTRUCTIONS</code>. Applies to every tool at once.",
+                ],
+                [
+                  "3",
+                  "Tool annotations",
+                  "<code>annotations: { destructiveHint: true, ... }</code> — advisory metadata some MCP clients render their own warning UI from. A request to the client, not something this server can enforce.",
+                ],
+                [
+                  "4",
+                  "Two-step confirm gate <em>(in place today)</em>",
+                  "<code>src/mcp/tools/confirmation.js</code> — a <code>confirm</code> field plus an <code>isConfirmed()</code> guard at the top of the handler. A call without <code>confirm: true</code> writes nothing and returns a preview of the change instead. Enforced by this server, so it needs no client support.",
+                ],
+                [
+                  "5",
+                  "Elicitation",
+                  "<code>server.elicitInput({ mode: 'form', ... })</code> — a real confirmation prompt the <em>client</em> renders. Not used anywhere in this codebase today; requires the connecting client to support it.",
+                ],
               ],
             )}
-            <h3 class="pg-h3">Worked example — confirm before <code>task_delete</code></h3>
+            <h3 class="pg-h3">Where the gate lives</h3>
+            <p class="pg-p">Option 4 is already wired into all five native tool files and the Wrike proxy, so a new write tool only needs three lines to join it:</p>
+            ${codeBlock(
+              "js",
+              `// src/mcp/tools/*.js — the shape every update/delete tool already follows
+inputSchema: {
+  taskId: z.string().describe("..."),
+  confirm: confirmField("update to this task"),   // NEW — user approval
+},
+annotations: { destructiveHint: true, ... },
+
+async ({ taskId, confirm }, extra) => {
+  if (!auth) return getAuthError(serverUrl);
+
+  // NEW — no write until the user has seen this and approved it
+  if (!isConfirmed(confirm)) {
+    return confirmationRequest({
+      toolName: "task_update",
+      action: "update this task",
+      target: \`task \${taskId}\`,
+      arguments: { taskId, formFields },
+    });
+  }
+
+  // unchanged from here down
+  const result = await UpdateTask(auth.wrikeToken, { taskId }, auth.environmentName);
+  ...`,
+              "src/mcp/tools/confirmation.js",
+            )}
+            ${callout("warn", "Why a flag and not a prompt", "The gate cannot be skipped by the model: without <code>confirm: true</code> the write path is never reached, and <code>isConfirmed</code> accepts only a strict boolean <code>true</code>. Repeating the call without the flag just returns the same preview, so there is no way to hammer through it.")}
+
+            <h3 class="pg-h3">Worked example — an elicitation prompt for <code>task_delete</code></h3>
+            <p class="pg-p"><code>task_delete</code> is already gated by option 4, so an unconfirmed delete cannot happen today. This example is for layering the client's own rendered prompt on top of that guarantee.</p>
             ${codeBlock(
               "js",
               `// src/mcp/tools/task.js — inside task_delete's handler
@@ -572,16 +707,32 @@ async ({ taskId }, extra) => {
   ...`,
               "src/mcp/tools/task.js",
             )}
-            ${callout("warn", "Caveat", "Elicitation is a capability the connecting client must declare support for — this server cannot force it. Pair it with the destructiveHint annotation (already set) as a fallback.")}
+            ${callout("warn", "Caveat", "Elicitation is a capability the connecting client must declare support for — this server cannot force it. Pair it with the gate in option 4, which holds regardless of what the client supports.")}
 
             <h3 class="pg-h3">Other asks, mapped to an extension point</h3>
             ${table(
               ["Ask", "Extension point", "Where"],
               [
-                ["Cap deletes per session", "Handler code", "Add a counter check inside the handler, like <code>ids_convert</code>'s existing <code>MAX_IDS_PER_CALL</code> cap (<code>ids.js:16</code>)."],
-                ["Hide specific <code>wrike_*</code> tools", "<code>wrikeMcpProxy.js:189-209</code>", "Add a name-based filter on <code>tools</code> before the <code>.forEach</code> loop in <code>registerWrikeProxyTools</code>."],
-                ["Log every individual tool call", "<code>src/plugins/mcp.js</code>", "Currently one activity-log row per HTTP request (<code>recordActivity</code>, lines 82-105), not per tool call — needs a hook inside each handler or around <code>registerTool</code>."],
-                ["Extra approval on high-value fields (e.g. budget)", "① + ④ combined", "Describe the rule in <code>campaign_update</code>'s description, then gate an <code>elicitInput</code> call on whether <code>formFields.campaignbudget</code> is present."],
+                [
+                  "Cap deletes per session",
+                  "Handler code",
+                  "Add a counter check inside the handler, like <code>ids_convert</code>'s existing <code>MAX_IDS_PER_CALL</code> cap (<code>ids.js:16</code>).",
+                ],
+                [
+                  "Hide specific <code>wrike_*</code> tools",
+                  "<code>wrikeMcpProxy.js:204-262</code>",
+                  "Add a name-based filter on <code>tools</code> before the <code>.forEach</code> loop in <code>registerWrikeProxyTools</code>.",
+                ],
+                [
+                  "Log every individual tool call",
+                  "<code>src/plugins/mcp.js</code>",
+                  "Currently one activity-log row per HTTP request (<code>recordActivity</code>, lines 82-105), not per tool call — needs a hook inside each handler or around <code>registerTool</code>.",
+                ],
+                [
+                  "Extra approval on high-value fields (e.g. budget)",
+                  "① + ⑤ combined",
+                  "Describe the rule in <code>campaign_update</code>'s description, then gate an <code>elicitInput</code> call on whether <code>formFields.campaignbudget</code> is present.",
+                ],
               ],
             )}
             `,
@@ -590,24 +741,44 @@ async ({ taskId }, extra) => {
               <div class="flow-step"><span class="flow-n">1</span><strong>Smallest change</strong><p>Add a sentence to one tool's note — e.g. "double-check the name before deleting." Affects only that action.</p></div>
               <div class="flow-step"><span class="flow-n">2</span><strong>Small change</strong><p>Add a rule to the general rulebook — e.g. "always confirm before deleting anything." Applies everywhere.</p></div>
               <div class="flow-step"><span class="flow-n">3</span><strong>Small change</strong><p>Every delete already carries a "this is risky" flag. Some assistants show their own warning automatically from it.</p></div>
-              <div class="flow-step"><span class="flow-n">4</span><strong>A real, built-in step</strong><p>Genuinely pauses the action and asks the assistant to show a real "are you sure?" prompt — not just a note. Detailed below.</p></div>
+              <div class="flow-step"><span class="flow-n">4</span><strong>Built in and already running</strong><p>Nothing changes on the first attempt. Instead the assistant gets back a summary of what it was about to do, and has to put that to the person and wait for a yes before anything happens. This is how updates and deletes behave today.</p></div>
+              <div class="flow-step"><span class="flow-n">5</span><strong>A prompt drawn by the assistant</strong><p>Pauses the action and asks the assistant to show a real "are you sure?" box — not just a note. Detailed below.</p></div>
             </div>
 
-            <h3 class="pg-h3">How option 4 actually works</h3>
+            <h3 class="pg-h3">Already in place — the two-step step</h3>
+            <p class="pg-p">Every update and delete, including the Wrike tools borrowed from Wrike itself, refuses to run on the first ask. It replies with a plain summary of the intended change and the exact details instead, and the assistant has to show that to the person and get a yes. Only then does the same instruction, sent a second time, actually go through.</p>
+            <p class="pg-p"><b>Why this one holds:</b> the write simply isn't reachable without the second, approved step — so this doesn't depend on the assistant choosing to behave well, and it doesn't depend on the assistant being able to draw a prompt box. Asking again without the approval just produces the same summary again.</p>
+
+            <h3 class="pg-h3">How option 5 works</h3>
             <p class="pg-p">This app's underlying system supports pausing a delete action and asking the connected assistant to show the person a real confirmation prompt before continuing.</p>
             <p class="pg-p"><b>Lightest version (already true today):</b> delete actions already carry a sensitive-action flag. Any assistant that respects it already shows its own confirmation — no work needed, though it's a request, not a guarantee.</p>
-            <p class="pg-p"><b>Fully enforced version:</b> before anything is deleted, the assistant is made to show the person a real yes/no prompt naming exactly what will be deleted. Only "yes" continues; anything else cancels and nothing happens.</p>
-            ${callout("warn", "One honest limit", "The fully-enforced version only works if the connecting assistant knows how to display that kind of prompt. Most modern assistants do, but it isn't guaranteed for every one — which is why pairing it with the lighter “flag” approach is worth doing too.")}
+            <p class="pg-p"><b>Client-drawn version (option 5):</b> before anything is deleted, the assistant is made to show the person a real yes/no prompt naming exactly what will be deleted. Only "yes" continues; anything else cancels and nothing happens.</p>
+            ${callout("warn", "One honest limit", "The option 5 version only works if the connecting assistant knows how to display that kind of prompt. Most modern assistants do, but it isn't guaranteed for every one — which is why option 4, which is already running, is what actually guarantees the pause.")}
 
             <h3 class="pg-h3">Other future requests, and roughly where they'd land</h3>
             ${table(
               ["Request", "Roughly where it would be made"],
               [
-                ["Limit how many things can be deleted at once", "Inside the specific delete action itself — a counter check, similar to how one existing tool already caps a bulk operation."],
-                ["Add a brand-new capability", "A new tool is written, wired into the same toolkit our existing tools already belong to, then given its own plain-language note the same way the others have."],
-                ["Hide certain Wrike tools from the assistant", "The place where Wrike's toolkit is borrowed and merged in — a short filter can leave specific ones out."],
-                ["Keep a record of every individual action taken", "Currently, one record is kept per connection, not per individual action — a more detailed log would need a small addition inside each action."],
-                ["Require extra approval for sensitive changes (e.g. budget)", "Combine options 1 and 4 — a note explaining the rule, plus a real pause-and-confirm step triggered only when a budget field is involved."],
+                [
+                  "Limit how many things can be deleted at once",
+                  "Inside the specific delete action itself — a counter check, similar to how one existing tool already caps a bulk operation.",
+                ],
+                [
+                  "Add a brand-new capability",
+                  "A new tool is written, wired into the same toolkit our existing tools already belong to, then given its own plain-language note the same way the others have.",
+                ],
+                [
+                  "Hide certain Wrike tools from the assistant",
+                  "The place where Wrike's toolkit is borrowed and merged in — a short filter can leave specific ones out.",
+                ],
+                [
+                  "Keep a record of every individual action taken",
+                  "Currently, one record is kept per connection, not per individual action — a more detailed log would need a small addition inside each action.",
+                ],
+                [
+                  "Require extra approval for sensitive changes (e.g. budget)",
+                  "Combine options 1 and 5 — a note explaining the rule, plus a real pause-and-confirm step triggered only when a budget field is involved.",
+                ],
               ],
             )}
             `,
