@@ -370,7 +370,14 @@
 .tok-filter-sheet .tok-filter-popup-foot {
   padding-bottom: calc(11px + env(safe-area-inset-bottom));
 }
-
+/* Slightly tighter cells than the shared default: this is the widest table in
+   the console, and two pixels a side across eight columns is most of a
+   column's width back. */
+#page-tokens .dt2-table thead th,
+#page-tokens .dt2-table tbody td {
+  padding-left: 12px;
+  padding-right: 12px;
+}
 /* Nothing in this table is prose (environment names, account ids, emails,
    UUIDs, timestamps), so nothing wraps. On a narrow viewport the table
    scrolls sideways (DataTable's own .dt2-scroll) instead of breaking a UUID

@@ -260,6 +260,9 @@ const toAdminShape = (token) => ({
   environment_name: token?.environment?.environment_name || null,
   environment_visible: token?.environment?.is_visible ?? null,
   is_active: token.is_active,
+  // When the token the caller holds stops being accepted. Null on rows that
+  // predate the column and on any row whose mint was never recorded.
+  token_expires_at: token.token_expires_at || null,
   created_at: token.created_at,
   updated_at: token.updated_at,
   creator_email: token?.creator?.email || null,
@@ -272,6 +275,7 @@ const ADMIN_ATTRIBUTES = [
   "username",
   "env_id",
   "is_active",
+  "token_expires_at",
   "created_at",
   "updated_at",
 ];

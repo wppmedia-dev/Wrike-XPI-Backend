@@ -4,8 +4,9 @@ import { getCachedVisibleWrikeCredentials } from "../../utils/wrikeCredentials";
 import { WrikeTokenExchange } from "../tokens/handlers/wrikeTokenExchange";
 import { ResolveAuthFromJWT } from "../../middlewares/authentication";
 import { clientIp } from "../../utils/environmentAccess";
+import { TOKEN_TTL_SECONDS } from "../../utils/tokenTtl";
 
-const ACCESS_TOKEN_TTL_SECONDS = 180 * 24 * 60 * 60; // matches the 180d JWE minted by WrikeTokenExchange
+const ACCESS_TOKEN_TTL_SECONDS = TOKEN_TTL_SECONDS; // the JWE lifetime, one authority (src/utils/tokenTtl.js)
 const AUTH_CODE_TTL = "60s";
 
 const isLoopback = (urlString) => {
@@ -50,7 +51,10 @@ const renderEnvironmentPicker = ({ visibleCreds, query }) => {
     .join("\n");
 
   const options = Object.entries(visibleCreds || {})
-    .map(([envName, envData]) => `<option value="${envData.id}">${envName}</option>`)
+    .map(
+      ([envName, envData]) =>
+        `<option value="${envData.id}">${envName}</option>`,
+    )
     .join("");
 
   return `
@@ -167,28 +171,32 @@ export const oauthRoute = (fastify, opts, done) => {
       } = req.query;
 
       if (!redirect_uri) {
-        return reply
-          .code(400)
-          .send({ error: "invalid_request", error_description: "redirect_uri is required" });
+        return reply.code(400).send({
+          error: "invalid_request",
+          error_description: "redirect_uri is required",
+        });
       }
       if (response_type && response_type !== "code") {
-        return reply
-          .code(400)
-          .send({ error: "unsupported_response_type" });
+        return reply.code(400).send({ error: "unsupported_response_type" });
       }
       if (!code_challenge || code_challenge_method !== "S256") {
         return reply.code(400).send({
           error: "invalid_request",
-          error_description: "PKCE (code_challenge + code_challenge_method=S256) is required",
+          error_description:
+            "PKCE (code_challenge + code_challenge_method=S256) is required",
         });
       }
 
-      const allowedRedirects = resolveRegisteredRedirectUris(fastify, client_id);
+      const allowedRedirects = resolveRegisteredRedirectUris(
+        fastify,
+        client_id,
+      );
       if (allowedRedirects) {
         if (!allowedRedirects.includes(redirect_uri)) {
           return reply.code(400).send({
             error: "invalid_request",
-            error_description: "redirect_uri is not registered for this client_id",
+            error_description:
+              "redirect_uri is not registered for this client_id",
           });
         }
       } else if (!isLoopback(redirect_uri)) {
@@ -263,10 +271,15 @@ export const oauthRoute = (fastify, opts, done) => {
           });
         }
 
-        if (redirect_uri && decoded.redirect_uri && redirect_uri !== decoded.redirect_uri) {
+        if (
+          redirect_uri &&
+          decoded.redirect_uri &&
+          redirect_uri !== decoded.redirect_uri
+        ) {
           return reply.code(400).send({
             error: "invalid_grant",
-            error_description: "redirect_uri does not match the one used at /authorize",
+            error_description:
+              "redirect_uri does not match the one used at /authorize",
           });
         }
 
@@ -328,7 +341,8 @@ export const oauthRoute = (fastify, opts, done) => {
         // not a malformed/expired grant.
         return reply.code(403).send({
           error: "access_denied",
-          error_description: err?.message || "Access denied for this environment",
+          error_description:
+            err?.message || "Access denied for this environment",
         });
       }
       return reply.code(400).send({
@@ -344,7 +358,8 @@ export const oauthRoute = (fastify, opts, done) => {
     if (!Array.isArray(redirect_uris) || redirect_uris.length === 0) {
       return reply.code(400).send({
         error: "invalid_client_metadata",
-        error_description: "redirect_uris is required and must be a non-empty array",
+        error_description:
+          "redirect_uris is required and must be a non-empty array",
       });
     }
 

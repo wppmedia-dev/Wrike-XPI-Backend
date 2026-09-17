@@ -35,6 +35,12 @@ export interface AdminToken {
   environment_name: string | null;
   environment_visible: boolean | null;
   is_active: boolean;
+  /**
+   * When the token the caller holds stops being accepted. The JWE carries its
+   * own expiry, and this is that value recorded server-side at mint time (see
+   * src/utils/tokenTtl.js). Null only for rows whose mint was never recorded.
+   */
+  token_expires_at: string | null;
   created_at: string | null;
   updated_at: string | null;
   creator_email: string | null;
