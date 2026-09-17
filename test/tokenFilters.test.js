@@ -151,7 +151,6 @@ check(
 
 section("Substring filters");
 
-check("token id, partially", shortIds({ token_id: "aaaa" }).join(","), "aaaa");
 check("case-insensitively", shortIds({ client: "claude" }).join(","), "aaaa");
 check("account id", shortIds({ account_id: "IEAC999" }).join(","), "aaaa");
 check("a creator by email", shortIds({ creator: "sam@" }).join(","), "aaaa");
@@ -161,6 +160,37 @@ check(
   "1111",
 );
 check("no match is an empty list", shortIds({ client: "nope" }).length, 0);
+
+/* ── Identifiers ───────────────────────────────────────────────────────── */
+
+section("A token id is named whole");
+
+// Ids compare by equality, not by substring (src/utils/searchMatch.js). The
+// distinction is the difference between "find this token" and "find every
+// token whose id happens to contain these characters", and the second one is
+// what makes a search for "1" return the whole table.
+const FULL_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+check(
+  "in full, it finds that token",
+  shortIds({ token_id: FULL_ID }).join(","),
+  "aaaa",
+);
+check(
+  "whatever case it was pasted in",
+  shortIds({ token_id: FULL_ID.toUpperCase() }).join(","),
+  "aaaa",
+);
+check(
+  "with the space a pasted id brings",
+  shortIds({ token_id: `  ${FULL_ID}  ` }).join(","),
+  "aaaa",
+);
+check("a fragment of it does not", shortIds({ token_id: "aaaa" }).length, 0);
+check(
+  "nor a fragment from the middle",
+  shortIds({ token_id: "4aaa" }).length,
+  0,
+);
 
 /* ── The environment picker ────────────────────────────────────────────── */
 
@@ -270,6 +300,29 @@ check(
 );
 check("over the creator", shortIds({ search: "sam@" }).join(","), "aaaa");
 check("with no match, nothing", shortIds({ search: "zzz" }).length, 0);
+
+// The search box reads a full id as the id it is: the row it names, and only
+// that row. `id` and `env_id` are the two identifiers it compares whole.
+check(
+  "a whole token id names that token",
+  shortIds({ search: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }).join(","),
+  "aaaa",
+);
+check(
+  "a whole environment id names the tokens in it",
+  shortIds({ search: "22222222-2222-4222-8222-222222222222" }).join(","),
+  "1111",
+);
+check(
+  "and a fragment of one is not a search for it",
+  shortIds({ search: "aaaaaaaa" }).length,
+  0,
+);
+check(
+  "while the account number stays a substring, so part of one still finds the row",
+  shortIds({ search: "ieac" }).join(","),
+  "1111,aaaa",
+);
 
 /* ── Combinations, and the picker's options ───────────────────────────── */
 

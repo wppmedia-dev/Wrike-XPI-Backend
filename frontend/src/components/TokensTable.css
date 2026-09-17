@@ -393,9 +393,10 @@
   gap: 3px;
 }
 
-/* Environment name and, beside it, what the token was issued to. A person can
-   hold several tokens in one environment, so this is what stops two rows named
-   PROD from reading as duplicates. */
+/* The name line of a stacked cell: the environment name in the Environment
+   column, or the client pill in the Token column. A person can hold several
+   tokens in one environment, so the pill is what stops two rows in the same
+   environment from reading as duplicates. */
 .tok-table .tok-name-row {
   display: flex;
   align-items: center;
@@ -427,8 +428,48 @@
   height: 22px;
 }
 
-/* The token UUID under the environment name. Monospace and quiet, like the
-   env table's env-id-code. */
+/* The Wrike account the token acts in, on the line under its id.
+
+   A chip rather than plain text, and a different KIND of chip from the client
+   pill beside it: that one is a word (sans-serif, solid outline, filled), this
+   one is a reference (monospace, dashed outline, hollow). Same size, same
+   weight, different grammar, so a row reads as "who this is for" and "which
+   account it acts in" without either competing with the two ids above them. */
+.tok-table .tok-account {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  /* Dashed, and left hollow: an identifier a reader may want, not an action
+     they can take. */
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  padding: 1px 6px;
+  max-width: 180px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.tok-table .tok-account-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.tok-table .tok-account-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--text-secondary);
+  /* min-width: 0 or the ellipsis below never fires inside a flex row. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The identifying UUID under a cell's name line: the token id in the Token
+   column, the environment id in the Environment column. Monospace and quiet,
+   like the env table's env-id-code. */
 .tok-table .tok-id-code {
   font-size: 11px;
   color: var(--text-muted);

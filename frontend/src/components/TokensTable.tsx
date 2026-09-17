@@ -327,44 +327,72 @@ export function TokensTable({
   const columns = useMemo<ColumnDef<AdminToken>[]>(
     () => [
       {
-        id: "token",
-        header: "Token",
-        // The client name rides along so the toolbar search finds a token by
-        // what is using it, not only by its environment.
-        accessor: (token) =>
-          [token.environment_name, token.client_name].filter(Boolean).join(" "),
-        // Environment name, what the token was issued to, and the token's own
-        // id in one cell, the way the Environments table shows an environment:
-        // the id is what identifies the row for support (and what its
-        // permissions are keyed on), so it stays visible and copyable without
-        // costing a 36-character column. The client name matters here now that
-        // a person can hold several tokens in one environment: without it, two
-        // rows named PROD look identical.
+        id: "env",
+        header: "Environment",
+        // Sorted by the name a reader sees, not by the uuid under it.
+        accessor: (token) => token.environment_name,
+        // The environment, the way the Environments table shows one: the name
+        // it is called by, and the id it is identified by for support and for
+        // the API. Two columns rather than one because a token is not "in" its
+        // environment in the way a name suggests — the environment is a
+        // separate thing that this token acts for, several tokens can act for
+        // the same one, and a token can act for none at all.
         cell: (token) => (
           <div className="tok-name-cell">
             <div className="tok-name-row">
               <strong>
                 {token.environment_name || <span className="text-muted">{EMPTY}</span>}
               </strong>
-              {token.client_name && (
-                <span className="tok-client" title="Issued to">
-                  {token.client_name}
-                </span>
-              )}
             </div>
-            <div className="action-cell tok-id-row">
-              <code className="tok-id-code">{token.id}</code>
-              <CopyButton value={token.id} title="Copy token ID" />
-            </div>
+            {token.env_id && (
+              <div className="action-cell tok-id-row">
+                <code className="tok-id-code">{token.env_id}</code>
+                <CopyButton value={token.env_id} title="Copy environment ID" />
+              </div>
+            )}
           </div>
         ),
       },
       {
-        id: "account_id",
-        header: "Account ID",
-        accessor: (token) => token.account_id,
-        cell: (token) =>
-          token.account_id ? token.account_id : <span className="text-muted">{EMPTY}</span>,
+        id: "token",
+        header: "Token",
+        // Sorted by what the token was issued to rather than by its own id: a
+        // uuid has no order worth reading, and "group the Claude tokens
+        // together" is the question this column gets asked.
+        accessor: (token) => token.client_name,
+        // The token's own identity: the id its permissions are keyed on, and
+        // what a caller quotes in a support ticket. Under it, what the token
+        // was issued to and which Wrike account it acts in. Both ride along
+        // here rather than taking columns of their own because a person can
+        // hold several tokens in one environment and two of them can differ in
+        // nothing else, so this is what tells the rows apart.
+        cell: (token) => (
+          <div className="tok-name-cell">
+            <div className="action-cell tok-id-row">
+              <code className="tok-id-code">{token.id}</code>
+              <CopyButton value={token.id} title="Copy token ID" />
+            </div>
+            {(token.client_name || token.account_id) && (
+              <div className="tok-name-row">
+                {token.client_name && (
+                  <span className="tok-client" title="Issued to">
+                    {token.client_name}
+                  </span>
+                )}
+                {token.account_id && (
+                  // Labelled rather than shown bare: with no column header of
+                  // its own, a bare number beside a client name does not say
+                  // what it is. Styled as a reference chip (see TokensTable.css)
+                  // so it reads as separate from the two names above it.
+                  <span className="tok-account" title="Wrike account">
+                    <span className="tok-account-label">Acct</span>
+                    <span className="tok-account-code">{token.account_id}</span>
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        ),
       },
       {
         id: "creator",
@@ -495,6 +523,19 @@ export function TokensTable({
                 icon: "fa-regular fa-copy",
                 onSelect: () => {
                   navigator.clipboard?.writeText(token.id).catch(() => {});
+                },
+              },
+              {
+                // The account number is in the Token column, small and under
+                // the token's own id, so this is how a caller copies the value
+                // the Account filter above expects rather than selecting 11px
+                // text out of a dense cell.
+                label: "Copy account ID",
+                icon: "fa-regular fa-copy",
+                onSelect: () => {
+                  if (token.account_id) {
+                    navigator.clipboard?.writeText(token.account_id).catch(() => {});
+                  }
                 },
               },
               {

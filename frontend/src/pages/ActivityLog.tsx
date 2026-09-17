@@ -12,6 +12,7 @@ import type { AdminEnvironment } from "../lib/adminApi";
 import { toast } from "../lib/notify";
 import AdminSelect from "../components/AdminSelect";
 import { CopyButton } from "../components/ui/CopyButton";
+import { callerNote } from "../lib/activityCaller";
 import "./ActivityLog.css";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
@@ -464,7 +465,10 @@ export default function ActivityLog({
                     <td className="al-time">{formatTime(row.created_at)}</td>
                     <td className="al-caller">
                       {row.actor_email || (
-                        <span className="al-unresolved">
+                        <span
+                          className="al-unresolved"
+                          title={callerNote(row)}
+                        >
                           <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" />
                           Unresolved
                         </span>
@@ -613,7 +617,10 @@ export default function ActivityLog({
                   <dt>Caller</dt>
                   <dd>
                     {detailRow.actor_email || (
-                      <span className="al-muted">Unresolved</span>
+                      <>
+                        <span className="al-muted">Unresolved</span>
+                        <div className="al-detail-note">{callerNote(detailRow)}</div>
+                      </>
                     )}
                   </dd>
                 </div>

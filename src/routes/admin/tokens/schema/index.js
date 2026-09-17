@@ -20,9 +20,10 @@ export const IdParamSchema = {
  * nothing at all. A value that is neither blank nor a member of its enum is
  * still refused, so a typo is loud rather than silently ignored.
  *
- * `token_id` is a string and not a uuid because the filter is a substring: the
- * console lets an admin paste the first few characters of an id. `env_id` is a
- * uuid, and the nil UUID is meaningful in it (see NO_ENVIRONMENT in
+ * `token_id` is a string and not a uuid because the same field also accepts
+ * something that is not an id at all: an id in it is matched whole, but the
+ * value itself is not required to be one (src/utils/searchMatch.js). `env_id`
+ * is a uuid, and the nil UUID is meaningful in it (see NO_ENVIRONMENT in
  * src/utils/tokenFilters.js).
  */
 export const TOKEN_FILTER_QUERY = {

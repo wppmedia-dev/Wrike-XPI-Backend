@@ -16,6 +16,26 @@ import { clientIp } from "../../utils/environmentAccess";
 // file used to carry its own copy of the table.
 import { actionForMethod } from "../../utils/tokenPermissionMap";
 
+/**
+ * Record who this request turned out to belong to, for the activity log.
+ *
+ * Wrike's contact response is the only place the token surface can learn a
+ * person's email, and both routes that can learn it already ask for it: the
+ * exchange reads the signed-in person before deciding whether they may have a
+ * token at all, and /view-tokens has to know the account it is listing tokens
+ * for. Without this the log row for either said "Unresolved" about a request
+ * whose caller had just been established.
+ *
+ * `req.callerEmail` is the same field the private router sets
+ * (src/middlewares/authentication.js), so both surfaces feed one column.
+ * Lower-cased to match: the console's filter compares case-insensitively, and
+ * one spelling in the column is easier to explain than two.
+ */
+const setCallerFromWrikeUser = (req, wrikeUserResponse) => {
+  const email = wrikeUserResponse?.data?.[0]?.primaryEmail;
+  req.callerEmail = email ? String(email).trim().toLowerCase() : null;
+};
+
 export const tokenRoute = (fastify, opts, done) => {
   // Token-service calls (OAuth exchange/callback/profile) are logged to the
   // audit log too, category "token", so token traffic is visible beside
@@ -53,7 +73,14 @@ export const tokenRoute = (fastify, opts, done) => {
       // token row is being created by the request being logged.
       tokenId: req.tokenId || null,
       surface: "rest",
-      actorEmail: null,
+      // Set by a handler that resolved the Wrike user behind this request, which
+      // the exchange and /view-tokens both do on their way to doing their job:
+      // the first reads the signed-in person's email before it decides whether
+      // they may have a token at all, and the second has to know the account it
+      // is listing tokens for. A row here with no caller is therefore one whose
+      // request was never identified: a token that failed validation, or a
+      // lookup Wrike refused.
+      actorEmail: req.callerEmail || null,
       action: actionForMethod(req.method),
       resource,
       method: req.method,
@@ -77,6 +104,11 @@ export const tokenRoute = (fastify, opts, done) => {
       const wrikeToken = await ValidateJWT(token);
 
       const result = await GetUserData(wrikeToken, fastify);
+
+      // The token was validated and Wrike was asked who it belongs to, so the
+      // caller is known here even though nothing authenticated them to us: the
+      // activity log records that person rather than "Unresolved".
+      setCallerFromWrikeUser(req, result);
 
       return reply.code(200).send({
         success: true,
@@ -103,6 +135,7 @@ export const tokenRoute = (fastify, opts, done) => {
           clientName: "Login page",
         },
         fastify,
+        req,
       );
 
       if (!result)
@@ -181,6 +214,7 @@ export const tokenRoute = (fastify, opts, done) => {
           clientName: String(decodedData?.client_name || "Login page"),
         },
         fastify,
+        req,
       );
 
       if (!result) {

@@ -442,6 +442,15 @@
   color: var(--text-muted);
 }
 
+/* Mirrors .al-detail-note in the console's log: why this row has no caller. */
+.pal-detail-note {
+  margin-top: 3px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-muted);
+  max-width: 46ch;
+}
+
 /* Table caption, kept in the accessibility tree but out of the layout. */
 .pal-sr-only {
   position: absolute;

@@ -206,8 +206,30 @@ export default function AdminDashboard() {
   const [activityRefreshKey, setActivityRefreshKey] = useState(0);
 
   /* ── Environments ─────────────────────────────────────────────────── */
+  /* Two lists, deliberately.
+   *
+   * `environments` is the CATALOGUE: every environment, unfiltered. The nav
+   * badge, the dashboard stats, the API access drawer and the
+   * assign-environments picker all read it, and none of them may shrink to a
+   * search somebody typed into the table's search box.
+   *
+   * `envRows` is what the Environments TABLE shows: the same list, or the
+   * server's answer to the active search. The search is a query parameter
+   * rather than a filter applied in the browser (src/utils/
+   * environmentFilters.js), so the table renders what came back instead of
+   * deciding for itself which of those rows match.
+   */
   const [environments, setEnvironments] = useState<AdminEnvironment[]>([]);
+  const [envRows, setEnvRows] = useState<AdminEnvironment[]>([]);
   const [envLoaded, setEnvLoaded] = useState(false);
+  // The term the table is showing. A ref rather than state because the table
+  // owns the visible term (it is its own input) and nothing renders off this
+  // one; it exists so that a refresh triggered by a write re-asks the same
+  // question instead of silently widening the table back to everything.
+  const envSearchRef = useRef("");
+  // Guards against an earlier search landing after a later one: the box has
+  // moved on, so the older answer is not an answer any more.
+  const envRequestRef = useRef(0);
 
   // API access scope drawer — opened from an environment row's shield
   // button, scoped to that one environment (see EnvironmentAccess.tsx).
@@ -221,11 +243,31 @@ export default function AdminDashboard() {
     setAccessDrawerOpen(true);
   }
 
-  const loadEnvironments = async () => {
+  /**
+   * Load the environments, optionally as the answer to a search.
+   *
+   * Called with no argument by every write (an edit, a duplicate, a delete, a
+   * switch flip), and then it re-asks whatever the table is currently showing
+   * so a refresh cannot quietly widen the table while the box still displays a
+   * term. While a search is active that is two questions — the table's rows
+   * and the whole catalogue — because the catalogue is what the rest of the
+   * page reads and it must not be left stale by the write that got us here.
+   */
+  const loadEnvironments = async (term = envSearchRef.current) => {
+    const request = ++envRequestRef.current;
     window.NProgress?.start();
     try {
-      const data = await listEnvironments();
-      setEnvironments(data);
+      const rows = await listEnvironments(term);
+      if (request !== envRequestRef.current) return;
+      setEnvRows(rows);
+
+      if (term) {
+        const all = await listEnvironments();
+        if (request !== envRequestRef.current) return;
+        setEnvironments(all);
+      } else {
+        setEnvironments(rows);
+      }
     } catch (err) {
       toast("Failed to load environments", "error");
       console.error(err);
@@ -233,6 +275,12 @@ export default function AdminDashboard() {
       setEnvLoaded(true);
       window.NProgress?.done();
     }
+  };
+
+  /* The Environments table's search box, debounced there. */
+  const searchEnvironments = (term: string) => {
+    envSearchRef.current = term;
+    loadEnvironments(term);
   };
 
   useEffect(() => {
@@ -1488,8 +1536,9 @@ export default function AdminDashboard() {
             <div className="card">
               <div className="card-body">
                 <EnvironmentsTable
-                  environments={environments}
+                  environments={envRows}
                   loading={!envLoaded}
+                  onSearch={searchEnvironments}
                   onAdd={openAddModal}
                   onEdit={(env) => openEditModal(env.id)}
                   onDuplicate={(env) => openDuplicateModal(env.id)}
