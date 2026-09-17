@@ -5,12 +5,12 @@ import { MODULES, catalog } from "../../../utils/tokenPermissionCatalog";
 import { IdParamSchema, SetPermissionsSchema, SetStatusSchema } from "./schema";
 
 /**
- * Admin API behind /api/v1/admin/tokens — the console's view of the token
+ * Admin API behind /api/v1/admin/tokens: the console's view of the token
  * records this service has issued, and the only place their module
  * permissions are edited.
  *
  * Two things this module deliberately never does. It never returns a token's
- * secret material (see Tokens.ListAll) — an admin identifies a token by its
+ * secret material (see Tokens.ListAll). An admin identifies a token by its
  * row id, which is also what its permissions are keyed on. And it never reads
  * permissions through the cache: the cached read exists for the request-path
  * gate (src/middlewares/tokenPermissions.js), while an admin editing a matrix
@@ -36,7 +36,7 @@ export const adminTokensRoute = (fastify, opts, done) => {
   const summarise = (entry) => {
     if (!entry?.configured) {
       // Unrestricted is not "0 granted". A token nobody has restricted can do
-      // all of it, and the list has to say so — otherwise a freshly issued
+      // all of it, and the list has to say so, otherwise a freshly issued
       // token reads as powerless, which is the opposite of the truth.
       return { configured: false, granted: totalGrants, total: totalGrants };
     }
@@ -51,7 +51,7 @@ export const adminTokensRoute = (fastify, opts, done) => {
     return { configured: true, granted, total: totalGrants };
   };
 
-  // GET /admin/tokens — every token, with the permission summary the list
+  // GET /admin/tokens: every token, with the permission summary the list
   // column shows. One extra query for all of them, not one per row.
   fastify.get("/", guard, async (req, reply) => {
     try {
@@ -72,13 +72,13 @@ export const adminTokensRoute = (fastify, opts, done) => {
     }
   });
 
-  // GET /admin/tokens/permissions/catalog — the module vocabulary, fetched by
+  // GET /admin/tokens/permissions/catalog: the module vocabulary, fetched by
   // the console rather than duplicated in the frontend.
   fastify.get("/permissions/catalog", guard, async (req, reply) =>
     ok(reply, catalog()),
   );
 
-  // GET /admin/tokens/:id/permissions — uncached on purpose, see above.
+  // GET /admin/tokens/:id/permissions: uncached on purpose, see above.
   fastify.get(
     "/:id/permissions",
     { ...IdParamSchema, ...guard },
@@ -94,7 +94,7 @@ export const adminTokensRoute = (fastify, opts, done) => {
     },
   );
 
-  // PUT /admin/tokens/:id/permissions — replaces the whole matrix, and is what
+  // PUT /admin/tokens/:id/permissions: replaces the whole matrix, and is what
   // moves a token from unrestricted to governed for the first time.
   fastify.put(
     "/:id/permissions",
@@ -114,7 +114,7 @@ export const adminTokensRoute = (fastify, opts, done) => {
     },
   );
 
-  // PUT /admin/tokens/:id/status — the Active switch in the list. Kept
+  // PUT /admin/tokens/:id/status: the Active switch in the list. Kept
   // separate from the full record (there is no "full record" to resend) and
   // from the permissions route, because switching a token off is a different
   // decision from what it may do while it is on.

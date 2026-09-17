@@ -7,7 +7,7 @@ import {
 import { cachedMatrix, invalidateToken } from "../utils/tokenPermissionCache";
 
 /**
- * Module-level permissions for API tokens — the storage side. Vocabulary
+ * Module-level permissions for API tokens: the storage side. Vocabulary
  * (which modules, which actions) lives in src/utils/tokenPermissionCatalog.js.
  *
  * Every read here answers with a `configured` flag next to the matrix,
@@ -26,12 +26,12 @@ const rowsToMatrix = (rows) => {
 
   for (const mod of MODULES) {
     const row = rowByModule[mod.key];
-    // No row for this module — the all-false default stands.
+    // No row for this module, so the all-false default stands.
     if (!row) continue;
 
     // Only the actions this module declares. A row written while the
     // catalogue said otherwise must not resurrect a grant that no longer
-    // exists, so the catalogue decides on read as well as on write — the same
+    // exists, so the catalogue decides on read as well as on write, the same
     // rule normaliseMatrix applies to what gets stored.
     for (const action of mod.actions) {
       result[mod.key][action] = !!row[`can_${action}`];
@@ -76,7 +76,7 @@ export const GetMatrixCached = async (tokenId) =>
  * failed.
  *
  * Writing all five module rows is also what flips the token from
- * unrestricted to governed — see the `configured` note above.
+ * unrestricted to governed. See the `configured` note above.
  */
 export const SetMatrix = async (profileId, tokenId, input) => {
   if (!tokenId)
@@ -119,7 +119,7 @@ export const SetMatrix = async (profileId, tokenId, input) => {
 };
 
 /**
- * Matrices for many tokens at once — one query, for the token list's
+ * Matrices for many tokens at once: one query, for the token list's
  * permission summary column.
  */
 export const GetMatrixForTokens = async (tokenIds = []) => {

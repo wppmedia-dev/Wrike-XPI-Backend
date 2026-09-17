@@ -1,6 +1,6 @@
 /**
  * Which module and which action a request is, and whether a token's matrix
- * allows it — the two pure decisions behind the per-token module gate
+ * allows it. These are the two pure decisions behind the per-token module gate
  * (src/middlewares/tokenPermissions.js).
  *
  * Pure on purpose: no models, no redis, no fastify, so the mapping and the
@@ -13,7 +13,7 @@
  * about what "update" means would be worse than either being wrong alone.
  *
  * The module comes from the path rather than from the matched route, so
- * anything under /wrikexpi/<module> is governed — including routes added
+ * anything under /wrikexpi/<module> is governed, including routes added
  * later, which is the whole point. The cost of that choice is that a path
  * under a governed module which no route actually serves answers 403 for a
  * restricted token where an unrestricted one gets 404. The alternative is an
@@ -56,7 +56,7 @@ const MODULE_BY_HEAD = {
  * (/wrikexpi/campaign/:id/channel, /wrikexpi/channel/:id/task,
  * /wrikexpi/campaign/:id/task). They are attributed to what they actually
  * return, so switching "channel read" off has to stop a caller reading
- * channels through the campaign path too — otherwise the switch is a lie.
+ * channels through the campaign path too, otherwise the switch is a lie.
  *
  * Keyed by head segment, then by the second segment of a two-segment tail.
  * That length check is what keeps /wrikexpi/campaign/upload a campaign route
@@ -69,8 +69,8 @@ const NESTED_MODULE_BY_TAIL = {
 };
 
 /**
- * The module a request path belongs to, or null when the path is not governed
- * — the app-config/docs routes, the public /wrikexpi/token/* OAuth surface,
+ * The module a request path belongs to, or null when the path is not governed:
+ * the app-config and docs routes, the public /wrikexpi/token/* OAuth surface,
  * and /wrikexpi/mcp, which is its own surface with its own gate
  * (src/plugins/mcp.js, same matrix, evaluated per tool call).
  */
@@ -98,7 +98,7 @@ export const moduleForPath = (url = "") => {
 };
 
 /**
- * { module, action } for a request, or null when nothing governs it — an
+ * { module, action } for a request, or null when nothing governs it: an
  * ungoverned path, or a method no action maps to.
  */
 export const resolveRoute = (method, url) => {
@@ -121,7 +121,7 @@ const DECLARED_ACTIONS = Object.fromEntries(
  *
  *   1. Nothing governs the path (route is null).
  *   2. The token has never been configured. Full access is the default, so
- *      restricting a token is something an admin has to do on purpose — that
+ *      restricting a token is something an admin has to do on purpose. That
  *      is what keeps every token issued before this gate existed working.
  *   3. The module cannot express this action (there is no create endpoint for
  *      channel or task), so there is no switch an admin could have set and

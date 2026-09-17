@@ -109,7 +109,7 @@ interface Props {
   /** Incremented by the top-bar Refresh button to force a reload. */
   refreshKey?: number;
   /**
-   * Scope the whole page to one token — set by the API Tokens table's
+   * Scope the whole page to one token. Set by the API Tokens table's
    * "Activity logs" row action. `label` is only for the chip; the server
    * filters on `id` alone.
    */
@@ -283,7 +283,7 @@ export default function ActivityLog({
 
       <div className="al-filterbar">
         {/* The token scope, shown before the other filters because it is the
-            one the admin did not set from this page — and removable right
+            one the admin did not set from this page, and removable right
             here, so arriving from a token row never traps them. */}
         {tokenFilter && (
           <span className="al-token-chip" title={`Filtered to ${tokenFilter.label}`}>

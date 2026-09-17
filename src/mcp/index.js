@@ -42,7 +42,7 @@ CONFIRMING WRITE OPERATIONS — every update and delete is gated
 - Never state or imply that a change was made until a call carrying confirm: true has actually returned successfully.
 - Creating a campaign (campaign_create) is not gated — it destroys nothing and has no prior state to preview.
 
-MODULE PERMISSIONS — a token may be narrower than the tool list
+MODULE PERMISSIONS: a token may be narrower than the tool list
 - The tool list is what the *surface* can do. What your token is *allowed* to do is granted per module (campaign, channel, task, master data, amoeba, Wrike MCP tools) and per action (read, create, update, delete), and a token nobody has restricted can do everything.
 - A tool call outside those grants returns FORBIDDEN with isError: true, naming the module and action that is missing. That is a final answer, not a transient one: retrying, or reaching for a different tool that would achieve the same change (for example wrike_update_items instead of campaign_update), is not permitted.
 - When you get FORBIDDEN: report the missing module and action to the user and stop. An administrator can change it in the admin portal; you cannot, and nothing was changed.

@@ -38,7 +38,7 @@ const MODULE_BY_PREFIX = {
  * Wrike's own MCP tools, proxied one-to-one as `wrike_*`.
  *
  * Their names come from Wrike at runtime, so they cannot be attributed to one
- * of the five XPI modules — `wrike_search_items` is not a campaign call any
+ * of the five XPI modules, because `wrike_search_items` is not a campaign call any
  * more than it is a task call. They get their own matrix row instead, which is
  * also the honest answer to "can this token touch raw Wrike objects?".
  *
@@ -70,8 +70,8 @@ const actionForTool = (subject, annotations) => {
 /**
  * The module and action a tool call needs, or null when nothing governs it.
  *
- * Null is returned for the read-only helpers — datahub_list_fields and
- * ids_convert — which read definitions and convert identifiers without
+ * Null is returned for the read-only helpers, datahub_list_fields and
+ * ids_convert, which read definitions and convert identifiers without
  * touching an XPI or Wrike resource, and for any tool outside the families
  * above (a new native family needs a prefix entry here to be governed, the
  * same way a new REST prefix needs an entry in src/utils/tokenPermissionMap.js).
@@ -112,9 +112,9 @@ export const resolveToolRoute = (name, annotations) => {
  * user for approval and then retry, which would fail identically.
  *
  * The closing instruction matters as much as the denial. Every write this
- * refuses is also reachable through another tool on the other surface — a
+ * refuses is also reachable through another tool on the other surface: a
  * blocked campaign_update can be attempted as wrike_update_items, a blocked
- * REST call can be retried over MCP — so the result names the missing
+ * REST call can be retried over MCP. So the result names the missing
  * permission and says plainly not to route around it.
  */
 export const permissionDenied = ({ toolName, module, action, code }) => ({
@@ -123,13 +123,13 @@ export const permissionDenied = ({ toolName, module, action, code }) => ({
     {
       type: "text",
       text: [
-        "FORBIDDEN — nothing was changed.",
+        "FORBIDDEN. Nothing was changed.",
         "",
         `"${toolName}" was not executed: this token is not permitted to ${action} ${module}.`,
         code ? `Reason code: ${code}.` : "",
         "",
         "A token's access is granted per module and per action by an administrator in the admin portal. This is not a transient failure or a rate limit, so repeating the call returns this same result.",
-        "Next step: tell the user which permission is missing (module and action, as above) and stop. Do not attempt the same change through a different tool, and do not ask them to approve anything — there is nothing to approve.",
+        "Next step: tell the user which permission is missing (module and action, as above) and stop. Do not attempt the same change through a different tool, and do not ask them to approve anything. There is nothing to approve.",
       ]
         .filter(Boolean)
         .join("\n"),

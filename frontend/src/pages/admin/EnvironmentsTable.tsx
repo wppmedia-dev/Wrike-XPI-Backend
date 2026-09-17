@@ -22,6 +22,8 @@ export interface EnvironmentsTableProps {
   onDuplicate: (env: AdminEnvironment) => void;
   onDelete: (env: AdminEnvironment) => void;
   onOpenAccess: (env: AdminEnvironment) => void;
+  /** Opens the API Tokens page scoped to this environment. */
+  onViewTokens: (env: AdminEnvironment) => void;
   onToggle: (
     env: AdminEnvironment,
     field: "is_active" | "is_visible",
@@ -37,6 +39,7 @@ export function EnvironmentsTable({
   onDuplicate,
   onDelete,
   onOpenAccess,
+  onViewTokens,
   onToggle,
   onAdd,
 }: EnvironmentsTableProps) {
@@ -128,6 +131,14 @@ export function EnvironmentsTable({
                 onSelect: () => onOpenAccess(env),
               },
               {
+                // Straight to the tokens issued for this environment, already
+                // filtered to it — the question "what is using this
+                // environment?" asked from the environment's own row.
+                label: "View tokens",
+                icon: "fa-solid fa-key",
+                onSelect: () => onViewTokens(env),
+              },
+              {
                 label: "Edit",
                 icon: "fa-solid fa-pen-to-square",
                 onSelect: () => onEdit(env),
@@ -148,7 +159,7 @@ export function EnvironmentsTable({
         ),
       },
     ],
-    [onEdit, onDuplicate, onDelete, onOpenAccess, onToggle],
+    [onEdit, onDuplicate, onDelete, onOpenAccess, onViewTokens, onToggle],
   );
 
   const table = useTable({
