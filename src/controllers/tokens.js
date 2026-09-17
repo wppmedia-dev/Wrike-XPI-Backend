@@ -1,4 +1,11 @@
 import models from "../../models";
+import * as TokenPermissions from "./tokenPermissions";
+import { summarisePermissions } from "../utils/tokenPermissionSummary";
+import {
+  applyTokenFilters,
+  environmentChoices,
+  hasUnassignedTokens,
+} from "../utils/tokenFilters";
 
 export const Insert = async (profile_id, data, options = {}) => {
   try {
@@ -320,6 +327,41 @@ export const ListForEnvironments = async (envIds = []) => {
   const rows = await findAdminRows({ env_id: { [Op.in]: envIds } });
 
   return rows.map(toAdminShape);
+};
+
+/**
+ * What both consoles' token lists are built from: the rows in scope, each with
+ * the permission summary its Access badge shows, filtered server-side, plus the
+ * two things the filter UI cannot derive from a filtered list.
+ *
+ * The filters are applied here rather than in the browser because the browser
+ * only ever holds the response, and a filter applied to a page is a filter that
+ * silently lies about the table. `total` is the count before filtering, so the
+ * console can say how many tokens were searched rather than how many survived,
+ * and `environments` is the picker's option set from the unfiltered rows.
+ *
+ * `envIds` is the portal's scope: null for the admin console, and an array for
+ * the portal, where an empty array means no environments and therefore no
+ * tokens (ListForEnvironments refuses to widen an empty scope).
+ */
+export const ListForConsole = async ({ envIds = null, filters = {} } = {}) => {
+  const rows =
+    envIds === null ? await ListAll() : await ListForEnvironments(envIds);
+
+  const matrices = await TokenPermissions.GetMatrixForTokens(
+    rows.map((row) => row.id),
+  );
+  const withSummary = rows.map((row) => ({
+    ...row,
+    permissions: summarisePermissions(matrices[row.id]),
+  }));
+
+  return {
+    tokens: applyTokenFilters(withSummary, filters),
+    environments: environmentChoices(withSummary),
+    has_unassigned: hasUnassignedTokens(withSummary),
+    total: withSummary.length,
+  };
 };
 
 /**

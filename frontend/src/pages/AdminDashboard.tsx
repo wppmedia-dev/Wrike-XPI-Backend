@@ -31,6 +31,7 @@ import {
   listTokens,
   setTokenStatus,
   type AdminToken,
+  type TokenListQuery,
 } from "../lib/tokenPermissionsApi";
 import EnvironmentAccess from "./EnvironmentAccess";
 import PortalUserPermissions from "./PortalUserPermissions";
@@ -39,7 +40,12 @@ import ActivityLog from "./ActivityLog";
 import MfaSettings from "./MfaSettings";
 import { EnvironmentsTable } from "./admin/EnvironmentsTable";
 import { PortalUsersTable } from "./admin/PortalUsersTable";
-import { TokensTable } from "../components/TokensTable";
+import {
+  EMPTY_FILTERS,
+  TokensTable,
+  toTokenListQuery,
+  type TokenFilters,
+} from "../components/TokensTable";
 import EnvBadge from "../components/EnvBadge";
 import BuildTag from "../components/BuildTag";
 import { CopyButton } from "../components/ui/CopyButton";
@@ -474,6 +480,19 @@ export default function AdminDashboard() {
   // whose tokens are simply still in flight.
   const [tokLoaded, setTokLoaded] = useState(false);
 
+  /** The filters the server was last asked for, and the search box's term.
+      Both live here rather than in the table because they are the two inputs
+      of one request: the table edits a draft and the server answers. */
+  const [tokenFilters, setTokenFilters] = useState<TokenFilters>(EMPTY_FILTERS);
+  const [tokenSearch, setTokenSearch] = useState("");
+  // The environment picker's options and the scope's size, both from the
+  // server's unfiltered view of the same request (see Tokens.ListForConsole).
+  const [tokenEnvironments, setTokenEnvironments] = useState<
+    { id: string; name: string }[]
+  >([]);
+  const [tokenHasUnassigned, setTokenHasUnassigned] = useState(false);
+  const [tokenTotal, setTokenTotal] = useState(0);
+
   // Per-token module permission modal, opened from a token row. Held here
   // (rather than inside the table) for the same reason the portal-user one
   // is: the table stays presentational and the modal sits as a sibling of
@@ -488,16 +507,61 @@ export default function AdminDashboard() {
     setTokPermsOpen(true);
   }
 
-  const loadTokens = async () => {
+  /**
+   * The list, fetched for whatever filters are currently applied.
+   *
+   * One request per committed change: the server filters, the table renders
+   * what came back, and the response also carries the picker's options and the
+   * unfiltered count, neither of which the table could derive from a filtered
+   * array. Called with no arguments after a write, to reload with the filters
+   * that are already applied.
+   */
+  const loadTokens = async (
+    query: TokenListQuery = toTokenListQuery(tokenFiltersRef.current, tokenSearchRef.current),
+  ) => {
     try {
-      const data = await listTokens();
-      setTokens(data);
+      const data = await listTokens(query);
+      setTokens(data.tokens);
+      setTokenEnvironments(data.environments);
+      setTokenHasUnassigned(!!data.has_unassigned);
+      setTokenTotal(data.total);
     } catch (err: any) {
       toast(err?.message || "Failed to load tokens", "error");
     } finally {
       setTokLoaded(true);
     }
   };
+
+  /* Read by loadTokens for the reloads triggered by a write (a status flip, a
+     permission save), which must reuse the current query without making every
+     callback identity depend on it. */
+  const tokenFiltersRef = useRef(tokenFilters);
+  tokenFiltersRef.current = tokenFilters;
+  const tokenSearchRef = useRef(tokenSearch);
+  tokenSearchRef.current = tokenSearch;
+
+  /** A committed change: the new query is stored and fetched in one go. */
+  const fetchTokensFor = useCallback(
+    (filters: TokenFilters, search: string) => {
+      setTokenFilters(filters);
+      setTokenSearch(search);
+      loadTokens(toTokenListQuery(filters, search));
+    },
+    [],
+  );
+
+  const applyTokenFilters = useCallback(
+    (filters: TokenFilters) => fetchTokensFor(filters, tokenSearchRef.current),
+    [fetchTokensFor],
+  );
+
+  const searchTokens = useCallback(
+    (search: string) => {
+      if (search === tokenSearchRef.current) return;
+      fetchTokensFor(tokenFiltersRef.current, search);
+    },
+    [fetchTokensFor],
+  );
 
   /**
    * The API Tokens table's Status switch, in both directions.
@@ -600,8 +664,10 @@ export default function AdminDashboard() {
 
     try {
       await deactivateToken(token.id);
-      const data = await listTokens();
-      setTokens(data);
+      // Refetched rather than patched locally: this row left the list only if
+      // the applied filters exclude switched-off tokens, and whether it did is
+      // the server's answer to give, not this handler's to guess.
+      await loadTokens();
       toast("Token deactivated", "success");
     } catch (err: any) {
       toast(err?.message || "Could not deactivate the token", "error");
@@ -1479,6 +1545,12 @@ export default function AdminDashboard() {
                 <TokensTable
                   tokens={tokens}
                   loading={!tokLoaded}
+                  filters={tokenFilters}
+                  onApplyFilters={applyTokenFilters}
+                  environmentOptions={tokenEnvironments}
+                  hasUnassigned={tokenHasUnassigned}
+                  total={tokenTotal}
+                  onSearch={searchTokens}
                   onPermissions={openTokenPermissions}
                   onToggleStatus={handleTokenToggle}
                   onActivityLogs={openTokenActivityLogs}

@@ -73,6 +73,64 @@ export interface TokenPermissionEntry {
 
 const BASE = "/api/v1/admin/tokens";
 
+/**
+ * The list's committed filters, as query parameters. Blank values are left out
+ * of the URL rather than sent empty: an empty enum member is a bug, and the
+ * server refuses it instead of guessing.
+ *
+ * Names match the schema (src/routes/admin/tokens/schema) one for one, so a
+ * control added here without a server parameter is a visible 400 rather than a
+ * filter that silently does nothing.
+ */
+export interface TokenListQuery {
+  /** The toolbar search box, over the fields the row shows. */
+  search?: string;
+  env_id?: string;
+  token_id?: string;
+  client?: string;
+  account_id?: string;
+  creator?: string;
+  access?: string;
+  validity?: string;
+  updated?: string;
+  status?: string;
+}
+
+/**
+ * What the list endpoints answer with: the matching rows, the environment
+ * picker's options and the count before filtering.
+ *
+ * The options and the total come from the server because the client no longer
+ * holds the unfiltered set. Deriving them from a filtered response would make
+ * the picker lose every environment the current filter excludes — exactly the
+ * moment somebody wants to switch to one of them — and would report the number
+ * of rows that survived as the number that were searched.
+ */
+export interface TokenListResult {
+  tokens: AdminToken[];
+  environments: { id: string; name: string }[];
+  /** True when the scope holds tokens with no environment at all. */
+  has_unassigned: boolean;
+  total: number;
+}
+
+/**
+ * The value the Environment picker sends for "tokens with no environment".
+ * The server reads the nil UUID as exactly that (NO_ENVIRONMENT in
+ * src/utils/tokenFilters.js); a real environment id is never the nil UUID.
+ */
+export const NO_ENVIRONMENT = "00000000-0000-0000-0000-000000000000";
+
+const queryString = (query: TokenListQuery = {}) => {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value) params.set(key, value);
+  }
+  const encoded = params.toString();
+  return encoded ? `?${encoded}` : "";
+};
+
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await adminFetch(`${BASE}${path}`, init);
   const json = await res.json().catch(() => null);
@@ -84,7 +142,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return json?.data as T;
 }
 
-export const listTokens = () => request<AdminToken[]>("/");
+export const listTokens = (query: TokenListQuery = {}) =>
+  request<TokenListResult>(`/${queryString(query)}`);
 
 export const getTokenPermissionCatalog = () =>
   request<PermissionCatalog>("/permissions/catalog");

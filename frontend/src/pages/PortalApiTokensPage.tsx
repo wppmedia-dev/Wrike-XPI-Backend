@@ -1,5 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
-import { TokensTable } from "../components/TokensTable";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  EMPTY_FILTERS,
+  TokensTable,
+  toTokenListQuery,
+  type TokenFilters,
+} from "../components/TokensTable";
 import { confirmDanger, toast } from "../lib/notify";
 import { getPortalToken } from "../lib/portalAuthApi";
 import {
@@ -10,7 +15,7 @@ import {
   setPortalTokenStatus,
   type PortalApiToken,
 } from "../lib/portalApiTokensApi";
-import type { AdminToken } from "../lib/tokenPermissionsApi";
+import type { AdminToken, TokenListQuery } from "../lib/tokenPermissionsApi";
 import TokenPermissions, { type TokenPermissionsApi } from "./TokenPermissions";
 
 /* The portal's API Tokens page.
@@ -87,24 +92,75 @@ export default function PortalApiTokensPage({
   const [tokens, setTokens] = useState<PortalApiToken[]>([]);
   const [loading, setLoading] = useState(false);
 
+  /** The query the server was last asked for. Same shape and the same
+      reasoning as the admin console: the server filters, this page renders
+      what came back. */
+  const [filters, setFilters] = useState<TokenFilters>(EMPTY_FILTERS);
+  const [search, setSearch] = useState("");
+  const [environments, setEnvironments] = useState<{ id: string; name: string }[]>([]);
+  const [hasUnassigned, setHasUnassigned] = useState(false);
+  const [total, setTotal] = useState(0);
+
   const [permsTokenId, setPermsTokenId] = useState<string | null>(null);
   const [permsLabel, setPermsLabel] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    if (!token) return;
-    setLoading(true);
-    try {
-      setTokens(await listPortalApiTokens(token));
-    } catch (err: any) {
-      toast(err?.message || "Could not load tokens", "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [token]);
+  /* Read by the reloads a write triggers (a status flip), so those reuse the
+     query that is currently applied instead of resetting to everything. */
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
+  const searchRef = useRef(search);
+  searchRef.current = search;
+
+  const load = useCallback(
+    async (
+      query: TokenListQuery = toTokenListQuery(
+        filtersRef.current,
+        searchRef.current,
+      ),
+    ) => {
+      if (!token) return;
+      setLoading(true);
+      try {
+        const data = await listPortalApiTokens(token, query);
+        setTokens(data.tokens);
+        setEnvironments(data.environments);
+        setHasUnassigned(!!data.has_unassigned);
+        setTotal(data.total);
+      } catch (err: any) {
+        toast(err?.message || "Could not load tokens", "error");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [token],
+  );
 
   useEffect(() => {
     load();
   }, [load]);
+
+  /** A committed change: store the query and fetch it in one go. */
+  const fetchFor = useCallback(
+    (next: TokenFilters, term: string) => {
+      setFilters(next);
+      setSearch(term);
+      load(toTokenListQuery(next, term));
+    },
+    [load],
+  );
+
+  const applyFilters = useCallback(
+    (next: TokenFilters) => fetchFor(next, searchRef.current),
+    [fetchFor],
+  );
+
+  const searchTokens = useCallback(
+    (term: string) => {
+      if (term === searchRef.current) return;
+      fetchFor(filtersRef.current, term);
+    },
+    [fetchFor],
+  );
 
   /** Identifies a token in the permissions popup's header without ever showing
       its credential: the environment it acts for and its account. */
@@ -181,6 +237,12 @@ export default function PortalApiTokensPage({
           <TokensTable
             tokens={tokens}
             loading={loading}
+            filters={filters}
+            onApplyFilters={applyFilters}
+            environmentOptions={environments}
+            hasUnassigned={hasUnassigned}
+            total={total}
+            onSearch={searchTokens}
             onPermissions={openPermissions}
             // Undefined without the update grant, which is what turns the
             // Status column into a badge: the table draws the switch it is

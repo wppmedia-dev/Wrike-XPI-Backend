@@ -295,6 +295,15 @@
   gap: 8px;
 }
 
+/* Done, while the panel holds something the table is not showing yet. The
+   count beside it already says "Not applied yet"; this is the button that
+   changes that, so it is the one that carries the ring. The fallback matters
+   for the same reason it does in Toggle.css: this stylesheet is shared by both
+   consoles and --accent-soft is defined in each page's own scope. */
+.tok-filter-apply {
+  box-shadow: 0 0 0 3px var(--accent-soft, rgba(0, 130, 98, 0.12));
+}
+
 /* ── Bottom sheet (mobile) ────────────────────────────────────────────
    Below 640px the popup stops being a floating panel and becomes a sheet
    pinned to the bottom of the screen. A 460px panel on a 360px viewport is
