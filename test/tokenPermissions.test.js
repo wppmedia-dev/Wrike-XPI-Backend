@@ -3,12 +3,14 @@
    allow/deny decision itself.
    Run from the repo root:  node test/tokenPermissions.test.js
 
-   No database, Redis or Wrike account required. Everything under test is
+   No database, Redis or Wrike account required. The decisions under test are
    deliberately pure (src/utils/tokenPermissionCatalog.js,
    src/utils/tokenPermissionMap.js, src/mcp/tools/permission.js), which is the
-   point of keeping the decisions out of the middleware and the MCP wrapper.
-   The one thing it asserts about the non-pure code is that the MCP verb list
-   still agrees with the confirmation gate about what a write is. */
+   point of keeping them out of the middleware and the MCP wrapper. Two things
+   it asserts about the rest of the code: that the MCP verb list still agrees
+   with the confirmation gate about what a write is, and that amoeba really is
+   registered for every method its catch-all claims, which is why the map has
+   to have an answer for a method it does not know. */
 
 require("@babel/register")({
   presets: [["@babel/preset-env", { targets: { node: "current" } }]],
@@ -35,10 +37,13 @@ const check = (label, actual, expected) => {
   }
 };
 
-/** "module/action" for a request, or "not governed". */
+/** "module/action" for a request, or "not governed". A governed path whose
+    method maps to no action reads as "module/no action": it is checked, and
+    refused, rather than waved through. */
 const routeOf = (method, url) => {
   const route = map.resolveRoute(method, url);
-  return route ? `${route.module}/${route.action}` : "not governed";
+  if (!route) return "not governed";
+  return `${route.module}/${route.action || "no action"}`;
 };
 
 const entry = (matrix, configured = true) => ({ configured, matrix });
@@ -154,7 +159,13 @@ console.log("\nREST routes → module/action");
     ["POST", "/api/v1/wrikexpi/mcp", "not governed"],
     ["GET", "/api/v1/admin/tokens", "not governed"],
     ["POST", "/api/v1/portal/environments", "not governed"],
-    ["TRACE", "/api/v1/wrikexpi/campaign/IEAC1", "not governed"],
+
+    // A governed path with a method no action maps to. Not "not governed":
+    // it is governed, and the decision refuses it, because there is no switch
+    // an admin could have set for TRACE and no cell to read.
+    ["TRACE", "/api/v1/wrikexpi/campaign/IEAC1", "campaign/no action"],
+    ["TRACE", "/api/v1/wrikexpi/amoeba/slug", "amoeba/no action"],
+    ["TRACE", "/api/v1/wrikexpi/amoeba/slug/svc", "amoeba/no action"],
   ];
 
   cases.forEach(([method, url, expected]) => {
@@ -162,16 +173,93 @@ console.log("\nREST routes → module/action");
   });
 }
 
+/* ── The premise of that last rule, from the router ───────────────────────
+   amoeba's two paths are registered with fastify.all, and Fastify's all()
+   includes TRACE. Without the refusal above, such a request would reach the
+   proxy handler and be forwarded upstream, because the gate returns early when
+   the map resolves nothing. */
+
+const runRouterChecks = async () => {
+  console.log("\nWhat the amoeba route really accepts");
+
+  const Fastify = require("fastify");
+  const { amoebaRoute } = require("../src/routes/amoeba");
+
+  const app = Fastify();
+  const methods = new Set();
+
+  // `method` arrives as an array for these two, because fastify.all registers
+  // one route entry carrying the whole method list, TRACE included.
+  app.addHook("onRoute", (registered) => {
+    if (!registered.url.includes("amoeba")) return;
+    for (const method of [].concat(registered.method)) methods.add(method);
+  });
+
+  app.register(amoebaRoute, { prefix: "/wrikexpi/amoeba" });
+  await app.ready();
+
+  ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE"].forEach(
+    (method) => {
+      check(`amoeba is registered for ${method}`, methods.has(method), true);
+    },
+  );
+
+  // Everything it accepts has an action except TRACE, which is the whole
+  // reason the map refuses rather than ignores a method it does not know.
+  const amoebaActions = ["GET", "POST", "PUT", "PATCH", "DELETE"]
+    .concat("HEAD", "OPTIONS")
+    .map((method) => map.actionForMethod(method));
+  check(
+    "the seven routable methods it does have actions all map to one",
+    amoebaActions.filter(Boolean).length,
+    7,
+  );
+  check("TRACE has none", map.actionForMethod("TRACE"), null);
+};
+
 console.log("\nThe decision");
 {
   const readOnlyCampaign = entry(
     catalog.normaliseMatrix({ campaign: { read: true } }),
+  );
+  const everyAmoebaAction = entry(
+    catalog.normaliseMatrix({
+      amoeba: { read: true, create: true, update: true, delete: true },
+    }),
   );
   const nothing = entry(catalog.emptyMatrix());
   const unconfigured = entry(catalog.emptyMatrix(), false);
   const route = (method, url) => map.resolveRoute(method, url);
   const decide = (matrixEntry, method, url) =>
     map.denialFor(matrixEntry, route(method, url));
+
+  // A restricted token, asked for something the matrix has no answer to. Even
+  // a token holding every amoeba action is refused: METHOD_NOT_GOVERNABLE is
+  // about the request, not about what the token was granted.
+  check(
+    "TRACE on amoeba is refused, with a token that holds every amoeba action",
+    decide(everyAmoebaAction, "TRACE", "/api/v1/wrikexpi/amoeba/slug"),
+    "METHOD_NOT_GOVERNABLE",
+  );
+  check(
+    "TRACE on campaign is refused too",
+    decide(readOnlyCampaign, "TRACE", "/api/v1/wrikexpi/campaign/IEAC1"),
+    "METHOD_NOT_GOVERNABLE",
+  );
+  // The path still has to be governed: an ungoverned path stays ungoverned
+  // whatever the method is.
+  check(
+    "TRACE on an ungoverned path is still allowed",
+    decide(readOnlyCampaign, "TRACE", "/api/v1/admin/tokens"),
+    null,
+  );
+  // And grandfathering wins, as it does everywhere else: a token nobody has
+  // restricted is not narrowed by a rule about methods either.
+  check(
+    "an unrestricted token is not refused over the method",
+    decide(unconfigured, "TRACE", "/api/v1/wrikexpi/amoeba/slug"),
+    null,
+  );
 
   // Grandfathering: no rows at all means unrestricted, which is what keeps
   // every token issued before this feature working.
@@ -372,5 +460,7 @@ console.log("\nDenial payload");
   );
 }
 
-console.log(`\n${pass} passed, ${fail} failed\n`);
-process.exit(fail ? 1 : 0);
+runRouterChecks().then(() => {
+  console.log(`\n${pass} passed, ${fail} failed\n`);
+  process.exit(fail ? 1 : 0);
+});

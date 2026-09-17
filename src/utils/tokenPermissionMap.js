@@ -98,14 +98,22 @@ export const moduleForPath = (url = "") => {
 };
 
 /**
- * { module, action } for a request, or null when nothing governs it: an
- * ungoverned path, or a method no action maps to.
+ * { module, action } for a request, or null when nothing governs it.
+ *
+ * A governed path asked for with a method no action maps to comes back as
+ * { module, action: null } and not as null. The difference matters: null means
+ * "nothing here to check" (an ungoverned path), while a governed path with no
+ * action is a request the matrix cannot allow, so denialFor refuses it. TRACE
+ * is the case that exists: src/routes/amoeba registers both of its paths with
+ * fastify.all, and Fastify's all() includes TRACE, so a proxy handler would
+ * otherwise forward a TRACE to somebody else's service with no permission
+ * check at all.
  */
 export const resolveRoute = (method, url) => {
   const module = moduleForPath(url);
-  const action = actionForMethod(method);
-  if (!module || !action) return null;
-  return { module, action };
+  if (!module) return null;
+
+  return { module, action: actionForMethod(method) || null };
 };
 
 const DECLARED_ACTIONS = Object.fromEntries(
@@ -126,10 +134,20 @@ const DECLARED_ACTIONS = Object.fromEntries(
  *   3. The module cannot express this action (there is no create endpoint for
  *      channel or task), so there is no switch an admin could have set and
  *      nothing to deny against.
+ *
+ * And one denies outside the matrix: a governed path asked for with a method
+ * no action maps to. There is no switch for it and no cell to read, so the
+ * only safe reading of the matrix is "not granted", and refusing costs nothing
+ * because nothing in this system sends such a request except a client doing it
+ * deliberately (see resolveRoute).
  */
 export const denialFor = (entry, route) => {
   if (!route) return null;
   if (!entry?.configured) return null;
+
+  // Checked before the declared-actions case below, which would otherwise let
+  // a null action through: null is not in any module's list.
+  if (!route.action) return "METHOD_NOT_GOVERNABLE";
 
   if (!DECLARED_ACTIONS[route.module]?.includes(route.action)) return null;
 
