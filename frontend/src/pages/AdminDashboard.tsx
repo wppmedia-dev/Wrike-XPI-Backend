@@ -1527,6 +1527,9 @@ export default function AdminDashboard() {
         tokenLabel={tokPermsLabel}
         open={tokPermsOpen}
         onClose={() => setTokPermsOpen(false)}
+        // The Access column is derived from the matrix this popup saves, so the
+        // list has to be re-read or the row would keep showing its old badge.
+        onSaved={loadTokens}
       />
 
       {/* ═══════════ PU: ADD USER MODAL ═══════════ */}
