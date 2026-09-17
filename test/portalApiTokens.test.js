@@ -3,13 +3,16 @@
 
    Two things are being protected here.
 
-   First, the vocabulary. `api_tokens` is a module whose three actions each map
-   to a real portal route (src/routes/portal/apiTokens/index.js), so a missing
+   First, the vocabulary. `api_tokens` is a module whose two actions each map to
+   a real portal route (src/routes/portal/apiTokens/index.js), so a missing
    action would be a route nobody can be granted, and an extra one would be a
    tick in the console that means nothing. There is no create action and no
    create route: a token is minted by the root login page or an MCP client's
    OAuth flow, which exchange a Wrike authorization code only a person signing
-   in can produce, so neither console can issue one.
+   in can produce, so neither console can issue one. There is no delete action
+   and no delete route either: a token's availability is a narrowing decision
+   like the matrix beside it, so update carries both, and delete had nothing
+   left of its own to authorise.
 
    Second, the scope. A portal user's token list is filtered by the same rule as
    their environment list (src/utils/portalScope.js). The dangerous failure is a
@@ -21,9 +24,9 @@
    token route carries the admin check. A route added later without its gate is
    the one mistake nobody notices, because it works for whoever tests it.
 
-   Fourth, the direction of a status change. Both directions are the delete
-   action, so the status route carries the delete gate and the status route
-   itself refuses a caller the delete grant would refuse.
+   Fourth, the direction of a status change. Both directions are the update
+   action, so the status route carries the update gate and the route itself
+   refuses a caller without it, in either direction.
 
    Run from the repo root:  node test/portalApiTokens.test.js
 
@@ -73,9 +76,9 @@ section("api_tokens in the portal catalogue");
 checkTrue("the module exists", !!apiTokens);
 check("it is labelled for the console", apiTokens?.label, "API Tokens");
 check(
-  "it offers the three actions its routes implement",
+  "it offers the two actions its routes implement",
   apiTokens?.actions.join(","),
-  "read,update,delete",
+  "read,update",
 );
 check(
   "it offers no create action, because no route can mint a token",
@@ -83,9 +86,14 @@ check(
   false,
 );
 check(
+  "it offers no delete action, because availability rides on update",
+  apiTokens?.actions.includes("delete"),
+  false,
+);
+check(
   "it declares no action the catalogue does not know",
   apiTokens?.actions.length,
-  3,
+  2,
 );
 checkTrue(
   "it describes itself, so the matrix does not show an empty row",
@@ -106,16 +114,20 @@ const normalised = catalogue.normaliseMatrix({
 });
 check("every grant survives normalisation", normalised.api_tokens.read, true);
 check("update survives", normalised.api_tokens.update, true);
-check("delete survives", normalised.api_tokens.delete, true);
 check(
   "a create grant is not invented: the module has no such action, so a\n   submitted create tick normalises to off",
   normalised.api_tokens.create,
   false,
 );
+check(
+  "nor is a delete grant, even though it is still sent by a stale client",
+  normalised.api_tokens.delete,
+  false,
+);
 checkTrue("an invented module is dropped", !("not_a_module" in normalised));
 
 const partial = catalogue.normaliseMatrix({ api_tokens: { read: true } });
-check("an omitted grant is off, not missing", partial.api_tokens.delete, false);
+check("an omitted grant is off, not missing", partial.api_tokens.update, false);
 
 /* ---------------------------------------------------------------- scope -- */
 
@@ -192,7 +204,6 @@ const runRouteChecks = async () => {
     "the portal token routes are the ones the module promises",
     portalKeys.join(" | "),
     [
-      "DELETE /api/v1/portal/api-tokens/:id",
       // No trailing slash: Fastify strips it, which is exactly why this list is
       // compared against what the router actually registered rather than
       // against the paths as written in the source.
@@ -213,6 +224,14 @@ const runRouteChecks = async () => {
   check(
     "nor an environments route, which only the picker needed",
     portalKeys.filter((key) => key.includes("environments")).length,
+    0,
+  );
+  // The status route is PUT because availability is the update action; a DELETE
+  // route would mean a delete grant the catalogue does not offer, and a route
+  // nobody can be authorised for.
+  check(
+    "nor a DELETE route, whose grant the module no longer has",
+    portalKeys.filter((key) => key.startsWith("DELETE")).length,
     0,
   );
 

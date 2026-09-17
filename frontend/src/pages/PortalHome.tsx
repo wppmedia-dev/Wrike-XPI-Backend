@@ -984,8 +984,9 @@ export default function PortalHome() {
           {canSeeApiTokens && (
           <div className={`page${activePage === "api-tokens" ? " active" : ""}`} id="page-api-tokens">
             <PortalApiTokensPage
+              // Update is this module's one write grant: it opens the editor in
+              // the permissions popup and it draws the Status switch.
               canUpdate={can("api_tokens", "update")}
-              canDelete={can("api_tokens", "delete")}
               // Only offered when this user may read the log at all.
               onViewActivityLogs={canSeeActivity ? openTokenActivityLogs : undefined}
               envScope={tokensEnvScope}

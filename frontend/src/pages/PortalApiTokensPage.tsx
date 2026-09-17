@@ -3,7 +3,6 @@ import { TokensTable } from "../components/TokensTable";
 import { confirmDanger, toast } from "../lib/notify";
 import { getPortalToken } from "../lib/portalAuthApi";
 import {
-  deactivatePortalApiToken,
   getPortalTokenCatalog,
   getPortalTokenPermissions,
   listPortalApiTokens,
@@ -28,9 +27,11 @@ import TokenPermissions, { type TokenPermissionsApi } from "./TokenPermissions";
  *   - Scope. The server filters by the environments this user can see
  *     (src/utils/portalScope.js, the same rule the Environments page uses), so
  *     this page has no environment scope chip and no "all environments" view.
- *   - Grants. The api_tokens matrix decides which controls exist: read shows
- *     the page, update the Permissions popup's editor, delete the Status switch
- *     and the Activate/Deactivate row action. requirePortalPermission in
+ *   - Grants. The api_tokens matrix decides which controls exist: read shows the
+ *     page and the permissions popup, update the popup's editor and the Status
+ *     switch. There is no third grant: availability is a narrowing decision like
+ *     the matrix itself, so update carries both, and delete had nothing left of
+ *     its own to authorise. requirePortalPermission in
  *     src/routes/portal/apiTokens enforces the same grants again, so a hidden
  *     control is never the only thing standing in a request's way.
  *   - Create. There is none, here or in the admin console. A token is minted by
@@ -57,9 +58,10 @@ const PORTAL_PERMISSIONS_API: TokenPermissionsApi = {
 };
 
 interface Props {
-  /** The api_tokens grants from the portal permission matrix. */
+  /** The api_tokens grants from the portal permission matrix. Update is the one
+      write grant this page has: it opens the permissions editor and it draws
+      the Status switch. */
   canUpdate: boolean;
-  canDelete: boolean;
   /** Called by the "Activity logs" row action: the shell switches to the
       Activity Log page with this token's rows filtered in. */
   onViewActivityLogs?: (token: PortalApiToken) => void;
@@ -76,7 +78,6 @@ interface Props {
 
 export default function PortalApiTokensPage({
   canUpdate,
-  canDelete,
   onViewActivityLogs,
   envScope = null,
   onClearEnvScope,
@@ -116,64 +117,51 @@ export default function PortalApiTokensPage({
   };
 
   /**
-   * Switching a token back ON, which the table labels "Reactivate".
+   * The Status switch, in both directions, which is the update grant's write.
    *
-   * Only that direction, because that is the only one this page can reach:
-   * taking a token out of service is the delete action and goes through
-   * handleDeactivate below, which is where the table sends the switch's OFF
-   * position when it is given an onDelete (this page gives it one). Asking for
-   * a confirmation here would never be seen.
+   * One handler rather than one per direction: switching a token off and
+   * switching it back on are the same lever, they are authorised by the same
+   * grant, and they reach the same route (PUT /api/v1/portal/api-tokens/:id/
+   * status). The OFF direction asks first, because it takes effect on the next
+   * request: whatever integration holds the token starts getting 401s
+   * immediately, and this console cannot tell that integration anything.
+   *
+   * Not offered at all without the grant: the page hands the table no writer, so
+   * the column is a badge and there is no control to explain away. The server
+   * refuses the same write again.
    */
-  const handleActivate = async (row: AdminToken) => {
+  const handleStatus = async (row: AdminToken, next: boolean) => {
     if (!token) return;
 
+    if (!next) {
+      const confirmed = await confirmDanger({
+        title: "Deactivate this token?",
+        html: `This keeps the token's record and switches it off, so <strong>${
+          row.username || row.id
+        }</strong> stops working. It is not deleted: the record is what explains the 401.`,
+        confirmText: "Deactivate",
+      });
+      if (!confirmed) return;
+    }
+
     try {
-      await setPortalTokenStatus(token, row.id, true);
+      await setPortalTokenStatus(token, row.id, next);
       // Patched locally rather than refetched: one boolean changed, and a
       // reload here would make the switch feel like it bounced.
       setTokens((prev) =>
         prev.map((item) =>
-          item.id === row.id ? { ...item, is_active: true } : item,
+          item.id === row.id ? { ...item, is_active: next } : item,
         ),
       );
-      toast("Token reactivated", "success");
+      toast(next ? "Token reactivated" : "Token deactivated", "success");
     } catch (err: any) {
-      toast(err?.message || "Could not reactivate the token", "error");
-    }
-  };
-
-  /**
-   * Switching a token off, and the delete action: the same write, two doors.
-   *
-   * A switch-off, not a row removal. The row holds the only copy of the
-   * encrypted Wrike credential, so deleting it would break whoever is still
-   * calling with that token with no record of why. The admin console has no
-   * hard delete either. It goes through DELETE /:id so the server checks the
-   * delete grant, which is the grant that decides whether this caller may take
-   * a token out of service at all.
-   */
-  const handleDeactivate = async (row: AdminToken) => {
-    if (!token) return;
-
-    const confirmed = await confirmDanger({
-      title: "Deactivate this token?",
-      html: `This keeps the token's record and switches it off, so <strong>${
-        row.username || row.id
-      }</strong> stops working. It is not deleted: the record is what explains the 401.`,
-      confirmText: "Deactivate",
-    });
-    if (!confirmed) return;
-
-    try {
-      await deactivatePortalApiToken(token, row.id);
-      setTokens((prev) =>
-        prev.map((item) =>
-          item.id === row.id ? { ...item, is_active: false } : item,
-        ),
+      toast(
+        err?.message ||
+          (next
+            ? "Could not reactivate the token"
+            : "Could not deactivate the token"),
+        "error",
       );
-      toast("Token deactivated", "success");
-    } catch (err: any) {
-      toast(err?.message || "Could not deactivate the token", "error");
     }
   };
 
@@ -194,17 +182,14 @@ export default function PortalApiTokensPage({
             tokens={tokens}
             loading={loading}
             onPermissions={openPermissions}
-            onToggleStatus={handleActivate}
+            // Undefined without the update grant, which is what turns the
+            // Status column into a badge: the table draws the switch it is
+            // given a writer for, and nothing else. There is no onDelete here
+            // either, so both positions of the switch reach the status write.
+            onToggleStatus={canUpdate ? handleStatus : undefined}
             onActivityLogs={onViewActivityLogs}
             envScope={envScope}
             onClearEnvScope={onClearEnvScope}
-            // Delete has an endpoint of its own here (DELETE /api/v1/portal/
-            // api-tokens/:id, a switch-off that keeps the record), so both
-            // directions of the switch go through it: the delete grant is what
-            // decides whether this caller may take an integration out of
-            // service, and it is the same lever that brings it back.
-            onDelete={handleDeactivate}
-            canDelete={canDelete}
           />
         </div>
       </div>

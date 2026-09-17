@@ -20,15 +20,14 @@ import { IdParamSchema, SetPermissionsSchema, SetStatusSchema } from "./schema";
  * portal user administers exactly the tokens belonging to their own
  * environments and nothing else.
  *
- * Every route carries one of the three grants of the `api_tokens` module from
+ * Every route carries one of the two grants of the `api_tokens` module from
  * src/utils/portalPermissionCatalog.js:
  *
  *   GET    /                 read   list the tokens of my environments
  *   GET    /catalog          read   the module vocabulary the matrix editor draws
  *   GET    /:id/permissions  read   one token's matrix, uncached
  *   PUT    /:id/permissions  update edit a token's module matrix
- *   PUT    /:id/status       delete switch a token off, or back on
- *   DELETE /:id              delete switch a token off
+ *   PUT    /:id/status       update switch a token off, or back on
  *
  * There is no create route, and no create grant. A token is minted in exactly
  * two places: the token service's root login page, and an MCP client's OAuth
@@ -38,17 +37,22 @@ import { IdParamSchema, SetPermissionsSchema, SetStatusSchema } from "./schema";
  * button existed for a while and was removed: a control that cannot do the
  * thing it is named after is worse than no control.
  *
- * Availability is the delete grant's business in both directions. Switching a
- * token off and switching it back on are one lever with two positions, and a
- * caller trusted to take an integration out of service is the same caller who
- * has to be able to put it back; splitting that across two grants produced a
- * state nobody could explain (switchable off, never on). Update is what the
- * matrix is for.
+ * Availability is the update grant's business, in both directions. Switching a
+ * token off and switching it back on are one lever with two positions, and both
+ * are the same kind of act as editing the matrix above them: a narrowing of what
+ * a token may do, reversible from this page. Splitting the two positions across
+ * two grants produced a state nobody could explain (switchable off, never on),
+ * and giving availability a grant of its own produced a different one, a Delete
+ * tick on a page where nothing is ever deleted. So this module has one write
+ * grant and it is update.
  *
- * Delete is a switch-off, not a row removal. The row is the only copy of the
- * encrypted Wrike credential inside it, so deleting it would break whoever is
- * still calling with that token with no record of why, which is also why the
- * admin console has no hard delete either.
+ * There is no DELETE route, for the same reason delete has no grant. The write
+ * behind both is a switch-off that keeps the record, because the row holds the
+ * only copy of the encrypted Wrike credential and removing it would break
+ * whoever is still calling with that token with no record of why. A verb that
+ * deletes nothing is a worse name for that write, and the admin console's
+ * DELETE /api/v1/admin/tokens/:id is where the verb still lives for anyone
+ * scripting against it.
  */
 
 export const portalApiTokensRoute = (fastify, opts, done) => {
@@ -57,10 +61,6 @@ export const portalApiTokensRoute = (fastify, opts, done) => {
   const canUpdate = [
     ...authGuard,
     requirePortalPermission("api_tokens", "update"),
-  ];
-  const canDelete = [
-    ...authGuard,
-    requirePortalPermission("api_tokens", "delete"),
   ];
 
   const ok = (reply, data, message) =>
@@ -168,12 +168,17 @@ export const portalApiTokensRoute = (fastify, opts, done) => {
     },
   );
 
-  // PUT /portal/api-tokens/:id/status — the delete grant, in both directions:
-  // the switch that takes a token out of service is the same switch that puts
-  // it back, and update is what the matrix is for.
+  // PUT /portal/api-tokens/:id/status — the Active switch in the list, and the
+  // only route here that writes anything except a matrix.
+  //
+  // Gated by the update grant, in both directions, because the two positions of
+  // one lever cannot sensibly be told apart: a caller trusted to take an
+  // integration out of service has to be the caller trusted to put it back, or
+  // the portal can strand a token it switched off. Scoped by the same check the
+  // matrix write uses, so a token outside this user's environments is a 404.
   fastify.put(
     "/:id/status",
-    { ...SetStatusSchema, preHandler: canDelete },
+    { ...SetStatusSchema, preHandler: canUpdate },
     async (req, reply) => {
       try {
         await scopedToken(req.portalUser, req.params.id);
@@ -185,38 +190,7 @@ export const portalApiTokensRoute = (fastify, opts, done) => {
         return ok(
           reply,
           { id: req.params.id, is_active: isActive },
-          `Token ${isActive ? "activated" : "deactivated"}.`,
-        );
-      } catch (err) {
-        return fail(reply, err);
-      }
-    },
-  );
-
-  // DELETE /portal/api-tokens/:id
-  fastify.delete(
-    "/:id",
-    { ...IdParamSchema, preHandler: canDelete },
-    async (req, reply) => {
-      try {
-        const record = await scopedToken(req.portalUser, req.params.id);
-
-        // Already off: nothing to do, and no second write to explain later.
-        if (!record.is_active) {
-          return ok(
-            reply,
-            { id: req.params.id, is_active: false },
-            "Token is already off.",
-          );
-        }
-
-        const updated = await Tokens.SetStatus(req.params.id, false);
-        if (!updated) throw { statusCode: 404, message: "Token not found." };
-
-        return ok(
-          reply,
-          { id: req.params.id, is_active: false },
-          "Token deactivated. Its record is kept, so anyone still calling with it gets a clear 401.",
+          `Token ${isActive ? "reactivated" : "deactivated"}.`,
         );
       } catch (err) {
         return fail(reply, err);

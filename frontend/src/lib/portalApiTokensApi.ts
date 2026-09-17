@@ -22,6 +22,10 @@ import type {
  * service's root login page or by an MCP client's OAuth flow, both of which
  * exchange a Wrike authorization code that only a person signing in can
  * produce. Neither console can stand in for that person.
+ *
+ * There is no delete call either: the portal's api_tokens module has no delete
+ * grant, and the write a delete used to perform (switch the token off, keep the
+ * record) is the status call below.
  */
 /**
  * One row of the portal's token list.
@@ -94,10 +98,11 @@ export const savePortalTokenPermissions = async (
 /**
  * PUT /api/v1/portal/api-tokens/:id/status — the token's availability.
  *
- * Guarded by the delete grant on the server, in both directions: taking a token
- * out of service and putting it back are the same lever with two positions, and
- * a caller trusted with one has to be trusted with the other. The update grant
- * is what the module matrix below is for.
+ * Guarded by the update grant on the server, in both directions: taking a token
+ * out of service and putting it back are one lever with two positions, and both
+ * are the same kind of act as editing the matrix above. There is no DELETE call
+ * here: the portal's module has no delete grant, and the write behind a delete
+ * was this one anyway.
  */
 export const setPortalTokenStatus = async (
   token: string,
@@ -115,22 +120,4 @@ export const setPortalTokenStatus = async (
   );
   const body = await res.json().catch(() => null);
   if (!body?.success) throw new Error(body?.message || "Could not change the status");
-};
-
-/**
- * DELETE /api/v1/portal/api-tokens/:id — delete.
- *
- * A switch-off, not a row removal: the row holds the only copy of the encrypted
- * Wrike credential, so removing it would break whoever is still calling with
- * that token with no record of why.
- */
-export const deactivatePortalApiToken = async (
-  token: string,
-  tokenId: string,
-): Promise<void> => {
-  const res = await portalFetch(`/api/v1/portal/api-tokens/${tokenId}`, token, {
-    method: "DELETE",
-  });
-  const body = await res.json().catch(() => null);
-  if (!body?.success) throw new Error(body?.message || "Could not deactivate the token");
 };
