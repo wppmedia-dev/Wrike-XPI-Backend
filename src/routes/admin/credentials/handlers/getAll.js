@@ -1,7 +1,16 @@
 import { decryptField } from "../../../../utils/crypto";
 import { WrikeCredentials } from "../../../../controllers";
+import { applyEnvironmentFilters } from "../../../../utils/environmentFilters";
 
-export const GetAll = () => {
+/**
+ * The Environments list. `search` is the table's search box, applied here so
+ * that the answer covers the whole table rather than the page the browser
+ * holds (src/utils/environmentFilters.js).
+ *
+ * Filtered AFTER mapping, on purpose: `client_id` is decrypted in the map
+ * below, so the readable value only exists from that point on.
+ */
+export const GetAll = ({ search } = {}) => {
   return new Promise(async (resolve, reject) => {
     try {
       const credentials = await WrikeCredentials.GetAllWithDeleted();
@@ -39,7 +48,7 @@ export const GetAll = () => {
       return resolve({
         statusCode: 200,
         message: "Credentials retrieved",
-        data,
+        data: applyEnvironmentFilters(data, { search }),
       });
     } catch (err) {
       console.log(err?.message || err);

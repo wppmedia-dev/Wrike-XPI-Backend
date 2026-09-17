@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { AdminEnvironment } from "../../lib/adminApi";
 import { DataTable } from "../../components/ui/DataTable";
 import { useTable, type ColumnDef } from "../../components/ui/useTable";
@@ -18,6 +18,14 @@ import { EMPTY, dateSortValue, formatDateTime } from "../../lib/format";
 export interface EnvironmentsTableProps {
   environments: AdminEnvironment[];
   loading: boolean;
+  /**
+   * The search box, answered by the server. The table keeps the term being
+   * typed (that is its own input state) and hands the settled term up; the
+   * rows it renders are already the server's answer, so it does not filter
+   * them itself. Omit it and the table filters what it was given, which is
+   * what every other caller wants.
+   */
+  onSearch?: (term: string) => void;
   onEdit: (env: AdminEnvironment) => void;
   onDuplicate: (env: AdminEnvironment) => void;
   onDelete: (env: AdminEnvironment) => void;
@@ -34,9 +42,14 @@ export interface EnvironmentsTableProps {
   onAdd: () => void;
 }
 
+/* Long enough that typing an environment id is one request rather than
+   eighteen. Same value as the Tokens table, for the same reason. */
+const SEARCH_DEBOUNCE_MS = 350;
+
 export function EnvironmentsTable({
   environments,
   loading,
+  onSearch,
   onEdit,
   onDuplicate,
   onDelete,
@@ -177,7 +190,34 @@ export function EnvironmentsTable({
     columns,
     getRowId: (env) => env.id,
     initialPageSize: 10,
+    // The rows are already what the server decided, so searching them again
+    // here would filter the answer by a term the answer was not asked for.
+    clientSearch: !onSearch,
   });
+
+  const { search } = table;
+
+  /* The term the parent is already showing, so a settled change is sent once
+     and mount does not re-ask for the list the parent has just loaded. */
+  const sentTermRef = useRef(search.trim());
+
+  useEffect(() => {
+    if (!onSearch) return;
+    const term = search.trim();
+    if (term === sentTermRef.current) return;
+
+    const timer = window.setTimeout(() => {
+      sentTermRef.current = term;
+      onSearch(term);
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [search, onSearch]);
+
+  // Read from the input rather than from props: while a search is in flight
+  // the box shows the question that was asked, which is what the empty state
+  // has to explain.
+  const activeTerm = search.trim();
 
   return (
     <DataTable
@@ -185,18 +225,34 @@ export function EnvironmentsTable({
       caption="Environments"
       loading={loading}
       className="env-table"
-      searchPlaceholder="Search environments…"
+      searchPlaceholder="Search by name or environment id…"
       empty={
-        <div className="dt2-empty">
-          <div className="dt2-empty-icon">
-            <i className="fa-regular fa-folder-open" aria-hidden="true" />
+        activeTerm ? (
+          // A search that matched nothing used to render the "no environments
+          // yet" panel below, which tells an admin their environments are gone
+          // when in fact they are all still there behind the term.
+          <div className="dt2-empty">
+            <div className="dt2-empty-icon">
+              <i className="fa-solid fa-magnifying-glass" aria-hidden="true" />
+            </div>
+            <h3>No environments match that search</h3>
+            <p>
+              Nothing matches “{activeTerm}”. Search by name, or paste an
+              environment id in full.
+            </p>
           </div>
-          <h3>No environments yet</h3>
-          <p>Add the first environment to start issuing tokens.</p>
-          <button type="button" className="btn btn-primary" onClick={onAdd}>
-            <i className="fa-solid fa-plus" aria-hidden="true" /> Add Environment
-          </button>
-        </div>
+        ) : (
+          <div className="dt2-empty">
+            <div className="dt2-empty-icon">
+              <i className="fa-regular fa-folder-open" aria-hidden="true" />
+            </div>
+            <h3>No environments yet</h3>
+            <p>Add the first environment to start issuing tokens.</p>
+            <button type="button" className="btn btn-primary" onClick={onAdd}>
+              <i className="fa-solid fa-plus" aria-hidden="true" /> Add Environment
+            </button>
+          </div>
+        )
       }
     />
   );

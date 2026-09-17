@@ -12,6 +12,7 @@ import {
 import { formatDateTime } from "../lib/format";
 import AdminSelect from "../components/AdminSelect";
 import { CopyButton } from "../components/ui/CopyButton";
+import { callerNote } from "../lib/activityCaller";
 import "./PortalActivityPage.css";
 
 /* The portal Activity Log.
@@ -461,7 +462,10 @@ export default function PortalActivityPage({
                     <td className="pal-time">{formatTime(row.created_at)}</td>
                     <td className="pal-caller">
                       {row.actor_email || (
-                        <span className="pal-unresolved">
+                        <span
+                          className="pal-unresolved"
+                          title={callerNote(row)}
+                        >
                           <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" />
                           Unresolved
                         </span>
@@ -626,7 +630,14 @@ export default function PortalActivityPage({
                 </div>
                 <div>
                   <dt>Caller</dt>
-                  <dd>{detailRow.actor_email || <span className="pal-muted">Unresolved</span>}</dd>
+                  <dd>
+                    {detailRow.actor_email || (
+                      <>
+                        <span className="pal-muted">Unresolved</span>
+                        <div className="pal-detail-note">{callerNote(detailRow)}</div>
+                      </>
+                    )}
+                  </dd>
                 </div>
                 <div>
                   <dt>Environment</dt>

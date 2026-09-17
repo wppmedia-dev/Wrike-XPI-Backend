@@ -12,9 +12,23 @@ import { tokenExpiryFrom, TOKEN_TTL_DAYS } from "../../../utils/tokenTtl";
 import { usernameFor } from "../../../utils/tokenUsername";
 import { v4 as uuidv4 } from "uuid";
 
+/**
+ * Mint, or refuse to mint, an XPI token for whoever just signed in at Wrike.
+ *
+ * `req` is optional and used for one thing: attributing the request in the
+ * activity log. Wrike's contact response a few lines below is the only place
+ * this flow learns a person's email, and without this the log row for a
+ * sign-in that created a token — or for one refused before it could — said
+ * "Unresolved" about somebody we had just looked up.
+ *
+ * @param {{code: string, environmentId: string, ip?: string, clientName?: string}} data
+ * @param {object} fastify - the app, for jwt.sign
+ * @param {object} [req] - the request, so its log row can name the caller
+ */
 export const WrikeTokenExchange = (
   { code, environmentId, ip, clientName },
   fastify,
+  req,
 ) => {
   return new Promise(async (resolve, reject) => {
     // Transaction is opened later, right before the first write. It must
@@ -65,6 +79,26 @@ export const WrikeTokenExchange = (
       }
 
       console.log("Fetched Wrike user data");
+
+      // Set before the access check rather than after it: a refusal is exactly
+      // the row an admin wants to be able to attribute ("who tried, and who was
+      // turned away?"), and the email is already in hand. It rides on the
+      // request because the log is written by the route's onResponse hook.
+      if (req) {
+        req.callerEmail = primaryEmail
+          ? String(primaryEmail).trim().toLowerCase()
+          : null;
+      }
+
+      // Set here rather than after the access check: a refusal is exactly the
+      // row an admin wants to be able to attribute ("who tried, and who was
+      // turned away?"), and the email is already known. It rides on the request
+      // because the log is written by the route's onResponse hook.
+      if (req) {
+        req.callerEmail = primaryEmail
+          ? String(primaryEmail).trim().toLowerCase()
+          : null;
+      }
 
       // Environment-level access scope: same gate ValidateToken applies to
       // every subsequent API call, run here BEFORE any credentials or token

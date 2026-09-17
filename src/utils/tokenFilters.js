@@ -18,7 +18,14 @@
  * frontend/src/lib/tokenDisplay.ts, and EXPIRY_WARNING_DAYS mirrors the same
  * file. A change to one without the other turns into a filter that hides rows
  * whose badge matches what was asked for.
+ *
+ * Identifiers compare whole and text compares by substring, decided in
+ * src/utils/searchMatch.js: the token id and the environment id are either the
+ * ones that were asked for or they are not, so a pasted uuid cannot come back
+ * with rows that merely share a fragment of it.
  */
+
+import { matchesIdentifier, matchesText } from "./searchMatch";
 
 /**
  * The nil UUID means "tokens with no environment", the way it means "matches
@@ -90,15 +97,6 @@ export const parseTokenFilters = (query = {}) =>
     search: query.search,
   });
 
-/** Case-insensitive substring over any of the given fields. Normalised input
-    means the needle is always a string and blank always means "no filter", so
-    an absent control never hides a row. */
-const matchesText = (needle, ...fields) => {
-  const term = needle.toLowerCase();
-  if (!term) return true;
-  return fields.some((field) => (field || "").toLowerCase().includes(term));
-};
-
 /**
  * The three states the Access badge can be in, from the summary the list
  * already carries (src/utils/tokenPermissionSummary.js). Mirrors
@@ -140,24 +138,34 @@ const matchesUpdated = (token, kind) => {
 };
 
 /**
- * The fields the search box covers.
+ * The search box's two halves.
  *
- * A superset of the table's searchable columns (frontend/src/components/
- * TokensTable.tsx), because the search is over the row rather than over what a
- * narrow window happened to render: username is not a column any more and is
- * still the value a caller authenticates with, so "find the token with this
- * username" has to work.
+ * The identifiers are compared whole: a search that is a token id or an
+ * environment id names that row and nothing else. The rest are substring
+ * matches, because they are the things people half-remember rather than paste
+ * (username is not a column any more and is still the value a caller
+ * authenticates with, so "find the token with this username" has to work).
+ *
+ * `account_id` stays in the text half on purpose. It is a Wrike account
+ * number rather than a uuid, it is not what a support ticket quotes at you,
+ * and a partial number is a reasonable thing to type.
  */
-const SEARCHABLE = (token) => [
-  token.id,
+const SEARCH_IDENTIFIERS = (token) => [token.id, token.env_id];
+
+const SEARCH_TEXT = (token) => [
   token.username,
   token.account_id,
-  token.env_id,
   token.environment_name,
   token.client_name,
   token.creator_email,
   token.creator_name,
 ];
+
+/** The search box's predicate: the term names an id, or it appears in any of
+    the text fields. */
+const matchesSearch = (term, token) =>
+  matchesIdentifier(term, ...SEARCH_IDENTIFIERS(token)) ||
+  matchesText(term, ...SEARCH_TEXT(token));
 
 /**
  * Is this row in the filtered set?
@@ -179,7 +187,10 @@ export const matchesTokenFilters = (token, filters = {}) => {
     }
   }
 
-  if (!matchesText(f.tokenId, token.id)) return false;
+  // The token id is an identifier, so it is named whole: "aaaa" is not a
+  // search for a token whose id begins with aaaa, it is a search for the
+  // token with that id.
+  if (!matchesIdentifier(f.tokenId, token.id)) return false;
   if (!matchesText(f.client, token.client_name)) return false;
   if (!matchesText(f.accountId, token.account_id)) return false;
   if (!matchesText(f.creator, token.creator_email, token.creator_name))
@@ -198,7 +209,7 @@ export const matchesTokenFilters = (token, filters = {}) => {
   if (f.status === "active" && !token.is_active) return false;
   if (f.status === "inactive" && token.is_active) return false;
 
-  if (f.search && !matchesText(f.search, ...SEARCHABLE(token))) {
+  if (f.search && !matchesSearch(f.search, token)) {
     return false;
   }
 

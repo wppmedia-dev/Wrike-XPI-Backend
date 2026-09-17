@@ -19,7 +19,7 @@ export const adminCredentialsRoute = (fastify, opts, done) => {
     { ...GetAllSchema, preHandler: [verifyAdminJWT] },
     async (req, reply) => {
       try {
-        const result = await GetAll();
+        const result = await GetAll({ search: req.query?.search });
 
         return reply.code(result?.statusCode || 200).send({
           success: true,

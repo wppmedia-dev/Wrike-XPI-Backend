@@ -579,6 +579,17 @@
   color: var(--text-muted);
 }
 
+/* The sentence under "Unresolved" in the call detail: why this row has no
+   caller, rather than leaving the reader to guess whether the log is broken.
+   Quiet and indented under the value it explains, not a callout. */
+.al-detail-note {
+  margin-top: 3px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-muted);
+  max-width: 46ch;
+}
+
 .al-detail-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));

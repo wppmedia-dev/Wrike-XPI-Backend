@@ -54,8 +54,20 @@ async function parseJson(res: Response): Promise<any> {
   return res.json().catch(() => null);
 }
 
-export const listEnvironments = async (): Promise<AdminEnvironment[]> => {
-  const res = await adminFetch("/api/v1/admin/credentials");
+/**
+ * The environments (credentials) list.
+ *
+ * `search` is the Environments table's search box, applied by the server: an
+ * environment id in it names that one environment, and anything else is
+ * matched against the name and the two Wrike values. Omitted when blank, so an
+ * empty box asks for the whole list rather than for rows matching "".
+ */
+export const listEnvironments = async (
+  search = "",
+): Promise<AdminEnvironment[]> => {
+  const term = search.trim();
+  const query = term ? `?search=${encodeURIComponent(term)}` : "";
+  const res = await adminFetch(`/api/v1/admin/credentials${query}`);
   const json = await parseJson(res);
   if (json?.success && Array.isArray(json.data)) {
     return json.data.map((c: any) => ({
