@@ -46,10 +46,10 @@ export const MODULES = [
     key: "api_tokens",
     label: "API Tokens",
     description:
-      "The API tokens issued for the environments this user can see: what each one is allowed to do, and whether it is switched on.",
-    // Three actions, one per route in src/routes/portal/apiTokens: read lists
-    // the tokens of the user's own environments, update edits a token's module
-    // matrix, delete switches one off and back on.
+      "The API tokens issued for the environments this user can see, and what each one is allowed to do.",
+    // Two actions, one per route in src/routes/portal/apiTokens: read lists the
+    // tokens of the user's own environments, update edits a token's module
+    // matrix.
     //
     // No create, deliberately. A token is minted in exactly two places, and
     // neither of them is a console: the token service's root login page, and an
@@ -57,7 +57,14 @@ export const MODULES = [
     // which only a person signing in can produce, so there is no create route
     // to grant. An unticked Create box would have been a promise nothing could
     // keep, and a ticked one would have bought a button that could not do it.
-    actions: ["read", "update", "delete"],
+    //
+    // No delete. A token's availability is a narrowing decision, not a
+    // destructive one: switching a token off is the same kind of act as editing
+    // its module matrix, and it is reversible from the same page. So update
+    // carries both, and delete has nothing of its own left to grant. A tick that
+    // authorises nothing is the same dead control as the untickable Create box
+    // above, so it is not offered either.
+    actions: ["read", "update"],
   },
   {
     key: "activity_logs",

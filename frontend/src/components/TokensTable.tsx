@@ -229,7 +229,18 @@ export interface TokensTableProps {
   tokens: AdminToken[];
   loading: boolean;
   onPermissions: (token: AdminToken) => void;
-  onToggleStatus: (token: AdminToken, next: boolean) => void | Promise<void>;
+  /**
+   * Moves a token to its other status. The Status column draws a switch when
+   * this is passed and a badge when it is not, which is how a caller without
+   * the grant loses the control: the portal hands it over only for a user
+   * holding api_tokens:update, and the server refuses the write again
+   * (requirePortalPermission in src/routes/portal/apiTokens). The admin console
+   * always passes it, because the whole console is the grant.
+   *
+   * Which route the OFF position reaches is `onDelete` below: this table has one
+   * status lever and does not care which verb moves it.
+   */
+  onToggleStatus?: (token: AdminToken, next: boolean) => void | Promise<void>;
   /**
    * Opens the Activity Log page scoped to this token. The row action appears
    * only when this is passed: the admin console can do that, the portal can
@@ -247,27 +258,13 @@ export interface TokensTableProps {
   /** Tells the parent its scope is no longer applied. */
   onClearEnvScope?: () => void;
   /**
-   * Called by the Status switch when a token goes out of service, when the
-   * caller has a delete route of its own. Both consoles do: the portal at
-   * DELETE /api/v1/portal/api-tokens/:id, the admin at
-   * DELETE /api/v1/admin/tokens/:id. A caller with no such endpoint falls back
-   * to the status write below, which drives both directions.
+   * Called by the Status switch when a token goes out of service, by a caller
+   * whose delete is a route of its own. The admin console does that: DELETE
+   * /api/v1/admin/tokens/:id switches the token off and keeps its row. A caller
+   * with no such endpoint, which includes the portal, falls back to the status
+   * write for both positions.
    */
   onDelete?: (token: AdminToken) => void | Promise<void>;
-  /**
-   * The api_tokens delete grant of whoever is looking at this table. Defaults
-   * to true, which is what the admin console passes (unconditionally, by virtue
-   * of being the super-admin console). The portal passes its matrix, so a user
-   * granted read without delete sees the Status column as a badge rather than a
-   * switch. The server enforces the same grant again (requirePortalPermission in
-   * src/routes/portal/apiTokens), so a hidden control is never the only thing
-   * stopping the write.
-   *
-   * There is no update grant here, because this table has no update to guard:
-   * the matrix itself is edited in the permissions popup, which takes its own
-   * read-only flag.
-   */
-  canDelete?: boolean;
 }
 
 export function TokensTable({
@@ -279,15 +276,14 @@ export function TokensTable({
   envScope = null,
   onClearEnvScope,
   onDelete,
-  canDelete = true,
 }: TokensTableProps) {
   /**
    * Switching a token off, through whichever route this caller has.
    *
-   * Both directions hang off the delete grant, because they are one lever with
-   * two positions: a caller trusted to take an integration out of service is
-   * the same caller who has to be able to put it back. Splitting them across
-   * two grants produced a state nobody could explain, a token that could be
+   * Both directions hang off one grant, because they are one lever with two
+   * positions: a caller trusted to take an integration out of service is the
+   * same caller who has to be able to put it back. Splitting them across two
+   * grants produced a state nobody could explain, a token that could be
    * switched off and never on.
    *
    * The Status switch is the ONLY control for that lever. The row menu used to
@@ -296,14 +292,13 @@ export function TokensTable({
    * better than the other. The switch is the one that stays, because it shows
    * the current state as well as offering the other one.
    *
-   * The portal has a delete endpoint, and that is the grant the server checks
-   * for a token going out of service, so the switch has to reach the same route
-   * the menu item did: routing it through the status write instead would have
-   * asked a delete-only caller for an update grant they were never given. A
-   * caller with no delete endpoint falls back to the status write.
+   * The portal reaches the status write for both positions, because its
+   * api_tokens module has no delete grant and so no delete route; the admin
+   * console sends the OFF position to DELETE /admin/tokens/:id, which is where
+   * that verb lives. A caller with neither falls back to the status write.
    */
   const switchOff = (token: AdminToken) =>
-    onDelete ? onDelete(token) : onToggleStatus(token, false);
+    onDelete ? onDelete(token) : onToggleStatus?.(token, false);
 
   const columns = useMemo<ColumnDef<AdminToken>[]>(
     () => [
@@ -411,11 +406,11 @@ export function TokensTable({
         width: "92px",
         sortable: false,
         /* The only control for a token's status, both directions, and the only
-           one its grant has to cover (see switchOff above). A caller without
-           the grant gets the state as a badge instead: the switch is not drawn
-           and the server refuses the write anyway. */
+           one its grant has to cover (see switchOff above). A caller that hands
+           this table no writer gets the state as a badge instead: no switch is
+           drawn, and the server refuses the write anyway. */
         cell: (token) =>
-          canDelete ? (
+          onToggleStatus ? (
             <Toggle
               size="sm"
               checked={token.is_active}
@@ -495,7 +490,7 @@ export function TokensTable({
         ),
       },
     ],
-    [onPermissions, onToggleStatus, onActivityLogs, onDelete, canDelete],
+    [onPermissions, onToggleStatus, onActivityLogs, onDelete],
   );
 
   const [filters, setFilters] = useState<Record<FilterKey, string>>(EMPTY_FILTERS);

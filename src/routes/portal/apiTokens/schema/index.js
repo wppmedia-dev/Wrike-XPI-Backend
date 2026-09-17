@@ -4,6 +4,9 @@
  * There is no create schema: this API has no create route (see the note at the
  * top of ./index.js). The environment picker that used to need one is gone
  * with it.
+ *
+ * There is no delete schema either: the module has no delete route, because
+ * availability is the update grant's business.
  */
 
 const ID_PARAM = {
@@ -45,7 +48,8 @@ export const SetStatusSchema = {
   },
 };
 
-// DELETE /portal/api-tokens/:id
+// The routes that address a single token: the permissions read and write, and
+// the status write.
 export const IdParamSchema = {
   schema: { params: ID_PARAM },
 };
