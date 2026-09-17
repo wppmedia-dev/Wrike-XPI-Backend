@@ -8,6 +8,7 @@ import {
   SURFACE,
   PUBLIC_DENIAL_MESSAGE,
 } from "../../../utils/environmentAccess";
+import { tokenExpiryFrom, TOKEN_TTL_DAYS } from "../../../utils/tokenTtl";
 
 export const WrikeTokenExchange = ({ code, environmentId, ip }, fastify) => {
   return new Promise(async (resolve, reject) => {
@@ -145,6 +146,12 @@ export const WrikeTokenExchange = ({ code, environmentId, ip }, fastify) => {
 
       console.log("Retrieved exising user token data");
 
+      // When the token minted below dies. Computed once, here, so the row and
+      // the signature cannot disagree about it, and stored on the row because
+      // nothing reads the JWE's own payload back — without this, "when does
+      // this integration stop working?" has no answer until it does.
+      const tokenExpiresAt = tokenExpiryFrom();
+
       // Update or create token record
       if (userTokenId) {
         await Tokens.Update(
@@ -157,6 +164,7 @@ export const WrikeTokenExchange = ({ code, environmentId, ip }, fastify) => {
             password_hash: passwordHash,
             salt: salt.toString("base64"),
             wrapped_dek: wrappedDEK.toString("base64"),
+            token_expires_at: tokenExpiresAt,
           },
           { transaction },
         );
@@ -175,6 +183,7 @@ export const WrikeTokenExchange = ({ code, environmentId, ip }, fastify) => {
             salt: salt.toString("base64"),
             wrapped_dek: wrappedDEK.toString("base64"),
             is_active: true,
+            token_expires_at: tokenExpiresAt,
           },
           { transaction },
         );
@@ -185,13 +194,14 @@ export const WrikeTokenExchange = ({ code, environmentId, ip }, fastify) => {
 
       // Sign the XPI token. It carries the token-record id (t) and the DEK
       // (d, base64) inline. The DEK is not secret from whoever holds this
-      // token; the signature is what protects the payload from tampering.
+      // token; the signature is what protects the payload from tampering. The
+      // lifetime is the same constant the row above was stamped with.
       const jweToken = fastify.jwt.sign(
         {
           t: userTokenId,
           d: dek.toString("base64"),
         },
-        { expiresIn: "180d" },
+        { expiresIn: `${TOKEN_TTL_DAYS}d` },
       );
 
       await transaction.commit();

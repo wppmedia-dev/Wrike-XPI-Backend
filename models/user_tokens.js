@@ -59,6 +59,12 @@ module.exports = (sequelize, DataTypes) => {
       wrapped_dek: {
         type: DataTypes.TEXT,
       },
+      token_expires_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment:
+          "When the signed token issued for this row stops being accepted (src/utils/tokenTtl.js)",
+      },
       is_active: {
         type: DataTypes.BOOLEAN,
       },

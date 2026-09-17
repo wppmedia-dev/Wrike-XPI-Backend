@@ -13,7 +13,7 @@ import { useTable, type ColumnDef } from "../../components/ui/useTable";
 import { RowMenu } from "../../components/ui/RowMenu";
 import { CopyButton } from "../../components/ui/CopyButton";
 import { Toggle } from "../../components/ui/Toggle";
-import { Badge } from "../../components/ui/Badge";
+import { Badge, type BadgeTone } from "../../components/ui/Badge";
 import AdminSelect from "../../components/AdminSelect";
 import { EMPTY, dateSortValue, formatDateTime } from "../../lib/format";
 import "./TokensTable.css";
@@ -44,6 +44,7 @@ type FilterKey =
   | "account"
   | "creator"
   | "access"
+  | "validity"
   | "updated"
   | "status";
 
@@ -57,6 +58,12 @@ interface FilterDef {
 
 /** Option value standing for "tokens that are not attached to an environment". */
 const NO_ENVIRONMENT = "\u0000none";
+
+/** Days before expiry at which a token is worth flagging: enough notice to
+    re-authenticate before whatever is using it starts failing. */
+const EXPIRY_WARNING_DAYS = 14;
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 const FILTER_DEFS: FilterDef[] = [
   {
@@ -86,6 +93,18 @@ const FILTER_DEFS: FilterDef[] = [
       { value: "unrestricted", label: "Unrestricted" },
       { value: "restricted", label: "Restricted" },
       { value: "none", label: "No access" },
+    ],
+  },
+  {
+    key: "validity",
+    label: "Validity",
+    kind: "select",
+    options: [
+      { value: "", label: "Any validity" },
+      { value: "expired", label: "Expired" },
+      { value: "soon", label: `Expiring within ${EXPIRY_WARNING_DAYS} days` },
+      { value: "valid", label: "Valid" },
+      { value: "unknown", label: "No expiry recorded" },
     ],
   },
   {
@@ -121,6 +140,7 @@ const EMPTY_FILTERS: Record<FilterKey, string> = {
   account: "",
   creator: "",
   access: "",
+  validity: "",
   updated: "",
   status: "",
 };
@@ -129,6 +149,52 @@ const RANGE_MS: Record<string, number> = {
   "24h": 24 * 60 * 60 * 1000,
   "7d": 7 * 24 * 60 * 60 * 1000,
   "30d": 30 * 24 * 60 * 60 * 1000,
+};
+
+interface Validity {
+  tone: BadgeTone;
+  label: string;
+  detail: string;
+}
+
+/**
+ * How long the token a caller holds will keep working.
+ *
+ * Two different things can stop a token: an admin switching it off (the Status
+ * column) and its own expiry. This is only the second one, and it is a fact
+ * about the credential rather than a setting, which is why it does not read as
+ * a warning unless it is close.
+ */
+const validityOf = (token: AdminToken): Validity => {
+  if (!token.token_expires_at) {
+    return {
+      tone: "neutral",
+      label: "Unknown",
+      detail: "No expiry was recorded for this token. It is checked when a caller uses it.",
+    };
+  }
+
+  const expiresAt = new Date(token.token_expires_at).getTime();
+  const days = Math.floor((expiresAt - Date.now()) / MS_PER_DAY);
+  const when = formatDateTime(token.token_expires_at);
+
+  if (days < 0) {
+    return {
+      tone: "danger",
+      label: "Expired",
+      detail: `Expired ${when}. Callers are refused until they sign in again.`,
+    };
+  }
+
+  if (days <= EXPIRY_WARNING_DAYS) {
+    return {
+      tone: "warning",
+      label: days === 0 ? "Expires today" : `${days} day${days === 1 ? "" : "s"} left`,
+      detail: `Expires ${when}.`,
+    };
+  }
+
+  return { tone: "neutral", label: `${days} days left`, detail: `Expires ${when}.` };
 };
 
 /** Case-insensitive substring over any of the given fields; a blank filter
@@ -156,6 +222,22 @@ const matchesFilters = (token: AdminToken, filters: Record<FilterKey, string>) =
   if (filters.access === "unrestricted" && configured) return false;
   if (filters.access === "restricted" && (!configured || granted === 0)) return false;
   if (filters.access === "none" && !(configured && granted === 0)) return false;
+
+  if (filters.validity) {
+    const expiresAt = token.token_expires_at
+      ? new Date(token.token_expires_at).getTime()
+      : null;
+
+    if (filters.validity === "unknown") {
+      if (expiresAt !== null) return false;
+    } else {
+      if (expiresAt === null) return false;
+      const days = (expiresAt - Date.now()) / MS_PER_DAY;
+      if (filters.validity === "expired" && days >= 0) return false;
+      if (filters.validity === "soon" && (days < 0 || days > EXPIRY_WARNING_DAYS)) return false;
+      if (filters.validity === "valid" && days <= EXPIRY_WARNING_DAYS) return false;
+    }
+  }
 
   if (filters.updated) {
     // Falls back to creation time: a token that has never been used still has
@@ -279,11 +361,21 @@ export function TokensTable({
         },
       },
       {
-        id: "updated_at",
-        header: "Last Updated",
-        accessor: (token) => dateSortValue(token.updated_at),
-        cell: (token) => formatDateTime(token.updated_at),
-        searchable: false,
+        id: "validity",
+        header: "Validity",
+        // Sorts on the expiry itself, so whatever is closest to breaking sits
+        // at the top of the list.
+        accessor: (token) => dateSortValue(token.token_expires_at),
+        cell: (token) => {
+          const validity = validityOf(token);
+          return (
+            // Badge has no title prop, and the exact timestamp is what an
+            // admin needs once the label tells them a token is worth a look.
+            <span title={validity.detail}>
+              <Badge tone={validity.tone}>{validity.label}</Badge>
+            </span>
+          );
+        },
       },
       {
         id: "is_active",
