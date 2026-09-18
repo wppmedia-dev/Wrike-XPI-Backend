@@ -730,6 +730,85 @@
   word-break: break-word;
 }
 
+/* Preview / Raw, shown only when the captured body is a rendered page (an
+   HTML error from the token surface). Same pill as the filter chips, so it
+   reads as a view switch rather than as two more actions. */
+.al-payload-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  /* The head sets uppercase for the title; the controls inside it are
+     sentence case, like every other button in the console. */
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 600;
+}
+
+.al-payload-tabs {
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.al-payload-tab {
+  padding: 4px 10px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.al-payload-tab:hover {
+  color: var(--text-primary);
+}
+
+.al-payload-tab[aria-pressed="true"] {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.al-payload-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* The captured page, rendered. White behind it on purpose: these pages bring
+   their own dark background, and a preview that inherits the console's theme
+   would misrepresent what the caller saw. */
+.al-payload-frame {
+  display: block;
+  width: 100%;
+  height: 360px;
+  background: #ffffff;
+  border: 0;
+}
+
+.al-payload-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 9px 12px;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--warning);
+}
+
+.al-payload-note i {
+  margin-top: 2px;
+  font-size: 10px;
+}
+
 .al-no-payload {
   padding: 14px;
   font-size: 12.5px;
