@@ -311,6 +311,78 @@ const {
   check("junk mints a 180-day token", junk.signOptions.expiresIn, "180d");
   check("with no seeded matrix", junk.seeded, null);
 
+  /* ── The validator ─────────────────────────────────────────────────── */
+
+  section("The validator answers from the calendar grant");
+
+  const Fastify = require("fastify");
+
+  /* The route registered on its own, with the two things the gates leave
+     behind (a token id and the loaded matrix) planted by a hook, so each case
+     below can ask the same question with a different permission and read the
+     status straight off. The handler and the decision under it are the real
+     ones either way. */
+  const validateWith = async (matrixEntry) => {
+    const app = Fastify();
+    app.addHook("onRequest", async (req) => {
+      req.tokenId = "11111111-1111-4111-8111-111111111111";
+      req.environmentName = "PROD";
+      req.envId = ENV_ID;
+      req.tokenMatrix = matrixEntry;
+    });
+    await app.register(require("../src/routes/calendar").calendarRoute);
+
+    const res = await app.inject({ method: "GET", url: "/validate" });
+    await app.close();
+    return { status: res.statusCode, body: res.json() };
+  };
+
+  const entryOf = (matrix, configured = true) => ({ configured, matrix });
+
+  const granted = await validateWith(entryOf(calendarSyncMatrix()));
+  check("a calendar token validates", granted.status, 200);
+  check("and the answer says so", granted.body.data.calendar_access, true);
+  check(
+    "with the environment it belongs to",
+    granted.body.data.environment,
+    "PROD",
+  );
+  check(
+    "and the token the console would show",
+    granted.body.data.token_id,
+    "11111111-1111-4111-8111-111111111111",
+  );
+
+  // Grandfathering, exactly as the gate applies it: no rows means unrestricted,
+  // which is what keeps tokens issued before the matrix existed working.
+  const unrestricted = await validateWith(
+    entryOf(catalog.emptyMatrix(), false),
+  );
+  check("an unrestricted token validates too", unrestricted.status, 200);
+
+  const campaignOnly = await validateWith(
+    entryOf(catalog.normaliseMatrix({ campaign: { read: true } })),
+  );
+  check("a campaign-only token does not", campaignOnly.status, 403);
+  check(
+    "and is told which module refused it",
+    campaignOnly.body.error.module,
+    CALENDAR_SYNC_MODULE,
+  );
+  check("and which action", campaignOnly.body.error.action, "read");
+  check("and why", campaignOnly.body.error.code, "MODULE_FORBIDDEN");
+
+  // A matrix that was never loaded is a check that could not be answered, not
+  // a grant. This is the branch that only fires if the route is ever mounted
+  // outside the guarded scope.
+  const unloaded = await validateWith(undefined);
+  check("an unanswerable check is refused", unloaded.status, 403);
+  check(
+    "as a failed check, not a denial",
+    unloaded.body.error.code,
+    "PERMISSION_CHECK_FAILED",
+  );
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 })();

@@ -162,6 +162,13 @@ console.log("\nREST routes → module/action");
     ["GET", "/api/v1/wrikexpi/amoeba/slug", "amoeba/read"],
     ["POST", "/api/v1/wrikexpi/amoeba/slug/svc", "amoeba/create"],
 
+    // The calendar surface. The path is named after the surface a calendar
+    // integration calls; the module after what the token is for. A prefix
+    // missing from the head table would be UNGOVERNED, which is the one thing
+    // the matrix cannot restrict.
+    ["GET", "/api/v1/wrikexpi/calendar/validate", "calendar_sync/read"],
+    ["GET", "/wrikexpi/calendar/validate", "calendar_sync/read"],
+
     // Nested listings are attributed to what they return, so switching
     // "channel read" off closes the campaign path too.
     ["GET", "/api/v1/wrikexpi/campaign/IEAC1/channel", "channel/read"],
@@ -254,6 +261,10 @@ console.log("\nThe decision");
   );
   const nothing = entry(catalog.emptyMatrix());
   const unconfigured = entry(catalog.emptyMatrix(), false);
+  // What the mint writes for a Calendar Sync token: the calendar module only.
+  const calendarOnly = entry(
+    catalog.normaliseMatrix({ calendar_sync: { read: true } }),
+  );
   const route = (method, url) => map.resolveRoute(method, url);
   const decide = (matrixEntry, method, url) =>
     map.denialFor(matrixEntry, route(method, url));
@@ -317,6 +328,36 @@ console.log("\nThe decision");
   check(
     "nested read follows the child module",
     decide(readOnlyCampaign, "GET", "/api/v1/wrikexpi/campaign/a/channel"),
+    "MODULE_FORBIDDEN",
+  );
+
+  // The calendar surface, both directions. A calendar token reaches only its
+  // own module; a token without the calendar grant does not reach that
+  // module's path, which is what makes the validator an answer about this
+  // token rather than a public health check.
+  check(
+    "a calendar token may validate itself",
+    decide(calendarOnly, "GET", "/api/v1/wrikexpi/calendar/validate"),
+    null,
+  );
+  check(
+    "a calendar token may not read campaigns",
+    decide(calendarOnly, "GET", "/api/v1/wrikexpi/campaign/a"),
+    "MODULE_FORBIDDEN",
+  );
+  check(
+    "nor channels",
+    decide(calendarOnly, "GET", "/api/v1/wrikexpi/channel/c"),
+    "MODULE_FORBIDDEN",
+  );
+  check(
+    "nor tasks",
+    decide(calendarOnly, "GET", "/api/v1/wrikexpi/task/t"),
+    "MODULE_FORBIDDEN",
+  );
+  check(
+    "and a campaign-only token may not validate calendars",
+    decide(readOnlyCampaign, "GET", "/api/v1/wrikexpi/calendar/validate"),
     "MODULE_FORBIDDEN",
   );
 

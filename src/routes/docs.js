@@ -1517,21 +1517,100 @@ async ({ taskId }, extra) => {
           )}
 
           <h2 class="pg-h2">5 · Give it to the calendar app</h2>
-          <p class="pg-p">Where it goes depends on the app, but anything that accepts a bearer credential uses the token as-is — the same header the REST API expects:</p>
+          <p class="pg-p">Where it goes depends on the app, but anything that accepts a bearer credential uses the token as-is — the same header the REST API expects. The calendar surface answers under <code>/wrikexpi/calendar</code>, and the call it makes to check the credential is:</p>
           ${codeBlock(
             "bash",
-            `curl -X GET "${apiUrl}/wrikexpi/campaign?pageSize=10" \\
+            `curl -X GET "${apiUrl}/wrikexpi/calendar/validate" \\
   -H "Authorization: Bearer <access_token>"`,
           )}
           ${callout(
             "info",
-            "If the app asks for a feed address instead",
-            "An ICS or webcal URL is produced by the calendar service, not by WrikeXPI. Use the token wherever that service asks for a WrikeXPI credential.",
+            "This credential is for the calendar surface only",
+            'A Calendar Sync token is granted the <b>Calendar Sync</b> module and nothing else, so a call into campaigns, channels or tasks is refused — which is the point of minting it from this button rather than the ordinary one. If the app asks for a feed address instead, an ICS or webcal URL is produced by the calendar service, not by WrikeXPI: give it the token wherever it asks for a WrikeXPI credential. See <a href="#/calendar/permissions">Permissions</a>.',
           )}
 
           <div class="cta-row">
             <a class="btn primary" href="#/calendar/permissions">Check what it can do</a>
             <a class="btn ghost" href="#/calendar/troubleshooting">Troubleshooting</a>
+          </div>`,
+      },
+      {
+        id: "calendar/validate",
+        group: "Calendar Sync Docs",
+        groupId: "calendar",
+        label: "Validate a token",
+        keywords:
+          "validate validator check token still valid endpoint heartbeat health 200 401 403 bearer",
+        html: `
+          <div class="pg-eyebrow">Calendar Sync Docs</div>
+          <h1 class="pg-title">Validate a token</h1>
+          <p class="pg-lede">One call answers "is this credential still good?" — without waiting for a sync to fail first.</p>
+
+          <h2 class="pg-h2">The endpoint</h2>
+          ${endpoint("GET", "/wrikexpi/calendar/validate", "Checks the token that authenticated the call.")}
+          ${codeBlock(
+            "bash",
+            `curl -X GET "${apiUrl}/wrikexpi/calendar/validate" \\
+  -H "Authorization: Bearer <access_token>"`,
+          )}
+
+          <h2 class="pg-h2">What a valid token gets</h2>
+          ${codeBlock(
+            "json",
+            `{
+  "success": true,
+  "message": "Token is valid.",
+  "data": {
+    "valid": true,
+    "calendar_access": true,
+    "token_id": "9f1c2e30-...",
+    "environment": "PROD",
+    "environment_id": "3f35cc2d-...",
+    "checked_at": "2026-09-18T06:12:44.512Z"
+  }
+}`,
+          )}
+          ${callout(
+            "tip",
+            "Nothing is sent to Wrike",
+            "The answer comes from the token itself and the environment's own settings. A healthy credential therefore cannot be reported unhealthy because something upstream was slow.",
+          )}
+          ${callout(
+            "info",
+            "It answers from the calendar permission",
+            "The call is allowed only when the token holds the <b>Calendar Sync</b> module, and the response says so in <code>calendar_access</code>. A token without that grant is refused here — the same rule that stops a token reading campaigns it was not granted.",
+          )}
+
+          <h2 class="pg-h2">What a refusal means</h2>
+          ${table(
+            ["Status", "Meaning", "What to do"],
+            [
+              [
+                "<code>200</code>",
+                "The token is valid, switched on, and its environment allows the caller.",
+                "Nothing.",
+              ],
+              [
+                "<code>401</code>",
+                "The credential is not usable — mistyped or truncated, switched off in the console, or replaced by a newer sign-in.",
+                'Sign in again with Calendar Sync (see <a href="#/calendar/setup">Connection setup</a>), then switch the old token off.',
+              ],
+              [
+                "<code>403</code>, not authorized to access the service",
+                "The token is fine, but the person behind it is no longer covered by the environment's access rules.",
+                "Check the environment's allow list under <b>Environment Access</b>.",
+              ],
+              [
+                "<code>403</code> with <code>MODULE_FORBIDDEN</code>",
+                "The <b>Calendar Sync</b> module has been switched off for this token.",
+                "Open <b>Token Permissions</b> on the token's row in the console.",
+              ],
+            ],
+          )}
+
+          <div class="cta-row">
+            <a class="btn primary" href="#/calendar/troubleshooting">Troubleshooting</a>
+            <a class="btn ghost" href="#/calendar/permissions">Permissions</a>
           </div>`,
       },
       {
@@ -1604,6 +1683,12 @@ async ({ taskId }, extra) => {
           <div class="pg-eyebrow">Calendar Sync Docs</div>
           <h1 class="pg-title">Troubleshooting</h1>
           <p class="pg-lede">A calendar that quietly stops updating is almost always one of three things, and the console can name all three.</p>
+
+          ${callout(
+            "tip",
+            "Ask the validator first",
+            '<code>GET /wrikexpi/calendar/validate</code> answers whether the credential is the problem, and its status code says which of the three cases below it is. See <a href="#/calendar/validate">Validate a token</a>.',
+          )}
 
           ${table(
             ["Symptom", "Likely cause", "Where to look"],
