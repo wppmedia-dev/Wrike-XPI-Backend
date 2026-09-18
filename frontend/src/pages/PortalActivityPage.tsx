@@ -12,6 +12,8 @@ import {
 import { formatDateTime } from "../lib/format";
 import AdminSelect from "../components/AdminSelect";
 import { CopyButton } from "../components/ui/CopyButton";
+import { PageInfo } from "../components/ui/PageInfo";
+import { PORTAL_HELP } from "../lib/pageHelp";
 import { callerNote } from "../lib/activityCaller";
 import "./PortalActivityPage.css";
 
@@ -243,7 +245,9 @@ export default function PortalActivityPage({
     <>
       <div className="section-header">
         <div>
-          <div className="section-title">Activity Log</div>
+          <div className="section-title">
+            Activity Log <PageInfo help={PORTAL_HELP.activity} />
+          </div>
           <div className="section-subtitle">
             Every API and MCP call on your environments: who called, what they called, and whether
             it was let through

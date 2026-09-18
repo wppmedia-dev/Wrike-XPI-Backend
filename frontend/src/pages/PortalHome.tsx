@@ -25,11 +25,12 @@ import PortalCachePage from "./PortalCachePage";
 import PortalApiTokensPage from "./PortalApiTokensPage";
 import PortalEnvironmentAccess from "./PortalEnvironmentAccess";
 import { PortalEnvironmentsTable } from "./PortalEnvironmentsTable";
+import { PageInfo } from "../components/ui/PageInfo";
+import { PORTAL_HELP } from "../lib/pageHelp";
 import TokenPermissions, {
   ENVIRONMENT_MODULES_COPY,
   type TokenPermissionsApi,
-} from "./TokenPermissions";
-import {
+} from "./TokenPermissions";import {
   getPortalEnvironmentModulePermissions,
   getPortalEnvironmentModulesCatalog,
   savePortalEnvironmentModulePermissions,
@@ -864,7 +865,9 @@ export default function PortalHome() {
           <div className={`page${activePage === "overview" ? " active" : ""}`} id="page-overview">
             <div className="section-header">
               <div>
-                <div className="section-title">Dashboard Overview</div>
+                <div className="section-title">
+                  Dashboard Overview <PageInfo help={PORTAL_HELP.overview} />
+                </div>
                 <div className="section-subtitle">Welcome back, {username}</div>
               </div>
             </div>
@@ -989,7 +992,9 @@ export default function PortalHome() {
           <div className={`page${activePage === "environments" ? " active" : ""}`} id="page-environments">
             <div className="section-header">
               <div>
-                <div className="section-title">My Environments</div>
+                <div className="section-title">
+                  My Environments <PageInfo help={PORTAL_HELP.environments} />
+                </div>
                 <div className="section-subtitle">Manage your Wrike environments</div>
               </div>
               {can("environments", "create") && (

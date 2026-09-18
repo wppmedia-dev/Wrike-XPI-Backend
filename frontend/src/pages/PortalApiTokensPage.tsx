@@ -16,6 +16,8 @@ import {
   type PortalApiToken,
 } from "../lib/portalApiTokensApi";
 import type { AdminToken, TokenListQuery } from "../lib/tokenPermissionsApi";
+import { PageInfo } from "../components/ui/PageInfo";
+import { PORTAL_HELP } from "../lib/pageHelp";
 import TokenPermissions, { type TokenPermissionsApi } from "./TokenPermissions";
 
 /* The portal's API Tokens page.
@@ -225,7 +227,9 @@ export default function PortalApiTokensPage({
     <>
       <div className="section-header">
         <div>
-          <div className="section-title">Tokens</div>
+          <div className="section-title">
+            Tokens <PageInfo help={PORTAL_HELP.apiTokens} />
+          </div>
           <div className="section-subtitle">
             Tokens issued for your environments
           </div>

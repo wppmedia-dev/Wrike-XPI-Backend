@@ -1,0 +1,204 @@
+/* Styles for <PageInfo />, the info icon beside a page title.
+ *
+ * Only CSS variables every console defines (both :root blocks carry the same
+ * names — AdminDashboard.css and PortalHome.css/PortalDashboard.css), so one
+ * stylesheet serves the admin console and the portal. Falls back to the plain
+ * palette values if a page is ever rendered without them. */
+
+.pi-wrap {
+  position: relative;
+  display: inline-flex;
+  vertical-align: middle;
+  margin-left: 7px;
+}
+
+.pi-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text-muted, #94a3b8);
+  cursor: pointer;
+  font-size: 0.78em;
+  line-height: 1;
+  transition: color 0.18s ease;
+}
+
+.pi-btn:hover,
+.pi-btn[aria-expanded="true"] {
+  color: var(--accent, #008262);
+}
+
+.pi-btn:focus-visible {
+  outline: 2px solid var(--accent, #008262);
+  outline-offset: 2px;
+  border-radius: 50%;
+}
+
+.pi-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: -8px;
+  z-index: 400;
+  width: 360px;
+  max-width: 84vw;
+  /* Capped and scrollable: the pages with the most to explain are exactly the
+     ones whose panel would otherwise run past the bottom of the window. The
+     panel scrolls, not the page behind it (overscroll-behavior), and the
+     console's own 5px scrollbar styling applies to it. */
+  max-height: min(72vh, 460px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px 16px;
+  text-align: left;
+  font-family: inherit;
+  font-weight: 400;
+  letter-spacing: normal;
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: var(--radius-md, 10px);
+  box-shadow: var(--shadow-lg, 0 4px 24px rgba(0, 0, 0, 0.12));
+}
+
+.pi-head {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted, #94a3b8);
+  margin-bottom: 7px;
+}
+
+.pi-summary {
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--text-secondary, #475569);
+}
+
+.pi-label {
+  margin-top: 11px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted, #94a3b8);
+}
+
+.pi-list {
+  margin: 7px 0 0;
+  padding-left: 17px;
+  display: grid;
+  gap: 5px;
+}
+
+.pi-list li {
+  font-size: 0.83rem;
+  line-height: 1.45;
+  color: var(--text-secondary, #475569);
+}
+
+.pi-note {
+  display: flex;
+  gap: 7px;
+  align-items: flex-start;
+  margin-top: 11px;
+  padding-top: 9px;
+  border-top: 1px dashed var(--border, #e2e8f0);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--text-muted, #94a3b8);
+}
+
+.pi-note i {
+  margin-top: 2px;
+  color: var(--warning, #f59e0b);
+}
+
+/* ── Phones: the same panel as a bottom sheet ───────────────────────────────
+ *
+ * A 360px popover anchored under a heading is the wrong shape on a 380px
+ * screen: it would run off the right edge and open under the thumb that pressed
+ * it. Fixed to the bottom instead, full width, where the content is readable
+ * and the tap target that closes it (anywhere outside) is the whole page above.
+ *
+ * `position: fixed` rather than `absolute` for a second reason: the page's
+ * content area is a scroll container, and an absolutely positioned panel inside
+ * it is clipped to it. Fixed is relative to the viewport, so the sheet sits
+ * over the whole screen.
+ */
+@media (max-width: 720px) {
+  .pi-panel {
+    position: fixed;
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: auto;
+    max-width: none;
+    max-height: 76vh;
+    padding: 10px 18px calc(18px + env(safe-area-inset-bottom, 0px));
+    border-right: none;
+    border-bottom: none;
+    border-left: none;
+    border-radius: var(--radius-lg, 14px) var(--radius-lg, 14px) 0 0;
+    box-shadow: 0 -10px 40px rgba(15, 23, 42, 0.22);
+    animation: pi-sheet-in 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* The grab handle. Sticky so it stays at the top of the sheet while the
+     content scrolls under it, which is what says "this scrolls". */
+  .pi-panel::before {
+    content: "";
+    position: sticky;
+    top: 0;
+    display: block;
+    width: 40px;
+    height: 4px;
+    margin: 0 auto 10px;
+    border-radius: 999px;
+    background: var(--border, #e2e8f0);
+  }
+
+  .pi-head {
+    margin-bottom: 6px;
+  }
+
+  /* A scrim, so it reads as a sheet over the page and so the tap that dismisses
+     it is obvious. `:has` keeps it tied to the panel actually being open; where
+     `:has` is unsupported it simply does not draw, and tapping outside still
+     closes the panel through the document listener in the component. */
+  .pi-wrap:has(.pi-panel)::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 399;
+    background: rgba(15, 23, 42, 0.32);
+    animation: pi-scrim-in 0.22s ease;
+  }
+}
+
+@keyframes pi-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pi-sheet-in {
+  from {
+    transform: translateY(14%);
+    opacity: 0.5;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pi-panel {
+    animation: none;
+  }
+}
+
