@@ -1371,7 +1371,7 @@ export default function EnvironmentAccess({
                       ? `${mismatched.length} ${mismatched.length === 1 ? "entry is" : "entries are"} not a valid ${TYPE_NOUN[addType]} — switch the type or remove ${mismatched.length === 1 ? "it" : "them"}.`
                       : addValues.length > 0
                         ? `${addValues.length} ${addValues.length === 1 ? "entry" : "entries"}, each added as its own row.`
-                        : "Press Enter or comma after each one. Paste a whole list at once."}
+                        : "Press Enter, comma or space after each one. Paste a whole list at once."}
                   </div>
                 </div>
 
