@@ -160,11 +160,10 @@ export default function ActivityLog({
   const [envFilter, setEnvFilter] = useState("");
   const [surfaceFilter, setSurfaceFilter] = useState<Surface | "">("");
   const [resultFilter, setResultFilter] = useState<"allowed" | "denied" | "">("");
-  const [emailFilter, setEmailFilter] = useState("");
-  // The reference id from an error a caller reported. Separate from the email
-  // search because it is the one filter someone arrives with, already written
-  // down, and it matches one row.
-  const [referenceFilter, setReferenceFilter] = useState("");
+  // The one search box. It matches the caller's email and the reference id of
+  // a failed call, because those are the two things a person arrives here
+  // holding — an email from the caller, or the id out of the error message.
+  const [searchFilter, setSearchFilter] = useState("");
 
   const loadedOnce = useRef(false);
   const searchDebounce = useRef<number | null>(null);
@@ -193,8 +192,7 @@ export default function ActivityLog({
             token_id: tokenFilterId,
             surface: surfaceFilter || undefined,
             allowed: resultFilter ? resultFilter === "allowed" : undefined,
-            actor_email: emailFilter.trim() || undefined,
-            reference: referenceFilter.trim() || undefined,
+            search: searchFilter.trim() || undefined,
             limit: pageSize,
             offset: nextOffset,
           }),
@@ -214,7 +212,7 @@ export default function ActivityLog({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [envFilter, surfaceFilter, resultFilter, emailFilter, referenceFilter, pageSize, tokenFilterId],
+    [envFilter, surfaceFilter, resultFilter, searchFilter, pageSize, tokenFilterId],
   );
 
   useEffect(() => {
@@ -235,8 +233,8 @@ export default function ActivityLog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, refreshKey]);
 
-  // Email search and the reference box are both free text — debounce them
-  // instead of firing on every keystroke.
+  // The search box is free text — debounce it instead of firing on every
+  // keystroke.
   useEffect(() => {
     if (!active) return;
     if (searchDebounce.current) window.clearTimeout(searchDebounce.current);
@@ -245,7 +243,7 @@ export default function ActivityLog({
       if (searchDebounce.current) window.clearTimeout(searchDebounce.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [emailFilter, referenceFilter]);
+  }, [searchFilter]);
 
   const page = Math.floor(offset / pageSize) + 1;
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
@@ -341,22 +339,10 @@ export default function ActivityLog({
           <i className="fa-solid fa-magnifying-glass" aria-hidden="true" />
           <input
             type="search"
-            placeholder="Search by caller email…"
-            value={emailFilter}
-            onChange={(e) => setEmailFilter(e.target.value)}
-            aria-label="Search by caller email"
-          />
-        </div>
-
-        {/* The reference a caller reads out — the whole id, capitals optional. */}
-        <div className="al-search al-search-ref">
-          <i className="fa-solid fa-hashtag" aria-hidden="true" />
-          <input
-            type="search"
-            placeholder="Find by reference id…"
-            value={referenceFilter}
-            onChange={(e) => setReferenceFilter(e.target.value)}
-            aria-label="Find a call by its reference id"
+            placeholder="Search caller or reference…"
+            value={searchFilter}
+            onChange={(e) => setSearchFilter(e.target.value)}
+            aria-label="Search by caller email or reference id"
           />
         </div>
 
@@ -769,9 +755,9 @@ export default function ActivityLog({
                           title="Copy reference id"
                         />
                       </span>
-                      <div className="al-detail-note">
+                      {/* <div className="al-detail-note">
                         What the caller was shown with the error they reported.
-                      </div>
+                      </div> */}
                     </dd>
                   </div>
                 )}

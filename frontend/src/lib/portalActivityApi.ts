@@ -55,9 +55,9 @@ export interface PortalActivityFilters {
       action applies. The server refuses to honour an id outside the caller's
       own environments (src/routes/portal/activity/index.js). */
   token_id?: string;
-  actor_email?: string;
-  /** Exact reference id, typed in from an error the caller reported. */
-  reference?: string;
+  /** The one search box: matched against the caller's email and the reference
+      id of a failed call, as substrings. */
+  search?: string;
   surface?: PortalSurface;
   allowed?: boolean;
   from?: string;
@@ -81,8 +81,7 @@ const qs = (filters: PortalActivityFilters): string =>
   toQueryString({
     env_id: filters.env_id,
     token_id: filters.token_id,
-    actor_email: filters.actor_email,
-    reference: filters.reference,
+    search: filters.search,
     surface: filters.surface,
     allowed: filters.allowed === undefined ? undefined : String(filters.allowed),
     from: filters.from,

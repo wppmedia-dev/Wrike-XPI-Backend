@@ -50,8 +50,7 @@ export const adminActivityRoute = (fastify, opts, done) => {
       const {
         env_id,
         token_id,
-        actor_email,
-        reference,
+        search,
         surface,
         allowed,
         from,
@@ -63,8 +62,7 @@ export const adminActivityRoute = (fastify, opts, done) => {
       const data = await ActivityLog.List({
         envId: env_id,
         tokenId: token_id,
-        actorEmail: actor_email,
-        reference,
+        search,
         surface,
         allowed: allowed === undefined ? undefined : allowed === "true",
         from,

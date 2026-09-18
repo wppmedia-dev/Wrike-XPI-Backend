@@ -366,18 +366,6 @@
 
 /* The reference box: mono, because what is typed into it is an id that has to
    match character for character. */
-.al-search-ref input {
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-  font-size: 12px;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-}
-
-.al-search-ref input::placeholder {
-  text-transform: none;
-  letter-spacing: normal;
-  font-family: inherit;
-}
 
 /* ── Pagination ─────────────────────────────────────────────────────── */
 

@@ -62,10 +62,9 @@ export interface ActivityFilters {
   /** Exact token id — what the API Tokens table's "Activity logs" action
       sets, so the page opens on one token's history. */
   token_id?: string;
-  actor_email?: string;
-  /** Exact reference id, typed in from an error the caller reported. Case
-      insensitive: it gets copied by hand from a screenshot. */
-  reference?: string;
+  /** The one search box: matched against the caller's email and the reference
+      id of a failed call, as substrings. */
+  search?: string;
   surface?: Surface;
   allowed?: boolean;
   from?: string;
@@ -91,8 +90,7 @@ const qs = (filters: ActivityFilters): string => {
   const params = new URLSearchParams();
   if (filters.env_id) params.set("env_id", filters.env_id);
   if (filters.token_id) params.set("token_id", filters.token_id);
-  if (filters.actor_email) params.set("actor_email", filters.actor_email);
-  if (filters.reference) params.set("reference", filters.reference);
+  if (filters.search) params.set("search", filters.search);
   if (filters.surface) params.set("surface", filters.surface);
   if (filters.allowed !== undefined) params.set("allowed", String(filters.allowed));
   if (filters.from) params.set("from", filters.from);

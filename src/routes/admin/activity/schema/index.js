@@ -7,11 +7,11 @@ export const ListSchema = {
         // Set by the API Tokens table's "Activity logs" row action, so the
         // log opens filtered to one token instead of its whole environment.
         token_id: { type: "string", format: "uuid" },
-        actor_email: { type: "string", maxLength: 320 },
-        // The reference a caller was shown with an error response, so a report
-        // can be turned into the row behind it. Free text rather than a
-        // pattern: it gets typed by hand from a screenshot.
-        reference: { type: "string", maxLength: 32 },
+        // The console's one search box. Free text across the columns a person
+        // arrives with: the caller's email, or the reference id from an error
+        // message. Both are matched as substrings, so a partial reference is
+        // enough.
+        search: { type: "string", maxLength: 320 },
         surface: { type: "string", enum: ["rest", "mcp"] },
         allowed: { type: "string", enum: ["true", "false"] },
         from: { type: "string" },
