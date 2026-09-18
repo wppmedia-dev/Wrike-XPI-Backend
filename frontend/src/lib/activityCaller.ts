@@ -2,7 +2,7 @@
  * Why a Caller cell is empty, in a sentence.
  *
  * "Unresolved" on its own says the column has nothing in it, and leaves the
- * reader wondering which of several quite different things went wrong — or
+ * reader wondering which of several quite different things went wrong, or
  * whether the log is broken. Three cases produce it, and they are not alike:
  *
  *   - the request never got a token past validation, so nothing was ever
@@ -29,20 +29,20 @@ export interface CallerContext {
 export const callerNote = (row: CallerContext): string => {
   switch (row.code) {
     case "AUTH_FAILED":
-      return "No caller was identified: the request's token was rejected before anything could be attributed, so this row is a rejected call rather than an anonymous one.";
+      return "The token on this request was rejected before we could tell who was calling, so there is nobody to show here. The call was turned away rather than made by somebody we could not name.";
 
     case "TOKEN_INVALID":
-      return "No caller was identified: the token could not be read, so nobody was attributed to this request.";
+      return "The token could not be read, so nobody could be attached to this request.";
 
     case "IDENTITY_UNAVAILABLE":
-      return "No caller was identified: Wrike did not say which person this login belongs to, so the request was refused.";
+      return "Wrike did not say which person this login belongs to, so the request was refused.";
 
     default:
       break;
   }
 
   if (row.category === "token") {
-    return "No caller was identified: this is the token service's own surface. A request here is either creating a token — the sign-in itself, where nobody has an identity yet — or reading one by its value.";
+    return "This is the token service's own part of the API. A call here either creates a token (the sign-in itself, when nobody has an identity yet) or reads one by its value.";
   }
 
   // Allowed with nobody attached is the surprising one, and the least alarming
@@ -50,8 +50,8 @@ export const callerNote = (row: CallerContext): string => {
   // login. The call still went through, and the Token and IP columns identify
   // it well enough to follow up.
   if (row.allowed) {
-    return `The call was allowed, but Wrike has no email address recorded for this login, so there was no name to put here. The Token and IP columns identify the request.`;
+    return "The call was allowed. Wrike just has no email address recorded for this login, so there is no name to show here. The token and the IP address identify the request.";
   }
 
-  return "No caller was identified: the request was refused before anything attributed it.";
+  return "The request was refused before anything identified the caller.";
 };

@@ -1,7 +1,7 @@
 import type { PageHelp } from "../components/ui/PageInfo";
 
 /**
- * What each console page is for — the text behind the ⓘ beside its title.
+ * What each console page is for: the text behind the ⓘ beside its title.
  *
  * Kept short and in one place. Short because nobody opens a help panel to read
  * three sentences about something they can see, and in one place so two pages
@@ -47,7 +47,7 @@ export const ADMIN_HELP: Record<AdminHelpKey, PageHelp> = {
   },
 
   users: {
-    summary: "Portal accounts — who can sign in, and which environments they look after.",
+    summary: "Portal accounts: who can sign in, and which environments they look after.",
     points: [
       "Add a user. The password shows once and has to be changed at first sign-in.",
       "Permissions decides which pages that person can see and change.",
@@ -62,7 +62,7 @@ export const ADMIN_HELP: Record<AdminHelpKey, PageHelp> = {
     points: [
       "Filters run on the server, so they cover the whole list, not just this page.",
       "Access: Unrestricted until somebody narrows it, then how much is left.",
-      "Validity: when it expires. Calendar Sync tokens have no expiry — they last until switched off.",
+      "Validity: when it expires. Calendar Sync tokens have no expiry, so they last until they are switched off.",
       "Status: deactivate blocks the token, reactivate lets it back in. Nothing is deleted.",
       "Row menu: permissions, copy the id or username, jump to its activity.",
     ],
@@ -79,7 +79,7 @@ export const ADMIN_HELP: Record<AdminHelpKey, PageHelp> = {
   },
 
   cache: {
-    summary: "The Redis keys this service caches — for when an answer looks stale.",
+    summary: "The Redis keys this service caches, for when an answer looks stale.",
     points: [
       "Search by key pattern, then open an entry to see the whole value.",
       "Delete one key, or select several, to force a fresh read.",
@@ -89,7 +89,7 @@ export const ADMIN_HELP: Record<AdminHelpKey, PageHelp> = {
 
   activity: {
     summary:
-      "Every call into this service, allowed or refused — REST, MCP and the sign-in flows.",
+      "Every call into this service, allowed or refused, across REST, MCP and the sign-in flows.",
     points: [
       "Search by the caller's email, or paste in the reference from an error message.",
       "Filter by environment, token, outcome or surface.",
@@ -137,7 +137,7 @@ export const PORTAL_HELP: Record<PortalHelpKey, PageHelp> = {
     points: [
       "Filter the list to find one integration among many.",
       "Access: how much that token is allowed to do.",
-      "Token Permissions opens the grid — editable if your account has the update grant.",
+      "Token Permissions opens the grid. Editable if your account has the update grant.",
       "Status: block a token, or let it through again. Nothing is deleted.",
     ],
     note: "You cannot create tokens here. They come from signing in on the login page, or through MCP.",
@@ -156,7 +156,7 @@ export const PORTAL_HELP: Record<PortalHelpKey, PageHelp> = {
 
   cache: {
     summary:
-      "Cached answers for your environments — for when a change does not seem to have taken effect.",
+      "Cached answers for your environments, for when a change does not seem to have taken effect.",
     points: [
       "Search by key pattern and read what an entry holds.",
       "Delete one key, or several, to force a fresh read.",
