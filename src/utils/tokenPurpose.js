@@ -63,9 +63,15 @@ export const isCalendarSyncPurpose = (value) =>
  * job that asked for it. Widening it is an administrator's decision taken on
  * purpose in the console, not a default nobody looked at.
  *
+ * Read only, and that is a floor rather than a limit on what the module can do.
+ * The calendar surface forwards to amoeba, so the module expresses Create,
+ * Update and Delete too (src/utils/tokenPermissionCatalog.js) and an
+ * administrator can grant them per token. What a token is MINTED with stays
+ * the narrowest thing that works, because a credential with no expiry should
+ * not arrive holding write access nobody asked for.
+ *
  * Built through normaliseMatrix so the shape is the catalogue's: every module
- * present, and any action a module does not declare forced off (the calendar
- * module declares Read and nothing else).
+ * present, and any action a module does not declare forced off.
  */
 export const calendarSyncMatrix = () =>
   normaliseMatrix({ [CALENDAR_SYNC_MODULE]: { read: true } });

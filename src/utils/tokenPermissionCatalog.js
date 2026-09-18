@@ -4,10 +4,9 @@
  * XPI token, and which of the four actions each one actually supports.
  *
  * One entry per API group the private router exposes (src/routes/index.js
- * registers campaign, channel, task, master and amoeba under /wrikexpi/*),
- * plus one for the MCP surface's proxied Wrike tools, which are not reachable
- * by path at all, plus one for the tokens minted for a calendar integration
- * (see src/utils/tokenPurpose.js), which is a scope rather than a path. Which
+ * registers campaign, channel, task, master, amoeba and calendar under
+ * /wrikexpi/*), plus one for the MCP surface's proxied Wrike tools, which are
+ * not reachable by path at all. Which
  * action a request is does not live here. That comes
  * from the HTTP method through the action map the activity log already labels
  * requests with (src/utils/tokenPermissionMap.js). This file decides only
@@ -81,11 +80,12 @@ export const MODULES = [
     key: "calendar_sync",
     label: "Calendar Sync",
     description:
-      "Calendar records under /wrikexpi/calendar: the validate endpoint a calendar integration calls to check that its credential still works. Read only. This is what a token minted from the login page's Calendar Sync option starts with, and no other REST path or MCP tool resolves to this row.",
-    // Read only, and deliberately so: the option exists for a subscription
-    // that displays Wrike items, and offering Create/Update/Delete here would
-    // describe powers the integration is not being handed.
-    actions: ["read"],
+      "Calendar records under /wrikexpi/calendar: the validate endpoint a calendar integration calls to check that its credential still works, and the amoeba forwarder at /wrikexpi/calendar/amoeba/<master slug>/<service slug>, which reaches the same services /wrikexpi/amoeba does. This is what a token minted from the login page's Calendar Sync option starts with, and no other REST path or MCP tool resolves to this row.",
+    // All four actions, because the forwarder carries whatever method the
+    // caller used. A calendar that only displays Wrike work is granted Read
+    // and nothing else; one that writes back is granted the verbs it needs,
+    // per token, in the console.
+    actions: ALL,
   },
 ];
 

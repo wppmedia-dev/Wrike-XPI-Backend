@@ -1566,6 +1566,11 @@ async ({ taskId }, extra) => {
   -H "Authorization: Bearer <access_token>"`,
           )}
 
+          <h2 class="pg-h2">The other endpoint</h2>
+          <p class="pg-p">An integration that writes back also uses the live data services, through an amoeba forwarder on the same surface:</p>
+          ${endpoint("POST", "/wrikexpi/calendar/amoeba/:master_slug/:service_slug", "The same forwarder /wrikexpi/amoeba uses, under the calendar module so one permission row decides it.")}
+          <p class="pg-p">GET reads, POST creates, PUT and PATCH update, DELETE deletes. See <a href="#/calendar/permissions">Permissions</a> for which action each one needs.</p>
+
           <h2 class="pg-h2">What a valid token gets</h2>
           ${codeBlock(
             "json",
@@ -1631,27 +1636,53 @@ async ({ taskId }, extra) => {
         groupId: "calendar",
         label: "Permissions",
         keywords:
-          "permissions permission module token permissions read only restrict narrow admin console status switch off revoke delete reactivate",
+          "permissions permission module token permissions restrict narrow admin console status switch off revoke delete reactivate amoeba forwarder write create update delete",
         html: `
           <div class="pg-eyebrow">Calendar Sync Docs</div>
           <h1 class="pg-title">What a Calendar Sync token can do</h1>
           <p class="pg-lede">Its own row in the permission grid, granted only what it is for, and one switch that stops it dead.</p>
 
           <h2 class="pg-h2">Its own module</h2>
-          <p class="pg-p">Token permissions include a <b>Calendar Sync</b> module. It is <b>read only</b>: a calendar displays what it is given and writes nothing back, so Create, Update and Delete are not offered on it at all — the console greys those cells out rather than showing ticks that could not mean anything.</p>
+          <p class="pg-p">Token permissions include a <b>Calendar Sync</b> module, and it offers all four actions: Read, Create, Update and Delete. A calendar that only displays Wrike work needs Read. A calendar that writes back needs the verb it uses, and the module offers it so the decision can be made per token rather than in advance.</p>
+
+          <h2 class="pg-h2">The forwarder</h2>
+          <p class="pg-p">Writes reach Wrike through amoeba, the data-driven service layer, at <code>/wrikexpi/calendar/amoeba/&lt;master slug&gt;/&lt;service slug&gt;</code>. It is the same forwarder the general <code>/wrikexpi/amoeba</code> path uses: the same services, the same payloads, and the method decides what the call is (POST creates, PUT and PATCH update, DELETE deletes).</p>
+          <p class="pg-p">The one difference is which permission row decides it. A calendar token does not hold the Amoeba module, so the general path would refuse it. Under the calendar path, one row of the grid decides both halves: Read for the validator and any lookup, Create, Update and Delete for the writes.</p>
+          ${table(
+            ["Call", "What it needs on the Calendar Sync row"],
+            [
+              ["<code>GET /wrikexpi/calendar/validate</code>", "Read"],
+              [
+                "<code>GET /wrikexpi/calendar/amoeba/&lt;master&gt;/&lt;service&gt;</code>",
+                "Read",
+              ],
+              [
+                "<code>POST &hellip;/amoeba/&lt;master&gt;/&lt;service&gt;</code>",
+                "Create",
+              ],
+              [
+                "<code>PUT</code> or <code>PATCH &hellip;/amoeba/&lt;master&gt;/&lt;service&gt;</code>",
+                "Update",
+              ],
+              [
+                "<code>DELETE &hellip;/amoeba/&lt;master&gt;/&lt;service&gt;</code>",
+                "Delete",
+              ],
+            ],
+          )}
           ${callout(
             "info",
             "A scope, not a permission level",
             "The module says which tokens the row applies to. What each token may then do is still decided per token, module by module, in the same grid.",
           )}
 
-          <h2 class="pg-h2">Minted with only the calendar scope</h2>
-          <p class="pg-p">A Calendar Sync token is created with an explicit matrix: the <b>Calendar Sync</b> module granted, and every other module switched off. It is not left unrestricted, which is what a freshly issued token otherwise is — so the credential is exactly as wide as the job that asked for it, on purpose, from its first request.</p>
+          <h2 class="pg-h2">Minted with Read only</h2>
+          <p class="pg-p">A Calendar Sync token is created with an explicit matrix: <b>Read</b> on the Calendar Sync module, and every other module switched off. It is not left unrestricted, which is what a freshly issued token otherwise is — so the credential is exactly as wide as the job that asked for it, on purpose, from its first request.</p>
           <p class="pg-p">Rows are written for every module, in the off position, which is what makes this a token an admin can see and edit in the grid rather than one that has never been configured.</p>
           ${callout(
             "tip",
-            "Widening it is a deliberate step",
-            "Open <b>Token Permissions</b> on the row and grant another module to let this calendar reach it. Until then, a call into any other module is refused.",
+            "Letting a calendar write",
+            "Open <b>Token Permissions</b> on the row and grant <b>Create</b>, <b>Update</b> or <b>Delete</b> on the Calendar Sync module. Grant only the verb the integration actually uses, and grant the other modules only if it has business reaching them.",
           )}
           ${callout(
             "info",
