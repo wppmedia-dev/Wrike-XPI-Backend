@@ -23,8 +23,10 @@ const fp = require("fastify-plugin");
 
 const {
   ALPHABET,
+  SURFACES,
   newReference,
   referenceFor,
+  surfaceForUrl,
   withReference,
 } = require("../src/utils/activityReference");
 
@@ -45,7 +47,8 @@ const check = (label, actual, expected) => {
 
 const checkTrue = (label, actual) => check(label, !!actual, true);
 
-const SHAPE = /^XPI-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}$/;
+// `XPI-API-XXXXXXXX` or `XPI-MCP-XXXXXXXX`: the surface, then eight characters.
+const SHAPE = /^XPI-(?:API|MCP)-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}$/;
 
 /* ── The alphabet ────────────────────────────────────────────────────────── */
 
@@ -73,13 +76,58 @@ console.log("\nThe alphabet it draws from");
 console.log("\nA new reference");
 {
   const reference = newReference();
-  checkTrue(`looks like XPI-XXXXXXXX (${reference})`, SHAPE.test(reference));
+  checkTrue(
+    `looks like XPI-API-XXXXXXXX (${reference})`,
+    SHAPE.test(reference),
+  );
   check(
-    "is prefixed so it is recognisable in a message",
-    reference.slice(0, 4),
-    "XPI-",
+    "names the API when nobody says otherwise",
+    reference.slice(0, 8),
+    "XPI-API-",
   );
   check("and is a string", typeof reference, "string");
+
+  // The surface is the point of the prefix: an agent's refusal and an
+  // integration's REST failure are looked up in the same log, but they are not
+  // the same conversation.
+  checkTrue(
+    "an MCP reference says so",
+    newReference("mcp").startsWith("XPI-MCP-"),
+  );
+  checkTrue(
+    "one that asks for the API says so",
+    newReference("rest").startsWith("XPI-API-"),
+  );
+  checkTrue(
+    "and a surface nobody defined falls back to the API rather than inventing one",
+    newReference("graphql").startsWith("XPI-API-"),
+  );
+}
+
+console.log("\nWhich surface a request is, from its URL");
+{
+  check("the API is labelled", SURFACES.rest, "API");
+  check("the MCP surface is labelled", SURFACES.mcp, "MCP");
+
+  const cases = [
+    ["/api/v1/wrikexpi/mcp", "mcp"],
+    ["/api/v1/wrikexpi/mcp?session=1", "mcp"],
+    ["/api/v1/wrikexpi/mcp/env-123", "mcp"],
+    ["/mcp", "mcp"],
+    ["/api/v1/wrikexpi/campaign", "rest"],
+    ["/api/v1/wrikexpi/calendar/validate", "rest"],
+    ["/api/v1/wrikexpi/token/callback?code=x", "rest"],
+    // The documentation pages are named after the surface they describe; a
+    // 500 on one of them is not an MCP call.
+    ["/docs/mcp", "rest"],
+    ["/docs/api", "rest"],
+    [undefined, "rest"],
+    ["", "rest"],
+  ];
+
+  for (const [url, expected] of cases) {
+    check(`${url} is ${expected}`, surfaceForUrl(url), expected);
+  }
 }
 
 console.log("\nTwo thousand of them");
@@ -97,7 +145,7 @@ console.log("\nTwo thousand of them");
   );
   checkTrue(
     "and none is a single repeated character",
-    [...seen].every((reference) => new Set(reference.slice(4)).size > 1),
+    [...seen].every((reference) => new Set(reference.slice(8)).size > 1),
   );
 }
 
@@ -126,7 +174,7 @@ console.log("\nThe reference for a request");
 
 console.log("\nAttaching it to a response body");
 {
-  const reference = "XPI-23456789";
+  const reference = "XPI-API-23456789";
 
   const body = JSON.stringify({ success: false, message: "Nope" });
   const withRef = withReference(body, reference);

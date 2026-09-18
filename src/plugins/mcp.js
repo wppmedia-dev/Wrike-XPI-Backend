@@ -70,7 +70,7 @@ module.exports = async function (fastify, opts) {
    * out (see recordActivity below). The row and the message have to name each
    * other, so whoever gets there first mints it and the other reuses it.
    */
-  const referenceOnce = (req) => referenceFor(req);
+  const referenceOnce = (req) => referenceFor(req, "mcp");
 
   /* The 401 this surface sends carries the reference too, so the row it just
      wrote and the message the client reads agree. */
