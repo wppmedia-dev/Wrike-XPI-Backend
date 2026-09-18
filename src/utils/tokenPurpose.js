@@ -54,6 +54,22 @@ export const isCalendarSyncPurpose = (value) =>
   normalisePurpose(value) === TOKEN_PURPOSE.CALENDAR_SYNC;
 
 /**
+ * Does this query value ask for the Calendar Sync sign-in?
+ *
+ * The flag a link can carry, as opposed to the purpose a mint reads: `?calendarSync=1`
+ * on the root login page, so one address can be handed to somebody for "put my
+ * Wrike tasks in my calendar" without them having to pick the right one of two
+ * buttons. It is read in the same place the purpose vocabulary lives so the
+ * spelling exists once.
+ *
+ * Only the two spellings a URL is normally written with count. "Anything
+ * truthy" would start a sign-in off a typo, and the failure would be silent:
+ * the person would land on a token screen with no idea they had asked for
+ * something else.
+ */
+export const isCalendarSyncFlag = (value) => value === "true" || value === "1";
+
+/**
  * The matrix a Calendar Sync token is minted with: the Calendar Sync module
  * granted, everything else off.
  *
