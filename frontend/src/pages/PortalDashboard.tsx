@@ -10,6 +10,8 @@ import {
 import { useHashPage } from "../lib/useHashPage";
 import EnvBadge from "../components/EnvBadge";
 import BuildTag from "../components/BuildTag";
+import { PageInfo } from "../components/ui/PageInfo";
+import { PORTAL_ADMIN_HELP } from "../lib/pageHelp";
 import "./PortalDashboard.css";
 
 type PageId = "overview" | "environments";
@@ -526,7 +528,10 @@ export default function PortalDashboard() {
           <div className={`page${activePage === "overview" ? " active" : ""}`} id="page-overview">
             <div className="section-header">
               <div>
-                <div className="section-title">Dashboard Overview</div>
+                <div className="section-title">
+                  Dashboard Overview{" "}
+                  <PageInfo help={PORTAL_ADMIN_HELP.overview} />
+                </div>
                 <div className="section-subtitle">
                   {loaded ? `Welcome back, ${username}` : "Welcome back"}
                 </div>
@@ -637,7 +642,9 @@ export default function PortalDashboard() {
           <div className={`page${activePage === "environments" ? " active" : ""}`} id="page-environments">
             <div className="section-header">
               <div>
-                <div className="section-title">Environments</div>
+                <div className="section-title">
+                  Environments <PageInfo help={PORTAL_ADMIN_HELP.environments} />
+                </div>
                 <div className="section-subtitle">Your assigned Wrike environments</div>
               </div>
             </div>

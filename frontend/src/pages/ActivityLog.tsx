@@ -12,6 +12,8 @@ import type { AdminEnvironment } from "../lib/adminApi";
 import { toast } from "../lib/notify";
 import AdminSelect from "../components/AdminSelect";
 import { CopyButton } from "../components/ui/CopyButton";
+import { PageInfo } from "../components/ui/PageInfo";
+import { ADMIN_HELP } from "../lib/pageHelp";
 import { callerNote } from "../lib/activityCaller";
 import "./ActivityLog.css";
 
@@ -259,7 +261,9 @@ export default function ActivityLog({
     <>
       <div className="section-header">
         <div>
-          <div className="section-title">Activity Log</div>
+          <div className="section-title">
+            Activity Log <PageInfo help={ADMIN_HELP.activity} />
+          </div>
           <div className="section-subtitle">
             Every API and MCP call: who called, what they called, and whether it was let through
           </div>

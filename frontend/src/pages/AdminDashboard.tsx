@@ -57,6 +57,8 @@ import {
 import EnvBadge from "../components/EnvBadge";
 import BuildTag from "../components/BuildTag";
 import { CopyButton } from "../components/ui/CopyButton";
+import { PageInfo } from "../components/ui/PageInfo";
+import { ADMIN_HELP } from "../lib/pageHelp";
 import { ActiveBadge } from "../components/ui/Badge";
 import { MaskedValue } from "../components/ui/MaskedValue";
 import { copyToClipboard, formatDateTime } from "../lib/format";
@@ -1425,7 +1427,9 @@ export default function AdminDashboard() {
           <div className={`page${activePage === "overview" ? " active" : ""}`} id="page-overview">
             <div className="section-header">
               <div>
-                <div className="section-title">Dashboard Overview</div>
+                <div className="section-title">
+                  Dashboard Overview <PageInfo help={ADMIN_HELP.overview} />
+                </div>
                 <div className="section-subtitle">Welcome back, Administrator</div>
               </div>
             </div>
@@ -1559,7 +1563,9 @@ export default function AdminDashboard() {
           <div className={`page${activePage === "environments" ? " active" : ""}`} id="page-environments">
             <div className="section-header">
               <div>
-                <div className="section-title">Environments</div>
+                <div className="section-title">
+                  Environments <PageInfo help={ADMIN_HELP.environments} />
+                </div>
                 <div className="section-subtitle">Manage Wrike API credentials per environment</div>
               </div>
               <button className="btn btn-primary" onClick={openAddModal}>
@@ -1592,7 +1598,9 @@ export default function AdminDashboard() {
           <div className={`page${activePage === "users" ? " active" : ""}`} id="page-users">
             <div className="section-header">
               <div>
-                <div className="section-title">Portal Users</div>
+                <div className="section-title">
+                  Portal Users <PageInfo help={ADMIN_HELP.users} />
+                </div>
                 <div className="section-subtitle">Manage portal user accounts and environment access</div>
               </div>
               <button className="btn btn-primary" onClick={openAddUserModal}>
@@ -1619,7 +1627,9 @@ export default function AdminDashboard() {
           <div className={`page${activePage === "tokens" ? " active" : ""}`} id="page-tokens">
             <div className="section-header">
               <div>
-                <div className="section-title">Tokens</div>
+                <div className="section-title">
+                  Tokens <PageInfo help={ADMIN_HELP.tokens} />
+                </div>
                 <div className="section-subtitle">
                   Every token this service has issued, and the modules each one may call
                 </div>
@@ -1653,7 +1663,9 @@ export default function AdminDashboard() {
           <div className={`page${activePage === "settings" ? " active" : ""}`} id="page-settings">
             <div className="section-header">
               <div>
-                <div className="section-title">Settings</div>
+                <div className="section-title">
+                  Settings <PageInfo help={ADMIN_HELP.settings} />
+                </div>
                 <div className="section-subtitle">Configure system preferences</div>
               </div>
             </div>
@@ -1667,7 +1679,9 @@ export default function AdminDashboard() {
           <div className={`page${activePage === "cache-settings" ? " active" : ""}`} id="page-cache-settings">
             <div className="section-header">
               <div>
-                <div className="section-title">Cache Settings</div>
+                <div className="section-title">
+                  Cache Settings <PageInfo help={ADMIN_HELP.cache} />
+                </div>
                 <div className="section-subtitle">Manage cache keys and inspect Redis data</div>
               </div>
               <button
