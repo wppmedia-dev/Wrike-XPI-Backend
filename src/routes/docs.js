@@ -784,9 +784,9 @@ async ({ taskId }, extra) => {
                   "Add a name-based filter on <code>tools</code> before the <code>.forEach</code> loop in <code>registerWrikeProxyTools</code>.",
                 ],
                 [
-                  "Log every individual tool call",
-                  "<code>src/plugins/mcp.js</code>",
-                  "Currently one activity-log row per HTTP request (<code>recordActivity</code>, lines 82-105), not per tool call — needs a hook inside each handler or around <code>registerTool</code>.",
+                  "Log every individual tool call as its own row",
+                  "<code>src/plugins/mcp.js</code> + <code>SetMcpTools</code>",
+                  'Already solved for "which tool": the gate (src/mcp/index.js <code>installPermissionGate</code>) reports every call, and its name is written onto the request\'s activity row. Rows are still one per HTTP request, so an agent batching several tool calls in one POST appears as one row listing them. Making it a row per call means writing from the gate itself and deciding whether to keep the request row as well.',
                 ],
                 [
                   "Extra approval on high-value fields (e.g. budget)",

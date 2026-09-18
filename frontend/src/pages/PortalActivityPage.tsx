@@ -49,6 +49,10 @@ const CODE_LABEL: Record<string, string> = {
   UNAUTHORIZED: "No bearer token",
   TOKEN_INVALID: "Token invalid or expired",
   AUTH_FAILED: "Authentication failed",
+  // The two module layers, which is what a refused MCP tool call carries.
+  MODULE_FORBIDDEN: "Not permitted for this token",
+  ENVIRONMENT_MODULE_FORBIDDEN: "Not permitted in this environment",
+  PERMISSION_CHECK_FAILED: "Permission check could not be completed",
 };
 
 const codeLabel = (code: string | null) => (code ? CODE_LABEL[code] || code : "—");
@@ -498,7 +502,15 @@ export default function PortalActivityPage({
                     </td>
                     <td className="pal-called">
                       {row.method && <span className="pal-method">{row.method}</span>}
-                      <code>{row.resource}</code>
+                      {/* An MCP row's interesting half is the tool: the URL is
+                          the same for every call an agent makes. */}
+                      {row.mcp_tool ? (
+                        <code className="pal-tool" title={`MCP tool · ${row.resource}`}>
+                          {row.mcp_tool}
+                        </code>
+                      ) : (
+                        <code>{row.resource}</code>
+                      )}
                     </td>
                     <td className="pal-ip">
                       {row.ip ? (
@@ -710,6 +722,14 @@ export default function PortalActivityPage({
                     </code>
                   </dd>
                 </div>
+                {detailRow.mcp_tool && (
+                  <div className="pal-detail-resource">
+                    <dt>MCP tool</dt>
+                    <dd>
+                      <code>{detailRow.mcp_tool}</code>
+                    </dd>
+                  </div>
+                )}
                 <div className="pal-detail-resource">
                   <dt>Reason</dt>
                   <dd>{codeLabel(detailRow.code)}</dd>

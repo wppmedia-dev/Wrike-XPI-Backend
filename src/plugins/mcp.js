@@ -13,6 +13,7 @@ const {
   PUBLIC_DENIAL_MESSAGE,
 } = require("../utils/environmentAccess.js");
 const { log: logActivity } = require("../utils/activityLog.js");
+const { SetMcpTools } = require("../controllers/activityLog.js");
 const {
   captureRequest,
   buildResponseSnapshot,
@@ -77,8 +78,14 @@ module.exports = async function (fastify, opts) {
   // (see routes/oauth/wellKnown.js) instead of the generic picker flow.
   const handleMcpPost = (resourceMetadataUrl) => async (req, reply) => {
     // Activity log — one row per MCP request (the REST path logs one row
-    // per HTTP call the same way; MCP has no per-tool-call hook to attach to
-    // in this build, so the request itself is the unit logged here).
+    // per HTTP call the same way). Which TOOL that request called is only
+    // known once the call has happened, so the row is annotated afterwards:
+    // the permission gate reports every call through `onToolCall` below, and
+    // the summary is written onto this row when the request is done. See
+    // SetMcpTools in src/controllers/activityLog.js for why it is an update
+    // rather than a second row, and why a refused tool call also flips the
+    // row's outcome.
+    const toolCalls = [];
     const recordActivity = ({
       envId,
       environmentName,
@@ -105,6 +112,21 @@ module.exports = async function (fastify, opts) {
         requestPayload: captureRequest(req),
         responsePayload: req.activityResponsePayload || null,
       });
+
+    /**
+     * The tool summary for this request, or null when it called no tool (an
+     * `initialize` or `tools/list` handshake). Names in call order, deduped:
+     * an agent that calls the same tool twice asked one question twice, and
+     * the row is a summary rather than a transcript.
+     */
+    const toolSummary = () => {
+      const names = [...new Set(toolCalls.map((call) => call.tool))];
+      return names.length ? names.join(", ").slice(0, 255) : null;
+    };
+
+    /** The first refusal, if any tool call was refused. */
+    const firstDenial = () =>
+      toolCalls.find((call) => !call.allowed)?.code || null;
 
     const authHeader = req.headers.authorization || "";
     const [scheme, token] = authHeader.split(" ");
@@ -178,8 +200,10 @@ module.exports = async function (fastify, opts) {
 
     // Logged as "accepted" here, before the response is hijacked for
     // streaming — this measures whether the MCP connection was authorized,
-    // not the success/failure of whatever tool calls happen over it.
-    recordActivity({
+    // not the success/failure of whatever tool calls happen over it. The
+    // handshake row's id is kept so the tool summary can be written onto it
+    // once the calls have happened.
+    const rowWritten = recordActivity({
       envId: auth.envId,
       environmentName: auth.environmentName,
       actorEmail: access.email,
@@ -201,8 +225,12 @@ module.exports = async function (fastify, opts) {
         req.raw.headers.accept = "application/json, text/event-stream";
       }
 
-      // Fresh server + transport per request — no shared session state
-      const server = await createMcpServer(fastify, serverUrl, auth);
+      // Fresh server + transport per request — no shared session state. The
+      // gate is handed the collector, so every tool call this request makes
+      // is reported as it happens.
+      const server = await createMcpServer(fastify, serverUrl, auth, (call) =>
+        toolCalls.push(call),
+      );
       const transport = new StreamableHTTPServerTransport({
         enableJsonResponse: true,
       });
@@ -216,6 +244,18 @@ module.exports = async function (fastify, opts) {
           success: false,
           message: err?.message || "MCP request handling failed.",
         }),
+      );
+    } finally {
+      // The tool names and any refusal, onto the row this request wrote. Chained
+      // off the (already started) write rather than awaited: the response is on
+      // the wire by now, and nothing about the caller's result depends on this.
+      rowWritten.then((row) =>
+        row?.id
+          ? SetMcpTools(row.id, {
+              tool: toolSummary(),
+              code: firstDenial(),
+            })
+          : null,
       );
     }
   };

@@ -24,6 +24,8 @@ export interface PortalActivityRow {
   status_code: number | null;
   ip: string | null;
   category: string | null;
+  /** The MCP tool(s) the agent called, in call order. Null for REST rows. */
+  mcp_tool: string | null;
   created_at: string;
 }
 

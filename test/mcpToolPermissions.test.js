@@ -155,7 +155,10 @@ const callTool = async (
     },
   };
 
-  installPermissionGate(server, { tokenId, envId });
+  /* `calls` is what the gate reported about this tool call — the same list the
+     activity log annotates its request row from (src/plugins/mcp.js). */
+  const calls = [];
+  installPermissionGate(server, { tokenId, envId }, (call) => calls.push(call));
 
   // Through the gate's wrapper, exactly as the tool files do it (they hold the
   // server object createMcpServer passed them).
@@ -163,6 +166,7 @@ const callTool = async (
 
   const result = await handlers.get(name)({}, {});
   return {
+    calls,
     ran: result === RAN,
     isError: result?.isError === true,
     text: result?.content?.[0]?.text || "",
@@ -421,6 +425,49 @@ const runGateChecks = async () => {
       unreadable.text.includes("PERMISSION_CHECK_FAILED"),
     );
     check("and the token is never reached", asked.length, 0);
+  }
+
+  console.log("\nWhat the gate reports about a call");
+  {
+    // This is what the activity log writes onto the request's row: which tool,
+    // and what was decided about it. It has to be reported for refused calls
+    // as well, or a log would only ever show what ran.
+    const allowed = await callTool(WIDER, "campaign_get", read);
+    check("an allowed call is reported once", allowed.calls.length, 1);
+    check("with the tool name", allowed.calls[0].tool, "campaign_get");
+    check("its module", allowed.calls[0].module, "campaign");
+    check("its action", allowed.calls[0].action, "read");
+    check("and the decision", allowed.calls[0].allowed, true);
+    check("with no reason code", allowed.calls[0].code, null);
+
+    const refused = await callTool(RESTRICTED, "campaign_delete", destructive);
+    check("a refused call is reported too", refused.calls.length, 1);
+    check(
+      "with the code that refused it",
+      refused.calls[0].code,
+      "MODULE_FORBIDDEN",
+    );
+    check("and allowed false", refused.calls[0].allowed, false);
+    check("though its handler did not run", refused.ran, false);
+
+    const byEnvironment = await callTool(
+      UNRESTRICTED,
+      "channel_get",
+      read,
+      ENV_RESTRICTED,
+    );
+    check(
+      "the environment's refusal is reported as the environment's",
+      byEnvironment.calls[0].code,
+      "ENVIRONMENT_MODULE_FORBIDDEN",
+    );
+
+    const broken = await callTool(UNREADABLE, "campaign_get", read);
+    check(
+      "a check that could not be answered is reported as such",
+      broken.calls[0].code,
+      "PERMISSION_CHECK_FAILED",
+    );
   }
 
   console.log("\nIt asks about the token that authenticated the request");
