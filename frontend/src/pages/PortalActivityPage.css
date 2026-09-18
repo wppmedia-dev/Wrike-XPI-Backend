@@ -421,6 +421,34 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* The reference column: the id from an error a caller reported, kept in mono
+   so it can be read off the screen character for character. A dash when the
+   call succeeded, because only a failure is given one. */
+.pal-ref-cell {
+  font-size: 12px;
+}
+
+.pal-ref-code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+}
+
+.pal-search-ref input {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.pal-search-ref input::placeholder {
+  text-transform: none;
+  letter-spacing: normal;
+  font-family: inherit;
+}
+
 .pal-ip {
   font-size: 12px;
 }

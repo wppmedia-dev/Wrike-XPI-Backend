@@ -29,6 +29,12 @@ export interface ActivityRow {
    * SetMcpTools).
    */
   mcp_tool: string | null;
+  /**
+   * The reference the caller was shown when this call failed (the `reference`
+   * field in the error body, "XPI-XXXXXXXX"). Set only on error rows: a call
+   * that succeeded was never given one. src/utils/activityReference.js.
+   */
+  reference_id: string | null;
   request_payload: unknown;
   response_payload: unknown;
   created_at: string;
@@ -57,6 +63,9 @@ export interface ActivityFilters {
       sets, so the page opens on one token's history. */
   token_id?: string;
   actor_email?: string;
+  /** Exact reference id, typed in from an error the caller reported. Case
+      insensitive: it gets copied by hand from a screenshot. */
+  reference?: string;
   surface?: Surface;
   allowed?: boolean;
   from?: string;
@@ -83,6 +92,7 @@ const qs = (filters: ActivityFilters): string => {
   if (filters.env_id) params.set("env_id", filters.env_id);
   if (filters.token_id) params.set("token_id", filters.token_id);
   if (filters.actor_email) params.set("actor_email", filters.actor_email);
+  if (filters.reference) params.set("reference", filters.reference);
   if (filters.surface) params.set("surface", filters.surface);
   if (filters.allowed !== undefined) params.set("allowed", String(filters.allowed));
   if (filters.from) params.set("from", filters.from);

@@ -188,8 +188,15 @@ export const resolveToolRoute = (name, annotations) => {
  * REST call can be retried over MCP. So the result names the missing
  * permission and says plainly not to route around it.
  */
-export const permissionDenied = ({ toolName, module, action, code }) => ({
+export const permissionDenied = ({
+  toolName,
+  module,
+  action,
+  code,
+  reference,
+}) => ({
   isError: true,
+  reference: reference || null,
   content: [
     {
       type: "text",
@@ -198,6 +205,12 @@ export const permissionDenied = ({ toolName, module, action, code }) => ({
         "",
         `"${toolName}" was not executed: this token is not permitted to ${action} ${module}.`,
         code ? `Reason code: ${code}.` : "",
+        // The same id is on the activity log row for this request, so a
+        // person reporting "the agent said FORBIDDEN" can be answered with
+        // the exact call instead of a timestamp guess.
+        reference
+          ? `Reference: ${reference}. Quote it when reporting this;`
+          : "",
         "",
         "A token's access is granted per module and per action by an administrator in the admin portal. This is not a transient failure or a rate limit, so repeating the call returns this same result.",
         "Next step: tell the user which permission is missing (module and action, as above) and stop. Do not attempt the same change through a different tool, and do not ask them to approve anything. There is nothing to approve.",

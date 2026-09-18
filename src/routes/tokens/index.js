@@ -6,6 +6,7 @@ import { WrikeTokenExchangeSchema } from "./schema/wrikeTokenExchange";
 import { GetUserDataSchema } from "./schema/getUserData";
 import { ValidateJWT } from "../../middlewares/authentication";
 import { log as logActivity } from "../../utils/activityLog";
+import { referenceFor } from "../../utils/activityReference";
 import { captureRequest, buildResponseSnapshot } from "../../utils/capture";
 import { clientIp } from "../../utils/environmentAccess";
 
@@ -88,6 +89,7 @@ export const tokenRoute = (fastify, opts, done) => {
       code: reply.statusCode >= 400 ? "TOKEN_ERROR" : null,
       statusCode: reply.statusCode,
       ip: req.ip || null,
+      referenceId: req.activityReference || null,
       category: "token",
       requestPayload: captureRequest(req),
       responsePayload: req.activityResponsePayload || null,
@@ -609,6 +611,29 @@ export const tokenRoute = (fastify, opts, done) => {
       margin: 16px 0 28px;
     }
 
+    /* The reference the same error carries in its JSON form. This page is the
+       one error a person reads in a browser rather than a client logs, and
+       without it "the login said something went wrong" is unanswerable. */
+    .ref {
+      margin: -12px 0 24px;
+      font-size: 0.85rem;
+      color: #ddd;
+    }
+
+    .ref code {
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.95rem;
+      color: #fff;
+      letter-spacing: 0.04em;
+    }
+
+    .ref small {
+      display: block;
+      margin-top: 4px;
+      font-size: 0.75rem;
+      opacity: 0.65;
+    }
+
     .btn {
       background: var(--accent);
       border: none;
@@ -632,6 +657,10 @@ export const tokenRoute = (fastify, opts, done) => {
   <div class="card">
     <h1>Oops! Something went wrong</h1>
     <div class="message">${err?.message || "Unexpected error occurred"}</div>
+    <div class="ref">
+      Reference: <code>${referenceFor(req)}</code>
+      <small>Quote it when you report this — it identifies this exact attempt in the activity log.</small>
+    </div>
     <a class="btn" href="${process.env.APP_URL}">⬅ Back to Login</a>
   </div>
 </body>

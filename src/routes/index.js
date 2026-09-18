@@ -173,6 +173,10 @@ export const PrivateRouters = (fastify, opts, done) => {
         (reply.statusCode >= 400 ? "AUTH_FAILED" : null),
       statusCode: reply.statusCode,
       ip: access?.ip || req.ip || null,
+      // Set by the error-reference hook when this response was an error (a
+      // 4xx/5xx carries a reference back to the caller). Null on a success,
+      // where no reference was ever shown to anyone.
+      referenceId: req.activityReference || null,
       category: categoryForUrl(resource),
       requestPayload: captureRequest(req),
       responsePayload: req.activityResponsePayload || null,

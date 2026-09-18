@@ -8,6 +8,10 @@ export const ListSchema = {
         // log opens filtered to one token instead of its whole environment.
         token_id: { type: "string", format: "uuid" },
         actor_email: { type: "string", maxLength: 320 },
+        // The reference a caller was shown with an error response, so a report
+        // can be turned into the row behind it. Free text rather than a
+        // pattern: it gets typed by hand from a screenshot.
+        reference: { type: "string", maxLength: 32 },
         surface: { type: "string", enum: ["rest", "mcp"] },
         allowed: { type: "string", enum: ["true", "false"] },
         from: { type: "string" },

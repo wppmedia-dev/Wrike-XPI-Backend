@@ -49,6 +49,13 @@ module.exports = (sequelize, DataTypes) => {
        * migrations/20260918150000-add-mcp-tool-to-api-activity-logs.js.
        */
       mcp_tool: { type: DataTypes.STRING(255), allowNull: true },
+      /**
+       * The reference the caller was shown when this request failed, so the
+       * message they are holding can be looked up. Null on a successful call —
+       * a reference is only created for an error response. See
+       * migrations/20260918160000-add-reference-id-to-api-activity-logs.js.
+       */
+      reference_id: { type: DataTypes.STRING(32), allowNull: true },
       request_payload: { type: DataTypes.JSON, allowNull: true },
       response_payload: { type: DataTypes.JSON, allowNull: true },
       created_at: { type: DataTypes.DATE },
