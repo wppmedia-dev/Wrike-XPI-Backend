@@ -11,7 +11,7 @@ import { adminApiRoute } from "./admin";
 import { portalApiRoute } from "./portal";
 // Auth Middleware
 import { ValidateToken } from "../middlewares/authentication";
-import { requireTokenPermission } from "../middlewares/tokenPermissions";
+import { requireModulePermissions } from "../middlewares/modulePermissions";
 import { log as logActivity } from "../utils/activityLog";
 import {
   captureRequest,
@@ -107,16 +107,18 @@ export const PrivateRouters = (fastify, opts, done) => {
     ValidateToken(req, reply, fastify),
   );
 
-  // Module-level scope for the token that just authenticated: which of the
-  // five API modules it may touch, and with which verb. One hook covers every
-  // route registered below — including the nested listings — because the
-  // module comes from the path and the action from the method.
+  // Module-level scope for the token that just authenticated: the environment
+  // it belongs to first, then the token itself. Both have to allow the module
+  // and verb, so the environment's matrix is a ceiling over every token in it
+  // (src/middlewares/modulePermissions.js). One hook covers every route
+  // registered below — including the nested listings — because the module comes
+  // from the path and the action from the method.
   //
-  // A separate hook rather than more lines inside ValidateToken, so a 401
-  // (this is not a valid token) and a 403 (this token may not do this) stay
-  // distinguishable in the code and in the audit trail.
+  // A separate hook rather than more lines inside ValidateToken, so a 401 (this
+  // is not a valid token) and a 403 (this token, or its environment, may not do
+  // this) stay distinguishable in the code and in the audit trail.
   fastify.addHook("onRequest", (req, reply) =>
-    requireTokenPermission(req, reply),
+    requireModulePermissions(req, reply),
   );
 
   // Store the response body for everything EXCEPT the 200/201 success path —

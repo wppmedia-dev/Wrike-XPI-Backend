@@ -1,5 +1,7 @@
 import { decryptField } from "../../../../utils/crypto";
 import { scopedEnvironmentsFor } from "../../../../utils/portalScope";
+import { EnvironmentModulePermissions } from "../../../../controllers";
+import { summarisePermissions } from "../../../../utils/tokenPermissionSummary";
 
 export const GetMyEnvironments = (portalUser) => {
   return new Promise(async (resolve, reject) => {
@@ -9,6 +11,14 @@ export const GetMyEnvironments = (portalUser) => {
       // the API Tokens page so the two cannot disagree about what a user can
       // see (a token list is scoped by exactly this).
       const environments = await scopedEnvironmentsFor(portalUser);
+
+      // The module ceiling each of these environments holds its tokens to, in
+      // the same summary shape the admin console shows. One extra query for the
+      // page, not one per row.
+      const matrices =
+        await EnvironmentModulePermissions.GetMatrixForEnvironments(
+          (environments || []).map((env) => env.id),
+        );
 
       const data = (environments || []).map((env) => ({
         id: env.id,
@@ -37,6 +47,9 @@ export const GetMyEnvironments = (portalUser) => {
         // showing access scope accurately.
         allowlist_check_enabled: env.allowlist_check_enabled !== false,
         custom_field_check_enabled: !!env.custom_field_check_enabled,
+        // No rows means no ceiling, which summarisePermissions already says
+        // without this handler repeating the rule.
+        module_permissions: summarisePermissions(matrices[env.id]),
         created_at: env.created_at,
         updated_at: env.updated_at,
       }));

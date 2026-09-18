@@ -60,6 +60,60 @@ const MODULE_ICON: Record<string, string> = {
 };
 
 /**
+ * The grid's prose. One editor serves two layers — a token's own matrix and the
+ * module ceiling of an environment (src/middlewares/modulePermissions.js
+ * applies the environment first) — and they are different enough in the
+ * sentence to be worth wording rather than a noun swap: a token *calls* a
+ * module, an environment *allows* one for everything in it. Everything else
+ * about the two grids is identical, which is the point of sharing this file.
+ */
+export interface PermissionsCopy {
+  title: string;
+  icon: string;
+  loadError: string;
+  hint: string;
+  readOnlyNotice: string;
+  /**
+   * The "every module is allowed by default" panel, shown only while nothing
+   * is stored for what is being edited. Two strings because it is one sentence
+   * around the "…which is why every box starts" clause the grid adds.
+   *
+   * Both are optional, and OMITTING BOTH HIDES THE PANEL. A token's grid needs
+   * it: an empty grid would read as "this token can do nothing" while the API
+   * went on answering every call. An environment's grid does not — it is opened
+   * from a row that already shows that environment's state, so the panel said
+   * nothing the row had not already said.
+   */
+  defaultNotice?: string;
+  saveNotice?: string;
+}
+
+export const TOKEN_PERMISSIONS_COPY: PermissionsCopy = {
+  title: "Token Permissions",
+  icon: "fa-solid fa-key",
+  loadError: "Could not load token permissions",
+  hint: "Which API modules this token may call, and with which verb. A module it can write to needs read as well. The checkboxes keep that pair consistent.",
+  readOnlyNotice:
+    "These are the modules this token may call, and with which verb. Changing them needs the update permission on Token management, which your account does not have.",
+  defaultNotice:
+    "Nothing is stored for this token yet, so it can call all of them, which is why every box starts",
+  saveNotice:
+    "Saving stores this as its matrix: untick what it must not do, or set every row to No access to switch it off completely.",
+};
+
+export const ENVIRONMENT_MODULES_COPY: PermissionsCopy = {
+  title: "Environment Module Permissions",
+  icon: "fa-solid fa-layer-group",
+  loadError: "Could not load environment module permissions",
+  hint: "Which API modules anything in this environment may call at all, and with which verb. This is a ceiling: every token here is held to it, and a token's own matrix can only narrow it further.",
+  readOnlyNotice:
+    "These are the modules this environment allows. Changing them needs the update permission on Environment Modules, which your account does not have.",
+  // No defaultNotice/saveNotice: the panel is hidden for this layer. The row
+  // this grid opens from already carries the environment's state, so a notice
+  // explaining an empty grid would be repeating it.
+};
+
+/**
  * Where the editor reads and writes.
  *
  * Injectable because the same widget serves two surfaces: the admin console,
@@ -114,6 +168,8 @@ interface Props {
    * component declining to send it.
    */
   readOnly?: boolean;
+  /** The grid's own words. Defaults to a token's matrix. */
+  copy?: PermissionsCopy;
 }
 
 /**
@@ -136,6 +192,7 @@ export default function TokenPermissions({
   onSaved,
   api = ADMIN_API,
   readOnly = false,
+  copy = TOKEN_PERMISSIONS_COPY,
 }: Props) {
   const [catalog, setCatalog] = useState<PermissionCatalog | null>(null);
   const [original, setOriginal] = useState<PermissionMatrix | null>(null);
@@ -179,7 +236,7 @@ export default function TokenPermissions({
       setDraft(shown);
     })()
       .catch((err) => {
-        toast(err?.message || "Could not load token permissions", "error");
+        toast(err?.message || copy.loadError, "error");
         setOriginal(null);
         setDraft(null);
         setConfigured(null);
@@ -333,14 +390,14 @@ export default function TokenPermissions({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="tkp-modal" role="dialog" aria-modal="true" aria-label="Token permissions">
+      <div className="tkp-modal" role="dialog" aria-modal="true" aria-label={copy.title}>
         <div className="tkp-head">
           <div className="tkp-head-title">
             <span className="tkp-head-icon" aria-hidden="true">
-              <i className="fa-solid fa-key" />
+              <i className={copy.icon} />
             </span>
             <div>
-              <div className="tkp-head-name">Token Permissions</div>
+              <div className="tkp-head-name">{copy.title}</div>
               <div className="tkp-head-token">{tokenLabel || tokenId || "—"}</div>
             </div>
           </div>
@@ -364,28 +421,24 @@ export default function TokenPermissions({
                 <div className="tkp-notice" role="note">
                   <i className="fa-solid fa-eye" aria-hidden="true" />
                   <div>
-                    <strong>Read-only.</strong> These are the modules this token may call, and
-                    with which verb. Changing them needs the update permission on Token management,
-                    which your account does not have.
+                    <strong>Read-only.</strong> {copy.readOnlyNotice}
                   </div>
                 </div>
               ) : (
-                <p className="tkp-hint">
-                  Which API modules this token may call, and with which verb. A module it can write
-                  to needs read as well. The checkboxes keep that pair consistent.
-                </p>
+                <p className="tkp-hint">{copy.hint}</p>
               )}
 
-              {configured === false && (
+              {configured === false && copy.defaultNotice && (
                 <div className="tkp-notice" role="note">
                   <i className="fa-solid fa-unlock" aria-hidden="true" />
                   <div>
-                    <strong>Every module is allowed by default.</strong> Nothing is stored for
-                    this token yet, so it can call all of them, which is why every box starts
-                    {readOnly ? " ticked." : (
+                    <strong>Every module is allowed by default.</strong>{" "}
+                    {copy.defaultNotice}
+                    {readOnly ? (
+                      " ticked."
+                    ) : (
                       <>
-                        {" "}ticked. Saving stores this as its matrix: untick what it must not do,
-                        or set every row to <em>No access</em> to switch it off completely.
+                        {" "}ticked.{copy.saveNotice ? ` ${copy.saveNotice}` : ""}
                       </>
                     )}
                   </div>

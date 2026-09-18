@@ -4,6 +4,11 @@ import { DataTable } from "../components/ui/DataTable";
 import { useTable, type ColumnDef } from "../components/ui/useTable";
 import { RowMenu } from "../components/ui/RowMenu";
 import { ActiveBadge, Badge } from "../components/ui/Badge";
+import {
+  ACCESS_BADGE,
+  accessLabel,
+  accessStateOf,
+} from "../lib/tokenDisplay";
 import { EMPTY, dateSortValue, formatDateTime } from "../lib/format";
 
 /* The portal user's "My Environments" table — same useTable/DataTable/RowMenu
@@ -26,6 +31,12 @@ export interface PortalEnvironmentsTableProps {
       admin console's Environments table offers: straight to the tokens issued
       for this environment, already filtered to it. */
   canViewTokens: boolean;
+  /** environment_modules:read — shows the module ceiling in the Modules column
+      and the row action that opens it. */
+  canSeeModules: boolean;
+  /** environment_modules:update — opens that grid as an editor rather than a
+      read-only view. */
+  canUpdateModules: boolean;
   /** activity_logs:read — shows the "Activity logs" row action, again matching
       the admin console. Offered only with the grant, because the log page and
       its API are behind it and a row action that 403s is a trap. */
@@ -35,6 +46,8 @@ export interface PortalEnvironmentsTableProps {
   onManageAccess: (env: PortalEnvironmentFull) => void;
   onViewTokens: (env: PortalEnvironmentFull) => void;
   onViewActivityLogs: (env: PortalEnvironmentFull) => void;
+  /** Opens this environment's module ceiling. */
+  onModulePermissions: (env: PortalEnvironmentFull) => void;
   onAdd: () => void;
 }
 
@@ -50,12 +63,15 @@ export function PortalEnvironmentsTable({
   canDelete,
   canSeeAccess,
   canViewTokens,
+  canSeeModules,
+  canUpdateModules,
   canSeeActivity,
   onEdit,
   onDelete,
   onManageAccess,
   onViewTokens,
   onViewActivityLogs,
+  onModulePermissions,
   onAdd,
 }: PortalEnvironmentsTableProps) {
   const columns = useMemo<ColumnDef<PortalEnvironmentFull>[]>(() => {
@@ -94,6 +110,33 @@ export function PortalEnvironmentsTable({
         searchable: false,
       },
       {
+        id: "module_permissions",
+        header: "Modules",
+        width: "132px",
+        // Sorts on what the badge says: how much of the ceiling is granted.
+        accessor: (env) => env.module_permissions?.granted ?? 0,
+        cell: (env) => {
+          const permissions = env.module_permissions ?? {
+            configured: false,
+            granted: 0,
+            total: 0,
+          };
+          const state = accessStateOf(permissions);
+          const { tone, icon } = ACCESS_BADGE[state];
+          const detail = permissions.configured
+            ? `Every token in ${env.environment_name} is held to this ceiling.`
+            : "No ceiling: every module is allowed here, and each token's own matrix decides what it may do.";
+
+          return (
+            <span title={detail}>
+              <Badge tone={tone} icon={icon}>
+                {accessLabel(state, permissions.granted, permissions.total)}
+              </Badge>
+            </span>
+          );
+        },
+      },
+      {
         id: "is_visible",
         header: "Visibility",
         accessor: (env) => env.is_visible,
@@ -119,7 +162,14 @@ export function PortalEnvironmentsTable({
     // Actions column only exists at all if there's at least one action this
     // user can take — an empty RowMenu with zero items would just be a
     // trigger that opens nothing.
-    if (canUpdate || canDelete || canSeeAccess || canViewTokens || canSeeActivity) {
+    if (
+      canUpdate ||
+      canDelete ||
+      canSeeAccess ||
+      canViewTokens ||
+      canSeeModules ||
+      canSeeActivity
+    ) {
       cols.push({
         id: "actions",
         header: "Actions",
@@ -149,6 +199,18 @@ export function PortalEnvironmentsTable({
                       label: "View tokens",
                       icon: "fa-solid fa-key",
                       onSelect: () => onViewTokens(env),
+                    },
+                  ]
+                : []),
+              ...(canSeeModules
+                ? [
+                    {
+                      // The layer above those tokens: what anything in this
+                      // environment may reach at all. Same wording as the admin
+                      // console's row action for it.
+                      label: "Module permissions",
+                      icon: "fa-solid fa-layer-group",
+                      onSelect: () => onModulePermissions(env),
                     },
                   ]
                 : []),
@@ -194,6 +256,8 @@ export function PortalEnvironmentsTable({
     canDelete,
     canSeeAccess,
     canViewTokens,
+    canSeeModules,
+    canUpdateModules,
     canSeeActivity,
     onEdit,
     onDelete,

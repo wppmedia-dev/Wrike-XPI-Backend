@@ -6,7 +6,7 @@ import { registerDatahubTools } from "./tools/datahub.js";
 import { registerIdsTools } from "./tools/ids.js";
 import { registerWrikeProxyTools } from "./wrikeMcpProxy.js";
 import wrikeIconDataUri from "./wrikeIcon.js";
-import { TokenPermissions } from "../controllers";
+import { EnvironmentModulePermissions, TokenPermissions } from "../controllers";
 import { denialFor } from "../utils/tokenPermissionMap";
 import { permissionDenied, resolveToolRoute } from "./tools/permission.js";
 
@@ -57,20 +57,25 @@ MECHANICS
 - Respect limits and pagination: wrike_* tools cap results (e.g. 200 newest comments, pageSize on search_items) and return truncation/next-page signals — page through or narrow the query as each tool's description explains.`;
 
 /**
- * Wrap server.registerTool so every tool checks the calling token's module
- * permissions before its handler runs.
+ * Wrap server.registerTool so every tool checks module permissions before its
+ * handler runs — both layers, in the same order the REST gate uses
+ * (src/middlewares/modulePermissions.js): the environment the token belongs to
+ * first, then the token itself. Either refusing is a denial, so an environment
+ * with Wrike MCP Tools switched off refuses every MCP call into it however the
+ * calling token's own grid looks.
  *
  * A wrapper rather than a guard inside each handler because this is the one
  * point every tool funnels through: all sixteen native tools *and* the whole
  * dynamically-named wrike_* family register via this single method, and the
  * server is rebuilt per HTTP request, so the per-request auth (which carries
- * the token id) is safe to close over. It also keeps the confirmation gate's
- * invariant intact — test/mcpConfirmation.test.js scans the tool files for
- * those guards, and no tool file gains a second concern from this change.
+ * the token id and the environment id) is safe to close over. It also keeps
+ * the confirmation gate's invariant intact — test/mcpConfirmation.test.js scans
+ * the tool files for those guards, and no tool file gains a second concern from
+ * this change.
  *
  * Denies on a failed lookup as well as on a denied rule: a permission check
  * that cannot be answered must not quietly become a grant, and the REST gate
- * (src/middlewares/tokenPermissions.js) makes the same choice.
+ * makes the same choice.
  *
  * Exported so test/mcpToolPermissions.test.js can drive it directly: this is
  * the enforcement itself, and a test of the mapping alone would still pass if
@@ -86,6 +91,17 @@ export const installPermissionGate = (server, auth) => {
       if (!route) return handler(args, extra);
 
       try {
+        const environment = await EnvironmentModulePermissions.GetMatrixCached(
+          auth?.envId,
+        );
+        if (denialFor(environment, route)) {
+          return permissionDenied({
+            toolName: name,
+            ...route,
+            code: "ENVIRONMENT_MODULE_FORBIDDEN",
+          });
+        }
+
         const entry = await TokenPermissions.GetMatrixCached(auth?.tokenId);
         const code = denialFor(entry, route);
         if (code) return permissionDenied({ toolName: name, ...route, code });

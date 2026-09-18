@@ -5,6 +5,12 @@ import { useTable, type ColumnDef } from "../../components/ui/useTable";
 import { RowMenu } from "../../components/ui/RowMenu";
 import { CopyButton } from "../../components/ui/CopyButton";
 import { Toggle } from "../../components/ui/Toggle";
+import { Badge } from "../../components/ui/Badge";
+import {
+  ACCESS_BADGE,
+  accessLabel,
+  accessStateOf,
+} from "../../lib/tokenDisplay";
 import { EMPTY, dateSortValue, formatDateTime } from "../../lib/format";
 
 /* The Environments table.
@@ -30,6 +36,8 @@ export interface EnvironmentsTableProps {
   onDuplicate: (env: AdminEnvironment) => void;
   onDelete: (env: AdminEnvironment) => void;
   onOpenAccess: (env: AdminEnvironment) => void;
+  /** Opens the module ceiling this environment holds every token to. */
+  onModulePermissions: (env: AdminEnvironment) => void;
   /** Opens the API Tokens page scoped to this environment. */
   onViewTokens: (env: AdminEnvironment) => void;
   /** Opens the Activity Log scoped to this environment. */
@@ -54,6 +62,7 @@ export function EnvironmentsTable({
   onDuplicate,
   onDelete,
   onOpenAccess,
+  onModulePermissions,
   onViewTokens,
   onActivityLogs,
   onToggle,
@@ -99,6 +108,32 @@ export function EnvironmentsTable({
         accessor: (env) => dateSortValue(env.updated_at),
         cell: (env) => formatDateTime(env.updated_at),
         searchable: false,
+      },
+      {
+        id: "module_permissions",
+        header: "Modules",
+        width: "132px",
+        // Sorts on what the badge says: how much of the ceiling is granted.
+        accessor: (env) => env.module_permissions.granted,
+        cell: (env) => {
+          const state = accessStateOf(env.module_permissions);
+          const { tone, icon } = ACCESS_BADGE[state];
+          const detail = env.module_permissions.configured
+            ? `Every token in ${env.environment_name} is held to this ceiling. Open Module permissions to change it.`
+            : "No ceiling: every module is allowed here, and each token's own matrix decides what it may do. Open Module permissions to restrict the whole environment.";
+
+          return (
+            <span title={detail}>
+              <Badge tone={tone} icon={icon}>
+                {accessLabel(
+                  state,
+                  env.module_permissions.granted,
+                  env.module_permissions.total,
+                )}
+              </Badge>
+            </span>
+          );
+        },
       },
       {
         id: "is_visible",
@@ -147,6 +182,14 @@ export function EnvironmentsTable({
                 onSelect: () => onOpenAccess(env),
               },
               {
+                // The other half of "who may call this, and what may they
+                // reach": the access scope decides who gets in, this decides
+                // what any of them can touch once they are in.
+                label: "Module permissions",
+                icon: "fa-solid fa-layer-group",
+                onSelect: () => onModulePermissions(env),
+              },
+              {
                 // Straight to the tokens issued for this environment, already
                 // filtered to it. That is the question "what is using this
                 // environment?" asked from the environment's own row.
@@ -182,7 +225,7 @@ export function EnvironmentsTable({
         ),
       },
     ],
-    [onEdit, onDuplicate, onDelete, onOpenAccess, onViewTokens, onActivityLogs, onToggle],
+    [onEdit, onDuplicate, onDelete, onOpenAccess, onModulePermissions, onViewTokens, onActivityLogs, onToggle],
   );
 
   const table = useTable({
