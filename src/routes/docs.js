@@ -940,11 +940,11 @@ async ({ taskId }, extra) => {
         groupId: "api",
         label: "Authentication",
         keywords:
-          "auth authentication oauth bearer token access token sign in login authorize",
+          "auth authentication oauth bearer token access token sign in login authorize query params parameters environmentId environment purpose redirectUri accountId returnTo autoRedirect calendarSync code state exchange",
         html: `
           <div class="pg-eyebrow">XPI API Docs</div>
           <h1 class="pg-title">Authentication</h1>
-          <p class="pg-lede">All endpoints require an OAuth 2.0 access token sent as a bearer token.</p>
+          <p class="pg-lede">All endpoints require an OAuth 2.0 access token sent as a bearer token. This page covers how one is issued, every parameter a sign-in accepts, and the exchange call that turns a code into a token.</p>
 
           <h2 class="pg-h2">Authorization header</h2>
           ${codeBlock(
@@ -958,17 +958,162 @@ async ({ taskId }, extra) => {
             "Returns <code>401 Unauthorized</code> with an <code>WWW-Authenticate: Bearer</code> challenge.",
           )}
 
-          <h2 class="pg-h2">Getting a token</h2>
-          <ol class="ordered">
-            <li>Open the login page and choose an environment.</li>
-            <li>Sign in with Wrike — you'll be redirected back with an authorization code.</li>
-            <li>Exchange the code at <code>GET /wrikexpi/token/exchange</code> (or use the MCP OAuth flow at <code>/oauth</code>).</li>
-          </ol>
+          <h2 class="pg-h2">How a token is issued</h2>
+          <p class="pg-p">Every token is minted by completing a Wrike sign-in. Two things can start one, and both end in the same place: a single-use authorization code that this service exchanges for a token.</p>
+          <ul class="bullets">
+            <li><b>The login page</b> at <code>/</code>, for a person. Choose an environment, press <b>Login with Wrike</b>, and the token is shown on the screen that follows.</li>
+            <li><b>The OAuth flow</b> at <code>/oauth</code>, for an MCP client, which receives the token without anyone reading it off a page.</li>
+          </ul>
+          <p class="pg-p">A caller that wants the first route without a person in front of it builds the same address the page builds, asks for it with <code>GET /get-redirect-url</code>, and reads the token from the JSON that the exchange returns rather than off a screen.</p>
+
+          <h2 class="pg-h2">Starting a sign-in</h2>
+          <p class="pg-p">With no parameters at all, the login page shows an environment picker and a sign-in button. Everything below pre-chooses part of that.</p>
+          ${codeBlock("text", `${appUrl}/?environmentId=<environment_id>&purpose=login`)}
+          <p class="pg-p">Rather than assemble that by hand, ask for it. <code>GET /get-redirect-url</code> takes the same parameters and answers with the address to send the browser to:</p>
+          ${codeBlock(
+            "bash",
+            `curl -X GET "${appUrl}/get-redirect-url?environmentId=<environment_id>&purpose=login"`,
+          )}
+          ${codeBlock(
+            "json",
+            `{
+  "success": true,
+  "redirectUrl": "https://login.wrike.com/oauth2/authorize/v4?client_id=...&state=..."
+}`,
+          )}
+
+          <h2 class="pg-h2">Query parameters</h2>
+          <p class="pg-p">What the login page at <code>/</code> accepts. Every one of them is optional: with none, the page shows an environment picker and a sign-in button.</p>
+          ${table(
+            ["Parameter", "What it does"],
+            [
+              [
+                "<code>environmentId</code>",
+                "The environment to sign in for, by its <b>id</b>. Wins over <code>environment</code> when both are given, and with neither, the most recently added environment is used.",
+              ],
+              [
+                "<code>environment</code>",
+                "The environment by <b>name</b>, for a link written by hand. Prefer the id: a name can be edited in the console and an id cannot.",
+              ],
+              [
+                "<code>environment_id</code>",
+                "Accepted alias for <code>environmentId</code>. The OAuth discovery metadata publishes this spelling, so both are read.",
+              ],
+              [
+                "<code>redirectUri</code>",
+                "Where to send the browser once the sign-in finishes, instead of showing the token screen. The callback appends <code>?code=...&amp;environmentId=...</code> to it.",
+              ],
+              [
+                "<code>accountId</code>",
+                "The Wrike account to authorize against. Defaults to the account already recorded for the environment, which is right unless one environment spans several accounts.",
+              ],
+              [
+                "<code>purpose</code>",
+                "Which sign-in this is. <code>login</code>, the default, mints an ordinary token. <code>calendar_sync</code> mints one for a calendar integration: no expiry, and only the Calendar Sync module granted to begin with. Anything else, including a value nobody recognises, is treated as <code>login</code> rather than guessed at.",
+              ],
+              [
+                "<code>returnTo</code>",
+                "Where to hand the person back to when it finishes, named rather than given as a URL. Only <code>calendar-docs</code> exists today, and it is honoured only on a <code>calendar_sync</code> sign-in.",
+              ],
+              [
+                "<code>autoRedirect</code>",
+                "<code>true</code> or <code>1</code> sends the browser straight on to Wrike, so the login page never renders at all.",
+              ],
+              [
+                "<code>calendarSync</code>",
+                "<code>true</code> or <code>1</code> starts the Calendar Sync sign-in outright: <code>autoRedirect</code> and <code>purpose=calendar_sync</code> in one parameter, for a link handed to somebody who should not have to choose between two buttons.",
+              ],
+            ],
+          )}
+
+          <h2 class="pg-h2">What the server signs, and why</h2>
+          <p class="pg-p">Three of those parameters decide what actually gets minted, and the browser is not allowed to have the last word on them. The server signs them into the <code>state</code> value it hands to Wrike, and the callback reads them back out of that signed value rather than trusting the query string:</p>
+          ${table(
+            ["Decided by the signed state", "What it settles"],
+            [
+              [
+                "<code>environmentId</code>",
+                "Which environment the token belongs to, and therefore which Wrike workspace it can reach.",
+              ],
+              [
+                "<code>purpose</code>",
+                "Whether the token expires, and which modules it starts with.",
+              ],
+              [
+                "<code>returnTo</code>",
+                "Where the person is handed back to afterwards.",
+              ],
+            ],
+          )}
+          ${callout(
+            "tip",
+            "Editing the address bar changes nothing",
+            "Change any of these on the way back from Wrike and the state no longer verifies, so the sign-in fails instead of minting something else. That is what stops a link asking for an ordinary token from being turned into a calendar connection, or the reverse.",
+          )}
+          <p class="pg-p">This value travels back to us as the <code>state</code> parameter on <code>GET /wrikexpi/token/callback</code>, which is the only endpoint that reads it. It is not a parameter you send.</p>
+          <p class="pg-p">There is one exception, and it is deliberate. <code>purpose</code> on <code>/exchange</code> is read straight from the query, because that call is already holding a code this service issued for a sign-in that finished. Anyone able to reach that point can ask for a Calendar Sync token through the login page anyway, so signing it here would add no protection. <code>calendarSync</code> is the stricter one of the two, and it is stricter on purpose: it is the parameter a link gets handed around with.</p>
+
+          <h2 class="pg-h2">Exchanging the code</h2>
+          <p class="pg-p">Wrike sends the browser back to <code>GET /wrikexpi/token/callback?code=...&amp;state=...</code>, which mints the token and shows it. A caller that wants the token as data calls the exchange route with that same code instead.</p>
+
+          <h3 class="pg-h3">Query parameters</h3>
+          ${table(
+            ["Parameter", "What it does"],
+            [
+              [
+                "<code>code</code>",
+                "The authorization code Wrike returned. Required, and spendable once.",
+              ],
+              [
+                "<code>environmentId</code>",
+                "The environment to mint the token for. Required here: the callback reads this out of the signed state instead, but a direct call has to say it.",
+              ],
+              [
+                "<code>purpose</code>",
+                "<code>login</code> or <code>calendar_sync</code>, the same choice the login page offers. See the page's parameters above; a call that leaves it out gets an ordinary token.",
+              ],
+            ],
+          )}
+          ${codeBlock(
+            "bash",
+            `curl -X GET "${apiUrl}/wrikexpi/token/exchange?code=<authorization_code>&environmentId=<environment_id>" \\
+  -H "Accept: application/json"`,
+          )}
+          <p class="pg-p">It answers with the token, and with the credentials that go with it:</p>
+          ${codeBlock(
+            "json",
+            `{
+  "success": true,
+  "data": {
+    "token": "<access_token>",
+    "credentials": {
+      "username": "<wrike_username>",
+      "password": "<generated_password>",
+      "message": "IMPORTANT: Save these credentials. They will only be shown once."
+    }
+  }
+}`,
+          )}
+          ${callout(
+            "info",
+            "The token is the access token",
+            "Send the <code>token</code> value as <code>Authorization: Bearer &lt;token&gt;</code> on every call afterwards. Nothing else from the sign-in is needed again.",
+          )}
+          ${callout(
+            "warn",
+            "The code is single use",
+            "Wrike's code can be spent once, so exchanging it twice fails. And a token cannot be looked up afterwards: what is stored is the Wrike credential this service renews, never the token it handed out. A token that is lost is replaced by signing in again, not recovered.",
+          )}
+          <p class="pg-p">A failed exchange answers <code>400</code> with <code>success: false</code>, a <code>message</code> written to be read, and a <code>reference</code> to quote when reporting it. See <a class="lnk" href="#/api/errors">Errors</a>.</p>
 
           <h2 class="pg-h2">Token endpoints</h2>
-          ${endpoint("GET", "/wrikexpi/token/exchange", "Exchange an authorization code for an access token.")}
-          ${endpoint("GET", "/wrikexpi/token/callback", "OAuth callback that finalizes the token handshake.")}
-          ${endpoint("POST", "/wrikexpi/token/profile", "Return profile data for a supplied token.")}
+          ${endpoint("GET", "/wrikexpi/token/exchange", "Exchange an authorization code for a token. Query: <code>code</code>, <code>environmentId</code>, <code>purpose</code>.")}
+          ${endpoint("GET", "/wrikexpi/token/callback", "Where Wrike sends the browser back to. Query: <code>code</code>, <code>state</code>. Shows the token, or redirects to the <code>redirectUri</code> the sign-in carried.")}
+          ${endpoint("POST", "/wrikexpi/token/profile", "Who a token belongs to. Body: <code>token</code>.")}
+          ${endpoint("POST", "/wrikexpi/token/view-tokens", "Every token issued to the account a token belongs to. Body: <code>token</code>.")}
+          ${endpoint("GET", "/get-redirect-url", "The Wrike address to send the browser to, for a chosen environment. Query: the same parameters the login page takes.")}
+          ${endpoint("GET", "/environments", "The environments a person may choose between, and which one that is. Query: <code>environmentId</code>.")}
+          <p class="pg-p">The last two take the token in the body rather than the query, because a credential in a URL is written into every log between here and there.</p>
 
           <h2 class="pg-h2">OAuth metadata</h2>
           <p class="pg-p">Discovery metadata is published at the host root per <b>RFC 8414 / 9728</b>:</p>
