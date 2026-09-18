@@ -75,14 +75,15 @@ console.log("\nCatalogue");
     JSON.stringify(catalog.MODULES.find((m) => m.key === "task").actions),
     JSON.stringify(["read", "update", "delete"]),
   );
-  // A calendar reads what it displays and writes nothing back, so the module
-  // must not be able to express a write at all.
+  // The calendar surface forwards to amoeba, so the module has to be able to
+  // express a write: a calendar that pushes changes back is granted the verb
+  // it needs, per token, in the console.
   check(
-    "calendar sync is read only",
+    "calendar sync can express all four actions",
     JSON.stringify(
       catalog.MODULES.find((m) => m.key === "calendar_sync").actions,
     ),
-    JSON.stringify(["read"]),
+    JSON.stringify(["read", "create", "update", "delete"]),
   );
   check(
     "campaign supports all four",
@@ -168,6 +169,35 @@ console.log("\nREST routes → module/action");
     // the matrix cannot restrict.
     ["GET", "/api/v1/wrikexpi/calendar/validate", "calendar_sync/read"],
     ["GET", "/wrikexpi/calendar/validate", "calendar_sync/read"],
+
+    // The amoeba forwarder: the same services /wrikexpi/amoeba reaches, under
+    // the calendar module, so one row of the matrix decides both the read and
+    // the write side of a calendar integration.
+    [
+      "GET",
+      "/api/v1/wrikexpi/calendar/amoeba/leads/service",
+      "calendar_sync/read",
+    ],
+    [
+      "POST",
+      "/api/v1/wrikexpi/calendar/amoeba/leads/service",
+      "calendar_sync/create",
+    ],
+    [
+      "PUT",
+      "/api/v1/wrikexpi/calendar/amoeba/leads/service",
+      "calendar_sync/update",
+    ],
+    [
+      "PATCH",
+      "/api/v1/wrikexpi/calendar/amoeba/leads/service",
+      "calendar_sync/update",
+    ],
+    [
+      "DELETE",
+      "/api/v1/wrikexpi/calendar/amoeba/leads/service",
+      "calendar_sync/delete",
+    ],
 
     // Nested listings are attributed to what they return, so switching
     // "channel read" off closes the campaign path too.
@@ -353,6 +383,66 @@ console.log("\nThe decision");
   check(
     "nor tasks",
     decide(calendarOnly, "GET", "/api/v1/wrikexpi/task/t"),
+    "MODULE_FORBIDDEN",
+  );
+
+  // The amoeba forwarder is decided by the same row, which is the point of it:
+  // a calendar that reads is one grant, a calendar that writes is another, on
+  // one row rather than across two modules.
+  check(
+    "a calendar token may read through the amoeba forwarder",
+    decide(
+      calendarOnly,
+      "GET",
+      "/api/v1/wrikexpi/calendar/amoeba/leads/service",
+    ),
+    null,
+  );
+  check(
+    "but may not write through it without the grant",
+    decide(
+      calendarOnly,
+      "POST",
+      "/api/v1/wrikexpi/calendar/amoeba/leads/service",
+    ),
+    "MODULE_FORBIDDEN",
+  );
+  check(
+    "and may once the verb is granted",
+    decide(
+      entry(
+        catalog.normaliseMatrix({
+          calendar_sync: {
+            read: true,
+            create: true,
+            update: true,
+            delete: true,
+          },
+        }),
+      ),
+      "DELETE",
+      "/api/v1/wrikexpi/calendar/amoeba/leads/service",
+    ),
+    null,
+  );
+  // Reaching amoeba the plain way stays closed to a calendar token: the two
+  // paths are two rows, and granting one must not grant the other.
+  check(
+    "the plain amoeba path is still not the calendar's",
+    decide(
+      entry(
+        catalog.normaliseMatrix({
+          calendar_sync: {
+            read: true,
+            create: true,
+            update: true,
+            delete: true,
+          },
+        }),
+      ),
+      "POST",
+      "/api/v1/wrikexpi/amoeba/leads/service",
+    ),
     "MODULE_FORBIDDEN",
   );
   check(

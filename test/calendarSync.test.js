@@ -383,6 +383,165 @@ const {
     "PERMISSION_CHECK_FAILED",
   );
 
+  /* ── The amoeba forwarder ──────────────────────────────────────────── */
+
+  section("The amoeba forwarder hands the call to amoeba");
+
+  /* The handler the amoeba route uses, stubbed on the very object the calendar
+     route imports it from — so what is asserted is the wiring (the params, the
+     method, the envelope) rather than Wrike, Datahub or a network. */
+  const amoebaHandlerModule = require("../src/routes/amoeba/handlers/amoebaHandler");
+  const realAmoebaHandler = amoebaHandlerModule.AmoebaHandler;
+  const forwarded = [];
+  amoebaHandlerModule.AmoebaHandler = async (
+    wrikeToken,
+    req,
+    environmentName,
+  ) => {
+    forwarded.push({
+      wrikeToken,
+      moduleSlug: req.params.moduleSlug,
+      serviceSlug: req.params.serviceSlug,
+      masterSlug: req.params.master_slug,
+      serviceSlugParam: req.params.service_slug,
+      method: req.method,
+      environmentName,
+      body: req.body ?? null,
+    });
+    return { statusCode: 201, data: { id: "item-1" } };
+  };
+
+  const forward = async (method, body) => {
+    const app = Fastify();
+    app.addHook("onRequest", async (req) => {
+      req.wrikeToken = "wrike-token";
+      req.environmentName = "PROD";
+      req.envId = ENV_ID;
+    });
+    await app.register(require("../src/routes/calendar").calendarRoute);
+
+    const res = await app.inject({
+      method,
+      url: "/amoeba/leads/service",
+      ...(body ? { payload: body } : {}),
+    });
+    await app.close();
+    return res;
+  };
+
+  forwarded.length = 0;
+  const read = await forward("GET");
+  check(
+    "the handler's status code is what the caller gets",
+    read.statusCode,
+    201,
+  );
+  check("with the handler's own payload", read.json().data.id, "item-1");
+  check("and its success flag", read.json().success, true);
+  check("the handler ran once", forwarded.length, 1);
+  check(
+    "with the master slug as the module slug",
+    forwarded[0].moduleSlug,
+    "leads",
+  );
+  check(
+    "and the service slug as the service slug",
+    forwarded[0].serviceSlug,
+    "service",
+  );
+  check("the URL's own names are left alone", forwarded[0].masterSlug, "leads");
+  check(
+    "so a handler that reads them still can",
+    forwarded[0].serviceSlugParam,
+    "service",
+  );
+  check("the method arrives as it was sent", forwarded[0].method, "GET");
+  check(
+    "with the token the gate resolved",
+    forwarded[0].wrikeToken,
+    "wrike-token",
+  );
+  check(
+    "and the environment it belongs to",
+    forwarded[0].environmentName,
+    "PROD",
+  );
+
+  // A write has to survive the trip too: the body is the forwarder's payload,
+  // and nothing about it is rewritten on the way.
+  const write = await forward("POST", { name: "New lead", stage: "new" });
+  check("a write is answered too", write.statusCode, 201);
+  check("and passes the body through", forwarded[1].body.name, "New lead");
+  check("as a POST", forwarded[1].method, "POST");
+
+  // A refusal is the amoeba handler's own: its status code and message are the
+  // ones the caller sees, in the same envelope the amoeba route sends.
+  amoebaHandlerModule.AmoebaHandler = async () => {
+    throw {
+      statusCode: 409,
+      message: "Multiple amoeba module mappings found for moduleSlug: leads",
+    };
+  };
+  const refused = await forward("GET");
+  check("a refused call keeps the handler's status", refused.statusCode, 409);
+  check("and reports failure", refused.json().success, false);
+  check(
+    "with the handler's message",
+    refused.json().message.includes("Multiple amoeba module mappings"),
+    true,
+  );
+
+  amoebaHandlerModule.AmoebaHandler = async () => {
+    throw new Error("boom");
+  };
+  const broken = await forward("GET");
+  check(
+    "an unexpected throw is a 400, as on the amoeba route",
+    broken.statusCode,
+    400,
+  );
+  check(
+    "with a message rather than a stack",
+    typeof broken.json().message,
+    "string",
+  );
+
+  amoebaHandlerModule.AmoebaHandler = realAmoebaHandler;
+
+  // Every verb the amoeba route accepts, this one accepts: it is the same
+  // forwarder, so a calendar that needs to update or delete can be granted
+  // exactly that.
+  const registered = new Set();
+  const routeApp = Fastify();
+  routeApp.addHook("onRoute", (route) => {
+    if (!String(route.url).includes("amoeba")) return;
+    for (const method of [].concat(route.method)) registered.add(method);
+  });
+  routeApp.register(require("../src/routes/calendar").calendarRoute, {
+    prefix: "/wrikexpi/calendar",
+  });
+  await routeApp.ready();
+  await routeApp.close();
+
+  ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE"].forEach(
+    (method) => {
+      check(
+        `the forwarder is registered for ${method}, exactly as amoeba is`,
+        registered.has(method),
+        true,
+      );
+    },
+  );
+
+  const {
+    CalendarAmoebaSchema,
+  } = require("../src/routes/calendar/schema/amoeba");
+  check(
+    "both slugs are required by the URL",
+    JSON.stringify(CalendarAmoebaSchema.schema.params.required),
+    JSON.stringify(["master_slug", "service_slug"]),
+  );
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 })();
