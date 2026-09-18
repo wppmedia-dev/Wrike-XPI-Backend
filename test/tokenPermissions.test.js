@@ -63,7 +63,7 @@ console.log("\nCatalogue");
   check(
     "module keys",
     catalog.MODULE_KEYS.join(","),
-    "campaign,channel,task,master,amoeba,mcp_proxy",
+    "campaign,channel,task,master,amoeba,mcp_proxy,calendar_sync",
   );
   check(
     "channel has no create endpoint",
@@ -75,6 +75,15 @@ console.log("\nCatalogue");
     JSON.stringify(catalog.MODULES.find((m) => m.key === "task").actions),
     JSON.stringify(["read", "update", "delete"]),
   );
+  // A calendar reads what it displays and writes nothing back, so the module
+  // must not be able to express a write at all.
+  check(
+    "calendar sync is read only",
+    JSON.stringify(
+      catalog.MODULES.find((m) => m.key === "calendar_sync").actions,
+    ),
+    JSON.stringify(["read"]),
+  );
   check(
     "campaign supports all four",
     catalog.MODULES.find((m) => m.key === "campaign").actions.length,
@@ -84,12 +93,28 @@ console.log("\nCatalogue");
   check(
     "empty matrix keeps every module",
     Object.keys(catalog.emptyMatrix()).length,
-    6,
+    7,
   );
   check(
     "empty matrix is all false",
     Object.values(catalog.emptyMatrix().master).join(","),
     "false,false,false,false",
+  );
+
+  // The definition of "everything granted". No mint uses it today: a Calendar
+  // Sync token gets the calendar module only (test/calendarSync.test.js), and
+  // an ordinary sign-in is left unrestricted rather than written a matrix. It
+  // is pinned here because it is the catalogue's answer to the question, and a
+  // future mint policy will read it.
+  const full = catalog.fullMatrix();
+  check("fullMatrix covers every module", Object.keys(full).length, 7);
+  check("fullMatrix grants campaign delete", full.campaign.delete, true);
+  check("fullMatrix leaves channel create off", full.channel.create, false);
+  check("fullMatrix grants the calendar scope", full.calendar_sync.read, true);
+  check(
+    "fullMatrix declares no action a module lacks",
+    Object.keys(full.channel).join(","),
+    "read,create,update,delete",
   );
 
   // Unknown modules and undeclared actions are discarded, never stored. A

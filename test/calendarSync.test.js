@@ -1,0 +1,316 @@
+/* Exercises the Calendar Sync sign-in end to end, minus the network.
+   Run from the repo root:  node test/calendarSync.test.js
+
+   Four things are asserted, in the order they happen in a real sign-in:
+
+     1. the purpose vocabulary decides 180 days vs no expiry, and treats
+        anything it does not recognise as an ordinary sign-in;
+     2. the purpose survives the trip through Wrike, in the SIGNED state the
+        redirect URL carries — the one place a caller cannot edit it, and the
+        one place Fastify's query stripping would silently drop it from if the
+        schema did not declare it;
+     3. the mint acts on it: the claim, the row, the client name and the
+        permission matrix all come out of the same decision;
+     4. the matrix it seeds is the catalogue's "everything", including the
+        read-only calendar_sync scope.
+
+   No database, Redis or Wrike account required. Every side effect the mint
+   reaches for is stubbed on the very object the handler reads it from, which
+   is the pattern the other suites in this directory use (see
+   test/environmentSearch.test.js). What this file does NOT stub is the
+   decision itself: normalisePurpose, calendarSyncMatrix and the handler body
+   are the real ones. */
+
+require("@babel/register")({
+  presets: [["@babel/preset-env", { targets: { node: "current" } }]],
+});
+process.on("unhandledRejection", () => {});
+
+const ENV_ID = "11111111-1111-4111-8111-111111111111";
+const ACCOUNT_ID = "IEAC7PRT";
+
+let pass = 0;
+let fail = 0;
+
+const check = (label, actual, expected) => {
+  if (actual === expected) {
+    pass++;
+    console.log(`  ok    ${label}`);
+  } else {
+    fail++;
+    console.log(
+      `  FAIL  ${label}\n          got ${actual}, expected ${expected}`,
+    );
+  }
+};
+
+const section = (title) => console.log(`\n${title}`);
+
+const {
+  CALENDAR_SYNC_CLIENT_NAME,
+  CALENDAR_SYNC_MODULE,
+  TOKEN_PURPOSE,
+  calendarSyncMatrix,
+  isCalendarSyncPurpose,
+  normalisePurpose,
+} = require("../src/utils/tokenPurpose");
+const catalog = require("../src/utils/tokenPermissionCatalog");
+const {
+  WrikeTokenExchangeSchema,
+} = require("../src/routes/tokens/schema/wrikeTokenExchange");
+
+/* ── 1. The vocabulary ──────────────────────────────────────────────────── */
+
+section("Purpose vocabulary");
+
+check("absent is a normal sign-in", normalisePurpose(undefined), "login");
+check("blank is a normal sign-in", normalisePurpose(""), "login");
+check("null is a normal sign-in", normalisePurpose(null), "login");
+check(
+  "an unknown value is a normal sign-in",
+  normalisePurpose("forever"),
+  "login",
+);
+check(
+  "the calendar value is recognised",
+  normalisePurpose("calendar_sync"),
+  TOKEN_PURPOSE.CALENDAR_SYNC,
+);
+check(
+  "and it is recognised however it is spelled",
+  normalisePurpose("  Calendar_Sync "),
+  TOKEN_PURPOSE.CALENDAR_SYNC,
+);
+check("a near miss is not", normalisePurpose("calendar-sync"), "login");
+check(
+  "isCalendarSyncPurpose agrees",
+  isCalendarSyncPurpose("calendar_sync"),
+  true,
+);
+check("isCalendarSyncPurpose on junk", isCalendarSyncPurpose("1"), false);
+
+/* ── 2. The signed state ────────────────────────────────────────────────── */
+
+section("The purpose rides in the signed state");
+
+/* Stubbed on the module wrikeRedirect imports from: the same object, patched
+   before it loads. No database is touched — a credentials cache is exactly
+   what this function reads, and filling it by hand is the whole fixture. */
+const wrikeCredentials = require("../src/utils/wrikeCredentials");
+wrikeCredentials.getCachedWrikeCredentials = () => ({
+  PROD: { id: ENV_ID, clientId: "client-id", accountId: ACCOUNT_ID },
+});
+
+// The endpoint pair the URL is built from. Read from process.env at call time,
+// so setting them here is enough.
+process.env.WRIKE_LOGIN_ENDPOINT = "https://www.wrike.com/oauth2";
+process.env.WRIKE_REDIRECT_URL = "http://localhost:3000/callback";
+
+const { findRedirectionURL } = require("../src/utils/wrikeRedirect");
+
+/* sign() answers a JSON string rather than a JWE so the state can be read back
+   out of the URL. The callback is the only thing that ever verifies it, and it
+   is not what this file is asking about. */
+const signState = (payload) => JSON.stringify(payload);
+const fakeFastify = { jwt: { sign: signState } };
+
+const stateOf = (query) => {
+  const { redirectUrl } = findRedirectionURL(query, fakeFastify);
+  return JSON.parse(new URL(redirectUrl).searchParams.get("state"));
+};
+
+const calendarState = stateOf({
+  environment: "PROD",
+  purpose: "calendar_sync",
+});
+check("calendar_sync is carried", calendarState.purpose, "calendar_sync");
+check("with the environment", calendarState.environmentId, ENV_ID);
+
+const loginState = stateOf({ environment: "PROD", purpose: "login" });
+check("a normal sign-in claims no purpose", "purpose" in loginState, false);
+check("but still carries the environment", loginState.environmentId, ENV_ID);
+
+const junkState = stateOf({ environment: "PROD", purpose: "forever" });
+check("junk claims no purpose", "purpose" in junkState, false);
+
+const absentState = stateOf({ environment: "PROD" });
+check("and neither does an absent one", "purpose" in absentState, false);
+
+/* Fastify's default query validation strips what the schema does not declare,
+   so an undeclared purpose would never reach the mint from /exchange or
+   /callback. This is the assertion that keeps it declared. */
+check(
+  "the purpose query param is declared",
+  Object.prototype.hasOwnProperty.call(
+    WrikeTokenExchangeSchema.schema.query.properties,
+    "purpose",
+  ),
+  true,
+);
+
+/* ── 3. The mint ────────────────────────────────────────────────────────── */
+
+section("What the mint does with it");
+
+/* The handlers/controllers the mint reaches for, patched on the objects it
+   reads them from. Captured rather than asserted on the way in, so both
+   branches can be compared at the end. */
+const models = require("../models");
+models.sequelize = {
+  transaction: async () => ({
+    commit: async () => {},
+    rollback: async () => {},
+  }),
+};
+
+const crypto = require("../src/utils/crypto");
+crypto.hashPassword = async () => "stub-hash";
+crypto.deriveKEK = async () => Buffer.alloc(32);
+
+const WrikeCredentials = require("../src/controllers/wrikeCredentials");
+WrikeCredentials.GetById = async () => ({ environment_name: "PROD" });
+
+const wrike = require("../src/utils/wrike");
+wrike.getWrikeTokens = async () => ({
+  access_token: "wrike-access",
+  refresh_token: "wrike-refresh",
+});
+wrike.getUserData = async () => ({
+  data: [
+    {
+      id: "wrike-user-1",
+      firstName: "Ana",
+      lastName: "Silva",
+      primaryEmail: "ana@example.com",
+      profiles: [{ accountId: ACCOUNT_ID }],
+    },
+  ],
+});
+
+const environmentAccess = require("../src/utils/environmentAccess");
+environmentAccess.evaluateAccess = async () => ({ allowed: true });
+
+const controllers = require("../src/controllers");
+controllers.Users.GetByWrikeId = async () => ({ id: "user-1" });
+
+let lastInsert = null;
+controllers.Tokens.Insert = async (userId, data) => {
+  lastInsert = data;
+  return { id: data.id };
+};
+
+let seeded = null;
+controllers.TokenPermissions.SeedMatrix = async (tokenId, matrix) => {
+  seeded = { tokenId, matrix };
+  return { configured: true, matrix };
+};
+
+const {
+  WrikeTokenExchange,
+} = require("../src/routes/tokens/handlers/wrikeTokenExchange");
+
+(async () => {
+  const runMint = async (data) => {
+    lastInsert = null;
+    seeded = null;
+    let signOptions = "not-called";
+
+    const fastify = {
+      jwt: {
+        sign: (payload, options) => {
+          signOptions = options;
+          return "jwe-token";
+        },
+      },
+    };
+
+    const result = await WrikeTokenExchange(data, fastify);
+    return { result, signOptions, insert: lastInsert, seeded };
+  };
+
+  const calendar = await runMint({
+    code: "code",
+    environmentId: ENV_ID,
+    purpose: "calendar_sync",
+    clientName: "Login page",
+  });
+
+  check("it mints a token", calendar.result.token, "jwe-token");
+  check("the signature carries no expiry", calendar.signOptions, undefined);
+  check("the row records no expiry", calendar.insert.token_expires_at, null);
+  check(
+    "and is labelled in the console",
+    calendar.insert.client_name,
+    CALENDAR_SYNC_CLIENT_NAME,
+  );
+  check("a matrix was seeded", calendar.seeded !== null, true);
+  check(
+    "for the token that was inserted",
+    calendar.seeded.tokenId,
+    calendar.insert.id,
+  );
+  check(
+    "covering every catalogue module",
+    Object.keys(calendar.seeded.matrix).length,
+    catalog.MODULES.length,
+  );
+  check(
+    "with the calendar scope granted",
+    calendar.seeded.matrix.calendar_sync.read,
+    true,
+  );
+  check(
+    "and the calendar scope unable to write",
+    calendar.seeded.matrix.calendar_sync.update,
+    false,
+  );
+  /* Only what it is for. A calendar token minted with campaigns, tasks and
+     master data available would be a credential far wider than the job that
+     asked for it, and widening it has to be somebody's decision. */
+  check(
+    "with every other module off",
+    Object.entries(calendar.seeded.matrix)
+      .filter(([key]) => key !== CALENDAR_SYNC_MODULE)
+      .every(
+        ([, row]) => !row.read && !row.create && !row.update && !row.delete,
+      ),
+    true,
+  );
+  check(
+    "exactly the matrix the policy defines",
+    JSON.stringify(calendar.seeded.matrix),
+    JSON.stringify(calendarSyncMatrix()),
+  );
+
+  const login = await runMint({
+    code: "code",
+    environmentId: ENV_ID,
+    clientName: "Login page",
+  });
+
+  check("a normal sign-in still signs", login.result.token, "jwe-token");
+  check("with the 180-day lifetime", login.signOptions.expiresIn, "180d");
+  check(
+    "and a row that says when it dies",
+    login.insert.token_expires_at instanceof Date,
+    true,
+  );
+  check("named after the login page", login.insert.client_name, "Login page");
+  check("and no matrix at all", login.seeded, null);
+
+  /* An unrecognised purpose must not be read as "calendar sync": that would
+     hand out a token with no expiry on the strength of a query parameter
+     nobody validated. */
+  const junk = await runMint({
+    code: "code",
+    environmentId: ENV_ID,
+    purpose: "forever",
+    clientName: "Login page",
+  });
+
+  check("junk mints a 180-day token", junk.signOptions.expiresIn, "180d");
+  check("with no seeded matrix", junk.seeded, null);
+
+  console.log(`\n${pass} passed, ${fail} failed`);
+  process.exit(fail ? 1 : 0);
+})();

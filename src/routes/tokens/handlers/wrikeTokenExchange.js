@@ -1,5 +1,5 @@
 import * as crypto from "../../../utils/crypto";
-import { Tokens, Users } from "../../../controllers";
+import { Tokens, Users, TokenPermissions } from "../../../controllers";
 import { getWrikeTokens, getUserData } from "../../../utils/wrike";
 import models from "../../../../models";
 import { GetById } from "../../../controllers/wrikeCredentials";
@@ -9,11 +9,25 @@ import {
   PUBLIC_DENIAL_MESSAGE,
 } from "../../../utils/environmentAccess";
 import { tokenExpiryFrom, TOKEN_TTL_DAYS } from "../../../utils/tokenTtl";
+import {
+  CALENDAR_SYNC_CLIENT_NAME,
+  TOKEN_PURPOSE,
+  calendarSyncMatrix,
+  normalisePurpose,
+} from "../../../utils/tokenPurpose";
 import { usernameFor } from "../../../utils/tokenUsername";
 import { v4 as uuidv4 } from "uuid";
 
 /**
  * Mint, or refuse to mint, an XPI token for whoever just signed in at Wrike.
+ *
+ * Two sign-ins reach this function and they differ in exactly one thing: how
+ * long the token they get lives. A normal sign-in (the default, and the only
+ * thing the MCP OAuth flow can be) mints a 180-day token. `purpose:
+ * "calendar_sync"` — the Calendar Sync option on the root login page — mints
+ * one with no expiry, labelled in the console, and seeded with an explicit
+ * permission matrix. src/utils/tokenPurpose.js owns that vocabulary and the
+ * reasoning behind it; the decision here is only which branch this call is.
  *
  * `req` is optional and used for one thing: attributing the request in the
  * activity log. Wrike's contact response a few lines below is the only place
@@ -21,12 +35,12 @@ import { v4 as uuidv4 } from "uuid";
  * sign-in that created a token — or for one refused before it could — said
  * "Unresolved" about somebody we had just looked up.
  *
- * @param {{code: string, environmentId: string, ip?: string, clientName?: string}} data
+ * @param {{code: string, environmentId: string, ip?: string, clientName?: string, purpose?: string}} data
  * @param {object} fastify - the app, for jwt.sign
  * @param {object} [req] - the request, so its log row can name the caller
  */
 export const WrikeTokenExchange = (
-  { code, environmentId, ip, clientName },
+  { code, environmentId, ip, clientName, purpose },
   fastify,
   req,
 ) => {
@@ -42,6 +56,13 @@ export const WrikeTokenExchange = (
       if (!code) return reject({ message: "Access Token must not be empty" });
       if (!environmentId)
         return reject({ message: "Environment must not be empty" });
+
+      // Which of the two sign-ins this is. Everything below that differs
+      // between them hangs off this one value, and anything unrecognised is
+      // treated as a normal 180-day sign-in rather than read as a request for
+      // a token that never expires.
+      const isCalendarSync =
+        normalisePurpose(purpose) === TOKEN_PURPOSE.CALENDAR_SYNC;
 
       const envData = await GetById(environmentId);
       const env = envData?.environment_name;
@@ -192,11 +213,16 @@ export const WrikeTokenExchange = (
         .encrypt(Buffer.from(refresh_token), dek)
         .toString("base64");
 
-      // When the token minted below dies. Computed once, here, so the row and
-      // the signature cannot disagree about it, and stored on the row because
-      // nothing reads the JWE's own payload back: without this, "when does this
-      // integration stop working?" has no answer until it does.
-      const tokenExpiresAt = tokenExpiryFrom();
+      // When the token minted below stops being accepted. Computed once, here,
+      // so the row and the signature cannot disagree about it, and stored on
+      // the row because nothing reads the JWE's own payload back: without this,
+      // "when does this integration stop working?" has no answer until it does.
+      //
+      // Null for a Calendar Sync token, deliberately, and the signature below
+      // leaves out its own expiry to match: the two halves of one lifetime are
+      // decided together, so a row can never say "no expiry" while the token in
+      // the caller's hands quietly stops after 180 days.
+      const tokenExpiresAt = isCalendarSync ? null : tokenExpiryFrom();
 
       const newUserTokenData = await Tokens.Insert(
         userId,
@@ -215,7 +241,16 @@ export const WrikeTokenExchange = (
           // put a label on a row that the console presents as fact. Truncated
           // because the column is a STRING(100) and one of the callers passes a
           // value that came in from outside.
-          client_name: clientName ? String(clientName).slice(0, 100) : null,
+          //
+          // A Calendar Sync token is named here rather than by the route that
+          // asked for it: that name is what the console's Client column shows,
+          // and it is the one thing that tells an admin which of the two
+          // sign-ins produced this row.
+          client_name: isCalendarSync
+            ? CALENDAR_SYNC_CLIENT_NAME
+            : clientName
+              ? String(clientName).slice(0, 100)
+              : null,
           token_expires_at: tokenExpiresAt,
         },
         { transaction },
@@ -224,16 +259,32 @@ export const WrikeTokenExchange = (
 
       console.log("Inserted a new token record", userTokenId);
 
+      // A Calendar Sync token is handed an explicit matrix — the calendar
+      // module granted and every other module off — instead of being left
+      // unrestricted like an ordinary sign-in, in the mint's own transaction so
+      // the token never exists for a moment with no permissions recorded
+      // against it. src/utils/tokenPurpose.js owns that matrix and the
+      // reasoning behind it.
+      if (isCalendarSync) {
+        await TokenPermissions.SeedMatrix(
+          userTokenId,
+          calendarSyncMatrix(),
+          transaction,
+        );
+        console.log("Seeded the Calendar Sync permission matrix");
+      }
+
       // Sign the XPI token. It carries the token-record id (t) and the DEK
       // (d, base64) inline. The DEK is not secret from whoever holds this
       // token; the signature is what protects the payload from tampering. The
-      // lifetime is the same constant the row above was stamped with.
+      // lifetime is the same constant the row above was stamped with — or, for
+      // Calendar Sync, the absence of one, matching the null expiry above.
       const jweToken = fastify.jwt.sign(
         {
           t: userTokenId,
           d: dek.toString("base64"),
         },
-        { expiresIn: `${TOKEN_TTL_DAYS}d` },
+        isCalendarSync ? undefined : { expiresIn: `${TOKEN_TTL_DAYS}d` },
       );
 
       await transaction.commit();

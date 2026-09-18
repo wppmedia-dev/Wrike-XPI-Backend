@@ -131,8 +131,11 @@ export const tokenRoute = (fastify, opts, done) => {
           ...req.query,
           ip: clientIp(req),
           // Nothing here knows who is asking. This route is reached from the
-          // hosted login page, so that is what the token gets called.
+          // hosted login page, so that is what the token gets called. The
+          // purpose is the one thing the login page CAN say about why it is
+          // asking, and it decides the token's lifetime (see the mint).
           clientName: "Login page",
+          purpose: req.query.purpose,
         },
         fastify,
         req,
@@ -212,6 +215,9 @@ export const tokenRoute = (fastify, opts, done) => {
           // indistinguishable from a plain sign-in. Nothing else sets it any
           // more: the consoles used to, and have no way to mint a token at all.
           clientName: String(decodedData?.client_name || "Login page"),
+          // Also from the signed state (src/utils/wrikeRedirect.js), so only a
+          // link this service signed can ask for the Calendar Sync sign-in.
+          purpose: decodedData?.purpose,
         },
         fastify,
         req,

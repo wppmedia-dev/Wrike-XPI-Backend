@@ -101,11 +101,17 @@ export interface Validity {
  */
 export const validityOf = (expiresAt: string | null): Validity => {
   if (!expiresAt) {
+    // Not "unknown": for a Calendar Sync token the absence is the fact
+    // (src/utils/tokenPurpose.js mints it without an expiry, and its Status
+    // switch is what stops it). Reading that as "Unknown" told an admin the
+    // console had lost a value it was never given, and the Validity filter
+    // has always called this state "No expiry recorded" — the badge now says
+    // the same thing.
     return {
       tone: "neutral",
-      label: "Unknown",
+      label: "No expiry",
       detail:
-        "No expiry was recorded for this token. It is checked when a caller uses it.",
+        "No expiry date was recorded for this token, so it stays valid until it is switched off.",
     };
   }
 
