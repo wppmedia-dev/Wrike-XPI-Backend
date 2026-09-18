@@ -7,21 +7,81 @@ const {
 /**
  * WrikeXPI documentation pages.
  *
- * MCP docs and the XPI REST API docs each live on their own page
- * (/docs/mcp and /docs/api), sharing a compact header + left side menu +
- * content body layout. The top-right nav links jump between the two.
+ * Three documentation sets each live on their own page — /docs/mcp,
+ * /docs/api and /docs/calendar — sharing a compact header + left side menu +
+ * content body layout. The top-right nav links jump between them, and the nav
+ * is built from DOC_SETS below, so a set cannot exist without being reachable
+ * from the other two.
  *
  * Client-side hash routing within each page, full-text search, and
  * copy-to-clipboard on code blocks. No page reloads.
  *
  * GET /docs/mcp
  * GET /docs/api
+ * GET /docs/calendar
  * GET /docs  → redirects to /docs/mcp
  */
+
+/**
+ * One entry per documentation set: the copy that differs between them, and the
+ * route each is served from. `route` doubles as the groupId renderDocs takes,
+ * and as the prefix every page id in that set carries (mcp/overview),
+ * which is what the hash router and the sidebar are keyed on.
+ */
+const DOC_SETS = {
+  mcp: {
+    route: "/docs/mcp",
+    nav: "MCP Docs",
+    search: "MCP",
+    eyebrow: "MCP",
+    hero: "Connect your AI assistant",
+    cta: { href: "#/mcp/setup", label: "Get connected" },
+    defaultPage: "mcp/overview",
+  },
+  api: {
+    route: "/docs/api",
+    nav: "API Docs",
+    search: "API",
+    eyebrow: "XPI API",
+    hero: "REST API reference",
+    cta: { href: "#/api/errors", label: "Error reference" },
+    defaultPage: "api/overview",
+  },
+  // Named in the nav after what it is for rather than after how long its token
+  // lasts, which is the same rule the login page's switch follows
+  // (src/utils/tokenPurpose.js).
+  calendar: {
+    route: "/docs/calendar",
+    nav: "Calendar Sync",
+    search: "Calendar Sync",
+    eyebrow: "Calendar Sync",
+    hero: "Keep a calendar in step with Wrike",
+    cta: { href: "#/calendar/setup", label: "Set up Calendar Sync" },
+    defaultPage: "calendar/overview",
+  },
+};
+
+/**
+ * The top nav, in order: Home first, then the doc sets.
+ *
+ * Home is not a doc set — it is the login page, which has no pages to render
+ * and no groupId — so it is listed here rather than faked into DOC_SETS, whose
+ * entries renderDocs() would then have to refuse. Built from DOC_SETS so a set
+ * can never be missing from the nav that jumps between sets.
+ */
+const DOC_NAV = [
+  { id: "home", href: "/", label: "Home" },
+  ...Object.entries(DOC_SETS).map(([id, set]) => ({
+    id,
+    href: set.route,
+    label: set.nav,
+  })),
+];
+
 module.exports = async function (fastify, opts) {
-  // Render a single documentation set (mcp | api) as its own page.
+  // Render a single documentation set as its own page.
   const renderDocs = (groupId) => {
-    const isApi = groupId === "api";
+    const meta = DOC_SETS[groupId] || DOC_SETS.mcp;
     const appUrl = process.env.APP_URL || "http://localhost:3000";
     const apiUrl = process.env.API_URL || `${appUrl}/api/v1`;
     const baseMcpUrl = `${appUrl}/api/v1/wrikexpi/mcp`;
@@ -1358,8 +1418,229 @@ async ({ taskId }, extra) => {
       },
     ];
 
-    const pages = isApi ? apiPages : mcpPages;
-    const defaultPage = isApi ? "api/overview" : "mcp/overview";
+    // ──────────────────────── Calendar Sync pages ────────────────────────
+    const calendarPages = [
+      {
+        id: "calendar/overview",
+        group: "Calendar Sync Docs",
+        groupId: "calendar",
+        label: "Overview",
+        keywords:
+          "calendar sync overview subscribe feed integration token login page button what is",
+        html: `
+          <div class="pg-eyebrow">Calendar Sync Docs</div>
+          <h1 class="pg-title">Calendar Sync</h1>
+          <p class="pg-lede">Give a calendar app its own connection to Wrike, so what it shows stays current without anybody signing in again.</p>
+
+          <div class="card-strip">
+            <div class="stat-card"><span class="stat-ic">${IC.bolt}</span><strong>One sign-in</strong><p>The same login page, with one extra choice.</p></div>
+            <div class="stat-card"><span class="stat-ic">${IC.check}</span><strong>Its own credential</strong><p>A separate token per calendar, never your Wrike password.</p></div>
+            <div class="stat-card"><span class="stat-ic">${IC.warn}</span><strong>Revocable</strong><p>Switch it off in the console and the calendar stops.</p></div>
+          </div>
+
+          <h2 class="pg-h2">What it is</h2>
+          <p class="pg-p">The <a href="/">login page</a> offers two buttons. <b>Login with Wrike</b> is the ordinary sign-in — a token for the REST API or an MCP client. <b>Calendar Sync Login</b>, the outline button directly beneath it, is for an integration that holds its own connection to Wrike and refreshes on a schedule, which is what a calendar does.</p>
+          <p class="pg-p">Both kinds are the same credential, minted by the same sign-in with Wrike. The difference is what the token is for, which is the one thing that tells the console where a token is in use.</p>
+          ${callout(
+            "info",
+            "Which one do I want?",
+            "Connecting an AI assistant? Follow the MCP docs and sign in normally. Feeding a calendar — or anything else that reads on its own schedule — choose Calendar Sync.",
+          )}
+
+          <h2 class="pg-h2">How it works</h2>
+          <div class="flow">
+            ${[
+              [
+                "Open the login page",
+                "Pick the environment the calendar should read.",
+              ],
+              [
+                "Choose Calendar Sync",
+                "Press the outline button under Login with Wrike.",
+              ],
+              [
+                "Sign in with Wrike",
+                "Authorize once, as the person whose visibility the calendar should have.",
+              ],
+              [
+                "Hand it to the calendar",
+                "The credential goes into the calendar app and is never needed again.",
+              ],
+            ]
+              .map(
+                ([t, d], i) => `
+              <div class="flow-step">
+                <span class="flow-n">${i + 1}</span>
+                <div><strong>${t}</strong><p>${d}</p></div>
+              </div>`,
+              )
+              .join("")}
+          </div>
+
+          <div class="cta-row">
+            <a class="btn primary" href="#/calendar/setup">Set it up ${IC.bolt}</a>
+            <a class="btn ghost" href="#/calendar/permissions">What it can do</a>
+          </div>`,
+      },
+      {
+        id: "calendar/setup",
+        group: "Calendar Sync Docs",
+        groupId: "calendar",
+        label: "Connection setup",
+        keywords:
+          "setup connect generate credential token once copy paste environment sign in bearer login page",
+        html: `
+          <div class="pg-eyebrow">Calendar Sync Docs</div>
+          <h1 class="pg-title">Connection setup</h1>
+          <p class="pg-lede">Pick the environment, pick Calendar Sync, sign in with Wrike, and hand the credential to the calendar app.</p>
+
+          <h2 class="pg-h2">1 · Choose the environment</h2>
+          <p class="pg-p">Open the <a href="/">login page</a> and select the environment the calendar should read. Everything the token can reach comes from that environment — nothing from any other one.</p>
+
+          <h2 class="pg-h2">2 · Press Calendar Sync Login</h2>
+          <p class="pg-p">On the <a href="/">login page</a>, press <b>Calendar Sync Login</b> — the outline button directly under <b>Login with Wrike</b> — rather than the solid one. That choice is the only thing that makes the token a calendar token.</p>
+          ${callout(
+            "tip",
+            "The choice is signed, not typed",
+            "It travels inside the signed state the login page sends through Wrike, so the service decides what gets minted. It is not a value anybody can set by editing the address bar.",
+          )}
+
+          <h2 class="pg-h2">3 · Sign in with Wrike</h2>
+          <p class="pg-p">The button takes you to Wrike's own sign-in. Sign in as the person whose Wrike visibility the calendar should follow — whether that person may connect at all is decided by the environment's access rules, exactly as it is for the API.</p>
+
+          <h2 class="pg-h2">4 · Copy the credential</h2>
+          <p class="pg-p">The next screen shows the token once, together with a username and password that authenticate against it.</p>
+          ${callout(
+            "warn",
+            "Shown once",
+            "The credential is not retrievable later. If it is lost before it is stored, sign in again — that issues a new token, and the older one can be switched off in the console.",
+          )}
+
+          <h2 class="pg-h2">5 · Give it to the calendar app</h2>
+          <p class="pg-p">Where it goes depends on the app, but anything that accepts a bearer credential uses the token as-is — the same header the REST API expects:</p>
+          ${codeBlock(
+            "bash",
+            `curl -X GET "${apiUrl}/wrikexpi/campaign?pageSize=10" \\
+  -H "Authorization: Bearer <access_token>"`,
+          )}
+          ${callout(
+            "info",
+            "If the app asks for a feed address instead",
+            "An ICS or webcal URL is produced by the calendar service, not by WrikeXPI. Use the token wherever that service asks for a WrikeXPI credential.",
+          )}
+
+          <div class="cta-row">
+            <a class="btn primary" href="#/calendar/permissions">Check what it can do</a>
+            <a class="btn ghost" href="#/calendar/troubleshooting">Troubleshooting</a>
+          </div>`,
+      },
+      {
+        id: "calendar/permissions",
+        group: "Calendar Sync Docs",
+        groupId: "calendar",
+        label: "Permissions",
+        keywords:
+          "permissions permission module token permissions read only restrict narrow admin console status switch off revoke delete reactivate",
+        html: `
+          <div class="pg-eyebrow">Calendar Sync Docs</div>
+          <h1 class="pg-title">What a Calendar Sync token can do</h1>
+          <p class="pg-lede">Its own row in the permission grid, granted only what it is for, and one switch that stops it dead.</p>
+
+          <h2 class="pg-h2">Its own module</h2>
+          <p class="pg-p">Token permissions include a <b>Calendar Sync</b> module. It is <b>read only</b>: a calendar displays what it is given and writes nothing back, so Create, Update and Delete are not offered on it at all — the console greys those cells out rather than showing ticks that could not mean anything.</p>
+          ${callout(
+            "info",
+            "A scope, not a permission level",
+            "The module says which tokens the row applies to. What each token may then do is still decided per token, module by module, in the same grid.",
+          )}
+
+          <h2 class="pg-h2">Minted with only the calendar scope</h2>
+          <p class="pg-p">A Calendar Sync token is created with an explicit matrix: the <b>Calendar Sync</b> module granted, and every other module switched off. It is not left unrestricted, which is what a freshly issued token otherwise is — so the credential is exactly as wide as the job that asked for it, on purpose, from its first request.</p>
+          <p class="pg-p">Rows are written for every module, in the off position, which is what makes this a token an admin can see and edit in the grid rather than one that has never been configured.</p>
+          ${callout(
+            "tip",
+            "Widening it is a deliberate step",
+            "Open <b>Token Permissions</b> on the row and grant another module to let this calendar reach it. Until then, a call into any other module is refused.",
+          )}
+          ${callout(
+            "info",
+            "The environment still comes first",
+            "Module permissions only ever narrow a token. The environment's access rules and its own credentials are checked before any module is consulted.",
+          )}
+
+          <h2 class="pg-h2">Turning it off</h2>
+          <p class="pg-p">The token appears in the console's Tokens list with the client name <b>Calendar Sync</b>. The <b>Status</b> switch on that row is how a connection is ended:</p>
+          ${table(
+            ["What you do", "What happens to the calendar"],
+            [
+              [
+                "Switch the token off",
+                "Every request is refused. The calendar stops updating until it is switched back on.",
+              ],
+              [
+                "Delete the token",
+                "The row and its permissions go with it. It cannot be switched back on; a new sign-in is needed.",
+              ],
+              [
+                "Switch a module off",
+                "Requests to that module are refused with <code>MODULE_FORBIDDEN</code>, and everything else keeps working.",
+              ],
+            ],
+          )}
+
+          <div class="cta-row">
+            <a class="btn primary" href="#/calendar/troubleshooting">If it stops working</a>
+            <a class="btn ghost" href="#/api/overview">REST API reference</a>
+          </div>`,
+      },
+      {
+        id: "calendar/troubleshooting",
+        group: "Calendar Sync Docs",
+        groupId: "calendar",
+        label: "Troubleshooting",
+        keywords:
+          "troubleshooting 401 403 forbidden denied stopped working switched off revoked deleted access rules activity log not updating",
+        html: `
+          <div class="pg-eyebrow">Calendar Sync Docs</div>
+          <h1 class="pg-title">Troubleshooting</h1>
+          <p class="pg-lede">A calendar that quietly stops updating is almost always one of three things, and the console can name all three.</p>
+
+          ${table(
+            ["Symptom", "Likely cause", "Where to look"],
+            [
+              [
+                "<code>401</code> Authentication failed",
+                "The token was switched off or deleted, or the credential was replaced by a newer sign-in.",
+                "Tokens → the row's <b>Status</b> switch",
+              ],
+              [
+                "<code>403</code> with <code>MODULE_FORBIDDEN</code>",
+                "A module this calendar needs has been switched off for this token — the Calendar Sync module included.",
+                "Tokens → row menu → <b>Token Permissions</b>",
+              ],
+              [
+                "<code>403</code> not authorized to access the service",
+                "The person the token belongs to is no longer covered by the environment's access rules.",
+                "Environment Access → the environment's allow list",
+              ],
+            ],
+          )}
+          ${callout(
+            "tip",
+            "Did the request even arrive?",
+            "Every call that reaches WrikeXPI is recorded in the activity log, refusals included, with the caller, the action and the outcome. No rows at all means nothing got here, which is a question for the calendar app rather than for this service.",
+          )}
+
+          <div class="cta-row">
+            <a class="btn primary" href="/">Back to the login page</a>
+            <a class="btn ghost" href="#/calendar/overview">Overview</a>
+          </div>`,
+      },
+    ];
+
+    const DOC_PAGES = { mcp: mcpPages, api: apiPages, calendar: calendarPages };
+    const pages = DOC_PAGES[groupId] || mcpPages;
+    const defaultPage = meta.defaultPage;
 
     // ─────────────────────────── build sidebar ───────────────────────────
     const groups = [
@@ -1786,6 +2067,11 @@ async ({ taskId }, extra) => {
     .scrim.open { opacity: 1; pointer-events: auto; }
     @media (max-width: 900px) {
       .menu-btn { display: inline-flex; }
+      /* Four destinations plus the brand get tight on a tablet, so the nav
+         shrinks rather than wrapping: it is the only way to move between doc
+         sets, and a wrapped header costs more height than it saves. */
+      .topnav { gap: 2px; }
+      .topnav a { padding: 7px 9px; font-size: 0.8rem; }
       .topbar-inner { grid-template-columns: 1fr auto; min-height: auto; padding: 10px 16px; row-gap: 8px; }
       .topbar-search.searchbox { grid-column: 1 / -1; grid-row: 2; justify-self: stretch; max-width: none; }
       .topbar-search .search-kbd { display: none; }
@@ -1800,6 +2086,12 @@ async ({ taskId }, extra) => {
       .content { padding: 14px 0 40px; }
       .docs-head { padding: 20px 18px; }
     }
+    /* Phone widths: the nav drops plain "Home" because the brand mark beside it
+       already opens the login page, and keeps the three doc sets, which have no
+       other way in. */
+    @media (max-width: 620px) {
+      .topnav a[data-top="home"] { display: none; }
+    }
   </style>
 </head>
 <body>
@@ -1807,20 +2099,22 @@ async ({ taskId }, extra) => {
 
   <header class="topbar">
     <div class="topbar-inner">
-      <a class="brand" href="${isApi ? "/docs/api" : "/docs/mcp"}" aria-label="WrikeXPI home">
+      <a class="brand" href="/" aria-label="WrikeXPI home">
         <span class="brand-mark">W</span>
         <span class="brand-name">WrikeXPI</span>
         <span class="brand-tag">Docs</span>
       </a>
       <div class="searchbox topbar-search">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input id="docsearch" type="search" placeholder="Search ${isApi ? "API" : "MCP"} docs…" autocomplete="off" aria-label="Search documentation" />
+        <input id="docsearch" type="search" placeholder="Search ${meta.search} docs…" autocomplete="off" aria-label="Search documentation" />
         <span class="search-kbd">/</span>
         <div class="search-results" id="search-results" role="listbox"></div>
       </div>
       <nav class="topnav" aria-label="Documentation">
-        <a href="/docs/mcp" data-top="mcp" class="${isApi ? "" : "active"}">MCP Docs</a>
-        <a href="/docs/api" data-top="api" class="${isApi ? "active" : ""}">API Docs</a>
+        ${DOC_NAV.map(
+          (item) =>
+            `<a href="${item.href}" data-top="${item.id}" class="${item.id === groupId ? "active" : ""}">${item.label}</a>`,
+        ).join("\n        ")}
         <button class="menu-btn" id="menu-btn" aria-label="Open menu">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </button>
@@ -1830,8 +2124,8 @@ async ({ taskId }, extra) => {
 
   <section class="docs-head">
     <div>
-      <div class="hero-eyebrow">WrikeXPI · ${isApi ? "XPI API" : "MCP"} Docs</div>
-      <h1>${isApi ? "REST API reference" : "Connect your AI assistant"}</h1>
+      <div class="hero-eyebrow">WrikeXPI · ${meta.eyebrow} Docs</div>
+      <h1>${meta.hero}</h1>
     </div>
   </section>
 
@@ -1846,14 +2140,14 @@ async ({ taskId }, extra) => {
           <h3>Still have questions?</h3>
           <p>Reach out to the WrikeXPI team and we'll point you in the right direction.</p>
         </div>
-        <a class="btn primary" href="${isApi ? "#/api/errors" : "#/mcp/setup"}">${isApi ? "Error reference" : "Get connected"}</a>
+        <a class="btn primary" href="${meta.cta.href}">${meta.cta.label}</a>
       </div>
     </main>
   </div>
 
   <footer class="page-foot">
     <span>WrikeXPI Developer Documentation</span>
-    <span>REST API · MCP · OAuth</span>
+    <span>REST API · MCP · Calendar Sync · OAuth</span>
   </footer>
 
   <script>
@@ -2083,6 +2377,9 @@ async ({ taskId }, extra) => {
   });
   fastify.get("/docs/api", async (req, reply) => {
     reply.type("text/html").send(renderDocs("api"));
+  });
+  fastify.get("/docs/calendar", async (req, reply) => {
+    reply.type("text/html").send(renderDocs("calendar"));
   });
   fastify.get("/docs", async (req, reply) => {
     reply.redirect("/docs/mcp");

@@ -6,7 +6,9 @@
  * One entry per API group the private router exposes (src/routes/index.js
  * registers campaign, channel, task, master and amoeba under /wrikexpi/*),
  * plus one for the MCP surface's proxied Wrike tools, which are not reachable
- * by path at all. Which action a request is does not live here. That comes
+ * by path at all, plus one for the tokens minted for a calendar integration
+ * (see src/utils/tokenPurpose.js), which is a scope rather than a path. Which
+ * action a request is does not live here. That comes
  * from the HTTP method through the action map the activity log already labels
  * requests with (src/utils/tokenPermissionMap.js). This file decides only
  * whether a module can express that action at all.
@@ -75,6 +77,16 @@ export const MODULES = [
       "Wrike's own MCP tools, proxied as wrike_*, plus anything else the MCP surface exposes that no XPI module owns. These are raw Wrike objects (items, spaces, approvals, comments, users, attachments) rather than XPI modules. Applies to MCP callers only; the REST API never resolves to this row.",
     actions: ALL,
   },
+  {
+    key: "calendar_sync",
+    label: "Calendar Sync",
+    description:
+      "Tokens minted from the login page's Calendar Sync option, for calendar integrations that keep to Wrike on their own. Read only: a calendar reads what it shows and writes nothing back. Applies to the calendar surface only; no REST or MCP path resolves to this row.",
+    // Read only, and deliberately so: the option exists for a subscription
+    // that displays Wrike items, and offering Create/Update/Delete here would
+    // describe powers the integration is not being handed.
+    actions: ["read"],
+  },
 ];
 
 export const MODULE_KEYS = MODULES.map((m) => m.key);
@@ -111,6 +123,23 @@ export const normaliseMatrix = (input) => {
 
   return result;
 };
+
+/**
+ * A full-grant matrix: every module, every action that module supports,
+ * granted. Where a token is minted with an explicit matrix rather than left
+ * unrestricted (a Calendar Sync token, src/utils/tokenPurpose.js), this is
+ * what "everything" means, and it is spelled once so the mint and any future
+ * caller cannot disagree about it.
+ */
+export const fullMatrix = () =>
+  normaliseMatrix(
+    Object.fromEntries(
+      MODULES.map((mod) => [
+        mod.key,
+        { read: true, create: true, update: true, delete: true },
+      ]),
+    ),
+  );
 
 export const isKnownModule = (key) => !!moduleByKey[key];
 

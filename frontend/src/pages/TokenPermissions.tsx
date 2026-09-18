@@ -56,6 +56,7 @@ const MODULE_ICON: Record<string, string> = {
   task: "fa-list-check",
   master: "fa-table-list",
   amoeba: "fa-shapes",
+  calendar_sync: "fa-calendar-days",
 };
 
 /**

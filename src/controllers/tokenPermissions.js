@@ -68,6 +68,40 @@ export const GetMatrixCached = async (tokenId) =>
   cachedMatrix(tokenId, () => GetMatrix(tokenId));
 
 /**
+ * Write every module row for one token, on the caller's transaction.
+ *
+ * One row per catalogue module, always all of them, whether or not the token
+ * was granted anything in that module: the presence of the rows is what makes
+ * a token governed. The catalogue decides which actions may be recorded, so a
+ * row written while the catalogue said otherwise cannot resurrect a grant.
+ */
+const writeMatrix = async (profileId, tokenId, matrix, transaction) => {
+  for (const mod of MODULES) {
+    const grant = matrix[mod.key];
+    const payload = {
+      can_read: !!grant.read,
+      can_create: !!grant.create,
+      can_update: !!grant.update,
+      can_delete: !!grant.delete,
+    };
+
+    const existing = await models.TokenPermissions.findOne({
+      where: { token_id: tokenId, module: mod.key },
+      transaction,
+    });
+
+    if (existing) {
+      await existing.update(payload, { transaction, profile_id: profileId });
+    } else {
+      await models.TokenPermissions.create(
+        { token_id: tokenId, module: mod.key, ...payload },
+        { transaction, profile_id: profileId },
+      );
+    }
+  }
+};
+
+/**
  * Replace a token's whole matrix in one transaction.
  *
  * Whole-matrix rather than per-cell: this is edited as one decision ("this
@@ -75,7 +109,7 @@ export const GetMatrixCached = async (tokenId) =>
  * would leave the token with a combination nobody actually chose if one row
  * failed.
  *
- * Writing all five module rows is also what flips the token from
+ * Writing a row for every module is also what flips the token from
  * unrestricted to governed. See the `configured` note above.
  */
 export const SetMatrix = async (profileId, tokenId, input) => {
@@ -88,34 +122,32 @@ export const SetMatrix = async (profileId, tokenId, input) => {
   const matrix = normaliseMatrix(input);
 
   await models.sequelize.transaction(async (transaction) => {
-    for (const mod of MODULES) {
-      const grant = matrix[mod.key];
-      const payload = {
-        can_read: !!grant.read,
-        can_create: !!grant.create,
-        can_update: !!grant.update,
-        can_delete: !!grant.delete,
-      };
-
-      const existing = await models.TokenPermissions.findOne({
-        where: { token_id: tokenId, module: mod.key },
-        transaction,
-      });
-
-      if (existing) {
-        await existing.update(payload, { transaction, profile_id: profileId });
-      } else {
-        await models.TokenPermissions.create(
-          { token_id: tokenId, module: mod.key, ...payload },
-          { transaction, profile_id: profileId },
-        );
-      }
-    }
+    await writeMatrix(profileId, tokenId, matrix, transaction);
   });
 
   await invalidateToken(tokenId);
 
   return { configured: true, matrix };
+};
+
+/**
+ * The same write for a token that was created moments ago, inside the mint's
+ * own transaction (src/routes/tokens/handlers/wrikeTokenExchange.js).
+ *
+ * Separate from SetMatrix because neither of its first two steps can work
+ * here: the token row is not committed yet, so a lookup outside this
+ * transaction would not find it, and opening a second transaction would hold
+ * the mint's transaction open behind it. Nothing is invalidated either — the
+ * id is seconds old, so no cached matrix can exist for it yet.
+ */
+export const SeedMatrix = async (tokenId, matrix, transaction) => {
+  if (!tokenId)
+    throw { statusCode: 400, message: "Token id must not be empty!" };
+
+  const normalised = normaliseMatrix(matrix);
+  await writeMatrix(null, tokenId, normalised, transaction);
+
+  return { configured: true, matrix: normalised };
 };
 
 /**

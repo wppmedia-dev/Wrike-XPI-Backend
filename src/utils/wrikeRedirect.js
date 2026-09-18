@@ -1,7 +1,16 @@
 import { getCachedWrikeCredentials } from "./wrikeCredentials";
+import { TOKEN_PURPOSE, normalisePurpose } from "./tokenPurpose";
 
 export const findRedirectionURL = (
-  { accountId, redirectUri, environment, environmentId, environment_id, extra },
+  {
+    accountId,
+    redirectUri,
+    environment,
+    environmentId,
+    environment_id,
+    extra,
+    purpose,
+  },
   fastify,
 ) => {
   try {
@@ -58,16 +67,31 @@ export const findRedirectionURL = (
     }
 
     let state = "";
+
+    // Which kind of token the sign-in is for. It rides in the SIGNED state
+    // rather than in the redirect URL, so it is the callback that decides what
+    // gets minted and a caller cannot arrive at that decision by editing the
+    // address bar. Only the one recognised value is written: a normal sign-in
+    // carries nothing, which is also what the MCP OAuth flow (which builds its
+    // own state) leaves behind, and matching that keeps one meaning for
+    // "absent" rather than two.
+    const purposeClaim =
+      normalisePurpose(purpose) === TOKEN_PURPOSE.CALENDAR_SYNC
+        ? { purpose: TOKEN_PURPOSE.CALENDAR_SYNC }
+        : {};
+
     if (redirectUri) {
       state = fastify.jwt.sign({
         redirectUri,
         environmentId: selectedCred ? selectedCred?.id : "",
         ...(extra || {}),
+        ...purposeClaim,
       });
     } else {
       state = fastify.jwt.sign({
         environmentId: selectedCred ? selectedCred?.id : "",
         ...(extra || {}),
+        ...purposeClaim,
       });
     }
 
