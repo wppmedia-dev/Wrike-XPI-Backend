@@ -53,6 +53,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   token: "Token service",
   master: "Master",
   amoeba: "Service",
+  calendar: "Calendar",
   mcp: "MCP",
 };
 

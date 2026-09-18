@@ -41,6 +41,14 @@ export const actionForMethod = (method) =>
  * prefixes src/routes/index.js actually registers are listed: `v1.0` is the
  * path while `master` is the name the console shows, and no alias for it is
  * added because a path nobody serves should not resolve to a governed module.
+ *
+ * `calendar` is the same kind of difference and not a mistake: the path is
+ * named after the surface a calendar integration calls, while the module is
+ * named after what the token is for, because that is what an administrator
+ * granting it is deciding about (src/utils/tokenPurpose.js). Without this
+ * entry the prefix would be UNGOVERNED, and an ungoverned path is the one
+ * thing the matrix cannot restrict — a token with everything switched off
+ * would still reach it.
  */
 const MODULE_BY_HEAD = {
   campaign: "campaign",
@@ -48,6 +56,7 @@ const MODULE_BY_HEAD = {
   task: "task",
   "v1.0": "master",
   amoeba: "amoeba",
+  calendar: "calendar_sync",
 };
 
 /**

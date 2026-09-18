@@ -6,6 +6,7 @@ import { channelRoute } from "./channel";
 import { taskRoute } from "./task";
 import { masterRoute } from "./master";
 import { amoebaRoute } from "./amoeba";
+import { calendarRoute } from "./calendar";
 import { adminApiRoute } from "./admin";
 import { portalApiRoute } from "./portal";
 // Auth Middleware
@@ -183,6 +184,10 @@ export const PrivateRouters = (fastify, opts, done) => {
   fastify.register(taskRoute, { prefix: "/wrikexpi/task" });
   fastify.register(masterRoute, { prefix: "/wrikexpi/v1.0" });
   fastify.register(amoebaRoute, { prefix: "/wrikexpi/amoeba" });
+  // The calendar surface. Registered like every other module prefix, so the
+  // two hooks above apply to it as well and its paths resolve to the
+  // calendar_sync module rather than being ungoverned.
+  fastify.register(calendarRoute, { prefix: "/wrikexpi/calendar" });
 
   // Traditional REST route
   fastify.get(

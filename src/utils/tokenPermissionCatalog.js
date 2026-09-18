@@ -81,7 +81,7 @@ export const MODULES = [
     key: "calendar_sync",
     label: "Calendar Sync",
     description:
-      "Tokens minted from the login page's Calendar Sync option, for calendar integrations that keep to Wrike on their own. Read only: a calendar reads what it shows and writes nothing back. Applies to the calendar surface only; no REST or MCP path resolves to this row.",
+      "Calendar records under /wrikexpi/calendar: the validate endpoint a calendar integration calls to check that its credential still works. Read only. This is what a token minted from the login page's Calendar Sync option starts with, and no other REST path or MCP tool resolves to this row.",
     // Read only, and deliberately so: the option exists for a subscription
     // that displays Wrike items, and offering Create/Update/Delete here would
     // describe powers the integration is not being handed.
