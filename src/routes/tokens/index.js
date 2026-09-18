@@ -7,6 +7,7 @@ import { GetUserDataSchema } from "./schema/getUserData";
 import { ValidateJWT } from "../../middlewares/authentication";
 import { log as logActivity } from "../../utils/activityLog";
 import { referenceFor } from "../../utils/activityReference";
+import { resolveReturnTarget } from "../../utils/wrikeRedirect";
 import { captureRequest, buildResponseSnapshot } from "../../utils/capture";
 import { clientIp } from "../../utils/environmentAccess";
 
@@ -230,6 +231,25 @@ export const tokenRoute = (fastify, opts, done) => {
           success: false,
           message: "Failed to process callback",
         });
+      }
+
+      // A Calendar Sync sign-in that started on the documentation page goes
+      // straight back to it with the connection it just created, so the
+      // address that person has to paste is assembled for them rather than
+      // described to them. The destination is one of a fixed set of paths
+      // looked up by name (src/utils/wrikeRedirect.js) from the signed state
+      // — never a URL the caller supplied — so this cannot be turned into an
+      // open redirect.
+      //
+      // The connection rides in the fragment, and a fragment is never sent to
+      // a server: it stays out of this service's logs and out of anything the
+      // request passes through. The page reads it and rewrites its own address
+      // to drop it before the person can copy or bookmark it by accident.
+      const docsReturn = resolveReturnTarget(decodedData?.returnTo);
+      if (docsReturn) {
+        return reply.redirect(
+          `${docsReturn}?xpiToken=${encodeURIComponent(result.token)}`,
+        );
       }
 
       const html = `
