@@ -35,7 +35,15 @@ import {
 } from "../lib/tokenPermissionsApi";
 import EnvironmentAccess from "./EnvironmentAccess";
 import PortalUserPermissions from "./PortalUserPermissions";
-import TokenPermissions from "./TokenPermissions";
+import TokenPermissions, {
+  ENVIRONMENT_MODULES_COPY,
+  type TokenPermissionsApi,
+} from "./TokenPermissions";
+import {
+  getEnvironmentModulePermissions,
+  getEnvironmentPermissionCatalog,
+  setEnvironmentModulePermissions,
+} from "../lib/environmentModulePermissionsApi";
 import ActivityLog from "./ActivityLog";
 import MfaSettings from "./MfaSettings";
 import { EnvironmentsTable } from "./admin/EnvironmentsTable";
@@ -75,6 +83,20 @@ const PAGE_NAMES: Record<PageId, string> = {
 };
 
 const PAGE_IDS = Object.keys(PAGE_NAMES) as PageId[];
+
+/**
+ * Where the environment module-permission grid reads and writes. A
+ * module-scope constant because the editor's load effect deliberately does not
+ * depend on its `api` prop: an inline literal would refetch on every render
+ * (see the TokenPermissionsApi doc comment).
+ */
+const ENVIRONMENT_MODULES_API: TokenPermissionsApi = {
+  // Same vocabulary as the token grid: one catalogue, fetched from the one
+  // route that serves it (src/utils/tokenPermissionCatalog.js).
+  loadCatalog: getEnvironmentPermissionCatalog,
+  load: getEnvironmentModulePermissions,
+  save: setEnvironmentModulePermissions,
+};
 
 
 /* ── Environment form shape (mirrors the #envForm fields) ──────────────── */
@@ -553,6 +575,19 @@ export default function AdminDashboard() {
     setTokPermsTokenId(token.id);
     setTokPermsLabel(tokenLabel(token));
     setTokPermsOpen(true);
+  }
+
+  // Per-environment module ceiling, opened from an environment's own row. The
+  // same editor as the token grid above, with the environment's copy and API:
+  // one component, two layers, so the two grids cannot drift apart.
+  const [envModsEnvId, setEnvModsEnvId] = useState<string | null>(null);
+  const [envModsLabel, setEnvModsLabel] = useState<string | null>(null);
+  const [envModsOpen, setEnvModsOpen] = useState(false);
+
+  function openEnvironmentModules(env: AdminEnvironment) {
+    setEnvModsEnvId(env.id);
+    setEnvModsLabel(env.environment_name);
+    setEnvModsOpen(true);
   }
 
   /**
@@ -1544,6 +1579,7 @@ export default function AdminDashboard() {
                   onDuplicate={(env) => openDuplicateModal(env.id)}
                   onDelete={(env) => confirmDeleteEnvironment(env.id, env.environment_name)}
                   onOpenAccess={(env) => openAccessDrawer(env.id, env.environment_name)}
+                  onModulePermissions={openEnvironmentModules}
                   onViewTokens={openTokensForEnv}
                   onActivityLogs={openEnvActivityLogs}
                   onToggle={handleEnvToggle}
@@ -1703,6 +1739,19 @@ export default function AdminDashboard() {
         // The Access column is derived from the matrix this popup saves, so the
         // list has to be re-read or the row would keep showing its old badge.
         onSaved={loadTokens}
+      />
+
+      {/* ═══════════ ENVIRONMENT: MODULE PERMISSIONS MODAL ═══════════ */}
+      <TokenPermissions
+        tokenId={envModsEnvId}
+        tokenLabel={envModsLabel}
+        open={envModsOpen}
+        onClose={() => setEnvModsOpen(false)}
+        copy={ENVIRONMENT_MODULES_COPY}
+        api={ENVIRONMENT_MODULES_API}
+        // Same reason as the token grid: the Modules column is derived from
+        // what this popup saves.
+        onSaved={loadEnvironments}
       />
 
       {/* ═══════════ PU: ADD USER MODAL ═══════════ */}

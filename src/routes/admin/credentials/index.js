@@ -9,8 +9,13 @@ import { SaveSchema } from "./schema/save";
 import { UpdateSchema } from "./schema/update";
 import { ToggleSchema } from "./schema/toggle";
 import { DeleteSchema } from "./schema/delete";
+import {
+  GetModulePermissionsSchema,
+  SetModulePermissionsSchema,
+} from "./schema/modulePermissions";
 
 import { verifyAdminJWT } from "../../../middlewares/adminAuth";
+import { EnvironmentModulePermissions } from "../../../controllers";
 
 export const adminCredentialsRoute = (fastify, opts, done) => {
   // GET /admin/credentials  (protected)
@@ -117,6 +122,62 @@ export const adminCredentialsRoute = (fastify, opts, done) => {
           success: true,
           message: result?.message,
         });
+      } catch (err) {
+        return reply.code(err?.statusCode || 400).send({
+          success: false,
+          message: err?.message || err,
+        });
+      }
+    },
+  );
+
+  // GET /admin/credentials/:id/module-permissions  (protected)
+  //
+  // The layer above a token's matrix: what anything in this environment may
+  // reach at all (src/middlewares/modulePermissions.js applies it first).
+  //
+  // Uncached on purpose, same as the token equivalent: the cached read exists
+  // for the request-path gate, while an admin editing this grid has to see what
+  // is in Postgres right now or a save would look like it did nothing.
+  fastify.get(
+    "/:id/module-permissions",
+    { ...GetModulePermissionsSchema, preHandler: [verifyAdminJWT] },
+    async (req, reply) => {
+      try {
+        const data = await EnvironmentModulePermissions.GetMatrix(
+          req.params.id,
+        );
+
+        return reply
+          .code(200)
+          .send({ success: true, message: undefined, data });
+      } catch (err) {
+        return reply.code(err?.statusCode || 400).send({
+          success: false,
+          message: err?.message || err,
+        });
+      }
+    },
+  );
+
+  // PUT /admin/credentials/:id/module-permissions  (protected)
+  //
+  // Replaces the whole matrix, and is what moves an environment from
+  // unrestricted to governed for the first time.
+  fastify.put(
+    "/:id/module-permissions",
+    { ...SetModulePermissionsSchema, preHandler: [verifyAdminJWT] },
+    async (req, reply) => {
+      try {
+        const data = await EnvironmentModulePermissions.SetMatrix(
+          req.adminUser?.id,
+          req.params.id,
+          req.body?.permissions,
+        );
+
+        return reply
+          .code(200)
+          .send({ success: true, message: "Permissions updated.", data });
       } catch (err) {
         return reply.code(err?.statusCode || 400).send({
           success: false,

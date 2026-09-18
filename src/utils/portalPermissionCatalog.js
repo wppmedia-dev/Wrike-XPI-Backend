@@ -67,6 +67,21 @@ export const MODULES = [
     actions: ["read", "update"],
   },
   {
+    key: "environment_modules",
+    label: "Environment Modules",
+    description:
+      "Which API modules each environment this user can see allows at all — the ceiling every token in that environment is held to. Reached from a row of the Environments page, so it is worth granting alongside it.",
+    // Two actions, one per route in src/routes/portal/environmentModules: read
+    // lists and fetches a grid, update replaces one.
+    //
+    // Its own module rather than a wider `environments` grant, so "may this
+    // person see the company's module ceiling?" and "may they change it?" are
+    // answered separately: reading it is what lets somebody explain why a call
+    // was refused, and changing it changes what every token in that
+    // environment may do.
+    actions: ["read", "update"],
+  },
+  {
     key: "activity_logs",
     label: "Activity Logs",
     description:

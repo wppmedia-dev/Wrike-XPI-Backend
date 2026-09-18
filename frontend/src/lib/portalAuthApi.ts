@@ -180,6 +180,21 @@ export interface PortalEnvironmentFull {
   allowlist_check_enabled: boolean;
   /** Gate 2 master switch — Wrike Xtend API custom field (flag only, phase 2). */
   custom_field_check_enabled: boolean;
+  /**
+   * The module ceiling over everything in this environment, same shape as a
+   * token's summary (src/controllers/environmentModulePermissions.js).
+   * `configured: false` means no ceiling, not "no access".
+   *
+   * Spelled out rather than imported from ./tokenDisplay: this module has no
+   * imports at all, because everything else in the portal client imports it
+   * (it owns portalFetch and the session keys), and a type-only import here
+   * would make that graph circular for a shape of three fields.
+   */
+  module_permissions: {
+    configured: boolean;
+    granted: number;
+    total: number;
+  };
   created_at: string | null;
   updated_at: string | null;
 }

@@ -80,6 +80,44 @@ TokenPermissions.GetMatrixCached = async (tokenId) => {
 const { installPermissionGate } = require("../src/mcp/index.js");
 const mcp = require("../src/mcp/tools/permission.js");
 
+/* ── The environment layer, stubbed the same way ───────────────────────────
+   The gate checks the environment before the token, so this stub is what
+   every case below runs through first. ENV_OPEN is the default — the state
+   every existing environment is in, because no rows means unrestricted — so
+   the token-only cases keep testing the token.
+
+   ENV_RESTRICTED grants campaign read and nothing else, which is what makes it
+   useful: it is a ceiling over a token that was never restricted, so anything
+   it refuses can only have been refused by this layer. */
+
+const ENV_OPEN = "env-never-restricted";
+const ENV_RESTRICTED = "env-campaign-read-only";
+const ENV_UNREADABLE = "env-lookup-fails";
+
+const ENVIRONMENT_MATRICES = {
+  [ENV_OPEN]: {
+    configured: false,
+    matrix: catalogue.emptyMatrix(),
+  },
+  [ENV_RESTRICTED]: {
+    configured: true,
+    matrix: catalogue.normaliseMatrix({ campaign: { read: true } }),
+  },
+};
+
+const askedEnvironments = [];
+
+const EnvironmentModulePermissions = require("../src/controllers/environmentModulePermissions");
+EnvironmentModulePermissions.GetMatrixCached = async (envId) => {
+  askedEnvironments.push(envId);
+  if (!envId) {
+    // What GetMatrix does with no id, same as the token side.
+    throw { statusCode: 400, message: "Environment id must not be empty!" };
+  }
+  if (envId === ENV_UNREADABLE) throw new Error("cache and database both down");
+  return ENVIRONMENT_MATRICES[envId] || ENVIRONMENT_MATRICES[ENV_OPEN];
+};
+
 let pass = 0;
 let fail = 0;
 
@@ -101,7 +139,14 @@ const checkTrue = (label, actual) => check(label, !!actual, true);
 
 const RAN = { content: [{ type: "text", text: "THE TOOL RAN" }] };
 
-const callTool = async (tokenId, name, config = { annotations: {} }) => {
+/* `envId` defaults to the unrestricted environment, so every case written
+   before this layer existed still asks the question it was written to ask. */
+const callTool = async (
+  tokenId,
+  name,
+  config = { annotations: {} },
+  envId = ENV_OPEN,
+) => {
   const handlers = new Map();
   const server = {
     registerTool(toolName, toolConfig, handler) {
@@ -110,7 +155,7 @@ const callTool = async (tokenId, name, config = { annotations: {} }) => {
     },
   };
 
-  installPermissionGate(server, { tokenId });
+  installPermissionGate(server, { tokenId, envId });
 
   // Through the gate's wrapper, exactly as the tool files do it (they hold the
   // server object createMcpServer passed them).
@@ -124,14 +169,14 @@ const callTool = async (tokenId, name, config = { annotations: {} }) => {
   };
 };
 
-const checkDenied = async (label, tokenId, name, config) => {
-  const result = await callTool(tokenId, name, config);
+const checkDenied = async (label, tokenId, name, config, envId) => {
+  const result = await callTool(tokenId, name, config, envId);
   check(`${label}: refused`, result.isError, true);
   check(`${label}: handler did not run`, result.ran, false);
 };
 
-const checkAllowed = async (label, tokenId, name, config) => {
-  const result = await callTool(tokenId, name, config);
+const checkAllowed = async (label, tokenId, name, config, envId) => {
+  const result = await callTool(tokenId, name, config, envId);
   check(`${label}: allowed`, result.ran, true);
 };
 
@@ -309,12 +354,84 @@ const runGateChecks = async () => {
     checkTrue("and the tool did not run", !anonymous.ran);
   }
 
+  console.log("\nThe environment layer, applied before the token's");
+  {
+    // A ceiling, not an alternative: this environment grants campaign read and
+    // nothing else, and the token below was never restricted at all. Anything
+    // refused here can only have been refused by the environment.
+    const unrestricted = UNRESTRICTED;
+
+    await checkAllowed(
+      "campaign_get (the one module the environment grants)",
+      unrestricted,
+      "campaign_get",
+      read,
+      ENV_RESTRICTED,
+    );
+    await checkDenied(
+      "campaign_delete in an environment that does not grant it",
+      unrestricted,
+      "campaign_delete",
+      destructive,
+      ENV_RESTRICTED,
+    );
+    await checkDenied(
+      "channel_get, a module the environment never granted",
+      unrestricted,
+      "channel_get",
+      read,
+      ENV_RESTRICTED,
+    );
+    await checkDenied(
+      "wrike_search_items, so the proxied tools are ceilinged too",
+      unrestricted,
+      "wrike_search_items",
+      read,
+      ENV_RESTRICTED,
+    );
+
+    const refused = await callTool(
+      unrestricted,
+      "campaign_delete",
+      destructive,
+      ENV_RESTRICTED,
+    );
+    checkTrue(
+      "the refusal says the environment layer was the one that denied",
+      refused.text.includes("ENVIRONMENT_MODULE_FORBIDDEN"),
+    );
+
+    // Short-circuit: the token is not even asked once the environment has said
+    // no, which is what "before token level" means at runtime.
+    asked.length = 0;
+    await callTool(unrestricted, "channel_get", read, ENV_RESTRICTED);
+    check("the token matrix is never read", asked.length, 0);
+
+    // Fail closed on this layer too, and before the token is consulted.
+    asked.length = 0;
+    const unreadable = await callTool(
+      unrestricted,
+      "campaign_get",
+      read,
+      ENV_UNREADABLE,
+    );
+    check("an unreadable environment is refused", unreadable.isError, true);
+    checkTrue(
+      "as a failed check, not a rule denial",
+      unreadable.text.includes("PERMISSION_CHECK_FAILED"),
+    );
+    check("and the token is never reached", asked.length, 0);
+  }
+
   console.log("\nIt asks about the token that authenticated the request");
   {
     asked.length = 0;
+    askedEnvironments.length = 0;
     await callTool(WIDER, "campaign_get", read);
     check("one lookup per tool call", asked.length, 1);
     check("for that token", asked[0], WIDER);
+    check("and one for its environment", askedEnvironments.length, 1);
+    check("for that environment", askedEnvironments[0], ENV_OPEN);
   }
 };
 

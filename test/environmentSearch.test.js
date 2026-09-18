@@ -188,6 +188,12 @@ WrikeCredentials.GetAllWithDeleted = async () =>
   rows.map((row) => ({ ...row, is_active: true, is_visible: true }));
 WrikeCredentials.GetOwnersByEnvIds = async () => ({});
 
+/* The list also carries each environment's module-permission summary now
+   (src/controllers/environmentModulePermissions.js). Stubbed as "no rows for
+   any of them", which is the unrestricted state the fixtures are in. */
+const EnvironmentModulePermissions = require("../src/controllers/environmentModulePermissions");
+EnvironmentModulePermissions.GetMatrixForEnvironments = async () => ({});
+
 const { GetAll } = require("../src/routes/admin/credentials/handlers/getAll");
 
 (async () => {

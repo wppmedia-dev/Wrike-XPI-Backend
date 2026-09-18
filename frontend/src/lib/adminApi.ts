@@ -1,4 +1,5 @@
 import { adminFetch } from "./authApi";
+import type { PermissionSummary } from "./tokenDisplay";
 
 /* ── Environments (credentials) ─────────────────────────────────────────
    Mirrors GET/POST /api/v1/admin/credentials and PUT/DELETE
@@ -30,6 +31,13 @@ export interface AdminEnvironment {
   /** Portal users currently mapped to this environment — an environment can
       be mapped to more than one user at once, each managing it independently. */
   owners?: { id: string; username: string }[];
+  /**
+   * The module ceiling over everything in this environment
+   * (src/controllers/environmentModulePermissions.js). Same shape as a token's
+   * summary, so the list can show at a glance which environments are
+   * restricted; `configured: false` means no ceiling, not "no access".
+   */
+  module_permissions: PermissionSummary;
   deleted_at?: string | null;
 }
 
@@ -93,6 +101,13 @@ export const listEnvironments = async (
       created_at: c.created_at,
       updated_at: c.updated_at,
       owners: Array.isArray(c.owners) ? c.owners : [],
+      // Absent from an older server means no ceiling, which is the same thing
+      // an empty matrix list means: unrestricted.
+      module_permissions: c.module_permissions || {
+        configured: false,
+        granted: 0,
+        total: 0,
+      },
       deleted_at: c.deleted_at,
     }));
   }

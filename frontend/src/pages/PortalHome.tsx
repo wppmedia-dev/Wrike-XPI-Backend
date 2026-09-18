@@ -25,9 +25,38 @@ import PortalCachePage from "./PortalCachePage";
 import PortalApiTokensPage from "./PortalApiTokensPage";
 import PortalEnvironmentAccess from "./PortalEnvironmentAccess";
 import { PortalEnvironmentsTable } from "./PortalEnvironmentsTable";
+import TokenPermissions, {
+  ENVIRONMENT_MODULES_COPY,
+  type TokenPermissionsApi,
+} from "./TokenPermissions";
+import {
+  getPortalEnvironmentModulePermissions,
+  getPortalEnvironmentModulesCatalog,
+  savePortalEnvironmentModulePermissions,
+} from "../lib/portalEnvironmentModulesApi";
 import "./PortalHome.css";
 
 type PageId = "overview" | "environments" | "api-tokens" | "activity" | "cache";
+
+/**
+ * The environment module-permission grid, pointed at the portal's own
+ * endpoints. Module scope so its identity is stable: the editor's load effect
+ * deliberately does not depend on it, and an object rebuilt on every render
+ * would either refetch constantly or read a stale session. `getPortalToken()`
+ * is called at request time for the same reason, so a re-login is picked up.
+ */
+const PORTAL_ENVIRONMENT_MODULES_API: TokenPermissionsApi = {
+  loadCatalog: async () =>
+    getPortalEnvironmentModulesCatalog(getPortalToken() || ""),
+  load: async (envId) =>
+    getPortalEnvironmentModulePermissions(getPortalToken() || "", envId),
+  save: async (envId, permissions) =>
+    savePortalEnvironmentModulePermissions(
+      getPortalToken() || "",
+      envId,
+      permissions,
+    ),
+};
 
 const PAGE_NAMES: Record<PageId, string> = {
   overview: "Overview",
@@ -228,6 +257,11 @@ export default function PortalHome() {
   const canSeeActivity = can("activity_logs", "read");
   const canSeeCache = can("cache", "read");
   const canSeeEnvironmentAccess = can("environment_access", "read");
+  // The module ceiling of each environment. Read shows the Modules column and
+  // the row action; update opens that grid as an editor. It hangs off the
+  // Environments page, so it is only reachable alongside environments:read.
+  const canSeeEnvironmentModules = can("environment_modules", "read");
+  const canUpdateEnvironmentModules = can("environment_modules", "update");
 
   /** A portal user can legitimately be created with nothing granted; the
       shell then has no page to show, so it says so instead of rendering an
@@ -381,6 +415,20 @@ export default function PortalHome() {
     setAccessEnvId(env.id);
     setAccessEnvName(env.environment_name);
     setAccessOpen(true);
+  }
+
+  /* ── Environment module permissions ──────────────────────────────────── */
+  // The ceiling this environment holds every token to, opened from its row.
+  // The same grid the admin console opens for a token, with the environment's
+  // copy and API, so the two layers are one control rather than two.
+  const [envModsEnvId, setEnvModsEnvId] = useState<string | null>(null);
+  const [envModsLabel, setEnvModsLabel] = useState<string | null>(null);
+  const [envModsOpen, setEnvModsOpen] = useState(false);
+
+  function openEnvironmentModules(env: PortalEnvironmentFull) {
+    setEnvModsEnvId(env.id);
+    setEnvModsLabel(env.environment_name);
+    setEnvModsOpen(true);
   }
 
   /* ── Add/Edit Environment modal ────────────────────────────────────── */
@@ -964,6 +1012,9 @@ export default function PortalHome() {
                   // portal user with api_tokens:read gets the same shortcut
                   // (the server scopes the list to their own environments).
                   canViewTokens={canSeeApiTokens}
+                  canSeeModules={canSeeEnvironmentModules}
+                  canUpdateModules={canUpdateEnvironmentModules}
+                  onModulePermissions={openEnvironmentModules}
                   // Only with the grant: the log page and its API sit behind
                   // activity_logs:read, and portalFetch signs a user out on a
                   // 403, so offering this without it would be a trap.
@@ -1029,6 +1080,23 @@ export default function PortalHome() {
         canCreate={can("environment_access", "create")}
         canUpdate={can("environment_access", "update")}
         canDelete={can("environment_access", "delete")}
+      />
+
+      {/* ════════ ENVIRONMENT MODULE PERMISSIONS GRID ════════ */}
+      {/* The other half of "who may call this, and what may they reach": the
+          access drawer above decides who gets in, this decides what any of
+          them can touch once they are in. Read-only without the update grant,
+          which the server enforces again (requirePortalPermission). */}
+      <TokenPermissions
+        tokenId={envModsEnvId}
+        tokenLabel={envModsLabel}
+        open={envModsOpen}
+        onClose={() => setEnvModsOpen(false)}
+        readOnly={!canUpdateEnvironmentModules}
+        copy={ENVIRONMENT_MODULES_COPY}
+        api={PORTAL_ENVIRONMENT_MODULES_API}
+        // The Modules column is derived from what this saves.
+        onSaved={loadEnvironments}
       />
 
       {/* ════════════ REDIRECT URL SUCCESS MODAL ════════════ */}
