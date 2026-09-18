@@ -1,6 +1,28 @@
 import { getCachedWrikeCredentials } from "./wrikeCredentials";
 import { TOKEN_PURPOSE, normalisePurpose } from "./tokenPurpose";
 
+/**
+ * Where a sign-in may hand the person back to once it has finished, by name.
+ *
+ * Callers name a destination instead of supplying a URL, so the address the
+ * callback redirects to can only ever be one of these paths. The name travels
+ * inside the SIGNED state, and the callback looks the path up here rather than
+ * trusting anything from the query string, which is what keeps "come back to
+ * the page that sent you" from becoming an open redirect.
+ *
+ * Only the Calendar Sync flow uses this today: the documentation asks the
+ * person to sign in and then shows them the address that sign-in produced, so
+ * it needs them returned to the page they started from rather than dropped on
+ * the generic token screen.
+ */
+export const RETURN_TARGETS = {
+  "calendar-docs": "/docs/calendar#/calendar/setup",
+};
+
+/** Look up a named return target, or null for anything unrecognised. */
+export const resolveReturnTarget = (name) =>
+  RETURN_TARGETS[String(name ?? "")] || null;
+
 export const findRedirectionURL = (
   {
     accountId,
@@ -10,6 +32,7 @@ export const findRedirectionURL = (
     environment_id,
     extra,
     purpose,
+    returnTo,
   },
   fastify,
 ) => {
@@ -80,18 +103,29 @@ export const findRedirectionURL = (
         ? { purpose: TOKEN_PURPOSE.CALENDAR_SYNC }
         : {};
 
+    // Where to hand the person back to when this is done. Only a Calendar Sync
+    // sign-in may carry it: the flag exists for the documentation page, and a
+    // plain sign-in asking for it would come back holding a 180-day token.
+    // Unrecognised names are dropped rather than signed, so the callback only
+    // ever sees one of the paths listed above.
+    const returnTarget = resolveReturnTarget(returnTo);
+    const returnClaim =
+      purposeClaim.purpose && returnTarget ? { returnTo: returnTo } : {};
+
     if (redirectUri) {
       state = fastify.jwt.sign({
         redirectUri,
         environmentId: selectedCred ? selectedCred?.id : "",
         ...(extra || {}),
         ...purposeClaim,
+        ...returnClaim,
       });
     } else {
       state = fastify.jwt.sign({
         environmentId: selectedCred ? selectedCred?.id : "",
         ...(extra || {}),
         ...purposeClaim,
+        ...returnClaim,
       });
     }
 

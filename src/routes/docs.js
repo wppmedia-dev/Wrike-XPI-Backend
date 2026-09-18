@@ -3,6 +3,7 @@
 const {
   getCachedVisibleWrikeCredentials,
 } = require("../utils/wrikeCredentials");
+const { findRedirectionURL } = require("../utils/wrikeRedirect");
 
 /**
  * WrikeXPI documentation pages.
@@ -99,6 +100,17 @@ module.exports = async function (fastify, opts) {
       process.env.CALENDAR_SYNC_ENDPOINT ||
       "https://dev-api.gowrike.space/api/v1/calendarsync";
     const calendarSyncFeed = `${calendarSyncUrl}?xpiToken={XPIToken}`;
+
+    /* The sign-in the setup page's button starts, with the chosen environment
+       appended by the page itself. The route it names answers with a redirect
+       to Wrike's own sign-in, so that button never passes through a page of
+       ours: this page has already established which environment is meant, and
+       asking again would be a step that decides nothing.
+
+       Nothing secret is in this string — the connection does not exist until
+       the sign-in finishes — and the route refuses any environment the picker
+       could not have offered. */
+    const calendarSignInBase = "/docs/calendar/connect?environmentId=";
 
     const visibleCreds = getCachedVisibleWrikeCredentials();
     const environments = Object.entries(visibleCreds || {}).map(
@@ -1535,35 +1547,51 @@ async ({ taskId }, extra) => {
           <p class="pg-lede">About five minutes, once. After that, your Wrike tasks keep themselves current in your calendar.</p>
 
           <h2 class="pg-h2">1 · Choose where it should look</h2>
-          <p class="pg-p">Open the <a href="/">login page</a> and pick the environment whose tasks you want in your calendar. Everything you will see comes from there, and nothing from anywhere else.</p>
+          <p class="pg-p">Pick the environment whose tasks you want in your calendar. Everything you will see comes from there, and nothing from anywhere else.</p>
+          <label class="field-label" for="docs-cal-env">Environment</label>
+          <div class="select-wrap">
+            <select id="docs-cal-env">
+              ${environments
+                .map((e) => `<option value="${esc(e.key)}">${e.label}</option>`)
+                .join("")}
+            </select>
+            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <p class="pg-p">Nothing is created yet. This choice is remembered only for the sign-in that follows.</p>
 
-          <h2 class="pg-h2">2 · Choose Calendar Sync</h2>
-          <p class="pg-p">Press <b>Calendar Sync Login</b>, the outlined button just under <b>Login with Wrike</b>. That single choice is what makes this connection a calendar connection rather than an ordinary sign-in.</p>
-          ${callout(
-            "tip",
-            "Nothing else changes",
-            "Your own Wrike access is untouched. The calendar gets a connection of its own, and it keeps working while you are signed out.",
-          )}
+          <h2 class="pg-h2">2 · Generate your connection</h2>
+          <p class="pg-p">Press the button and sign in with Wrike as the person whose tasks should appear in the calendar. You will come straight back here, with your own connection filled in for you.</p>
+          <div class="cta-row">
+            <a class="btn primary" id="cal-generate" href="${calendarSignInBase}${esc(environments[0]?.key || "")}">Generate my connection ${IC.bolt}</a>
+            <a class="btn ghost" href="#/calendar/permissions">See what it can do</a>
+          </div>
+          <p class="pg-p">Your calendar can never show more than you can see, and an administrator decides who is allowed to connect in the first place. Nothing you already have in Wrike changes.</p>
 
-          <h2 class="pg-h2">3 · Sign in with Wrike</h2>
-          <p class="pg-p">You will be taken to Wrike's own sign-in page. Sign in as the person whose tasks should appear in the calendar. Your calendar can never show more than you can see, and an administrator decides who is allowed to connect in the first place.</p>
+          <h2 class="pg-h2">3 · Copy your connection</h2>
+          <p class="pg-p">The address below is the whole of it. There is nothing to install and no account to create. While it still says <code>{XPIToken}</code>, it is the empty template, because no connection has been made yet.</p>
+          <div id="cal-connected" hidden>
+            ${callout(
+              "tip",
+              "Your connection is in the address below",
+              "Copy the whole line before you leave this page. It is shown once and cannot be looked up again.",
+            )}
+          </div>
+          <div class="url-box">
+            <code class="url-code" id="cal-feed">${esc(calendarSyncFeed)}</code>
+            <button type="button" class="copy-btn solid" id="cal-feed-copy" data-copy="${esc(calendarSyncFeed)}"><span class="copy-ic">${IC.copy}</span><span class="tick-ic">${IC.check}</span><span class="copy-txt">Copy</span></button>
+          </div>
 
-          <h2 class="pg-h2">4 · Copy your connection</h2>
-          <p class="pg-p">The next screen shows your connection once, with the details your calendar app will ask for.</p>
-          ${callout(
-            "warn",
-            "Copy it before you close the window",
-            "It is shown once and cannot be looked up again. If you lose it, set the connection up again and switch the old one off in the console. Nothing is broken by having two for a moment.",
-          )}
-
-          <h2 class="pg-h2">5 · Add it to your calendar</h2>
-          <p class="pg-p">Your calendar subscribes to one address. There is nothing to install and no account to create: take the address below and put your own connection where it says <code>{XPIToken}</code>.</p>
-          ${codeBlock("text", calendarSyncFeed, "Subscription address")}
-          <p class="pg-p">In your calendar app, look for <b>Subscribe</b>, <b>Add calendar from URL</b> or <b>Add account</b>, and paste that address. Google Calendar, Outlook and Apple Calendar all accept it.</p>
+          <h2 class="pg-h2">4 · Add it to your calendar</h2>
+          <p class="pg-p">In your calendar app, look for <b>Subscribe</b>, <b>Add calendar from URL</b> or <b>Add account</b>, and paste that address. Google Calendar, Outlook and Apple Calendar all accept it. That is the last step, and the last time you think about it.</p>
           ${callout(
             "tip",
             "The address and the connection are one thing",
             "Everything before the question mark is the address, and everything after it is your connection. Keep the whole line to yourself: anybody holding it can see what your connection can see.",
+          )}
+          ${callout(
+            "warn",
+            "If you lose it",
+            "A connection is shown once. If yours is gone, generate another one here and switch the old one off in the console. Nothing is broken by having two for a moment.",
           )}
 
           <div class="cta-row">
@@ -2074,6 +2102,14 @@ async ({ taskId }, extra) => {
     .copy-btn.solid { background: var(--accent); color: var(--on-accent); border-color: transparent; border-radius: 0 11px 11px 0; padding: 0 18px; }
     .copy-btn.solid:hover { background: #16a34a; }
 
+    /* A copy button that confirms with a tick as well as a colour. Turning green
+       is easy to miss on a button someone pressed while looking somewhere else,
+       and this one copies a long line that people often paste without reading. */
+    .copy-ic, .tick-ic { display: inline-flex; align-items: center; }
+    .copy-btn .tick-ic { display: none; }
+    .copy-btn.copied .copy-ic { display: none; }
+    .copy-btn.copied .tick-ic { display: inline-flex; }
+
     /* Callouts */
     .callout {
       display: flex; gap: 13px; align-items: flex-start;
@@ -2137,6 +2173,16 @@ async ({ taskId }, extra) => {
     .url-box { display: flex; align-items: stretch; background: var(--bg-elev); border: 1px solid var(--border-strong); border-radius: 11px; overflow: hidden; margin-bottom: 10px; }
     .url-code { flex: 1; display: flex; align-items: center; padding: 14px 16px; font-family: var(--mono); font-size: 0.82rem; color: #334155; word-break: break-all; overflow-wrap: anywhere; }
 
+    /* The Calendar Sync connection is long enough to wrap over several lines,
+       which made that one box taller than the paragraph under it. It scrolls
+       instead, so the address keeps the same shape whether it is the empty
+       template or a connection, and the copy button stays where the eye last
+       saw it. Top-aligned because centred text in a box it overflows is the
+       one layout that can hide its own first line. */
+    #cal-feed { align-items: flex-start; max-height: 120px; overflow-y: auto; overscroll-behavior: contain; }
+    #cal-feed::-webkit-scrollbar { width: 8px; }
+    #cal-feed::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 8px; }
+
     /* CTA */
     .cta-row { display: flex; flex-wrap: wrap; gap: 12px; margin: 30px 0 6px; }
     .btn { display: inline-flex; align-items: center; gap: 9px; padding: 12px 20px; border-radius: 11px; font-weight: 600; font-size: 0.9rem; text-decoration: none; transition: all .16s ease; }
@@ -2144,6 +2190,27 @@ async ({ taskId }, extra) => {
     .btn.primary:hover { background: #16a34a; transform: translateY(-2px); }
     .btn.ghost { border: 1px solid var(--border-strong); color: var(--fg-dim); }
     .btn.ghost:hover { color: var(--fg); border-color: var(--border-strong); transform: translateY(-2px); }
+
+    /* The Calendar Sync setup button is the one action on that page, so it does
+       not need a shadow to be found. On a page that is almost entirely copy the
+       shadow reads as a smudge rather than as a lift. */
+    #cal-generate { box-shadow: none; }
+
+    /* Pressing it hands the person over to Wrike's sign-in, and that handover
+       is not instant: the button has to say it is working, and it has to refuse
+       a second press, because a second press starts the whole sign-in again.
+       The aria-disabled case is the one time it stands down before anybody has
+       pressed anything: no environment to connect, so nothing to start. */
+    #cal-generate[aria-busy='true'],
+    #cal-generate[aria-disabled='true'] { pointer-events: none; opacity: 0.8; }
+    #cal-generate .cal-spin {
+      flex-shrink: 0;
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.45);
+      border-top-color: var(--on-accent);
+      animation: cal-spin 0.7s linear infinite;
+    }
+    @keyframes cal-spin { to { transform: rotate(360deg); } }
 
     .doc-foot {
       margin-top: 56px; padding-top: 22px; border-top: 1px solid var(--border);
@@ -2271,6 +2338,8 @@ async ({ taskId }, extra) => {
       )};
       var defaultPage = ${JSON.stringify(defaultPage)};
       var MCP_ANY_URL = ${JSON.stringify(baseMcpUrl)};
+      var CAL_SIGNIN = ${JSON.stringify(calendarSignInBase)};
+      var CAL_FEED = ${JSON.stringify(calendarSyncUrl)};
       var content = document.getElementById('content');
       var sidebar = document.getElementById('sidebar');
       var scrim = document.getElementById('scrim');
@@ -2278,8 +2347,21 @@ async ({ taskId }, extra) => {
       var searchResults = document.getElementById('search-results');
       var menuBtn = document.getElementById('menu-btn');
 
-      function currentId() {
+      // The page id, and anything that came after a '?' on the same hash. One
+      // page needs the query: the Calendar Sync setup page is where the
+      // sign-in hands the connection back (see takeCalendarToken below), and
+      // 'calendar/setup?xpiToken=…' has to be read as the page 'calendar/setup'
+      // rather than as a page that does not exist.
+      function hashParts() {
         var h = (location.hash || '').replace(/^#\\/?/, '');
+        var q = h.indexOf('?');
+        return q === -1
+          ? { id: h, query: '' }
+          : { id: h.slice(0, q), query: h.slice(q + 1) };
+      }
+
+      function currentId() {
+        var h = hashParts().id;
         return PAGES.some(function (p) { return p.id === h; }) ? h : defaultPage;
       }
 
@@ -2409,6 +2491,100 @@ async ({ taskId }, extra) => {
         });
       }
 
+      // Calendar Sync: the sign-in link follows the environment picker, and
+      // the connection the sign-in produced is put into the address block.
+      // Both live on the setup page, so both are no-ops everywhere else.
+      function renderCalendarSignIn() {
+        var sel = document.getElementById('docs-cal-env');
+        var btn = document.getElementById('cal-generate');
+        if (!sel || !btn) return;
+        var opt = sel.options[sel.selectedIndex];
+        var id = opt ? opt.value : '';
+        if (!id) {
+          btn.removeAttribute('href');
+          btn.setAttribute('aria-disabled', 'true');
+          return;
+        }
+        btn.removeAttribute('aria-disabled');
+        btn.setAttribute('href', CAL_SIGNIN + encodeURIComponent(id));
+      }
+
+      // The connection is kept in memory for as long as this page is open, and
+      // nowhere else: not in the address, not in storage. That way it is still
+      // there if the person reads another page and comes back, and gone the
+      // moment they close the tab.
+      var calToken = null;
+
+      function showCalendarFeed(token) {
+        var box = document.getElementById('cal-feed');
+        var copy = document.getElementById('cal-feed-copy');
+        var done = document.getElementById('cal-connected');
+        if (!box || !token) return;
+        var full = CAL_FEED + '?xpiToken=' + token;
+        box.textContent = full;
+        if (copy) copy.setAttribute('data-copy', full);
+        if (done) done.hidden = false;
+      }
+
+      // The sign-in sends the connection back in the fragment, which the
+      // server never sees. Read it, put it in the address block, then rewrite
+      // this page's own address so the connection is not left sitting in the
+      // address bar, in history, or in a copy of the link.
+      function takeCalendarToken() {
+        var parts = hashParts();
+        if (!parts.query) return;
+        var token = new URLSearchParams(parts.query).get('xpiToken');
+        if (!token) return;
+        calToken = token;
+        showCalendarFeed(token);
+        try {
+          history.replaceState(null, '', '#/' + parts.id);
+        } catch (e) {
+          /* Older browsers: the connection is still shown, the address simply
+             keeps it. */
+        }
+      }
+
+      document.addEventListener('change', function (e) {
+        if (e.target && e.target.id === 'docs-cal-env') renderCalendarSignIn();
+      });
+
+      // What the button says when it is not busy. Kept from the page's own
+      // markup, so the label is written in one place.
+      var calLabel = '';
+
+      function setCalendarBusy(busy) {
+        var btn = document.getElementById('cal-generate');
+        if (!btn) return;
+        if (busy) {
+          if (!calLabel) calLabel = btn.innerHTML;
+          btn.setAttribute('aria-busy', 'true');
+          btn.innerHTML =
+            '<span class="cal-spin" aria-hidden="true"></span>Taking you to Wrike…';
+        } else {
+          btn.removeAttribute('aria-busy');
+          if (calLabel) btn.innerHTML = calLabel;
+        }
+      }
+
+      // The click is the last thing that happens on this page: the next thing
+      // the person sees is Wrike's sign-in. Until that arrives the button has to
+      // look like it is working and turn away a second press.
+      document.addEventListener('click', function (e) {
+        var btn = e.target.closest('#cal-generate');
+        if (!btn) return;
+        if (!(btn.getAttribute('href') || '')) {
+          e.preventDefault();
+          return;
+        }
+        setCalendarBusy(true);
+      });
+
+      // Coming back with the browser's Back button restores this page from its
+      // cache, DOM and all, so the button would still be mid-spin. Reset it
+      // whenever the page is shown again.
+      window.addEventListener('pageshow', function () { setCalendarBusy(false); });
+
       // search
       function normalize(s) { return (s || '').toLowerCase(); }
       function indexText(p) { return normalize(p.group + ' ' + p.label + ' ' + p.keywords); }
@@ -2469,10 +2645,17 @@ async ({ taskId }, extra) => {
       menuBtn.addEventListener('click', openSidebar);
       scrim.addEventListener('click', closeSidebar);
 
-      window.addEventListener('hashchange', function () { render(); setFoot(); });
+      window.addEventListener('hashchange', function () {
+        render();
+        setFoot();
+        takeCalendarToken();
+        if (calToken) showCalendarFeed(calToken);
+      });
       render();
       setFoot();
       renderConnCommands();
+      renderCalendarSignIn();
+      takeCalendarToken();
     })();
   </script>
 </body>
@@ -2489,6 +2672,56 @@ async ({ taskId }, extra) => {
   });
   fastify.get("/docs/calendar", async (req, reply) => {
     reply.type("text/html").send(renderDocs("calendar"));
+  });
+
+  /**
+   * Start a Calendar Sync sign-in for one environment.
+   *
+   * This is what the button on the setup page points at, and its whole job is
+   * to answer with a redirect to Wrike. Doing it here rather than sending the
+   * person through the login page means the environment they already chose on
+   * the page is the one carried into the sign-in, with no second place to
+   * choose it and no page of ours in between.
+   *
+   * Two things are deliberately fixed rather than taken from the caller:
+   * the purpose (so this route can only ever start a Calendar Sync sign-in,
+   * never an ordinary one) and where the sign-in returns to. The environment
+   * is checked against the list the page is allowed to show, so the route
+   * cannot start a sign-in for an environment no visitor was offered.
+   */
+  fastify.get("/docs/calendar/connect", async (req, reply) => {
+    const environmentId = String(req.query.environmentId ?? "");
+
+    const visible = getCachedVisibleWrikeCredentials() || {};
+    const offered = Object.values(visible).some(
+      (env) => String(env?.id ?? "") === environmentId,
+    );
+
+    if (!offered || !environmentId) {
+      return reply.redirect("/docs/calendar#/calendar/setup");
+    }
+
+    try {
+      const { redirectUrl } = findRedirectionURL(
+        {
+          environmentId,
+          purpose: "calendar_sync",
+          returnTo: "calendar-docs",
+        },
+        fastify,
+      );
+      return reply.redirect(redirectUrl);
+    } catch (err) {
+      // A deployment missing its Wrike settings cannot start this sign-in.
+      // The person is sent back to the page they came from rather than left
+      // on an error, and the reason is in the log and in the activity log for
+      // whoever can fix it.
+      req.log.error(
+        { err, environmentId },
+        "Calendar Sync sign-in could not be started",
+      );
+      return reply.redirect("/docs/calendar#/calendar/setup");
+    }
   });
   fastify.get("/docs", async (req, reply) => {
     reply.redirect("/docs/mcp");
