@@ -2,9 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import "./TagInput.css";
 
 /**
- * A list field built out of chips: type a value, press Enter or comma, repeat.
+ * A list field built out of chips: type a value, then Enter, comma or space.
  * A pasted list — commas, newlines, tabs or semicolons — lands as many chips in
  * one go, so a column copied out of a spreadsheet arrives intact.
+ *
+ * Space is a commit key as well as a separator, which is safe here because no
+ * value this field is used for may contain one (an email, a domain and an IP
+ * are all single tokens). Typing "a@b.com " therefore ends that entry, exactly
+ * as the paste path already treated a space.
  *
  * Refusing a duplicate is the whole point of this component, so it does it
  * loudly rather than quietly:
@@ -184,9 +189,15 @@ export function TagInput({
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" || e.key === "," || e.key === ";") {
+    // An IME mid-composition (CJK input, accents): Enter and space belong to
+    // the candidate window, not to this field.
+    if (e.nativeEvent.isComposing) return;
+
+    if (e.key === "Enter" || e.key === "," || e.key === ";" || e.key === " ") {
       // Enter would otherwise submit the form the field sits in — or, in a
-      // form with no submit button, do nothing visible at all.
+      // form with no submit button, do nothing visible at all. The space and
+      // the separators are stopped for the same reason: they are consumed as
+      // the end of an entry, never inserted into it.
       e.preventDefault();
       if (draft.trim()) commit(draft);
       return;
