@@ -15,6 +15,7 @@ import { CopyButton } from "../components/ui/CopyButton";
 import { PageInfo } from "../components/ui/PageInfo";
 import { ADMIN_HELP } from "../lib/pageHelp";
 import { callerNote } from "../lib/activityCaller";
+import { InfoTip } from "../components/ui/InfoTip";
 import "./ActivityLog.css";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
@@ -481,12 +482,17 @@ export default function ActivityLog({
                     <td className="al-time">{formatTime(row.created_at)}</td>
                     <td className="al-caller">
                       {row.actor_email || (
-                        <span
-                          className="al-unresolved"
-                          title={callerNote(row)}
-                        >
+                        <span className="al-unresolved">
                           <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" />
                           Unresolved
+                          {/* Why the cell is empty, behind the icon rather than
+                              printed in the row: it is the same sentence on
+                              every such row, and the table is read for the
+                              calls, not the explanation. */}
+                          <InfoTip
+                            text={callerNote(row)}
+                            label="Why is this row unresolved?"
+                          />
                         </span>
                       )}
                     </td>
@@ -662,10 +668,13 @@ export default function ActivityLog({
                   <dt>Caller</dt>
                   <dd>
                     {detailRow.actor_email || (
-                      <>
+                      <span className="al-unresolved-detail">
                         <span className="al-muted">Unresolved</span>
-                        <div className="al-detail-note">{callerNote(detailRow)}</div>
-                      </>
+                        <InfoTip
+                          text={callerNote(detailRow)}
+                          label="Why is this row unresolved?"
+                        />
+                      </span>
                     )}
                   </dd>
                 </div>
