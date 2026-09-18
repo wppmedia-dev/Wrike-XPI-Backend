@@ -1071,6 +1071,35 @@
   color: var(--accent);
 }
 
+/* The entries the server refused. Inline in the modal rather than only in a
+   toast, because a toast with five names in it is unreadable and gone before
+   the admin can fix the box. */
+.ea-add-errors {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: var(--danger-soft);
+}
+
+.ea-add-errors-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--danger);
+}
+
+.ea-add-errors-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
 /* ═══════════════════════════════════════════════════════════
    CHECK TAB
    ═══════════════════════════════════════════════════════════ */

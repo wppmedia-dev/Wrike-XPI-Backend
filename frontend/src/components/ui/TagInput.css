@@ -1,0 +1,208 @@
+/* ── TagInput ──────────────────────────────────────────────────────────
+   A comma-separated list as chips. Lives in components/ui, so it is styled
+   from its own stylesheet and uses only variables both consoles define.
+   --warning* gets a fallback: it is defined per page scope and this control
+   must not lose its warning colour on a page that forgets it. */
+
+.ti-root {
+  width: 100%;
+}
+
+/* Reads as one input with chips inside it, not as a list above a box: the
+   field owns the border, radius and focus ring that form-control would. */
+.ti-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  min-height: 38px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  cursor: text;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.ti-field:hover:not(.ti-field-disabled) {
+  border-color: var(--accent);
+}
+
+.ti-field:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft, rgba(0, 130, 98, 0.12));
+}
+
+.ti-field-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* A value was refused because something already covers it. There is no chip to
+   flash, so the field takes the signal instead.
+   The doubled class is not decoration: `:hover:not(...)` above scores higher
+   than a single `.ti-field-refused`, and the pointer is hovering this box in
+   exactly the moment the refusal happens (the admin just pasted into it) — so
+   the red would be repainted green a frame later. Kept after those rules as
+   well, so an equal score resolves to red. */
+.ti-field.ti-field-refused,
+.ti-field.ti-field-refused:hover,
+.ti-field.ti-field-refused:focus-within {
+  border-color: var(--danger);
+}
+
+.ti-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  padding: 2px 3px 2px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* The chip a refused value collided with. Red on red-soft, plus a nudge, so
+   "this one is already here" is readable without the sentence underneath.
+   MUST come after `.ti-chip`: equal specificity, and the base rule's border
+   shorthand would otherwise reset the colour right back to grey. */
+.ti-chip-refused {
+  border-color: var(--danger);
+  background: var(--danger-soft, rgba(239, 68, 68, 0.1));
+  color: var(--danger);
+}
+
+.ti-chip-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ti-chip-x {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 9px;
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.ti-chip-x:hover:not(:disabled) {
+  background: var(--danger-soft, rgba(239, 68, 68, 0.1));
+  color: var(--danger);
+}
+
+.ti-chip-x:disabled {
+  cursor: not-allowed;
+}
+
+.ti-chip-x:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.ti-input {
+  flex: 1 1 90px;
+  min-width: 90px;
+  padding: 3px 4px;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.ti-input::placeholder {
+  color: var(--text-muted);
+}
+
+.ti-input:disabled {
+  cursor: not-allowed;
+}
+
+/* The refusal notice. Amber rather than red: nothing is broken, the value is
+   simply already accounted for, and red here would read as an error to fix.
+   The colour is a literal because --warning is tuned for fills in some page
+   scopes (#f59e0b on white is not legible as text); #b45309 keeps the same
+   amber family at a readable contrast. */
+.ti-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 7px;
+  color: var(--warning-text, #b45309);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.ti-notice i {
+  flex: none;
+  margin-top: 2px;
+  font-size: 10.5px;
+}
+
+.ti-notice span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Transform only, and only for people who have not asked for less motion —
+   the same rule the drawer's own animations follow. */
+@media (prefers-reduced-motion: no-preference) {
+  .ti-chip-refused {
+    animation: tiChipNudge 0.34s ease-out;
+  }
+
+  @keyframes tiChipNudge {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    25% {
+      transform: translateX(-3px);
+    }
+    50% {
+      transform: translateX(3px);
+    }
+    75% {
+      transform: translateX(-2px);
+    }
+  }
+
+  .ti-field-refused {
+    animation: tiFieldNudge 0.34s ease-out;
+  }
+
+  @keyframes tiFieldNudge {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    25% {
+      transform: translateX(-3px);
+    }
+    50% {
+      transform: translateX(3px);
+    }
+    75% {
+      transform: translateX(-2px);
+    }
+  }
+}

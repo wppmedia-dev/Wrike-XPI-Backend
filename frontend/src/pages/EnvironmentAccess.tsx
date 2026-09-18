@@ -20,6 +20,7 @@ import {
 } from "../lib/environmentAccessApi";
 import { setEnvironmentGates } from "../lib/environmentAccessApi";
 import { confirmDanger, escHtml, toast } from "../lib/notify";
+import { TagInput } from "../components/ui/TagInput";
 
 /** The only two fields this component reads off the environment record —
     both AdminEnvironment (frontend/src/lib/adminApi.ts) and
@@ -395,12 +396,39 @@ export default function EnvironmentAccess({
 
   const [addOpen, setAddOpen] = useState(false);
   const [addType, setAddType] = useState<RuleType>("email");
-  const [addValue, setAddValue] = useState("");
+  const [addValues, setAddValues] = useState<string[]>([]);
   const [addLabel, setAddLabel] = useState("");
   const [addAppliesTo, setAddAppliesTo] = useState<AppliesTo>("both");
   const [addTypeTouched, setAddTypeTouched] = useState(false);
   const [saving, setSaving] = useState(false);
   const [fillingMyIp, setFillingMyIp] = useState(false);
+  /** Values the server refused on the last submit, shown in the modal so a
+      pasted list can be corrected without retyping the parts that worked. */
+  const [addErrors, setAddErrors] = useState<string[]>([]);
+
+  /**
+   * What counts as "the same value" for this type. Domains are stored with the
+   * optional "@" stripped and everything lower-cased, so a chip written
+   * "@Example.com" has to collide with the stored "example.com" — otherwise the
+   * duplicate check would wave through a value the server then rejects with a
+   * 409. Handed to TagInput, which compares every value through it.
+   */
+  const valueKey = useCallback(
+    (value: string) =>
+      (addType === "domain" ? value.trim().replace(/^@+/, "") : value.trim()).toLowerCase(),
+    [addType],
+  );
+
+  /* Already saved for this environment and type. The form uses this to refuse
+     a re-entry up front (with the field highlighted) instead of letting the
+     admin submit and collect a 409 per duplicate. */
+  const existingKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const rule of rules) {
+      if (rule.rule_type === addType) keys.add(valueKey(rule.value));
+    }
+    return keys;
+  }, [rules, addType, valueKey]);
 
   const useMyIp = async () => {
     setFillingMyIp(true);
@@ -410,7 +438,21 @@ export default function EnvironmentAccess({
         toast("Could not detect your IP", "error");
         return;
       }
-      setAddValue(ip);
+
+      // Appends, so the button still works while a list is being built, and
+      // reports a collision the same way the field itself would.
+      const key = valueKey(ip);
+      if (addValues.some((value) => valueKey(value) === key)) {
+        toast(`${ip} is already in the list`, "warning");
+        return;
+      }
+      if (existingKeys.has(key)) {
+        toast(`${ip} is already on the allow list for this environment.`, "warning");
+        return;
+      }
+
+      setAddValues((prev) => [...prev, ip]);
+      setAddErrors([]);
     } catch (err: any) {
       toast(err?.message || "Could not detect your IP", "error");
     } finally {
@@ -560,10 +602,11 @@ export default function EnvironmentAccess({
   const openAdd = () => {
     if (!allowCreate) return;
     setAddType("email");
-    setAddValue("");
+    setAddValues([]);
     setAddLabel("");
     setAddAppliesTo("both");
     setAddTypeTouched(false);
+    setAddErrors([]);
     setAddOpen(true);
   };
 
@@ -583,39 +626,118 @@ export default function EnvironmentAccess({
     }
   };
 
-  const onAddValueChange = (value: string) => {
-    setAddValue(value);
-    if (!addTypeTouched) setAddType(inferRuleType(value));
+  const onAddValuesChange = (next: string[]) => {
+    setAddValues(next);
+    setAddErrors([]);
+    // The picker still types the whole submit, so the first chip decides the
+    // type while the admin has not chosen one themselves. A mixed list is
+    // caught per value by the server and comes back in the error list rather
+    // than being guessed at here.
+    if (!addTypeTouched && next[0]) setAddType(inferRuleType(next[0]));
   };
 
+  /**
+   * One submit, any number of entries.
+   *
+   * The form takes a list of chips and writes each value as its own allow-list
+   * row — the table, the per-row on/off switch, the applies-to scope and the
+   * request-path matcher are all built around one value per row, so a bulk add
+   * is N creates rather than a second shape of rule to keep in step everywhere
+   * else.
+   *
+   * Duplicates the field could see for itself (a repeat within the list, or a
+   * value already stored for this environment) never reach here: TagInput
+   * refuses them, highlights them and says why. What is left is a value the
+   * SERVER refuses — a bad email, or a collision the console's copy of the
+   * rules does not know about because another admin just added it — and those
+   * stay in the box with their message so the list can be fixed and resubmitted
+   * without retyping what did land.
+   *
+   * Sequential, not Promise.all: the unique index (env_id, rule_type, value)
+   * means two identical values in flight at once would race, and a 50-chip
+   * paste should not open 50 simultaneous writes.
+   */
   const submitAdd = async () => {
-    const value = addValue.trim();
-    if (!value) {
+    const values = addValues;
+    if (!values.length) {
       toast(`Enter ${addType === "ip" ? "an IP address" : "a value"} first`, "warning");
       return;
     }
     if (!envId) return;
 
     setSaving(true);
+    setAddErrors([]);
+
+    const added: string[] = [];
+    const duplicates: string[] = [];
+    const rejected: { value: string; message: string }[] = [];
+
     try {
-      await createRule(
-        {
-          env_id: envId,
-          rule_type: addType,
-          value,
-          label: addLabel.trim() || null,
-          applies_to: addAppliesTo,
-        },
-        transport,
-      );
-      toast(`Added to the allow list`, "success");
-      setAddOpen(false);
-      await afterWrite();
-    } catch (err: any) {
-      toast(err?.message || "Could not add the entry", "error");
+      for (const value of values) {
+        try {
+          await createRule(
+            {
+              env_id: envId,
+              rule_type: addType,
+              value,
+              label: addLabel.trim() || null,
+              applies_to: addAppliesTo,
+            },
+            transport,
+          );
+          added.push(value);
+        } catch (err: any) {
+          const message = err?.message || "Could not add the entry";
+          // The 409 arrives as prose from the controller (CreateRule throws
+          // "\"x\" is already on the allow list for this environment.").
+          if (/already on the allow list/i.test(message)) duplicates.push(value);
+          else rejected.push({ value, message });
+        }
+      }
     } finally {
       setSaving(false);
     }
+
+    if (added.length) await afterWrite();
+
+    // A single value reads exactly as it did before the form took a list.
+    if (values.length === 1) {
+      if (added.length) {
+        toast("Added to the allow list", "success");
+        setAddOpen(false);
+      } else if (duplicates.length) {
+        toast(
+          `"${values[0]}" is already on the allow list for this environment.`,
+          "warning",
+        );
+      } else {
+        setAddErrors(rejected.map((r) => r.message));
+        toast(rejected[0]?.message || "Could not add the entry", "error");
+      }
+      return;
+    }
+
+    const summary = [
+      added.length ? `${added.length} added` : null,
+      duplicates.length ? `${duplicates.length} already listed` : null,
+      rejected.length ? `${rejected.length} not added` : null,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    // Nothing left to retry — everything landed, or was already there — so
+    // the modal closes instead of sitting open on an empty box.
+    if (!rejected.length) {
+      toast(summary || "Nothing to add", duplicates.length ? "warning" : "success");
+      setAddOpen(false);
+      return;
+    }
+
+    // Only what still needs fixing stays on screen, as chips — the values that
+    // landed are gone from the form and already visible in the table behind it.
+    setAddErrors(rejected.map((r) => r.message));
+    setAddValues(rejected.map((r) => r.value));
+    toast(summary, "error");
   };
 
   const runCheck = async () => {
@@ -1195,14 +1317,24 @@ export default function EnvironmentAccess({
                       </button>
                     )}
                   </div>
-                  <input
+                  <TagInput
                     id="ea-add-value"
-                    className="form-control"
-                    type="text"
+                    values={addValues}
+                    onChange={onAddValuesChange}
+                    existing={existingKeys}
+                    toKey={valueKey}
+                    disabled={saving}
                     placeholder={TYPE_PLACEHOLDER[addType]}
-                    value={addValue}
-                    onChange={(e) => onAddValueChange(e.target.value)}
+                    duplicateMessage={(value) => `"${value}" is already in this list.`}
+                    existingMessage={(value) =>
+                      `"${value}" is already on the allow list for this environment.`
+                    }
                   />
+                  <div className="ea-field-hint">
+                    {addValues.length > 0
+                      ? `${addValues.length} ${addValues.length === 1 ? "entry" : "entries"}, each added as its own row.`
+                      : "Press Enter or comma after each one. Paste a whole list at once."}
+                  </div>
                 </div>
 
                 <div className="form-group">
@@ -1216,7 +1348,7 @@ export default function EnvironmentAccess({
                   />
                   <div className="ea-field-hint">
                     {addAppliesTo === "both"
-                      ? "This entry grants access to both the REST API and MCP."
+                      ? "Grants access to both the REST API and MCP."
                       : addAppliesTo === "api"
                         ? "REST API calls only. MCP agents using this identity are denied."
                         : "MCP agents only. REST API calls using this identity are denied."}
@@ -1235,7 +1367,28 @@ export default function EnvironmentAccess({
                     value={addLabel}
                     onChange={(e) => setAddLabel(e.target.value)}
                   />
+                  {addValues.length > 1 && (
+                    <div className="ea-field-hint">
+                      Applied to all {addValues.length} entries.
+                    </div>
+                  )}
                 </div>
+
+                {/* Which values the server refused, kept in the modal beside
+                    the box they came from (the box now holds only those). */}
+                {addErrors.length > 0 && (
+                  <div className="ea-add-errors" role="alert">
+                    <div className="ea-add-errors-head">
+                      <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" />
+                      Not added ({addErrors.length})
+                    </div>
+                    <ul className="ea-add-errors-list">
+                      {addErrors.map((message, i) => (
+                        <li key={i}>{message}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </form>
             </div>
             <div className="modal-footer">
@@ -1244,7 +1397,8 @@ export default function EnvironmentAccess({
               </button>
               <button className="btn btn-primary" disabled={saving} onClick={submitAdd}>
                 <i className={`fa-solid ${saving ? "fa-spinner fa-spin" : "fa-check"}`} aria-hidden="true" />
-                &nbsp;Add entry
+                &nbsp;
+                {addValues.length > 1 ? `Add ${addValues.length} entries` : "Add entry"}
               </button>
             </div>
           </div>
