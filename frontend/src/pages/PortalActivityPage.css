@@ -436,19 +436,6 @@
   letter-spacing: 0.02em;
 }
 
-.pal-search-ref input {
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-  font-size: 12px;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-}
-
-.pal-search-ref input::placeholder {
-  text-transform: none;
-  letter-spacing: normal;
-  font-family: inherit;
-}
-
 .pal-ip {
   font-size: 12px;
 }

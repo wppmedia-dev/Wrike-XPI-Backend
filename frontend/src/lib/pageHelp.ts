@@ -91,9 +91,9 @@ export const ADMIN_HELP: Record<AdminHelpKey, PageHelp> = {
     summary:
       "Every call into this service, allowed or refused — REST, MCP and the sign-in flows.",
     points: [
-      "Filter by environment, token, caller, outcome or time.",
+      "Search by the caller's email, or paste in the reference from an error message.",
+      "Filter by environment, token, outcome or surface.",
       "Open a row to read the request and the response in full.",
-      "Someone reported an error? Ask for the reference from the message and put it in the reference box.",
       "A refusal names the gate that said no: the access rules, the environment's modules, or the token's own permissions.",
     ],
     note: "Old rows are deleted automatically, so export anything you need to keep.",
@@ -146,9 +146,9 @@ export const PORTAL_HELP: Record<PortalHelpKey, PageHelp> = {
   activity: {
     summary: "Every call made against your environments, allowed or refused.",
     points: [
-      "Filter by environment, token, caller, outcome or time.",
+      "Search by the caller's email, or paste in the reference from an error message.",
+      "Filter by environment, token, outcome or surface.",
       "Open a row for the request, the response and which gate decided it.",
-      "If a call failed, the row shows the reference the caller was given — put it in the reference box to find it fast.",
       "A refusal names the reason, so you know where to look next.",
     ],
     note: "Old rows are deleted automatically, so copy anything you need to keep.",

@@ -100,8 +100,7 @@ export const SetMcpTools = async (id, { tool, code, referenceId } = {}) => {
 export const List = async ({
   envId,
   tokenId,
-  actorEmail,
-  reference,
+  search,
   surface,
   allowed,
   from,
@@ -114,12 +113,19 @@ export const List = async ({
   // Exact match, not a like: a token id is a UUID, and "show me everything
   // this token did" means that token, not anything whose id contains it.
   if (tokenId) where.token_id = tokenId;
-  // The whole reference, matched without case or surrounding space: it gets
-  // typed or read out by hand, so a capital may be lost, but a fragment is not
-  // accepted — an id is only useful if it identifies one row.
-  if (reference) where.reference_id = { [Op.iLike]: String(reference).trim() };
-  if (actorEmail)
-    where.actor_email = { [Op.iLike]: `%${actorEmail.trim().toLowerCase()}%` };
+  // One box, several columns. The consoles have a single search field, and
+  // what gets typed into it is whatever the person already has in hand: the
+  // caller's email, or the reference id out of an error message. Both are
+  // matched as substrings, case-insensitively, so "XPI-8ZTJ" is enough —
+  // the point of a reference that gets read out loud is that half of it
+  // should still find the row.
+  if (search) {
+    const term = `%${String(search).trim().toLowerCase()}%`;
+    where[Op.or] = [
+      { actor_email: { [Op.iLike]: term } },
+      { reference_id: { [Op.iLike]: term } },
+    ];
+  }
   if (surface) where.surface = surface;
   if (allowed !== undefined && allowed !== null) where.allowed = allowed;
   if (from || to) {

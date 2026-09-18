@@ -146,16 +146,7 @@ export const portalActivityRoute = (fastify, opts, done) => {
 
   fastify.get("/", { ...ListSchema, ...guard }, async (req, reply) => {
     try {
-      const {
-        actor_email,
-        reference,
-        surface,
-        allowed,
-        from,
-        to,
-        limit,
-        offset,
-      } = req.query;
+      const { search, surface, allowed, from, to, limit, offset } = req.query;
       const envId = await resolveAllowedEnvId(req.portalUser, req.query.env_id);
       const tokenFilter = await resolveAllowedTokenFilter(
         req.portalUser,
@@ -166,8 +157,7 @@ export const portalActivityRoute = (fastify, opts, done) => {
       const data = await ActivityLog.List({
         envId: tokenFilter.envId,
         tokenId: tokenFilter.tokenId,
-        actorEmail: actor_email,
-        reference,
+        search,
         surface,
         allowed: allowed === undefined ? undefined : allowed === "true",
         from,

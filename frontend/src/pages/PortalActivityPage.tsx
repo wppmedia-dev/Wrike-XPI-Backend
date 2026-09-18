@@ -137,10 +137,9 @@ export default function PortalActivityPage({
   const [envFilter, setEnvFilter] = useState("");
   const [surfaceFilter, setSurfaceFilter] = useState<PortalSurface | "">("");
   const [resultFilter, setResultFilter] = useState<"allowed" | "denied" | "">("");
-  const [emailFilter, setEmailFilter] = useState("");
-  // The reference from an error a caller reported — the one thing someone
-  // arrives here already holding.
-  const [referenceFilter, setReferenceFilter] = useState("");
+  // The one search box: the caller's email, or the reference id from an error
+  // a caller reported — the two things someone arrives here holding.
+  const [searchFilter, setSearchFilter] = useState("");
 
   const loadedOnce = useRef(false);
   const emailPrimed = useRef(false);
@@ -172,8 +171,7 @@ export default function PortalActivityPage({
             token_id: tokenFilterId,
             surface: surfaceFilter || undefined,
             allowed: resultFilter ? resultFilter === "allowed" : undefined,
-            actor_email: emailFilter.trim() || undefined,
-            reference: referenceFilter.trim() || undefined,
+            search: searchFilter.trim() || undefined,
             limit: pageSize,
             offset: nextOffset,
           }),
@@ -190,7 +188,7 @@ export default function PortalActivityPage({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [token, envFilter, surfaceFilter, resultFilter, emailFilter, referenceFilter, pageSize, tokenFilterId],
+    [token, envFilter, surfaceFilter, resultFilter, searchFilter, pageSize, tokenFilterId],
   );
 
   useEffect(() => {
@@ -211,10 +209,9 @@ export default function PortalActivityPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, refreshKey]);
 
-  // Caller email and the reference box are free text — debounce them instead
-  // of firing on every keystroke. The ref guard keeps the first render from
-  // firing a second, redundant fetch for the empty value the effect above
-  // already loaded.
+  // The search box is free text — debounce it instead of firing on every
+  // keystroke. The ref guard keeps the first render from firing a second,
+  // redundant fetch for the empty value the effect above already loaded.
   useEffect(() => {
     if (!active) return;
     if (!emailPrimed.current) {
@@ -227,7 +224,7 @@ export default function PortalActivityPage({
       if (searchDebounce.current) window.clearTimeout(searchDebounce.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [emailFilter, referenceFilter]);
+  }, [searchFilter]);
 
   const page = Math.floor(offset / pageSize) + 1;
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
@@ -332,21 +329,10 @@ export default function PortalActivityPage({
           <i className="fa-solid fa-magnifying-glass" aria-hidden="true" />
           <input
             type="search"
-            placeholder="Search by caller email…"
-            value={emailFilter}
-            onChange={(e) => setEmailFilter(e.target.value)}
-            aria-label="Search by caller email"
-          />
-        </div>
-
-        <div className="pal-search pal-search-ref">
-          <i className="fa-solid fa-hashtag" aria-hidden="true" />
-          <input
-            type="search"
-            placeholder="Find by reference id…"
-            value={referenceFilter}
-            onChange={(e) => setReferenceFilter(e.target.value)}
-            aria-label="Find a call by its reference id"
+            placeholder="Search caller or reference…"
+            value={searchFilter}
+            onChange={(e) => setSearchFilter(e.target.value)}
+            aria-label="Search by caller email or reference id"
           />
         </div>
 
@@ -785,9 +771,9 @@ export default function PortalActivityPage({
                           title="Copy reference id"
                         />
                       </span>
-                      <div className="pal-detail-note">
+                      {/* <div className="pal-detail-note">
                         What the caller was shown with the error they reported.
-                      </div>
+                      </div> */}
                     </dd>
                   </div>
                 )}
