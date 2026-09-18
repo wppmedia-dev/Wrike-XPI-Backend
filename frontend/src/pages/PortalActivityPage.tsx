@@ -554,7 +554,7 @@ export default function PortalActivityPage({
                         <span className="pal-token-cell">
                           <code
                             className="pal-ref-code"
-                            title={`Reference ${row.reference_id} — this is what the caller was shown with the error`}
+                            title={`Reference ${row.reference_id}. This is what the caller was shown with the error.`}
                           >
                             {row.reference_id}
                           </code>

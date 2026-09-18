@@ -559,7 +559,7 @@ export default function ActivityLog({
                         <span className="al-token-cell">
                           <code
                             className="al-ref-code"
-                            title={`Reference ${row.reference_id} — this is what the caller was shown with the error`}
+                            title={`Reference ${row.reference_id}. This is what the caller was shown with the error.`}
                           >
                             {row.reference_id}
                           </code>

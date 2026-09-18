@@ -3,11 +3,21 @@ import { createPortal } from "react-dom";
 import "./InfoTip.css";
 
 /**
+ * The closer of whichever tip is currently open, so opening one shuts the last.
+ *
+ * Module scope rather than context on purpose: these are annotations on a dense
+ * table, a reader opens one at a time, and two tips at once means neither is
+ * the one being read. A tiny registry beats threading a provider through every
+ * page that happens to show a caller column.
+ */
+let closeOpenTip: (() => void) | null = null;
+
+/**
  * One sentence of explanation behind an info icon, opened by click.
  *
  * Click rather than hover, for the same reason PageInfo does it: a hover
  * tooltip cannot be reached on a touch screen, cannot be selected from, and
- * vanishes the moment the pointer moves — and what these explain ("why is this
+ * vanishes the moment the pointer moves, and what these explain ("why is this
  * cell empty?") is exactly the thing a reader wants to finish reading.
  *
  * Drawn in a fixed layer on document.body rather than inside the caller, and
@@ -16,7 +26,7 @@ import "./InfoTip.css";
  * `animation-fill-mode: both`). A finished animation leaves the row with a
  * computed transform of the identity matrix rather than `none`, and any
  * transform at all makes the row the containing block for its fixed
- * descendants — so viewport coordinates measured off the icon would be
+ * descendants, so viewport coordinates measured off the icon would be
  * interpreted from the row's own origin, putting the tip hundreds of pixels
  * away from the icon (in practice: nowhere anyone can see). A portal takes the
  * tip out of that subtree, and out of the table's horizontal scroll container
@@ -24,7 +34,6 @@ import "./InfoTip.css";
  *
  * The anchor is therefore measured from the icon, flipped above when there is
  * no room below, and clamped to the viewport horizontally.
- *
  * Everything closes it: clicking the icon again, clicking anywhere else,
  * Escape, a scroll (the row it points at has moved, so the tip would be
  * pointing at nothing), or a resize.
@@ -49,6 +58,10 @@ export function InfoTip({
   const open = anchor !== null;
 
   const show = useCallback(() => {
+    // Shut any other one before measuring: two open at once would both survive
+    // a click that never touched them.
+    closeOpenTip?.();
+
     const rect = btnRef.current?.getBoundingClientRect();
     if (!rect) return;
 
@@ -69,6 +82,8 @@ export function InfoTip({
     if (!open) return;
 
     const close = () => setAnchor(null);
+    closeOpenTip = close;
+
     const onPointerDown = (event: MouseEvent) => {
       const target = event.target as Node;
       // The icon itself is excluded: its own click handler toggles, and closing
@@ -88,6 +103,7 @@ export function InfoTip({
     window.addEventListener("scroll", close, true);
     window.addEventListener("resize", close);
     return () => {
+      if (closeOpenTip === close) closeOpenTip = null;
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("scroll", close, true);
@@ -107,7 +123,7 @@ export function InfoTip({
         // Swallowed, because this sits inside rows that are themselves
         // clickable (the activity tables open a call-details modal from a row
         // click, and from Enter or Space on a focused row). Without this, a
-        // press on the icon would open the modal as well — and the row's own
+        // press on the icon would open the modal as well, and the row's own
         // key handler would fire alongside the button's.
         onClick={(event) => {
           event.stopPropagation();
