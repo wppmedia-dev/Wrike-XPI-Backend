@@ -11,6 +11,7 @@ import {
   listRules,
   ruleTypeLabel,
   updateRule,
+  validateRuleValue,
   type AccessRule,
   type AppliesTo,
   type CheckResult,
@@ -52,6 +53,15 @@ const TYPE_PLACEHOLDER: Record<RuleType, string> = {
   email: "person@company.com",
   domain: "company.com",
   ip: "203.0.113.4 or 203.0.113.0/24",
+};
+
+/** How the add form names a type in a sentence, e.g. "not a valid IP address
+    or range". ruleTypeLabel() gives the same words title-cased for a field
+    label, which reads wrong in the middle of a sentence. */
+const TYPE_NOUN: Record<RuleType, string> = {
+  email: "email address",
+  domain: "domain",
+  ip: "IP address or range",
 };
 
 /**
@@ -430,6 +440,16 @@ export default function EnvironmentAccess({
     return keys;
   }, [rules, addType, valueKey]);
 
+  /* Chips that no longer fit the selected type. Values are validated as they
+     are added, but the type picker can be changed afterwards — switch from
+     Email to IP address with three emails already in the list and every one of
+     them is now wrong, which is worth saying before the server says it three
+     times. */
+  const mismatched = useMemo(
+    () => addValues.filter((value) => validateRuleValue(addType, value) !== null),
+    [addValues, addType],
+  );
+
   const useMyIp = async () => {
     setFillingMyIp(true);
     try {
@@ -664,6 +684,21 @@ export default function EnvironmentAccess({
       return;
     }
     if (!envId) return;
+
+    /* A chip is validated as it is added, but history is not proof: the type
+       picker can change afterwards. Checked here so nothing bad is sent and
+       the reason appears in the same panel the server's own refusals use. */
+    const invalid = values
+      .map((value) => validateRuleValue(addType, value))
+      .filter((message): message is string => message !== null);
+    if (invalid.length) {
+      setAddErrors(invalid);
+      toast(
+        `${invalid.length} ${invalid.length === 1 ? "entry is" : "entries are"} not a valid ${TYPE_NOUN[addType]}`,
+        "error",
+      );
+      return;
+    }
 
     setSaving(true);
     setAddErrors([]);
@@ -1325,15 +1360,18 @@ export default function EnvironmentAccess({
                     toKey={valueKey}
                     disabled={saving}
                     placeholder={TYPE_PLACEHOLDER[addType]}
+                    validate={(value) => validateRuleValue(addType, value)}
                     duplicateMessage={(value) => `"${value}" is already in this list.`}
                     existingMessage={(value) =>
                       `"${value}" is already on the allow list for this environment.`
                     }
                   />
-                  <div className="ea-field-hint">
-                    {addValues.length > 0
-                      ? `${addValues.length} ${addValues.length === 1 ? "entry" : "entries"}, each added as its own row.`
-                      : "Press Enter or comma after each one. Paste a whole list at once."}
+                  <div className={`ea-field-hint${mismatched.length ? " ea-field-warn" : ""}`}>
+                    {mismatched.length
+                      ? `${mismatched.length} ${mismatched.length === 1 ? "entry is" : "entries are"} not a valid ${TYPE_NOUN[addType]} — switch the type or remove ${mismatched.length === 1 ? "it" : "them"}.`
+                      : addValues.length > 0
+                        ? `${addValues.length} ${addValues.length === 1 ? "entry" : "entries"}, each added as its own row.`
+                        : "Press Enter or comma after each one. Paste a whole list at once."}
                   </div>
                 </div>
 
