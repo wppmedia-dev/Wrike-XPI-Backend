@@ -307,6 +307,28 @@ export default function AdminDashboard() {
     loadEnvironments(term);
   };
 
+  /**
+   * Write one environment's changed fields into BOTH lists this page keeps.
+   *
+   * It holds two: `environments` — what the stats, the recent list and the edit
+   * modal read — and `envRows`, which is what the table actually renders (the
+   * server's answer, narrowed when a search is active). Updating only the first
+   * is why the Visibility switch flipped and snapped straight back: <Toggle />
+   * drops its optimistic value when the write resolves and re-reads its
+   * `checked` prop from the row, so a stale `envRows` put the switch back where
+   * it started and only a refresh — which replaces both lists — showed the new
+   * state.
+   */
+  const patchEnvironment = useCallback(
+    (id: string, fields: Partial<AdminEnvironment>) => {
+      const apply = (prev: AdminEnvironment[]) =>
+        prev.map((row) => (row.id === id ? { ...row, ...fields } : row));
+      setEnvironments(apply);
+      setEnvRows(apply);
+    },
+    [],
+  );
+
   useEffect(() => {
     window.NProgress?.configure({ showSpinner: false, minimum: 0.15 });
     loadEnvironments();
@@ -480,15 +502,17 @@ export default function AdminDashboard() {
    *
    * No list re-fetch: only this environment's field changed, so patching it
    * into state keeps the rest of the dashboard (stats, recent list, edit
-   * modal) consistent without a round trip. <Toggle /> owns the in-flight
-   * spinner and reverts itself if this rejects, so the error is re-thrown
-   * rather than swallowed. */
+   * modal) consistent without a round trip. Both lists, through
+   * patchEnvironment — the table reads one of them and the stats read the
+   * other. <Toggle /> owns the in-flight spinner and reverts itself if this
+   * rejects, so the error is re-thrown rather than swallowed. */
   const handleEnvToggle = useCallback(
     async (env: AdminEnvironment, field: "is_active" | "is_visible", next: boolean) => {
       try {
         await toggleEnvironmentStatus(env.id, { [field]: next });
-        setEnvironments((prev) =>
-          prev.map((row) => (row.id === env.id ? { ...row, [field]: next } : row)),
+        patchEnvironment(
+          env.id,
+          field === "is_active" ? { is_active: next } : { is_visible: next },
         );
         toast(
           field === "is_active"
@@ -505,7 +529,7 @@ export default function AdminDashboard() {
         throw err;
       }
     },
-    [],
+    [patchEnvironment],
   );
 
   /* ── Redirect URL success modal ──────────────────────────────────────── */
