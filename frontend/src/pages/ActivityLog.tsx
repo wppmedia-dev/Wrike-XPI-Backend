@@ -16,6 +16,7 @@ import { PageInfo } from "../components/ui/PageInfo";
 import { ADMIN_HELP } from "../lib/pageHelp";
 import { callerNote } from "../lib/activityCaller";
 import { InfoTip } from "../components/ui/InfoTip";
+import { PayloadBlock } from "../components/ui/PayloadBlock";
 import "./ActivityLog.css";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
@@ -66,52 +67,6 @@ const CATEGORY_LABEL: Record<string, string> = {
 
 const categoryLabel = (c: string | null) =>
   (c && CATEGORY_LABEL[c]) || c || "—";
-
-/** Pretty-print a JSON value (objects → 2-space indented JSON). */
-const prettyJson = (value: unknown): string => {
-  if (value === null || value === undefined) return "";
-  if (typeof value === "string") return value;
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-};
-
-/** A request/response payload block inside the call-details modal. */
-function ActivityPayloadBlock({ title, payload }: { title: string; payload: unknown }) {
-  const [copied, setCopied] = useState(false);
-  const text = payload === null || payload === undefined ? "" : prettyJson(payload);
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      /* clipboard unavailable — no-op */
-    }
-  };
-
-  return (
-    <div className="al-payload-block">
-      <div className="al-payload-head">
-        <span>{title}</span>
-        {text ? (
-          <button type="button" className="al-copy-btn" onClick={copy}>
-            <i className={`fa-solid ${copied ? "fa-check" : "fa-copy"}`} />{" "}
-            {copied ? "Copied" : "Copy"}
-          </button>
-        ) : null}
-      </div>
-      {text ? (
-        <pre className="al-json">{text}</pre>
-      ) : (
-        <div className="al-no-payload">No {title.toLowerCase()} captured.</div>
-      )}
-    </div>
-  );
-}
 
 interface Props {
   environments: AdminEnvironment[];
@@ -772,8 +727,8 @@ export default function ActivityLog({
                 )}
               </dl>
 
-              <ActivityPayloadBlock title="Request payload" payload={detailRow.request_payload} />
-              <ActivityPayloadBlock title="Response payload" payload={detailRow.response_payload} />
+              <PayloadBlock title="Request payload" payload={detailRow.request_payload} />
+              <PayloadBlock title="Response payload" payload={detailRow.response_payload} />
             </div>
 
             <div className="modal-footer">
