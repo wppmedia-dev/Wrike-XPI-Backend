@@ -1,3 +1,4 @@
+import ipaddr from "ipaddr.js";
 import { adminFetch } from "./authApi";
 import { portalFetch } from "./portalAuthApi";
 import { toggleEnvironmentStatus } from "./adminApi";
@@ -236,4 +237,52 @@ export const inferRuleType = (raw: string): RuleType => {
   }
   if (value.includes("@")) return "email";
   return "domain";
+};
+
+/**
+ * The console's copy of `validateRuleValue` in
+ * src/controllers/environmentAccess.js — same rules, and the messages are
+ * copied word for word, so a value the form refuses and the same value the
+ * API refuses read identically to the admin rather than describing one rule
+ * two ways.
+ *
+ * Returns null when the value is acceptable, or the reason it is not. The
+ * server stays the authority (an API caller sets rule_type without this form
+ * in the way); this only moves the answer to where the admin is typing.
+ *
+ * The IP check imports the SAME parser the API uses rather than re-deriving
+ * it, because "what is an IP" is full of corners that a hand-rolled regex gets
+ * wrong in the direction that hurts: `ipaddr.js` accepts shortened IPv4
+ * ("1.2.3"), leading zeros ("1.2.3.04") and IPv6 zone ids ("fe80::1%eth0"),
+ * and a stricter client would refuse values the API happily stores.
+ */
+export const validateRuleValue = (ruleType: RuleType, rawValue: string): string | null => {
+  const value = String(rawValue ?? "").trim();
+
+  if (!value) return "Value must not be empty!";
+
+  if (ruleType === "email") {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+      ? null
+      : `"${value}" is not a valid email address.`;
+  }
+
+  if (ruleType === "domain") {
+    const bare = value.replace(/^@+/, "");
+    return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i.test(bare)
+      ? null
+      : `"${value}" is not a valid domain.`;
+  }
+
+  if (ruleType === "ip") {
+    try {
+      if (value.includes("/")) ipaddr.parseCIDR(value);
+      else ipaddr.parse(value);
+      return null;
+    } catch {
+      return `"${value}" is not a valid IP address or CIDR range (e.g. 203.0.113.4 or 203.0.113.0/24).`;
+    }
+  }
+
+  return `Unknown rule type "${ruleType}".`;
 };

@@ -844,6 +844,14 @@
   color: var(--text-muted);
 }
 
+/* The same hint line, in the warning tone: the entries on screen no longer
+   match the selected type. Amber, not red — the fix is a click on the type
+   picker, and nothing has failed yet. Literal colour because --warning is
+   tuned for fills (#f59e0b on white is not legible as text). */
+.ea-field-warn {
+  color: #b45309;
+}
+
 .ea-verdict-scope {
   color: var(--text-muted);
 }

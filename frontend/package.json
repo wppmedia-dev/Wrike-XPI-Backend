@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "ipaddr.js": "^2.2.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
