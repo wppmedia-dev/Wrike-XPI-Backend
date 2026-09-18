@@ -5,8 +5,13 @@ require("dotenv").config();
 /**
  * The API/MCP activity log: who called, what they called, whether the
  * security gates let it through, what came back. Written on essentially
- * every authenticated request (src/middlewares/authentication.js's
- * onResponse hook, src/mcp/toolGuard.js per tool call).
+ * every authenticated request (src/middlewares/authentication.js's onResponse
+ * hook; src/plugins/mcp.js for the MCP surface).
+ *
+ * One row per request on both surfaces. Which MCP tool an agent called is not
+ * a second row: the permission gate reports every call
+ * (src/mcp/index.js installPermissionGate) and the name is written onto the
+ * request's own row afterwards (activityLog.SetMcpTools).
  *
  * Two rules that keep this from ever being the thing that breaks a request:
  *
@@ -28,16 +33,21 @@ const SWEEP_INTERVAL_MS = 6 * 60 * 60 * 1000; // every 6 hours
 /**
  * Fire-and-forget: write one activity row. Never throws, never awaited by a
  * caller — a logging failure is logged to the console and otherwise ignored.
+ *
+ * It does hand back the write, resolved to the row it created (or null when the
+ * write failed), so a caller that needs to annotate the row it just wrote can
+ * chain off it. The one caller that does is the MCP surface, which learns the
+ * tool it called only after the row is already in (src/plugins/mcp.js).
  */
-export const log = (entry) => {
+export const log = (entry) =>
   ActivityLog.Record(entry).catch((err) => {
     console.error(
       new Date().toISOString(),
       "[activity-log] write failed:",
       err?.message || err,
     );
+    return null;
   });
-};
 
 const sweep = async () => {
   try {

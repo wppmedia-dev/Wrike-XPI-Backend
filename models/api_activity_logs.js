@@ -41,6 +41,14 @@ module.exports = (sequelize, DataTypes) => {
       status_code: { type: DataTypes.INTEGER, allowNull: true },
       ip: { type: DataTypes.STRING(64), allowNull: true },
       category: { type: DataTypes.STRING(32), allowNull: true },
+      /**
+       * The MCP tool(s) this request called, comma-separated in call order.
+       * Null for REST rows, and for an MCP request that only handshook (an
+       * `initialize` or `tools/list` exchanges no tool call). Written after the
+       * call completes, onto the row the request already wrote — see
+       * migrations/20260918150000-add-mcp-tool-to-api-activity-logs.js.
+       */
+      mcp_tool: { type: DataTypes.STRING(255), allowNull: true },
       request_payload: { type: DataTypes.JSON, allowNull: true },
       response_payload: { type: DataTypes.JSON, allowNull: true },
       created_at: { type: DataTypes.DATE },

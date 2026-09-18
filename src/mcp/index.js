@@ -73,6 +73,13 @@ MECHANICS
  * the tool files for those guards, and no tool file gains a second concern from
  * this change.
  *
+ * `onToolCall` is called for every tool call, allowed or refused, with what was
+ * called and what was decided. That is how the activity log learns which tool
+ * an agent used: MCP writes one row per HTTP request, before any tool runs, and
+ * this hook is the only place the name is known (src/plugins/mcp.js). It is
+ * optional so the gate can be driven on its own, and it must not throw — the
+ * caller is a log annotation, never a permission decision.
+ *
  * Denies on a failed lookup as well as on a denied rule: a permission check
  * that cannot be answered must not quietly become a grant, and the REST gate
  * makes the same choice.
@@ -82,38 +89,43 @@ MECHANICS
  * the wrapper were never installed (see createMcpServer below) or looked up the
  * wrong token.
  */
-export const installPermissionGate = (server, auth) => {
+export const installPermissionGate = (server, auth, onToolCall) => {
   const registerTool = server.registerTool.bind(server);
+  const report = (call) => {
+    try {
+      onToolCall?.(call);
+    } catch (err) {
+      console.error(new Date().toISOString(), err);
+    }
+  };
 
   server.registerTool = (name, config, handler) =>
     registerTool(name, config, async (args, extra) => {
       const route = resolveToolRoute(name, config?.annotations);
       if (!route) return handler(args, extra);
 
+      const denied = (code) => {
+        report({ tool: name, ...route, allowed: false, code });
+        return permissionDenied({ toolName: name, ...route, code });
+      };
+
       try {
         const environment = await EnvironmentModulePermissions.GetMatrixCached(
           auth?.envId,
         );
         if (denialFor(environment, route)) {
-          return permissionDenied({
-            toolName: name,
-            ...route,
-            code: "ENVIRONMENT_MODULE_FORBIDDEN",
-          });
+          return denied("ENVIRONMENT_MODULE_FORBIDDEN");
         }
 
         const entry = await TokenPermissions.GetMatrixCached(auth?.tokenId);
         const code = denialFor(entry, route);
-        if (code) return permissionDenied({ toolName: name, ...route, code });
+        if (code) return denied(code);
       } catch (err) {
         console.error(new Date().toISOString(), err);
-        return permissionDenied({
-          toolName: name,
-          ...route,
-          code: "PERMISSION_CHECK_FAILED",
-        });
+        return denied("PERMISSION_CHECK_FAILED");
       }
 
+      report({ tool: name, ...route, allowed: true, code: null });
       return handler(args, extra);
     });
 };
@@ -127,9 +139,10 @@ export const installPermissionGate = (server, auth) => {
  * @param {object} fastify - Fastify instance
  * @param {string} serverUrl - Base URL for auth error messages
  * @param {{wrikeToken: string, environmentName: string, envId: string, tokenId: string}} auth - Resolved auth for this request
+ * @param {(call: {tool: string, module: string, action: string, allowed: boolean, code: string|null}) => void} [onToolCall] - told about every tool call, allowed or refused; the activity log annotates its request row with it (src/plugins/mcp.js)
  * @returns {Promise<McpServer>}
  */
-export const createMcpServer = async (fastify, serverUrl, auth) => {
+export const createMcpServer = async (fastify, serverUrl, auth, onToolCall) => {
   const server = new McpServer(
     {
       name: "wrikexpi-mcp",
@@ -154,7 +167,7 @@ export const createMcpServer = async (fastify, serverUrl, auth) => {
   );
   // Wraps registerTool before anything registers, so the native tools below
   // and the proxied wrike_* tools further down are all covered by one gate.
-  installPermissionGate(server, auth);
+  installPermissionGate(server, auth, onToolCall);
   registerCampaignTools(server, fastify, serverUrl, auth);
   registerChannelTools(server, serverUrl, auth);
   registerTaskTools(server, serverUrl, auth);

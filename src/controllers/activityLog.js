@@ -23,6 +23,7 @@ const ROW_ATTRS = [
   "status_code",
   "ip",
   "category",
+  "mcp_tool",
   "request_payload",
   "response_payload",
   "created_at",
@@ -46,6 +47,43 @@ export const Record = async (entry) => {
     request_payload: entry.requestPayload || null,
     response_payload: entry.responsePayload || null,
   });
+};
+
+/**
+ * Fill in the MCP tool(s) a request called, on the row that request already
+ * wrote — plus the outcome, when a tool call was refused.
+ *
+ * An update rather than a second row, because the request row is the unit
+ * everything else here counts (the retention sweep, the console's totals, the
+ * filters): adding a row per tool call would double the log for one visible
+ * call. The exception is the outcome. The request row is written before the
+ * tool call happens, so it records "the connection was authorised" — and a
+ * refused tool call would otherwise sit behind a green row. When one was
+ * refused, that is what the row now says.
+ *
+ * Never throws: the row exists and is correct without this, and an agent's
+ * call must not fail because the log could not be annotated.
+ */
+export const SetMcpTools = async (id, { tool, code } = {}) => {
+  if (!id || !tool) return null;
+
+  const patch = { mcp_tool: String(tool).slice(0, 255) };
+  if (code) {
+    patch.allowed = false;
+    patch.code = code;
+  }
+
+  try {
+    return await models.ApiActivityLogs.update(patch, { where: { id } });
+  } catch (err) {
+    console.error(
+      new Date().toISOString(),
+      "[activity-log] could not record the MCP tool on row",
+      id,
+      err?.message || err,
+    );
+    return null;
+  }
 };
 
 /**

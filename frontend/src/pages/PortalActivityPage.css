@@ -368,6 +368,16 @@
   flex-shrink: 0;
 }
 
+/* The MCP tool an agent called. Outlined rather than plain, because unlike the
+   URL beside it this is something the agent chose. Same treatment as the admin
+   console's .al-tool. */
+.pal-called .pal-tool {
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-primary);
+}
+
 /* Result — an icon chip, not just a text badge, so allowed/denied reads as a
    shape as well as a colour (never colour alone as the only signal). */
 .pal-result {

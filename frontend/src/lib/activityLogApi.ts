@@ -22,6 +22,13 @@ export interface ActivityRow {
   status_code: number | null;
   ip: string | null;
   category: string | null;
+  /**
+   * The MCP tool(s) the agent called, in call order. Null for REST rows and for
+   * an MCP request that only handshook — the row is written before the tool
+   * runs, and annotated once it has (src/controllers/activityLog.js
+   * SetMcpTools).
+   */
+  mcp_tool: string | null;
   request_payload: unknown;
   response_payload: unknown;
   created_at: string;

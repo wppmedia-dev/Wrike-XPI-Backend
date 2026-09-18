@@ -30,6 +30,10 @@ const CODE_LABEL: Record<string, string> = {
   UNAUTHORIZED: "No bearer token",
   TOKEN_INVALID: "Token invalid or expired",
   AUTH_FAILED: "Authentication failed",
+  // The two module layers, which is what a refused MCP tool call carries.
+  MODULE_FORBIDDEN: "Not permitted for this token",
+  ENVIRONMENT_MODULE_FORBIDDEN: "Not permitted in this environment",
+  PERMISSION_CHECK_FAILED: "Permission check could not be completed",
 };
 
 const codeLabel = (code: string | null) => (code ? CODE_LABEL[code] || code : "—");
@@ -501,7 +505,16 @@ export default function ActivityLog({
                     </td>
                     <td className="al-called">
                       {row.method && <span className="al-method">{row.method}</span>}
-                      <code>{row.resource}</code>
+                      {/* An MCP row's interesting half is the tool: the URL is
+                          the same for every call an agent makes. The resource
+                          is still in the title and in the detail drawer. */}
+                      {row.mcp_tool ? (
+                        <code className="al-tool" title={`MCP tool · ${row.resource}`}>
+                          {row.mcp_tool}
+                        </code>
+                      ) : (
+                        <code>{row.resource}</code>
+                      )}
                     </td>
                     <td className="al-ip">
                       {row.ip ? (
@@ -677,6 +690,14 @@ export default function ActivityLog({
                     <code>{detailRow.resource}</code>
                   </dd>
                 </div>
+                {detailRow.mcp_tool && (
+                  <div>
+                    <dt>MCP tool</dt>
+                    <dd>
+                      <code>{detailRow.mcp_tool}</code>
+                    </dd>
+                  </div>
+                )}
                 <div>
                   <dt>Status</dt>
                   <dd>{detailRow.status_code ?? "—"}</dd>
