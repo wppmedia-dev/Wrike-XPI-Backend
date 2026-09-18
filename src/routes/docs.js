@@ -55,8 +55,8 @@ const DOC_SETS = {
     nav: "Calendar Sync",
     search: "Calendar Sync",
     eyebrow: "Calendar Sync",
-    hero: "Keep a calendar in step with Wrike",
-    cta: { href: "#/calendar/setup", label: "Set up Calendar Sync" },
+    hero: "Your Wrike tasks, in your calendar",
+    cta: { href: "#/calendar/setup", label: "Connect your calendar" },
     defaultPage: "calendar/overview",
   },
 };
@@ -85,6 +85,20 @@ module.exports = async function (fastify, opts) {
     const appUrl = process.env.APP_URL || "http://localhost:3000";
     const apiUrl = process.env.API_URL || `${appUrl}/api/v1`;
     const baseMcpUrl = `${appUrl}/api/v1/wrikexpi/mcp`;
+
+    /* The address a calendar app subscribes to. It belongs to the calendar
+       service rather than to this one, which is why it is configured per
+       deployment (CALENDAR_SYNC_ENDPOINT) instead of being built from APP_URL.
+       The connection goes in as `xpiToken`, so the customer page can show one
+       complete address to paste rather than a description of one.
+
+       The fallback is the development address on purpose: a deployment that
+       forgets to set the variable shows an address that exists rather than a
+       broken promise. Set it in every environment. */
+    const calendarSyncUrl =
+      process.env.CALENDAR_SYNC_ENDPOINT ||
+      "https://dev-api.gowrike.space/api/v1/calendarsync";
+    const calendarSyncFeed = `${calendarSyncUrl}?xpiToken={XPIToken}`;
 
     const visibleCreds = getCachedVisibleWrikeCredentials();
     const environments = Object.entries(visibleCreds || {}).map(
@@ -1438,45 +1452,53 @@ async ({ taskId }, extra) => {
         groupId: "calendar",
         label: "Overview",
         keywords:
-          "calendar sync overview subscribe feed integration token login page button what is",
+          "calendar sync overview why benefits what is it for subscribe feed connect google outlook apple ics keep in step not updating",
         html: `
-          <div class="pg-eyebrow">Calendar Sync Docs</div>
-          <h1 class="pg-title">Calendar Sync</h1>
-          <p class="pg-lede">Give a calendar app its own connection to Wrike, so what it shows stays current without anybody signing in again.</p>
+          <div class="pg-eyebrow">Calendar Sync</div>
+          <h1 class="pg-title">Your Wrike tasks, in your calendar</h1>
+          <p class="pg-lede">Calendar Sync puts the tasks you work on in Wrike into the calendar you already open every morning: Google Calendar, Outlook, Apple Calendar, or any other one. Connect it once and it keeps itself up to date.</p>
 
           <div class="card-strip">
-            <div class="stat-card"><span class="stat-ic">${IC.bolt}</span><strong>One sign-in</strong><p>The same login page, with one extra choice.</p></div>
-            <div class="stat-card"><span class="stat-ic">${IC.check}</span><strong>Its own credential</strong><p>A separate token per calendar, never your Wrike password.</p></div>
-            <div class="stat-card"><span class="stat-ic">${IC.warn}</span><strong>Revocable</strong><p>Switch it off in the console and the calendar stops.</p></div>
+            <div class="stat-card"><span class="stat-ic">${IC.bolt}</span><strong>Connected in minutes</strong><p>One choice on the login page, one sign-in with Wrike, and you are done.</p></div>
+            <div class="stat-card"><span class="stat-ic">${IC.check}</span><strong>Always up to date</strong><p>When a task moves in Wrike, it moves in your calendar too. Nobody has to remember anything.</p></div>
+            <div class="stat-card"><span class="stat-ic">${IC.warn}</span><strong>Yours to switch off</strong><p>One switch in the console ends the connection, and the calendar stops at once.</p></div>
           </div>
 
-          <h2 class="pg-h2">What it is</h2>
-          <p class="pg-p">The <a href="/">login page</a> offers two buttons. <b>Login with Wrike</b> is the ordinary sign-in — a token for the REST API or an MCP client. <b>Calendar Sync Login</b>, the outline button directly beneath it, is for an integration that holds its own connection to Wrike and refreshes on a schedule, which is what a calendar does.</p>
-          <p class="pg-p">Both kinds are the same credential, minted by the same sign-in with Wrike. The difference is what the token is for, which is the one thing that tells the console where a token is in use.</p>
-          ${callout(
-            "info",
-            "Which one do I want?",
-            "Connecting an AI assistant? Follow the MCP docs and sign in normally. Feeding a calendar — or anything else that reads on its own schedule — choose Calendar Sync.",
-          )}
+          <h2 class="pg-h2">What this gives you</h2>
+          <ul class="bullets">
+            <li><b>Your tasks beside your meetings.</b> The work you are responsible for stops living in a second place you have to remember to check.</li>
+            <li><b>Due dates that stay honest.</b> Move a task in Wrike and the calendar follows. The two can never disagree.</li>
+            <li><b>One week, in one view.</b> Plan your day around real commitments instead of guessing what is coming.</li>
+            <li><b>Nothing to copy, ever.</b> No exports, no pasting, no reminders to update the calendar by hand.</li>
+          </ul>
+
+          <h2 class="pg-h2">Works with the calendar you already use</h2>
+          <p class="pg-p">Google Calendar, Outlook, Apple Calendar, and any other app that can add a subscription or connect an account. There is nothing to install, and nobody needs to change the way they work.</p>
+
+          <h2 class="pg-h2">What you need</h2>
+          <ul class="bullets">
+            <li>A Wrike account that can see the tasks you want in your calendar.</li>
+            <li>Your calendar app, and about five minutes, once.</li>
+          </ul>
 
           <h2 class="pg-h2">How it works</h2>
           <div class="flow">
             ${[
               [
-                "Open the login page",
-                "Pick the environment the calendar should read.",
+                "Choose where it should look",
+                "Pick the environment whose tasks the calendar should follow.",
               ],
               [
                 "Choose Calendar Sync",
-                "Press the outline button under Login with Wrike.",
+                "One extra choice on the login page, instead of the usual sign-in.",
               ],
               [
-                "Sign in with Wrike",
-                "Authorize once, as the person whose visibility the calendar should have.",
+                "Sign in with Wrike once",
+                "Authorise it as the person whose tasks it should bring across.",
               ],
               [
-                "Hand it to the calendar",
-                "The credential goes into the calendar app and is never needed again.",
+                "Add it to your calendar",
+                "Paste the connection into your calendar app. That is the last step, and the last time you think about it.",
               ],
             ]
               .map(
@@ -1489,279 +1511,237 @@ async ({ taskId }, extra) => {
               .join("")}
           </div>
 
+          ${callout(
+            "info",
+            "Your calendar never sees your Wrike password",
+            "It gets a connection of its own, created by your sign-in with Wrike. An administrator can end it at any moment, and ending it stops the calendar immediately.",
+          )}
+
           <div class="cta-row">
             <a class="btn primary" href="#/calendar/setup">Set it up ${IC.bolt}</a>
-            <a class="btn ghost" href="#/calendar/permissions">What it can do</a>
+            <a class="btn ghost" href="#/calendar/permissions">See what it can do</a>
           </div>`,
       },
       {
         id: "calendar/setup",
         group: "Calendar Sync Docs",
         groupId: "calendar",
-        label: "Connection setup",
+        label: "Set it up",
         keywords:
-          "setup connect generate credential token once copy paste environment sign in bearer login page",
+          "setup set up connect generate credential once copy paste environment sign in login page five minutes get started install subscribe",
         html: `
-          <div class="pg-eyebrow">Calendar Sync Docs</div>
-          <h1 class="pg-title">Connection setup</h1>
-          <p class="pg-lede">Pick the environment, pick Calendar Sync, sign in with Wrike, and hand the credential to the calendar app.</p>
+          <div class="pg-eyebrow">Calendar Sync</div>
+          <h1 class="pg-title">Set it up</h1>
+          <p class="pg-lede">About five minutes, once. After that, your Wrike tasks keep themselves current in your calendar.</p>
 
-          <h2 class="pg-h2">1 · Choose the environment</h2>
-          <p class="pg-p">Open the <a href="/">login page</a> and select the environment the calendar should read. Everything the token can reach comes from that environment — nothing from any other one.</p>
+          <h2 class="pg-h2">1 · Choose where it should look</h2>
+          <p class="pg-p">Open the <a href="/">login page</a> and pick the environment whose tasks you want in your calendar. Everything you will see comes from there, and nothing from anywhere else.</p>
 
-          <h2 class="pg-h2">2 · Press Calendar Sync Login</h2>
-          <p class="pg-p">On the <a href="/">login page</a>, press <b>Calendar Sync Login</b> — the outline button directly under <b>Login with Wrike</b> — rather than the solid one. That choice is the only thing that makes the token a calendar token.</p>
+          <h2 class="pg-h2">2 · Choose Calendar Sync</h2>
+          <p class="pg-p">Press <b>Calendar Sync Login</b>, the outlined button just under <b>Login with Wrike</b>. That single choice is what makes this connection a calendar connection rather than an ordinary sign-in.</p>
           ${callout(
             "tip",
-            "The choice is signed, not typed",
-            "It travels inside the signed state the login page sends through Wrike, so the service decides what gets minted. It is not a value anybody can set by editing the address bar.",
+            "Nothing else changes",
+            "Your own Wrike access is untouched. The calendar gets a connection of its own, and it keeps working while you are signed out.",
           )}
 
           <h2 class="pg-h2">3 · Sign in with Wrike</h2>
-          <p class="pg-p">The button takes you to Wrike's own sign-in. Sign in as the person whose Wrike visibility the calendar should follow — whether that person may connect at all is decided by the environment's access rules, exactly as it is for the API.</p>
+          <p class="pg-p">You will be taken to Wrike's own sign-in page. Sign in as the person whose tasks should appear in the calendar. Your calendar can never show more than you can see, and an administrator decides who is allowed to connect in the first place.</p>
 
-          <h2 class="pg-h2">4 · Copy the credential</h2>
-          <p class="pg-p">The next screen shows the token once, together with a username and password that authenticate against it.</p>
+          <h2 class="pg-h2">4 · Copy your connection</h2>
+          <p class="pg-p">The next screen shows your connection once, with the details your calendar app will ask for.</p>
           ${callout(
             "warn",
-            "Shown once",
-            "The credential is not retrievable later. If it is lost before it is stored, sign in again — that issues a new token, and the older one can be switched off in the console.",
+            "Copy it before you close the window",
+            "It is shown once and cannot be looked up again. If you lose it, set the connection up again and switch the old one off in the console. Nothing is broken by having two for a moment.",
           )}
 
-          <h2 class="pg-h2">5 · Give it to the calendar app</h2>
-          <p class="pg-p">Where it goes depends on the app, but anything that accepts a bearer credential uses the token as-is — the same header the REST API expects. The calendar surface answers under <code>/wrikexpi/calendar</code>, and the call it makes to check the credential is:</p>
-          ${codeBlock(
-            "bash",
-            `curl -X GET "${apiUrl}/wrikexpi/calendar/validate" \\
-  -H "Authorization: Bearer <access_token>"`,
-          )}
+          <h2 class="pg-h2">5 · Add it to your calendar</h2>
+          <p class="pg-p">Your calendar subscribes to one address. There is nothing to install and no account to create: take the address below and put your own connection where it says <code>{XPIToken}</code>.</p>
+          ${codeBlock("text", calendarSyncFeed, "Subscription address")}
+          <p class="pg-p">In your calendar app, look for <b>Subscribe</b>, <b>Add calendar from URL</b> or <b>Add account</b>, and paste that address. Google Calendar, Outlook and Apple Calendar all accept it.</p>
           ${callout(
-            "info",
-            "This credential is for the calendar surface only",
-            'A Calendar Sync token is granted the <b>Calendar Sync</b> module and nothing else, so a call into campaigns, channels or tasks is refused — which is the point of minting it from this button rather than the ordinary one. If the app asks for a feed address instead, an ICS or webcal URL is produced by the calendar service, not by WrikeXPI: give it the token wherever it asks for a WrikeXPI credential. See <a href="#/calendar/permissions">Permissions</a>.',
+            "tip",
+            "The address and the connection are one thing",
+            "Everything before the question mark is the address, and everything after it is your connection. Keep the whole line to yourself: anybody holding it can see what your connection can see.",
           )}
 
           <div class="cta-row">
-            <a class="btn primary" href="#/calendar/permissions">Check what it can do</a>
-            <a class="btn ghost" href="#/calendar/troubleshooting">Troubleshooting</a>
+            <a class="btn primary" href="#/calendar/permissions">See what it can do</a>
+            <a class="btn ghost" href="#/calendar/troubleshooting">If it stops working</a>
           </div>`,
       },
       {
-        id: "calendar/validate",
+        id: "calendar/check",
         group: "Calendar Sync Docs",
         groupId: "calendar",
-        label: "Validate a token",
+        label: "Check the connection",
         keywords:
-          "validate validator check token still valid endpoint heartbeat health 200 401 403 bearer",
+          "check connection still connected validator validate is it working not updating 401 403 not authorized forbidden status what to do",
         html: `
-          <div class="pg-eyebrow">Calendar Sync Docs</div>
-          <h1 class="pg-title">Validate a token</h1>
-          <p class="pg-lede">One call answers "is this credential still good?" — without waiting for a sync to fail first.</p>
+          <div class="pg-eyebrow">Calendar Sync</div>
+          <h1 class="pg-title">Check the connection</h1>
+          <p class="pg-lede">Not sure the calendar is still connected? You can find out in a moment, instead of waiting for it to miss something.</p>
 
-          <h2 class="pg-h2">The endpoint</h2>
-          ${endpoint("GET", "/wrikexpi/calendar/validate", "Checks the token that authenticated the call.")}
-          ${codeBlock(
-            "bash",
-            `curl -X GET "${apiUrl}/wrikexpi/calendar/validate" \\
-  -H "Authorization: Bearer <access_token>"`,
-          )}
-
-          <h2 class="pg-h2">The other endpoint</h2>
-          <p class="pg-p">An integration that writes back also uses the live data services, through an amoeba forwarder on the same surface:</p>
-          ${endpoint("POST", "/wrikexpi/calendar/amoeba/:master_slug/:service_slug", "The same forwarder /wrikexpi/amoeba uses, under the calendar module so one permission row decides it.")}
-          <p class="pg-p">GET reads, POST creates, PUT and PATCH update, DELETE deletes. See <a href="#/calendar/permissions">Permissions</a> for which action each one needs.</p>
-
-          <h2 class="pg-h2">What a valid token gets</h2>
-          ${codeBlock(
-            "json",
-            `{
-  "success": true,
-  "message": "Token is valid.",
-  "data": {
-    "valid": true,
-    "calendar_access": true,
-    "token_id": "9f1c2e30-...",
-    "environment": "PROD",
-    "environment_id": "3f35cc2d-...",
-    "checked_at": "2026-09-18T06:12:44.512Z"
-  }
-}`,
-          )}
+          <h2 class="pg-h2">The quickest way: the console</h2>
+          <p class="pg-p">Open the <b>Tokens</b> list and find the row named <b>Calendar Sync</b>. The <b>Status</b> switch on that row shows whether the connection is on, and the <b>Activity log</b> shows the calls your calendar has made, including the ones that were turned away.</p>
           ${callout(
             "tip",
-            "Nothing is sent to Wrike",
-            "The answer comes from the token itself and the environment's own settings. A healthy credential therefore cannot be reported unhealthy because something upstream was slow.",
-          )}
-          ${callout(
-            "info",
-            "It answers from the calendar permission",
-            "The call is allowed only when the token holds the <b>Calendar Sync</b> module, and the response says so in <code>calendar_access</code>. A token without that grant is refused here — the same rule that stops a token reading campaigns it was not granted.",
+            "Looking changes nothing",
+            "The console only shows what already happened. It cannot disturb your Wrike workspace, and nothing needs switching off to check it.",
           )}
 
-          <h2 class="pg-h2">What a refusal means</h2>
+          <h2 class="pg-h2">If the calendar app is the one complaining</h2>
+          <p class="pg-p">A calendar that cannot read its subscription usually goes quiet, or shows an error on the calendar itself. When the console says the connection is fine, the next thing worth checking is the address you were given: it should be the subscription address from <a href="#/calendar/setup">Set it up</a>, complete with your connection on the end.</p>
+
+          <h2 class="pg-h2">What the message means</h2>
           ${table(
-            ["Status", "Meaning", "What to do"],
+            ["What you see", "What it means", "What to do"],
             [
               [
-                "<code>200</code>",
-                "The token is valid, switched on, and its environment allows the caller.",
+                "Everything is up to date",
+                "The connection is on, and it is allowed to do what it is doing.",
                 "Nothing.",
               ],
               [
-                "<code>401</code>",
-                "The credential is not usable — mistyped or truncated, switched off in the console, or replaced by a newer sign-in.",
-                'Sign in again with Calendar Sync (see <a href="#/calendar/setup">Connection setup</a>), then switch the old token off.',
+                "Not authorized, or <code>401</code>",
+                "The connection is no longer accepted. It was switched off, deleted, or replaced by a newer sign-in.",
+                'Set it up again from the <a href="/">login page</a>, then switch the old connection off so there is only one.',
               ],
               [
-                "<code>403</code>, not authorized to access the service",
-                "The token is fine, but the person behind it is no longer covered by the environment's access rules.",
-                "Check the environment's allow list under <b>Environment Access</b>.",
-              ],
-              [
-                "<code>403</code> with <code>MODULE_FORBIDDEN</code>",
-                "The <b>Calendar Sync</b> module has been switched off for this token.",
-                "Open <b>Token Permissions</b> on the token's row in the console.",
+                "Forbidden, or <code>403</code>",
+                "The connection is fine, but something it needs has been turned off: either the person behind it lost access, or one of its permissions was switched off.",
+                "Ask an administrator to look at <b>Environment Access</b> for that environment, and at <b>Token Permissions</b> on the connection's row.",
               ],
             ],
           )}
 
           <div class="cta-row">
-            <a class="btn primary" href="#/calendar/troubleshooting">Troubleshooting</a>
-            <a class="btn ghost" href="#/calendar/permissions">Permissions</a>
+            <a class="btn primary" href="#/calendar/troubleshooting">Something still wrong?</a>
+            <a class="btn ghost" href="#/calendar/permissions">What it can do</a>
           </div>`,
       },
       {
         id: "calendar/permissions",
         group: "Calendar Sync Docs",
         groupId: "calendar",
-        label: "Permissions",
+        label: "What it can do",
         keywords:
-          "permissions permission module token permissions restrict narrow admin console status switch off revoke delete reactivate amoeba forwarder write create update delete",
+          "what it can do permissions read write add create update delete change dates remove allow restrict narrowing admin console access switch off revoke",
         html: `
-          <div class="pg-eyebrow">Calendar Sync Docs</div>
-          <h1 class="pg-title">What a Calendar Sync token can do</h1>
-          <p class="pg-lede">Its own row in the permission grid, granted only what it is for, and one switch that stops it dead.</p>
+          <div class="pg-eyebrow">Calendar Sync</div>
+          <h1 class="pg-title">What it can do</h1>
+          <p class="pg-lede">The syncing happens by itself, in the background. What the connection is allowed to do while it works is what you set here.</p>
+          <p class="pg-p">There is nothing to create, update or remove by hand, and no button to press once the connection is in place. Your calendar tool asks, this service answers, and your tasks stay up to date. What follows is the four things a connection can be allowed to do while that happens.</p>
 
-          <h2 class="pg-h2">Its own module</h2>
-          <p class="pg-p">Token permissions include a <b>Calendar Sync</b> module, and it offers all four actions: Read, Create, Update and Delete. A calendar that only displays Wrike work needs Read. A calendar that writes back needs the verb it uses, and the module offers it so the decision can be made per token rather than in advance.</p>
-
-          <h2 class="pg-h2">The forwarder</h2>
-          <p class="pg-p">Writes reach Wrike through amoeba, the data-driven service layer, at <code>/wrikexpi/calendar/amoeba/&lt;master slug&gt;/&lt;service slug&gt;</code>. It is the same forwarder the general <code>/wrikexpi/amoeba</code> path uses: the same services, the same payloads, and the method decides what the call is (POST creates, PUT and PATCH update, DELETE deletes).</p>
-          <p class="pg-p">The one difference is which permission row decides it. A calendar token does not hold the Amoeba module, so the general path would refuse it. Under the calendar path, one row of the grid decides both halves: Read for the validator and any lookup, Create, Update and Delete for the writes.</p>
+          <h2 class="pg-h2">The four things a connection can be allowed to do</h2>
           ${table(
-            ["Call", "What it needs on the Calendar Sync row"],
+            ["What the connection does", "It needs"],
             [
-              ["<code>GET /wrikexpi/calendar/validate</code>", "Read"],
               [
-                "<code>GET /wrikexpi/calendar/amoeba/&lt;master&gt;/&lt;service&gt;</code>",
-                "Read",
+                "Brings your Wrike tasks across, and keeps their dates and details current",
+                "<b>Read</b>",
               ],
-              [
-                "<code>POST &hellip;/amoeba/&lt;master&gt;/&lt;service&gt;</code>",
-                "Create",
-              ],
-              [
-                "<code>PUT</code> or <code>PATCH &hellip;/amoeba/&lt;master&gt;/&lt;service&gt;</code>",
-                "Update",
-              ],
-              [
-                "<code>DELETE &hellip;/amoeba/&lt;master&gt;/&lt;service&gt;</code>",
-                "Delete",
-              ],
+              ["Sends a new task back to Wrike", "<b>Create</b>"],
+              ["Changes the date or the details of a task", "<b>Update</b>"],
+              ["Removes a task", "<b>Delete</b>"],
             ],
           )}
-          ${callout(
-            "info",
-            "A scope, not a permission level",
-            "The module says which tokens the row applies to. What each token may then do is still decided per token, module by module, in the same grid.",
-          )}
 
-          <h2 class="pg-h2">Minted with Read only</h2>
-          <p class="pg-p">A Calendar Sync token is created with an explicit matrix: <b>Read</b> on the Calendar Sync module, and every other module switched off. It is not left unrestricted, which is what a freshly issued token otherwise is — so the credential is exactly as wide as the job that asked for it, on purpose, from its first request.</p>
-          <p class="pg-p">Rows are written for every module, in the off position, which is what makes this a token an admin can see and edit in the grid rather than one that has never been configured.</p>
+          <h2 class="pg-h2">What a new connection starts with</h2>
+          <p class="pg-p">Read, and nothing else. Bringing your tasks across is what the connection is for, so that is all it starts with. A tool that also sends changes back needs the verb it uses, granted on purpose, for that one connection, by an administrator in the console.</p>
+          <p class="pg-p">A calendar connection can never reach anywhere else in Wrike. Campaigns, projects, master data and everything else are closed to it unless somebody deliberately opens a door.</p>
           ${callout(
             "tip",
-            "Letting a calendar write",
-            "Open <b>Token Permissions</b> on the row and grant <b>Create</b>, <b>Update</b> or <b>Delete</b> on the Calendar Sync module. Grant only the verb the integration actually uses, and grant the other modules only if it has business reaching them.",
-          )}
-          ${callout(
-            "info",
-            "The environment still comes first",
-            "Module permissions only ever narrow a token. The environment's access rules and its own credentials are checked before any module is consulted.",
+            "Letting a calendar send changes back",
+            "Open the connection's row in the console, choose <b>Token Permissions</b>, and grant the one extra thing it needs. Grant the verb the tool actually uses, and nothing more.",
           )}
 
-          <h2 class="pg-h2">Turning it off</h2>
-          <p class="pg-p">The token appears in the console's Tokens list with the client name <b>Calendar Sync</b>. The <b>Status</b> switch on that row is how a connection is ended:</p>
+          <h2 class="pg-h2">It can never see more than you do</h2>
+          <p class="pg-p">Whatever a connection is allowed to do, it still only sees the tasks you can see. If you lose access to part of Wrike, the calendar loses it at the same moment.</p>
+          ${callout(
+            "info",
+            "Two questions, both answered",
+            "Who may connect from this environment at all is decided by an administrator. What each connection may then do is decided here. A connection has to pass both.",
+          )}
+
+          <h2 class="pg-h2">Ending a connection</h2>
+          <p class="pg-p">The connection appears in the console's <b>Tokens</b> list with the name <b>Calendar Sync</b>. That row is where it ends:</p>
           ${table(
             ["What you do", "What happens to the calendar"],
             [
               [
-                "Switch the token off",
-                "Every request is refused. The calendar stops updating until it is switched back on.",
+                "Switch it off",
+                "The calendar stops updating straight away. Nothing is deleted, and you can switch it back on.",
               ],
               [
-                "Delete the token",
-                "The row and its permissions go with it. It cannot be switched back on; a new sign-in is needed.",
+                "Delete it",
+                "The connection and its settings are removed for good. Setting it up again needs a fresh sign-in.",
               ],
               [
-                "Switch a module off",
-                "Requests to that module are refused with <code>MODULE_FORBIDDEN</code>, and everything else keeps working.",
+                "Ask for one permission to be removed",
+                "That part stops working and everything else carries on.",
               ],
             ],
           )}
 
           <div class="cta-row">
             <a class="btn primary" href="#/calendar/troubleshooting">If it stops working</a>
-            <a class="btn ghost" href="#/api/overview">REST API reference</a>
+            <a class="btn ghost" href="#/calendar/setup">Set up another</a>
           </div>`,
       },
       {
         id: "calendar/troubleshooting",
         group: "Calendar Sync Docs",
         groupId: "calendar",
-        label: "Troubleshooting",
+        label: "If it stops updating",
         keywords:
-          "troubleshooting 401 403 forbidden denied stopped working switched off revoked deleted access rules activity log not updating",
+          "troubleshooting stopped working not updating empty calendar missing tasks 401 403 forbidden denied switched off revoked deleted access rules activity log",
         html: `
-          <div class="pg-eyebrow">Calendar Sync Docs</div>
-          <h1 class="pg-title">Troubleshooting</h1>
-          <p class="pg-lede">A calendar that quietly stops updating is almost always one of three things, and the console can name all three.</p>
-
-          ${callout(
-            "tip",
-            "Ask the validator first",
-            '<code>GET /wrikexpi/calendar/validate</code> answers whether the credential is the problem, and its status code says which of the three cases below it is. See <a href="#/calendar/validate">Validate a token</a>.',
-          )}
+          <div class="pg-eyebrow">Calendar Sync</div>
+          <h1 class="pg-title">If it stops updating</h1>
+          <p class="pg-lede">A calendar that quietly stops keeping up is usually one of four things, and every one of them can be checked in a minute.</p>
 
           ${table(
-            ["Symptom", "Likely cause", "Where to look"],
+            ["What you notice", "What has usually happened", "What to do"],
             [
               [
-                "<code>401</code> Authentication failed",
-                "The token was switched off or deleted, or the credential was replaced by a newer sign-in.",
-                "Tokens → the row's <b>Status</b> switch",
+                "Nothing new appears at all",
+                "The connection was switched off, deleted, or replaced by a newer sign-in.",
+                'Open <b>Tokens</b>, find the row named <b>Calendar Sync</b>, and check the <b>Status</b> switch. If the row is gone, set the connection up again from the <a href="/">login page</a>.',
               ],
               [
-                "<code>403</code> with <code>MODULE_FORBIDDEN</code>",
-                "A module this calendar needs has been switched off for this token — the Calendar Sync module included.",
-                "Tokens → row menu → <b>Token Permissions</b>",
+                "Some things keep up, others do not",
+                "One of the connection's permissions was switched off.",
+                "Ask an administrator to open <b>Token Permissions</b> on that row and switch it back on.",
               ],
               [
-                "<code>403</code> not authorized to access the service",
-                "The person the token belongs to is no longer covered by the environment's access rules.",
-                "Environment Access → the environment's allow list",
+                "It stopped after somebody changed role or left",
+                "The person the connection belongs to no longer has access to that environment.",
+                "Ask an administrator to check <b>Environment Access</b> for that environment.",
+              ],
+              [
+                "Your calendar app shows an error it never showed before",
+                "Something about the connection has changed, and the app is telling you.",
+                'Set the connection up again from the <a href="/">login page</a>, then switch the old one off in <b>Tokens</b>.',
               ],
             ],
           )}
+
           ${callout(
             "tip",
-            "Did the request even arrive?",
-            "Every call that reaches WrikeXPI is recorded in the activity log, refusals included, with the caller, the action and the outcome. No rows at all means nothing got here, which is a question for the calendar app rather than for this service.",
+            "Check the console before anything else",
+            "The <b>Tokens</b> list shows whether the connection is on, and the <b>Activity log</b> shows every call your calendar has made, including the ones that were turned away. If nothing at all is in the log, nothing reached us, and the next place to look is your calendar app.",
           )}
-          <p class="pg-p">Each error response also carries a <b>reference</b> (<code>XPI-API-8ZTJ2QWF</code>): the id of that one call, and the same value shown on its row in the activity log. Copy it out of the error body when you report the problem, and an administrator can search for it directly. The older references start <code>XPI-</code> without a surface, and they still work.</p>
+
+          ${callout(
+            "info",
+            "Asking for help?",
+            "Every message we send back includes a short reference, like <code>XPI-API-8ZTJ2QWF</code>. Copy it when you report the problem, and whoever picks it up can open that exact call instead of searching for it.",
+          )}
 
           <div class="cta-row">
-            <a class="btn primary" href="/">Back to the login page</a>
+            <a class="btn primary" href="#/calendar/check">Check the connection</a>
             <a class="btn ghost" href="#/calendar/overview">Overview</a>
           </div>`,
       },

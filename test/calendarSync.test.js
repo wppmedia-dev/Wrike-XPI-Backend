@@ -542,6 +542,198 @@ const {
     JSON.stringify(["master_slug", "service_slug"]),
   );
 
+  /* ── The gate, method by method, on both forwarders ────────────────── */
+
+  section("The forwarder is gated by the method, exactly as amoeba is");
+
+  /* Nothing here is a stub of the decision: the real gate middleware runs
+     (src/middlewares/modulePermissions.js), reading the real mapping
+     (src/utils/tokenPermissionMap.js). Only the two caches it reads from are
+     replaced, so each case can hold a different matrix. Both forwarders are
+     mounted side by side, which is the point: the same call, the same verb,
+     and the only difference is which module's row decides it. */
+  const {
+    requireModulePermissions,
+  } = require("../src/middlewares/modulePermissions");
+  const map = require("../src/utils/tokenPermissionMap");
+  const TokenPermissions = require("../src/controllers/tokenPermissions");
+  const EnvironmentModulePermissions = require("../src/controllers/environmentModulePermissions");
+
+  let tokenMatrix = catalog.emptyMatrix();
+  let tokenConfigured = true;
+
+  EnvironmentModulePermissions.GetMatrixCached = async () => ({
+    // No environment rows: unrestricted, which is the state every environment
+    // is in until somebody narrows it, so what these cases measure is the
+    // TOKEN layer.
+    configured: false,
+    matrix: catalog.emptyMatrix(),
+  });
+  TokenPermissions.GetMatrixCached = async () => ({
+    configured: tokenConfigured,
+    matrix: tokenMatrix,
+  });
+
+  // The handler the amoeba route calls, so a call that gets past the gate is
+  // visible as "it reached the service" rather than as a status code alone.
+  const reached = [];
+  amoebaHandlerModule.AmoebaHandler = async (wrikeToken, req) => {
+    reached.push(`${req.method} ${req.url}`);
+    return { statusCode: 200, data: { ok: true } };
+  };
+
+  const gatedApp = Fastify();
+  gatedApp.addHook("onRequest", async (req) => {
+    req.tokenId = "11111111-1111-4111-8111-111111111111";
+    req.envId = ENV_ID;
+    req.wrikeToken = "wrike-token";
+    req.environmentName = "PROD";
+  });
+  gatedApp.addHook("onRequest", requireModulePermissions);
+  gatedApp.register(require("../src/routes/amoeba").amoebaRoute, {
+    prefix: "/wrikexpi/amoeba",
+  });
+  gatedApp.register(require("../src/routes/calendar").calendarRoute, {
+    prefix: "/wrikexpi/calendar",
+  });
+  await gatedApp.ready();
+
+  const CAL_PATH = "/wrikexpi/calendar/amoeba/leads/service";
+  const AMOEBA_PATH = "/wrikexpi/amoeba/leads/service";
+
+  /** What the gate does with one verb, on one path, under the current matrix. */
+  const attempt = async (method, url) => {
+    reached.length = 0;
+    const res = await gatedApp.inject({ method, url });
+    const body = res.json();
+    return {
+      status: res.statusCode,
+      code: body?.error?.code || null,
+      module: body?.error?.module || null,
+      action: body?.error?.action || null,
+      reachedService: reached.length > 0,
+    };
+  };
+
+  // The action is the request's, not the module's: this is the rule amoeba
+  // already follows, and the reason a grant is per verb rather than per
+  // endpoint.
+  for (const method of [
+    "GET",
+    "POST",
+    "PUT",
+    "PATCH",
+    "DELETE",
+    "HEAD",
+    "OPTIONS",
+  ]) {
+    const onCalendar = map.resolveRoute(method, `/api/v1${CAL_PATH}`);
+    const onAmoeba = map.resolveRoute(method, `/api/v1${AMOEBA_PATH}`);
+    check(
+      `${method} asks for the same action on both forwarders`,
+      onCalendar.action,
+      onAmoeba.action,
+    );
+  }
+  check(
+    "and an unmappable method asks for none on either",
+    [
+      map.resolveRoute("TRACE", `/api/v1${CAL_PATH}`).action,
+      map.resolveRoute("TRACE", `/api/v1${AMOEBA_PATH}`).action,
+    ].join(","),
+    ",",
+  );
+
+  // A calendar connection holding Read and Create, which is the shape a
+  // calendar that brings tasks across and adds some back would have.
+  tokenMatrix = catalog.normaliseMatrix({
+    calendar_sync: { read: true, create: true },
+  });
+
+  const readAllowed = await attempt("GET", CAL_PATH);
+  check("a granted verb reaches the service", readAllowed.status, 200);
+  check("and the call arrived", readAllowed.reachedService, true);
+
+  const createAllowed = await attempt("POST", CAL_PATH);
+  check("its second granted verb too", createAllowed.status, 200);
+
+  const updateRefused = await attempt("PUT", CAL_PATH);
+  check("an ungranted verb is refused", updateRefused.status, 403);
+  check("as a module denial", updateRefused.code, "MODULE_FORBIDDEN");
+  check(
+    "naming the calendar module",
+    updateRefused.module,
+    CALENDAR_SYNC_MODULE,
+  );
+  check("and the action the verb meant", updateRefused.action, "update");
+  check("without reaching the service", updateRefused.reachedService, false);
+
+  const deleteRefused = await attempt("DELETE", CAL_PATH);
+  check("and so is delete", deleteRefused.action, "delete");
+  check("with a 403", deleteRefused.status, 403);
+
+  // The rule amoeba already applies: a governed path asked with a method no
+  // action maps to is refused rather than passed through, because
+  // fastify.all() registers TRACE as well.
+  const traceRefused = await attempt("TRACE", CAL_PATH);
+  check("TRACE is refused", traceRefused.status, 403);
+  check(
+    "for the same reason it is on amoeba",
+    traceRefused.code,
+    "METHOD_NOT_GOVERNABLE",
+  );
+  check("and never reaches the service", traceRefused.reachedService, false);
+
+  // The comparison that matters: hand the SAME two verbs to the amoeba row and
+  // the behaviour has to be identical, or a calendar would be gated by rules of
+  // its own.
+  tokenMatrix = catalog.normaliseMatrix({
+    amoeba: { read: true, create: true },
+  });
+
+  const amoebaRead = await attempt("GET", AMOEBA_PATH);
+  const amoebaUpdate = await attempt("PUT", AMOEBA_PATH);
+  const amoebaTrace = await attempt("TRACE", AMOEBA_PATH);
+  check("amoeba allows the same verb", amoebaRead.status, readAllowed.status);
+  check(
+    "refuses the same verb with the same code",
+    amoebaUpdate.code,
+    updateRefused.code,
+  );
+  check("and treats TRACE the same way", amoebaTrace.code, traceRefused.code);
+
+  // A calendar row does not open the amoeba path, and an amoeba row does not
+  // open the calendar path: two rows, two decisions.
+  tokenMatrix = catalog.normaliseMatrix({
+    calendar_sync: { read: true, create: true, update: true, delete: true },
+  });
+  const amoebaStillClosed = await attempt("POST", AMOEBA_PATH);
+  check(
+    "a calendar grant does not open the plain amoeba path",
+    amoebaStillClosed.status,
+    403,
+  );
+  tokenMatrix = catalog.normaliseMatrix({ amoeba: { read: true } });
+  const calendarStillClosed = await attempt("GET", CAL_PATH);
+  check("nor the other way round", calendarStillClosed.status, 403);
+
+  // Every verb granted: all five mapped methods are let through, which is what
+  // "the same as amoeba" means in practice for an integration that writes.
+  tokenMatrix = catalog.normaliseMatrix({
+    calendar_sync: { read: true, create: true, update: true, delete: true },
+  });
+  for (const method of ["GET", "POST", "PUT", "PATCH", "DELETE"]) {
+    const allowed = await attempt(method, CAL_PATH);
+    check(
+      `with everything granted, ${method} is let through`,
+      allowed.status,
+      200,
+    );
+  }
+
+  await gatedApp.close();
+  amoebaHandlerModule.AmoebaHandler = realAmoebaHandler;
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 })();
