@@ -161,6 +161,10 @@ export default function ActivityLog({
   const [surfaceFilter, setSurfaceFilter] = useState<Surface | "">("");
   const [resultFilter, setResultFilter] = useState<"allowed" | "denied" | "">("");
   const [emailFilter, setEmailFilter] = useState("");
+  // The reference id from an error a caller reported. Separate from the email
+  // search because it is the one filter someone arrives with, already written
+  // down, and it matches one row.
+  const [referenceFilter, setReferenceFilter] = useState("");
 
   const loadedOnce = useRef(false);
   const searchDebounce = useRef<number | null>(null);
@@ -190,6 +194,7 @@ export default function ActivityLog({
             surface: surfaceFilter || undefined,
             allowed: resultFilter ? resultFilter === "allowed" : undefined,
             actor_email: emailFilter.trim() || undefined,
+            reference: referenceFilter.trim() || undefined,
             limit: pageSize,
             offset: nextOffset,
           }),
@@ -209,7 +214,7 @@ export default function ActivityLog({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [envFilter, surfaceFilter, resultFilter, emailFilter, pageSize, tokenFilterId],
+    [envFilter, surfaceFilter, resultFilter, emailFilter, referenceFilter, pageSize, tokenFilterId],
   );
 
   useEffect(() => {
@@ -230,8 +235,8 @@ export default function ActivityLog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, refreshKey]);
 
-  // Email search is free text — debounce it instead of firing on every
-  // keystroke.
+  // Email search and the reference box are both free text — debounce them
+  // instead of firing on every keystroke.
   useEffect(() => {
     if (!active) return;
     if (searchDebounce.current) window.clearTimeout(searchDebounce.current);
@@ -240,7 +245,7 @@ export default function ActivityLog({
       if (searchDebounce.current) window.clearTimeout(searchDebounce.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [emailFilter]);
+  }, [emailFilter, referenceFilter]);
 
   const page = Math.floor(offset / pageSize) + 1;
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
@@ -340,6 +345,18 @@ export default function ActivityLog({
             value={emailFilter}
             onChange={(e) => setEmailFilter(e.target.value)}
             aria-label="Search by caller email"
+          />
+        </div>
+
+        {/* The reference a caller reads out — the whole id, capitals optional. */}
+        <div className="al-search al-search-ref">
+          <i className="fa-solid fa-hashtag" aria-hidden="true" />
+          <input
+            type="search"
+            placeholder="Find by reference id…"
+            value={referenceFilter}
+            onChange={(e) => setReferenceFilter(e.target.value)}
+            aria-label="Find a call by its reference id"
           />
         </div>
 
@@ -443,13 +460,17 @@ export default function ActivityLog({
                 <th scope="col">Called</th>
                 <th scope="col">IP</th>
                 <th scope="col">Result</th>
+                {/* The id a caller quotes back to support. A column of its own
+                    because a report arrives as that string: it has to be
+                    findable by eye, not just by the filter above. */}
+                <th scope="col">Reference</th>
               </tr>
             </thead>
             <tbody>
               {loading &&
                 Array.from({ length: 6 }).map((_, i) => (
                   <tr className="ea-skeleton-row" key={i}>
-                    <td colSpan={7}>
+                    <td colSpan={8}>
                       <div className="ea-skeleton" />
                     </td>
                   </tr>
@@ -540,6 +561,26 @@ export default function ActivityLog({
                           )}
                         </span>
                       </span>
+                    </td>
+                    <td className="al-ref-cell">
+                      {row.reference_id ? (
+                        <span className="al-token-cell">
+                          <code
+                            className="al-ref-code"
+                            title={`Reference ${row.reference_id} — this is what the caller was shown with the error`}
+                          >
+                            {row.reference_id}
+                          </code>
+                          <CopyButton
+                            value={row.reference_id}
+                            title="Copy reference id"
+                          />
+                        </span>
+                      ) : (
+                        // Only a failed call is given one, so this is the
+                        // common case rather than a gap in the data.
+                        <span className="al-muted">—</span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -715,6 +756,25 @@ export default function ActivityLog({
                     ) : null}
                   </dd>
                 </div>
+                {detailRow.reference_id && (
+                  <div>
+                    <dt>Reference</dt>
+                    <dd>
+                      <span className="al-token-cell">
+                        <code className="al-token-code">
+                          {detailRow.reference_id}
+                        </code>
+                        <CopyButton
+                          value={detailRow.reference_id}
+                          title="Copy reference id"
+                        />
+                      </span>
+                      <div className="al-detail-note">
+                        What the caller was shown with the error they reported.
+                      </div>
+                    </dd>
+                  </div>
+                )}
               </dl>
 
               <ActivityPayloadBlock title="Request payload" payload={detailRow.request_payload} />

@@ -138,6 +138,9 @@ export default function PortalActivityPage({
   const [surfaceFilter, setSurfaceFilter] = useState<PortalSurface | "">("");
   const [resultFilter, setResultFilter] = useState<"allowed" | "denied" | "">("");
   const [emailFilter, setEmailFilter] = useState("");
+  // The reference from an error a caller reported — the one thing someone
+  // arrives here already holding.
+  const [referenceFilter, setReferenceFilter] = useState("");
 
   const loadedOnce = useRef(false);
   const emailPrimed = useRef(false);
@@ -170,6 +173,7 @@ export default function PortalActivityPage({
             surface: surfaceFilter || undefined,
             allowed: resultFilter ? resultFilter === "allowed" : undefined,
             actor_email: emailFilter.trim() || undefined,
+            reference: referenceFilter.trim() || undefined,
             limit: pageSize,
             offset: nextOffset,
           }),
@@ -186,7 +190,7 @@ export default function PortalActivityPage({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [token, envFilter, surfaceFilter, resultFilter, emailFilter, pageSize, tokenFilterId],
+    [token, envFilter, surfaceFilter, resultFilter, emailFilter, referenceFilter, pageSize, tokenFilterId],
   );
 
   useEffect(() => {
@@ -207,9 +211,10 @@ export default function PortalActivityPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, refreshKey]);
 
-  // Caller email is free text — debounce it instead of firing on every
-  // keystroke. The ref guard keeps the first render from firing a second,
-  // redundant fetch for the empty value the effect above already loaded.
+  // Caller email and the reference box are free text — debounce them instead
+  // of firing on every keystroke. The ref guard keeps the first render from
+  // firing a second, redundant fetch for the empty value the effect above
+  // already loaded.
   useEffect(() => {
     if (!active) return;
     if (!emailPrimed.current) {
@@ -222,7 +227,7 @@ export default function PortalActivityPage({
       if (searchDebounce.current) window.clearTimeout(searchDebounce.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [emailFilter]);
+  }, [emailFilter, referenceFilter]);
 
   const page = Math.floor(offset / pageSize) + 1;
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
@@ -334,6 +339,17 @@ export default function PortalActivityPage({
           />
         </div>
 
+        <div className="pal-search pal-search-ref">
+          <i className="fa-solid fa-hashtag" aria-hidden="true" />
+          <input
+            type="search"
+            placeholder="Find by reference id…"
+            value={referenceFilter}
+            onChange={(e) => setReferenceFilter(e.target.value)}
+            aria-label="Find a call by its reference id"
+          />
+        </div>
+
         {environments.length > 0 && (
           <div className="pal-env-select">
             <AdminSelect
@@ -438,13 +454,16 @@ export default function PortalActivityPage({
                 <th scope="col">Called</th>
                 <th scope="col">IP</th>
                 <th scope="col">Result</th>
+                {/* The id a caller quotes back to us. Its own column so a
+                    report can be matched to a row by eye. */}
+                <th scope="col">Reference</th>
               </tr>
             </thead>
             <tbody>
               {loading &&
                 Array.from({ length: 6 }).map((_, i) => (
                   <tr className="pal-skeleton-row" key={`skeleton-${i}`}>
-                    <td colSpan={7}>
+                    <td colSpan={8}>
                       <div className="pal-skeleton" />
                     </td>
                   </tr>
@@ -538,6 +557,25 @@ export default function PortalActivityPage({
                           )}
                         </span>
                       </span>
+                    </td>
+                    <td className="pal-ref-cell">
+                      {row.reference_id ? (
+                        <span className="pal-token-cell">
+                          <code
+                            className="pal-ref-code"
+                            title={`Reference ${row.reference_id} — this is what the caller was shown with the error`}
+                          >
+                            {row.reference_id}
+                          </code>
+                          <CopyButton
+                            value={row.reference_id}
+                            title="Copy reference id"
+                          />
+                        </span>
+                      ) : (
+                        // Only a failed call has one.
+                        <span className="pal-muted">—</span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -734,6 +772,25 @@ export default function PortalActivityPage({
                   <dt>Reason</dt>
                   <dd>{codeLabel(detailRow.code)}</dd>
                 </div>
+                {detailRow.reference_id && (
+                  <div className="pal-detail-resource">
+                    <dt>Reference</dt>
+                    <dd>
+                      <span className="pal-token-cell">
+                        <code className="pal-token-code">
+                          {detailRow.reference_id}
+                        </code>
+                        <CopyButton
+                          value={detailRow.reference_id}
+                          title="Copy reference id"
+                        />
+                      </span>
+                      <div className="pal-detail-note">
+                        What the caller was shown with the error they reported.
+                      </div>
+                    </dd>
+                  </div>
+                )}
               </dl>
             </div>
 

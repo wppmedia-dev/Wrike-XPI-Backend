@@ -415,7 +415,16 @@ module.exports = async function (fastify, opts) {
           </ol>
 
           <h2 class="pg-h2">Scopes</h2>
-          <p class="pg-p">The endpoint operates within the scopes granted to the WrikeXPI application. Contact your administrator to review scopes for your workspace.</p>`,
+          <p class="pg-p">The endpoint operates within the scopes granted to the WrikeXPI application. Contact your administrator to review scopes for your workspace.</p>
+
+          <h2 class="pg-h2">When a call is refused</h2>
+          <p class="pg-p">A tool call this token is not permitted to make comes back as a failed result rather than as a transport error, so the assistant reads the reason instead of retrying: it names the module and the action that were missing, and says plainly not to route the same change through another tool.</p>
+          <p class="pg-p">That result, and any <code>401</code> or <code>403</code> from the endpoint itself, also carries a <b>reference</b> — <code>XPI-8ZTJW8F3</code>. It identifies that one request in the activity log, which is where an administrator sees the decision that was made and what was sent back.</p>
+          ${callout(
+            "tip",
+            "Reporting a refusal",
+            "Keep the reference from the message. It turns “the assistant said FORBIDDEN” into one lookup in the console instead of a search by timestamp.",
+          )}`,
       },
       {
         id: "mcp/architecture",
@@ -1349,7 +1358,7 @@ async ({ taskId }, extra) => {
         groupId: "api",
         label: "Errors",
         keywords:
-          "errors error error-codes 400 401 403 500 response envelope status code",
+          "errors error error-codes 400 401 403 500 response envelope status code reference reference-id support",
         html: `
           <div class="pg-eyebrow">XPI API Docs</div>
           <h1 class="pg-title">Errors</h1>
@@ -1361,9 +1370,12 @@ async ({ taskId }, extra) => {
             `{
   "success": false,
   "message": "The selected filters are invalid. Please review your filter values and try again.",
-  "details": null
+  "details": null,
+  "reference": "XPI-8ZTJW8F3"
 }`,
           )}
+          <p class="pg-p">Every response with a status of <code>400</code> or above carries a <code>reference</code> — a short id for that one call. It is eight characters long and has no letters or digits that look like each other, so it survives being read aloud or copied from a screenshot.</p>
+          <p class="pg-p">The same id is on the call's row in the activity log, so quoting it is the fastest way for somebody to find what happened. Quote it (or log it) when you report a problem rather than describing the request.</p>
 
           <h2 class="pg-h2">Common status codes</h2>
           ${table(
@@ -1715,6 +1727,7 @@ async ({ taskId }, extra) => {
             "Did the request even arrive?",
             "Every call that reaches WrikeXPI is recorded in the activity log, refusals included, with the caller, the action and the outcome. No rows at all means nothing got here, which is a question for the calendar app rather than for this service.",
           )}
+          <p class="pg-p">Each error response also carries a <b>reference</b> (<code>XPI-8ZTJW8F3</code>): the id of that one call, and the same value shown on its row in the activity log. Copy it out of the error body when you report the problem — an administrator can search for it directly.</p>
 
           <div class="cta-row">
             <a class="btn primary" href="/">Back to the login page</a>

@@ -26,6 +26,9 @@ export interface PortalActivityRow {
   category: string | null;
   /** The MCP tool(s) the agent called, in call order. Null for REST rows. */
   mcp_tool: string | null;
+  /** The reference the caller was shown when this call failed ("XPI-XXXXXXXX").
+      Set only on error rows. src/utils/activityReference.js. */
+  reference_id: string | null;
   created_at: string;
 }
 
@@ -53,6 +56,8 @@ export interface PortalActivityFilters {
       own environments (src/routes/portal/activity/index.js). */
   token_id?: string;
   actor_email?: string;
+  /** Exact reference id, typed in from an error the caller reported. */
+  reference?: string;
   surface?: PortalSurface;
   allowed?: boolean;
   from?: string;
@@ -77,6 +82,7 @@ const qs = (filters: PortalActivityFilters): string =>
     env_id: filters.env_id,
     token_id: filters.token_id,
     actor_email: filters.actor_email,
+    reference: filters.reference,
     surface: filters.surface,
     allowed: filters.allowed === undefined ? undefined : String(filters.allowed),
     from: filters.from,

@@ -8,6 +8,7 @@ import { registerWrikeProxyTools } from "./wrikeMcpProxy.js";
 import wrikeIconDataUri from "./wrikeIcon.js";
 import { EnvironmentModulePermissions, TokenPermissions } from "../controllers";
 import { denialFor } from "../utils/tokenPermissionMap";
+import { newReference } from "../utils/activityReference";
 import { permissionDenied, resolveToolRoute } from "./tools/permission.js";
 
 /**
@@ -99,14 +100,23 @@ export const installPermissionGate = (server, auth, onToolCall) => {
     }
   };
 
+  // One reference for this request, not one per refusal: the activity log
+  // keeps a single row per MCP request, so every refusal inside this request
+  // has to name that same row. Created on the first refusal, so a request
+  // that is fully allowed is never given an id nobody sees.
+  let refusalReference = null;
+  const referenceOnce = () =>
+    (refusalReference = refusalReference || newReference());
+
   server.registerTool = (name, config, handler) =>
     registerTool(name, config, async (args, extra) => {
       const route = resolveToolRoute(name, config?.annotations);
       if (!route) return handler(args, extra);
 
       const denied = (code) => {
-        report({ tool: name, ...route, allowed: false, code });
-        return permissionDenied({ toolName: name, ...route, code });
+        const reference = referenceOnce();
+        report({ tool: name, ...route, allowed: false, code, reference });
+        return permissionDenied({ toolName: name, ...route, code, reference });
       };
 
       try {

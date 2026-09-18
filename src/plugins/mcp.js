@@ -13,6 +13,7 @@ const {
   PUBLIC_DENIAL_MESSAGE,
 } = require("../utils/environmentAccess.js");
 const { log: logActivity } = require("../utils/activityLog.js");
+const { referenceFor } = require("../utils/activityReference.js");
 const { SetMcpTools } = require("../controllers/activityLog.js");
 const {
   captureRequest,
@@ -60,14 +61,36 @@ module.exports = async function (fastify, opts) {
     done();
   });
 
-  const sendUnauthorized = (reply, description, resourceMetadataUrl) => {
+  /**
+   * The reference for this request: created on first use, then the same value
+   * for the rest of the request.
+   *
+   * MCP mints it itself instead of letting the generic error-reference hook do
+   * it, because on this surface the row is written BEFORE the response goes
+   * out (see recordActivity below). The row and the message have to name each
+   * other, so whoever gets there first mints it and the other reuses it.
+   */
+  const referenceOnce = (req) => referenceFor(req);
+
+  /* The 401 this surface sends carries the reference too, so the row it just
+     wrote and the message the client reads agree. */
+  const sendUnauthorized = (
+    reply,
+    description,
+    resourceMetadataUrl,
+    reference,
+  ) => {
     reply
       .code(401)
       .header(
         "WWW-Authenticate",
         `Bearer error="invalid_token", error_description="${description}", resource_metadata="${resourceMetadataUrl}"`,
       )
-      .send({ error: "invalid_token", error_description: description });
+      .send({
+        error: "invalid_token",
+        error_description: description,
+        reference,
+      });
   };
 
   // Shared POST handler for both /mcp and /mcp/:environmentId — auth
@@ -94,6 +117,7 @@ module.exports = async function (fastify, opts) {
       allowed,
       code,
       statusCode,
+      referenceId,
     }) =>
       logActivity({
         envId: envId || null,
@@ -107,6 +131,7 @@ module.exports = async function (fastify, opts) {
         allowed,
         code,
         statusCode,
+        referenceId: referenceId || null,
         ip: clientIp(req),
         category: "mcp",
         requestPayload: captureRequest(req),
@@ -125,31 +150,40 @@ module.exports = async function (fastify, opts) {
     };
 
     /** The first refusal, if any tool call was refused. */
-    const firstDenial = () =>
-      toolCalls.find((call) => !call.allowed)?.code || null;
+    const firstDenial = () => toolCalls.find((call) => !call.allowed) || null;
 
     const authHeader = req.headers.authorization || "";
     const [scheme, token] = authHeader.split(" ");
     if (scheme?.toLowerCase() !== "bearer" || !token) {
-      recordActivity({ allowed: false, code: "UNAUTHORIZED", statusCode: 401 });
+      const reference = referenceOnce(req);
+      recordActivity({
+        allowed: false,
+        code: "UNAUTHORIZED",
+        statusCode: 401,
+        referenceId: reference,
+      });
       return sendUnauthorized(
         reply,
         "Authorization required",
         resourceMetadataUrl,
+        reference,
       );
     }
 
     const auth = await resolveAuth(token);
     if (!auth) {
+      const reference = referenceOnce(req);
       recordActivity({
         allowed: false,
         code: "TOKEN_INVALID",
         statusCode: 401,
+        referenceId: reference,
       });
       return sendUnauthorized(
         reply,
         "Token is invalid or expired",
         resourceMetadataUrl,
+        reference,
       );
     }
 
@@ -173,11 +207,13 @@ module.exports = async function (fastify, opts) {
         allowed: false,
         code: "AUTHORIZATION_ERROR",
         statusCode: 403,
+        referenceId: referenceOnce(req),
       });
       return reply.code(403).send({
         error: "forbidden",
         error_description: "Access could not be verified for this token.",
         code: "AUTHORIZATION_ERROR",
+        reference: referenceOnce(req),
       });
     }
 
@@ -190,11 +226,13 @@ module.exports = async function (fastify, opts) {
         allowed: false,
         code: access.code,
         statusCode: 403,
+        referenceId: referenceOnce(req),
       });
       return reply.code(403).send({
         error: "forbidden",
         error_description: PUBLIC_DENIAL_MESSAGE,
         code: access.code,
+        reference: referenceOnce(req),
       });
     }
 
@@ -214,6 +252,11 @@ module.exports = async function (fastify, opts) {
     });
 
     if (typeof reply.hijack === "function") reply.hijack();
+
+    // The response is written straight to the socket from here on, so the
+    // generic error-reference hook never sees it: this surface mints its own
+    // reference, and keeps a failed request's one so the row can carry it.
+    let failureReference = null;
 
     try {
       // Ensure Accept header has both values required by the transport
@@ -238,25 +281,32 @@ module.exports = async function (fastify, opts) {
       await transport.handleRequest(req.raw, reply.raw, req.body);
     } catch (err) {
       const code = err?.statusCode || 500;
+      failureReference = referenceOnce(req);
       reply.raw.writeHead(code, { "Content-Type": "application/json" });
       reply.raw.end(
         JSON.stringify({
           success: false,
           message: err?.message || "MCP request handling failed.",
+          reference: failureReference,
         }),
       );
     } finally {
       // The tool names and any refusal, onto the row this request wrote. Chained
       // off the (already started) write rather than awaited: the response is on
       // the wire by now, and nothing about the caller's result depends on this.
-      rowWritten.then((row) =>
-        row?.id
-          ? SetMcpTools(row.id, {
-              tool: toolSummary(),
-              code: firstDenial(),
-            })
-          : null,
-      );
+      rowWritten.then((row) => {
+        if (!row?.id) return null;
+        const refusal = firstDenial();
+        return SetMcpTools(row.id, {
+          tool: toolSummary(),
+          code: refusal?.code || null,
+          // Reported by the gate with the refusal, so it matches the id the
+          // agent was given in the FORBIDDEN result. A request that failed
+          // before any tool ran stores its own, which is the one its caller
+          // was shown.
+          referenceId: refusal?.reference || failureReference || null,
+        });
+      });
     }
   };
 

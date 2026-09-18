@@ -169,6 +169,7 @@ const callTool = async (
     calls,
     ran: result === RAN,
     isError: result?.isError === true,
+    reference: result?.reference || null,
     text: result?.content?.[0]?.text || "",
   };
 };
@@ -449,6 +450,11 @@ const runGateChecks = async () => {
     );
     check("and allowed false", refused.calls[0].allowed, false);
     check("though its handler did not run", refused.ran, false);
+    check(
+      "and an allowed call carries no reference",
+      allowed.calls[0].reference,
+      undefined,
+    );
 
     const byEnvironment = await callTool(
       UNRESTRICTED,
@@ -467,6 +473,59 @@ const runGateChecks = async () => {
       "a check that could not be answered is reported as such",
       broken.calls[0].code,
       "PERMISSION_CHECK_FAILED",
+    );
+  }
+
+  console.log("\nThe reference a refusal carries");
+  {
+    // The agent reads this out, and it is what the person can be searched by:
+    // the log keeps one row per MCP request, so the reference on the row and
+    // the one in the message have to be the same string.
+    const refused = await callTool(RESTRICTED, "campaign_delete", destructive);
+    check(
+      "the message quotes a reference",
+      refused.text.includes(`Reference: ${refused.reference}.`),
+      true,
+    );
+    check(
+      "the result carries it as a field too",
+      refused.reference,
+      refused.calls[0].reference,
+    );
+    checkTrue(
+      "and it is the shape support can search (XPI- then 8)",
+      /^XPI-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}$/.test(refused.reference),
+    );
+    checkTrue(
+      "with no letter a screen reader or a screenshot confuses (no I, O, 0 or 1 in the body)",
+      !/[IO01]/.test(refused.reference.slice(4)),
+    );
+
+    // Two refusals in one request are one row, so they must name one row.
+    const handlers = new Map();
+    const server = {
+      registerTool(name, config, handler) {
+        handlers.set(name, handler);
+        return name;
+      },
+    };
+    const calls = [];
+    installPermissionGate(
+      server,
+      { tokenId: RESTRICTED, envId: ENV_OPEN },
+      (call) => calls.push(call),
+    );
+    server.registerTool("campaign_delete", destructive, async () => RAN);
+    server.registerTool("campaign_update", write, async () => RAN);
+
+    const first = await handlers.get("campaign_delete")({}, {});
+    const second = await handlers.get("campaign_update")({}, {});
+
+    check("both refusals report a reference", calls.length, 2);
+    check(
+      "and it is the same one for the request",
+      first.reference,
+      second.reference,
     );
   }
 

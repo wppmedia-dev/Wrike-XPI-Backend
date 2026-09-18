@@ -24,6 +24,7 @@ const ROW_ATTRS = [
   "ip",
   "category",
   "mcp_tool",
+  "reference_id",
   "request_payload",
   "response_payload",
   "created_at",
@@ -44,6 +45,7 @@ export const Record = async (entry) => {
     status_code: entry.statusCode ?? null,
     ip: entry.ip || null,
     category: entry.category || null,
+    reference_id: entry.referenceId || null,
     request_payload: entry.requestPayload || null,
     response_payload: entry.responsePayload || null,
   });
@@ -63,8 +65,12 @@ export const Record = async (entry) => {
  *
  * Never throws: the row exists and is correct without this, and an agent's
  * call must not fail because the log could not be annotated.
+ *
+ * `referenceId` is set only when a tool call was refused: the refusal is the
+ * error response on this surface, and the row is where the reference the agent
+ * was given has to end up (see src/mcp/tools/permission.js).
  */
-export const SetMcpTools = async (id, { tool, code } = {}) => {
+export const SetMcpTools = async (id, { tool, code, referenceId } = {}) => {
   if (!id || !tool) return null;
 
   const patch = { mcp_tool: String(tool).slice(0, 255) };
@@ -72,6 +78,7 @@ export const SetMcpTools = async (id, { tool, code } = {}) => {
     patch.allowed = false;
     patch.code = code;
   }
+  if (referenceId) patch.reference_id = String(referenceId).slice(0, 32);
 
   try {
     return await models.ApiActivityLogs.update(patch, { where: { id } });
@@ -94,6 +101,7 @@ export const List = async ({
   envId,
   tokenId,
   actorEmail,
+  reference,
   surface,
   allowed,
   from,
@@ -106,6 +114,10 @@ export const List = async ({
   // Exact match, not a like: a token id is a UUID, and "show me everything
   // this token did" means that token, not anything whose id contains it.
   if (tokenId) where.token_id = tokenId;
+  // The whole reference, matched without case or surrounding space: it gets
+  // typed or read out by hand, so a capital may be lost, but a fragment is not
+  // accepted — an id is only useful if it identifies one row.
+  if (reference) where.reference_id = { [Op.iLike]: String(reference).trim() };
   if (actorEmail)
     where.actor_email = { [Op.iLike]: `%${actorEmail.trim().toLowerCase()}%` };
   if (surface) where.surface = surface;
