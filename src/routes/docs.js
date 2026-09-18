@@ -1642,16 +1642,16 @@ async ({ taskId }, extra) => {
           <div class="flow">
             ${[
               [
-                "Choose where it should look",
-                "Pick the environment whose tasks the calendar should follow.",
-              ],
-              [
-                "Choose Calendar Sync",
-                "One extra choice on the login page, instead of the usual sign-in.",
+                "Choose an environment",
+                "Pick the environment this connection is made for. It is the only place your calendar will read from.",
               ],
               [
                 "Sign in with Wrike once",
                 "Authorise it as the person whose tasks it should bring across.",
+              ],
+              [
+                "Copy your connection",
+                "It appears on the setup page as soon as the sign-in finishes, ready to copy.",
               ],
               [
                 "Add it to your calendar",
@@ -1685,14 +1685,14 @@ async ({ taskId }, extra) => {
         groupId: "calendar",
         label: "Set it up",
         keywords:
-          "setup set up connect generate credential once copy paste environment sign in login page five minutes get started install subscribe",
+          "setup set up connect generate credential once copy paste environment sign in five minutes get started install subscribe",
         html: `
           <div class="pg-eyebrow">Calendar Sync</div>
           <h1 class="pg-title">Set it up</h1>
           <p class="pg-lede">About five minutes, once. After that, your Wrike tasks keep themselves current in your calendar.</p>
 
-          <h2 class="pg-h2">1 · Choose where it should look</h2>
-          <p class="pg-p">Pick the environment whose tasks you want in your calendar. Everything you will see comes from there, and nothing from anywhere else.</p>
+          <h2 class="pg-h2">1 · Choose an environment</h2>
+          <p class="pg-p">This step is only about making the connection. The environment you choose here is the one the connection is created for, and the only place your calendar will be able to read from.</p>
           <label class="field-label" for="docs-cal-env">Environment</label>
           <div class="select-wrap">
             <select id="docs-cal-env">
@@ -1702,7 +1702,7 @@ async ({ taskId }, extra) => {
             </select>
             <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
           </div>
-          <p class="pg-p">Nothing is created yet. This choice is remembered only for the sign-in that follows.</p>
+          <p class="pg-p">Nothing has been created yet. Your choice is used once, on the next step, to make a connection that can reach this environment and nothing else.</p>
 
           <h2 class="pg-h2">2 · Generate your connection</h2>
           <p class="pg-p">Press the button and sign in with Wrike as the person whose tasks should appear in the calendar. You will come straight back here, with your own connection filled in for you.</p>
