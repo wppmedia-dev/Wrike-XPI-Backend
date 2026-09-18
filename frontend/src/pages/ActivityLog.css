@@ -226,6 +226,15 @@
   border-left-color: var(--danger);
 }
 
+/* The call detail's version of the same cell: the same word and the same
+   explanation icon, without the table's warning colour (nothing is wrong with
+   one row of a detail view). */
+.al-unresolved-detail {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .al-time {
   font-size: 12px;
   color: var(--text-muted);

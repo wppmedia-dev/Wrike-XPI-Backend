@@ -1,0 +1,95 @@
+/* Styles for <InfoTip />, the info icon that explains a value in place.
+ *
+ * Only CSS variables every console defines (both :root blocks carry the same
+ * names — AdminDashboard.css and PortalHome.css/PortalDashboard.css), so one
+ * stylesheet serves the admin console and the portal. Falls back to the plain
+ * palette values if a page is ever rendered without them. */
+
+.it-wrap {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+/* Small, muted and borderless: it belongs to the word beside it ("Unresolved
+   ⓘ"), not to the row's controls. The accent colour on hover is the only
+   signal that it can be pressed.
+
+   No margin of its own: a chip that holds it (`gap`-ed flex, e.g.
+   .al-unresolved) already spaces its children, and the drawer's wrapper does
+   the same. */
+.it-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-muted, #94a3b8);
+  background: none;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+/* Two classes so this beats a parent that sizes its own icons — the chips this
+   sits in style every font-awesome `i` inside them (e.g. .al-unresolved i),
+   and the page stylesheet is bundled after this one. */
+.it-wrap .it-btn i {
+  font-size: 11px;
+}
+
+.it-btn:hover,
+.it-btn[aria-expanded="true"] {
+  color: var(--accent, #008262);
+}
+
+.it-btn:focus-visible {
+  outline: 2px solid var(--accent, #008262);
+  outline-offset: 2px;
+}
+
+/* Fixed, so it is never clipped by the table's horizontal scroll container,
+   and capped at the viewport width so a long sentence stays readable on a
+   phone rather than running off the side. */
+.it-tip {
+  position: fixed;
+  z-index: 400;
+  width: min(320px, calc(100vw - 24px));
+  max-height: 60vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.55;
+  letter-spacing: normal;
+  text-align: left;
+  white-space: normal;
+  color: var(--text-secondary, #475569);
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: var(--radius-md, 10px);
+  box-shadow: var(--shadow-lg, 0 4px 24px rgba(0, 0, 0, 0.12));
+  animation: it-in 0.12s ease-out;
+}
+
+@keyframes it-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .it-tip {
+    animation: none;
+  }
+}

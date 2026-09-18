@@ -15,6 +15,7 @@ import { CopyButton } from "../components/ui/CopyButton";
 import { PageInfo } from "../components/ui/PageInfo";
 import { PORTAL_HELP } from "../lib/pageHelp";
 import { callerNote } from "../lib/activityCaller";
+import { InfoTip } from "../components/ui/InfoTip";
 import "./PortalActivityPage.css";
 
 /* The portal Activity Log.
@@ -476,12 +477,16 @@ export default function PortalActivityPage({
                     <td className="pal-time">{formatTime(row.created_at)}</td>
                     <td className="pal-caller">
                       {row.actor_email || (
-                        <span
-                          className="pal-unresolved"
-                          title={callerNote(row)}
-                        >
+                        <span className="pal-unresolved">
                           <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" />
                           Unresolved
+                          {/* Why the cell is empty, behind the icon rather than
+                              printed in every row: it is the same sentence
+                              each time. */}
+                          <InfoTip
+                            text={callerNote(row)}
+                            label="Why is this row unresolved?"
+                          />
                         </span>
                       )}
                     </td>
@@ -673,10 +678,13 @@ export default function PortalActivityPage({
                   <dt>Caller</dt>
                   <dd>
                     {detailRow.actor_email || (
-                      <>
+                      <span className="pal-unresolved-detail">
                         <span className="pal-muted">Unresolved</span>
-                        <div className="pal-detail-note">{callerNote(detailRow)}</div>
-                      </>
+                        <InfoTip
+                          text={callerNote(detailRow)}
+                          label="Why is this row unresolved?"
+                        />
+                      </span>
                     )}
                   </dd>
                 </div>
