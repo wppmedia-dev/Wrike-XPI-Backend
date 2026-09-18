@@ -334,43 +334,74 @@
   color: var(--text-muted);
 }
 
+/* Numbered pagination — mirrors the Activity Log pager (‹ 1 2 3 … n ›) so
+   every table in the admin and portal consoles paginates the same way. */
 .dt2-pager {
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
-.dt2-pager button {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  font-size: 11px;
-  color: var(--text-secondary);
-  background: var(--bg-card);
+.dt2-page-btn,
+.dt2-page-arrow {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
   border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
   cursor: pointer;
-  transition: var(--transition);
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    background-color 0.15s ease;
 }
 
-.dt2-pager button:hover:not(:disabled) {
+.dt2-page-btn {
+  font-size: 12.5px;
+}
+
+/* Chevrons stay unfilled so navigation reads differently from page numbers. */
+.dt2-page-arrow {
+  font-size: 11px;
+}
+
+.dt2-page-btn:hover:not(.current),
+.dt2-page-arrow:hover:not(:disabled) {
   color: var(--accent);
   border-color: var(--accent);
   background: var(--accent-soft);
 }
 
-.dt2-pager button:disabled {
+.dt2-page-btn.current {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+  font-weight: 600;
+  cursor: default;
+}
+
+.dt2-page-arrow:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
 
-.dt2-pager-status {
-  padding: 0 8px;
-  font-size: 12.5px;
-  color: var(--text-secondary);
-  white-space: nowrap;
+.dt2-page-btn:focus-visible,
+.dt2-page-arrow:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.dt2-page-ellipsis {
+  padding: 0 2px;
+  color: var(--text-muted);
+  user-select: none;
 }
 
 @media (max-width: 640px) {
@@ -388,6 +419,13 @@
   }
 
   .dt2-footer {
+    justify-content: center;
+  }
+
+  /* A long numbered pager wraps rather than pushing the footer wider than
+     the viewport. */
+  .dt2-pager {
+    flex-wrap: wrap;
     justify-content: center;
   }
 }
