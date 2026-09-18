@@ -106,7 +106,7 @@ export const installPermissionGate = (server, auth, onToolCall) => {
   // that is fully allowed is never given an id nobody sees.
   let refusalReference = null;
   const referenceOnce = () =>
-    (refusalReference = refusalReference || newReference());
+    (refusalReference = refusalReference || newReference("mcp"));
 
   server.registerTool = (name, config, handler) =>
     registerTool(name, config, async (args, extra) => {

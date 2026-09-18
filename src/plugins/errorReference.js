@@ -1,7 +1,11 @@
 "use strict";
 
 const fp = require("fastify-plugin");
-const { referenceFor, withReference } = require("../utils/activityReference");
+const {
+  referenceFor,
+  surfaceForUrl,
+  withReference,
+} = require("../utils/activityReference");
 
 /**
  * Every error response leaves with a reference id in its body.
@@ -28,7 +32,12 @@ module.exports = fp(async function errorReference(fastify) {
     try {
       if (reply.statusCode < 400) return done(null, payload);
 
-      const body = withReference(payload, referenceFor(req));
+      // The surface comes off the path: this hook answers for every route, so
+      // it is the one place that cannot be told which surface it is serving.
+      const body = withReference(
+        payload,
+        referenceFor(req, surfaceForUrl(req.raw?.url || req.url)),
+      );
       return done(null, body || payload);
     } catch (err) {
       console.error(

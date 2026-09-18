@@ -493,12 +493,12 @@ const runGateChecks = async () => {
       refused.calls[0].reference,
     );
     checkTrue(
-      "and it is the shape support can search (XPI- then 8)",
-      /^XPI-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}$/.test(refused.reference),
+      "and it is the shape support can search (XPI-MCP- then 8)",
+      /^XPI-MCP-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}$/.test(refused.reference),
     );
     checkTrue(
       "with no letter a screen reader or a screenshot confuses (no I, O, 0 or 1 in the body)",
-      !/[IO01]/.test(refused.reference.slice(4)),
+      !/[IO01]/.test(refused.reference.slice(8)),
     );
 
     // Two refusals in one request are one row, so they must name one row.
