@@ -15,3 +15,20 @@ export const CalendarAmoebaSchema = {
     },
   },
 };
+
+// Same as CalendarAmoebaSchema, for the wildcard route that additionally
+// carries a remaining path after the service slug (e.g. .../tasks). Fastify
+// puts a `*` param's value under the "*" key, so it's declared here too.
+export const CalendarAmoebaWildcardSchema = {
+  schema: {
+    params: {
+      type: "object",
+      required: ["master_slug", "service_slug"],
+      properties: {
+        master_slug: { type: "string" },
+        service_slug: { type: "string" },
+        "*": { type: "string" },
+      },
+    },
+  },
+};

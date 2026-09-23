@@ -30,7 +30,10 @@ import { denialFor } from "../../utils/tokenPermissionMap";
 import { CALENDAR_SYNC_MODULE } from "../../utils/tokenPurpose";
 import { PUBLIC_DENIAL_MESSAGE } from "../../utils/environmentAccess";
 import { AmoebaHandler } from "../amoeba/handlers/amoebaHandler";
-import { CalendarAmoebaSchema } from "./schema/amoeba";
+import {
+  CalendarAmoebaSchema,
+  CalendarAmoebaWildcardSchema,
+} from "./schema/amoeba";
 
 /** The one thing a calendar caller is asking about, in gate terms. */
 const CALENDAR_READ = { module: CALENDAR_SYNC_MODULE, action: "read" };
@@ -110,33 +113,45 @@ export const calendarRoute = (fastify, opts, done) => {
    * than renaming either: the URL is what a caller is told to use, and the
    * handler is shared with the amoeba route.
    */
+  const forwardAmoeba = async (req, reply) => {
+    req.params.moduleSlug = req.params.master_slug;
+    req.params.serviceSlug = req.params.service_slug;
+
+    try {
+      const result = await AmoebaHandler(
+        req?.wrikeToken,
+        req,
+        req?.environmentName,
+      );
+
+      reply.code(result.statusCode || 200).send({ success: true, ...result });
+    } catch (err) {
+      reply.code(err?.statusCode || 400).send({
+        success: false,
+        details: err?.data,
+        message:
+          err?.message ||
+          err?.errorDescription ||
+          err?.data?.error?.message ||
+          "Fatal error: Unexpected error occurred and service is unable to complete the request.",
+      });
+    }
+  };
+
   fastify.all(
     "/amoeba/:master_slug/:service_slug",
     CalendarAmoebaSchema,
-    async (req, reply) => {
-      req.params.moduleSlug = req.params.master_slug;
-      req.params.serviceSlug = req.params.service_slug;
+    forwardAmoeba,
+  );
 
-      try {
-        const result = await AmoebaHandler(
-          req?.wrikeToken,
-          req,
-          req?.environmentName,
-        );
-
-        reply.code(result.statusCode || 200).send({ success: true, ...result });
-      } catch (err) {
-        reply.code(err?.statusCode || 400).send({
-          success: false,
-          details: err?.data,
-          message:
-            err?.message ||
-            err?.errorDescription ||
-            err?.data?.error?.message ||
-            "Fatal error: Unexpected error occurred and service is unable to complete the request.",
-        });
-      }
-    },
+  // Same forwarder, for calls that carry a remaining path after the service
+  // slug (e.g. /amoeba/wrikeapi/folders/{id}/tasks) — mirrors the plain
+  // amoeba route's "/:moduleSlug/*" variant (src/routes/amoeba/index.js).
+  // Without this, Fastify 404s before the request ever reaches the handler.
+  fastify.all(
+    "/amoeba/:master_slug/:service_slug/*",
+    CalendarAmoebaWildcardSchema,
+    forwardAmoeba,
   );
 
   done();
