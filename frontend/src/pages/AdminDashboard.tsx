@@ -68,7 +68,7 @@ import "./AdminDashboard.css";
 type PageId =
   | "overview"
   | "environments"
-  | "tokens"
+  | "sessions"
   | "users"
   | "settings"
   | "cache-settings"
@@ -77,7 +77,7 @@ type PageId =
 const PAGE_NAMES: Record<PageId, string> = {
   overview: "Overview",
   environments: "Environments",
-  tokens: "Sessions",
+  sessions: "Sessions",
   users: "Users",
   settings: "Settings",
   "cache-settings": "Cache Settings",
@@ -750,7 +750,7 @@ export default function AdminDashboard() {
 
   function openTokensForEnv(env: { id: string; environment_name: string }) {
     setTokensEnvScope({ id: env.id, name: env.environment_name });
-    handleNav("tokens");
+    handleNav("sessions");
   }
 
   /**
@@ -1216,7 +1216,7 @@ export default function AdminDashboard() {
     setMobileOpen(false);
 
     if (pageId === "users") loadPortalUsers();
-    if (pageId === "tokens") loadTokens();
+    if (pageId === "sessions") loadTokens();
     if (pageId === "cache-settings") loadCacheEntries(cacheSearchPatternRef.current);
   }
 
@@ -1227,7 +1227,7 @@ export default function AdminDashboard() {
       refreshPromise = loadCacheEntries(cacheSearchPatternRef.current);
     } else if (activePage === "users") {
       refreshPromise = loadPortalUsers();
-    } else if (activePage === "tokens") {
+    } else if (activePage === "sessions") {
       refreshPromise = loadTokens();
     } else if (activePage === "activity-log") {
       // The Activity Log owns its own fetch (rows + summary) — bump its key
@@ -1347,13 +1347,13 @@ export default function AdminDashboard() {
           </div>
 
           <div
-            className={`nav-item${activePage === "tokens" ? " active" : ""}`}
+            className={`nav-item${activePage === "sessions" ? " active" : ""}`}
             onClick={() => {
               // From the sidebar this means every token, so an environment
               // scope left over from an Environments row is dropped here rather
               // than persisting behind a nav item that just says "Sessions".
               setTokensEnvScope(null);
-              handleNav("tokens");
+              handleNav("sessions");
             }}
           >
             <span className="ni">
@@ -1648,7 +1648,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* ══════ SESSIONS PAGE ══════ */}
-          <div className={`page${activePage === "tokens" ? " active" : ""}`} id="page-tokens">
+          <div className={`page${activePage === "sessions" ? " active" : ""}`} id="page-sessions">
             <div className="section-header">
               <div>
                 <div className="section-title">
