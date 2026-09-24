@@ -62,7 +62,7 @@ const PORTAL_ENVIRONMENT_MODULES_API: TokenPermissionsApi = {
 const PAGE_NAMES: Record<PageId, string> = {
   overview: "Overview",
   environments: "My Environments",
-  "api-tokens": "Tokens",
+  "api-tokens": "Sessions",
   activity: "Activity Logs",
   cache: "Cache Settings",
 };
@@ -761,7 +761,7 @@ export default function PortalHome() {
               <span className="ni">
                 <i className="fa-solid fa-key" />
               </span>
-              <span className="nl">Tokens</span>
+              <span className="nl">Sessions</span>
             </div>
           )}
 

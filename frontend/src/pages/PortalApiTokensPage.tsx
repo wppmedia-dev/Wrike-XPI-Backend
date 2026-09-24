@@ -228,7 +228,7 @@ export default function PortalApiTokensPage({
       <div className="section-header">
         <div>
           <div className="section-title">
-            Tokens <PageInfo help={PORTAL_HELP.apiTokens} />
+            Sessions <PageInfo help={PORTAL_HELP.apiTokens} />
           </div>
           <div className="section-subtitle">
             Tokens issued for your environments

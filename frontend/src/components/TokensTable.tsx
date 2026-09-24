@@ -104,7 +104,7 @@ const FILTER_DEFS: FilterDef[] = [
   {
     // The one column that narrows a list where everything else looks alike:
     // "show me the tokens Claude is using" or "the ones people created by
-    // signing in". Matches the client name shown in the Token column.
+    // signing in". Matches the client name shown in the Token ID column.
     key: "client",
     param: "client",
     label: "Client",
@@ -357,7 +357,7 @@ export function TokensTable({
       },
       {
         id: "token",
-        header: "Token",
+        header: "Token ID",
         // Sorted by what the token was issued to rather than by its own id: a
         // uuid has no order worth reading, and "group the Claude tokens
         // together" is the question this column gets asked.
@@ -528,7 +528,7 @@ export function TokensTable({
                 },
               },
               {
-                // The account number is in the Token column, small and under
+                // The account number is in the Token ID column, small and under
                 // the token's own id, so this is how a caller copies the value
                 // the Account filter above expects rather than selecting 11px
                 // text out of a dense cell.
@@ -942,7 +942,7 @@ export function TokensTable({
   return (
     <DataTable
       table={table}
-      caption="Tokens"
+      caption="Sessions"
       loading={loading}
       className="tok-table"
       searchPlaceholder="Search by name, account, user or id…"

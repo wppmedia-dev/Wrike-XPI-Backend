@@ -77,7 +77,7 @@ type PageId =
 const PAGE_NAMES: Record<PageId, string> = {
   overview: "Overview",
   environments: "Environments",
-  tokens: "Tokens",
+  tokens: "Sessions",
   users: "Users",
   settings: "Settings",
   "cache-settings": "Cache Settings",
@@ -1351,7 +1351,7 @@ export default function AdminDashboard() {
             onClick={() => {
               // From the sidebar this means every token, so an environment
               // scope left over from an Environments row is dropped here rather
-              // than persisting behind a nav item that just says "Tokens".
+              // than persisting behind a nav item that just says "Sessions".
               setTokensEnvScope(null);
               handleNav("tokens");
             }}
@@ -1359,7 +1359,7 @@ export default function AdminDashboard() {
             <span className="ni">
               <i className="fa-solid fa-key" />
             </span>
-            <span className="nl">Tokens</span>
+            <span className="nl">Sessions</span>
             <span className="nav-badge">{tokens.length}</span>
           </div>
 
@@ -1647,12 +1647,12 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* ══════ TOKENS PAGE ══════ */}
+          {/* ══════ SESSIONS PAGE ══════ */}
           <div className={`page${activePage === "tokens" ? " active" : ""}`} id="page-tokens">
             <div className="section-header">
               <div>
                 <div className="section-title">
-                  Tokens <PageInfo help={ADMIN_HELP.tokens} />
+                  Sessions <PageInfo help={ADMIN_HELP.tokens} />
                 </div>
                 <div className="section-subtitle">
                   Every token this service has issued, and the modules each one may call
