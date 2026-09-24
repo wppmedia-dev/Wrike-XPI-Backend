@@ -70,17 +70,17 @@ body {
 .logo-mark {
   width: 38px;
   height: 38px;
-  background: var(--accent);
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 
-.logo-mark svg {
-  width: 22px;
-  height: auto;
-  fill: #fff;
+.logo-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .logo-name {

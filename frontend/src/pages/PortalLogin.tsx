@@ -6,6 +6,7 @@ import {
   portalLogin,
   setPortalSession,
 } from "../lib/portalAuthApi";
+import xtendIcon from "../assets/xtend-logo-icon.png";
 import "./PortalLogin.css";
 
 // Faithful React port of views/portal/login.ejs.
@@ -53,9 +54,7 @@ export default function PortalLogin() {
         <div className="card-brand">
           <div className="logo-lockup">
             <div className="logo-mark">
-              <svg viewBox="0 0 24 16" xmlns="http://www.w3.org/2000/svg">
-                <path d="M0 0h4.8l3.6 9.6 3.6-9.6h4.8l-6 16H6L0 0zm14.4 0H24l-6 16h-4.8l3.6-9.6L14.4 0z" />
-              </svg>
+              <img src={xtendIcon} alt="Xtend" />
             </div>
             <span className="logo-name">WrikeXPI</span>
           </div>

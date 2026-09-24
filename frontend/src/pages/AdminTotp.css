@@ -58,10 +58,9 @@ body {
   margin-bottom: 28px;
 }
 
-.card-brand svg.wrike-logo {
+.card-brand img.wrike-logo {
   width: 160px;
   height: auto;
-  fill: var(--accent);
 }
 
 .brand-sub {

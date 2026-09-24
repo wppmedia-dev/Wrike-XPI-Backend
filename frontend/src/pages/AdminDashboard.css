@@ -153,7 +153,6 @@
         height: 34px;
         min-width: 34px;
         border-radius: var(--radius-sm);
-        background: var(--accent);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -161,10 +160,10 @@
         flex-shrink: 0;
       }
 
-      .logo-mark svg {
-        width: 20px;
-        height: 13px;
-        fill: #ffffff;
+      .logo-mark img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
         display: block;
       }
 
