@@ -196,7 +196,7 @@ export function PortalEnvironmentsTable({
                       // The question "what is using this environment?" asked
                       // from the environment's own row, exactly as the admin
                       // console's Environments table asks it.
-                      label: "View tokens",
+                      label: "View sessions",
                       icon: "fa-solid fa-key",
                       onSelect: () => onViewTokens(env),
                     },

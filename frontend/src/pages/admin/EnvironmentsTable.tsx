@@ -193,7 +193,7 @@ export function EnvironmentsTable({
                 // Straight to the tokens issued for this environment, already
                 // filtered to it. That is the question "what is using this
                 // environment?" asked from the environment's own row.
-                label: "View tokens",
+                label: "View sessions",
                 icon: "fa-solid fa-key",
                 onSelect: () => onViewTokens(env),
               },
