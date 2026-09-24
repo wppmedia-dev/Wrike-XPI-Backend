@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { getAccessToken, login, setAccessToken, setTotpToken } from "../lib/authApi";
 import xtendLogo from "../assets/xtend-logo.png";
+import loginBackgroundVideo from "../assets/video/login-background.mp4";
 import "./Login.css";
 
 // Faithful React port of the original views/admin/login.ejs design — same
@@ -53,6 +54,15 @@ export default function Login() {
 
   return (
     <div className="login-page">
+      <video
+        className="login-bg-video"
+        src={loginBackgroundVideo}
+        autoPlay
+        muted
+        loop
+        playsInline
+        aria-hidden="true"
+      />
       <div className="login-card">
         <div className="card-brand">
           <img className="wrike-logo" src={xtendLogo} alt="Xtend logo" />
