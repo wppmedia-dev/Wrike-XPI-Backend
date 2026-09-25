@@ -397,7 +397,7 @@ export default function ActivityLog({
               <tr>
                 <th scope="col">Time</th>
                 <th scope="col">Caller</th>
-                <th scope="col">Token</th>
+                <th scope="col">Token ID</th>
                 <th scope="col">Surface</th>
                 <th scope="col">Called</th>
                 <th scope="col">IP</th>
@@ -638,7 +638,7 @@ export default function ActivityLog({
                   <dd>{detailRow.environment_name || "—"}</dd>
                 </div>
                 <div>
-                  <dt>Token</dt>
+                  <dt>Token ID</dt>
                   <dd>
                     {detailRow.token_id ? (
                       <span className="al-token-cell">
