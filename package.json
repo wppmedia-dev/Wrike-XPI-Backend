@@ -7,7 +7,7 @@
     "test": "test"
   },
   "scripts": {
-    "start": "npm run build && node dist",
+    "start": "node dist",
     "dev": "nodemon --exec babel-node --max-old-space-size=4096 src/index.js",
     "clean": "rm -rf dist",
     "build:frontend": "cd frontend && npm install && npm run build",
