@@ -223,7 +223,13 @@ export const oauthRoute = (fastify, opts, done) => {
     },
   );
 
-  fastify.get("/authorize", async (req, reply) => {
+  /**
+   * Shared body for both /authorize routes below. `environmentId` is passed
+   * in explicitly rather than read from req.query, so it can come from a URL
+   * path segment (env-specific route) as well as the query string (generic
+   * route) — see the two registrations right after this.
+   */
+  const handleAuthorize = async (req, reply, environmentId) => {
     try {
       const {
         response_type,
@@ -232,10 +238,10 @@ export const oauthRoute = (fastify, opts, done) => {
         state,
         code_challenge,
         code_challenge_method,
-        environment_id,
         environment,
         accountId,
       } = req.query;
+      const environment_id = environmentId || req.query.environment_id;
 
       if (!redirect_uri) {
         return reply.code(400).send({
@@ -315,6 +321,24 @@ export const oauthRoute = (fastify, opts, done) => {
         error_description: err?.message || "Failed to start authorization",
       });
     }
+  };
+
+  // Generic route: environment_id (if any) comes from the query string,
+  // same as every other OAuth param. This is what a client reaches when it
+  // omits environment_id entirely (the picker) or merges it correctly.
+  fastify.get("/authorize", async (req, reply) => {
+    return handleAuthorize(req, reply, null);
+  });
+
+  // Env-specific route: environment_id comes from the URL path instead of
+  // the query string, so it can never collide with a client's own OAuth
+  // params — a client that naively appends "?response_type=...&client_id=..."
+  // to whatever authorization_endpoint it was given (rather than parsing and
+  // merging query strings) cannot corrupt this the way it could corrupt
+  // "/authorize?environment_id=...". This is what /.well-known/oauth-authorization-server/env/:environmentId
+  // now advertises as authorization_endpoint (see ./wellKnown.js).
+  fastify.get("/authorize/env/:environmentId", async (req, reply) => {
+    return handleAuthorize(req, reply, req.params.environmentId);
   });
 
   fastify.post("/token", async (req, reply) => {
