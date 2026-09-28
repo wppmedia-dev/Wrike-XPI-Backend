@@ -27,7 +27,7 @@ const normalizeFieldMap = (fieldMapping = {}) => {
  */
 export const registerDatahubTools = (server, serverUrl, auth) => {
   server.registerTool(
-    "datahub_list_fields",
+    "xtend_datahub_list_fields",
 
     {
       description:

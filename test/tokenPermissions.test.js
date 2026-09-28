@@ -511,18 +511,18 @@ console.log("\nMCP tools → module/action");
   };
 
   const cases = [
-    ["campaign_list", readOnly, "campaign/read"],
-    ["campaign_get", readOnly, "campaign/read"],
-    ["campaign_create", write, "campaign/create"],
-    ["campaign_update", write, "campaign/update"],
-    ["campaign_delete", destructive, "campaign/delete"],
-    ["channel_update", write, "channel/update"],
-    ["task_list_campaign", readOnly, "task/read"],
-    ["task_delete", destructive, "task/delete"],
+    ["xtend_campaign_list", readOnly, "campaign/read"],
+    ["xtend_campaign_get", readOnly, "campaign/read"],
+    ["xtend_campaign_create", write, "campaign/create"],
+    ["xtend_campaign_update", write, "campaign/update"],
+    ["xtend_campaign_delete", destructive, "campaign/delete"],
+    ["xtend_channel_update", write, "channel/update"],
+    ["xtend_task_list_campaign", readOnly, "task/read"],
+    ["xtend_task_delete", destructive, "task/delete"],
     // The two helpers are governed by the MCP row, not exempt from it. Their
     // names carry no verb, so their own read-only annotation decides.
-    ["datahub_list_fields", readOnly, "mcp_proxy/read"],
-    ["ids_convert", readOnly, "mcp_proxy/read"],
+    ["xtend_datahub_list_fields", readOnly, "mcp_proxy/read"],
+    ["xtend_ids_convert", readOnly, "mcp_proxy/read"],
     ["wrike_search_items", readOnly, "mcp_proxy/read"],
     ["wrike_create_task_item", write, "mcp_proxy/create"],
     ["wrike_update_items", write, "mcp_proxy/update"],
@@ -539,6 +539,17 @@ console.log("\nMCP tools → module/action");
     ["some_future_tool", readOnly, "mcp_proxy/read"],
     ["some_future_delete_thing", destructive, "mcp_proxy/delete"],
   ];
+
+  // Every native tool registers under xtend_<family>_..., and the family
+  // lookup has to see past that prefix: xtend_campaign_update and
+  // campaign_update must resolve identically, so a client that only ever
+  // sees the xtend_ name is governed exactly like the bare family name would
+  // have been.
+  check(
+    "the xtend_ prefix is transparent to the family lookup",
+    routeOfTool("xtend_campaign_update", write),
+    routeOfTool("campaign_update", write),
+  );
 
   cases.forEach(([name, annotations, expected]) => {
     check(

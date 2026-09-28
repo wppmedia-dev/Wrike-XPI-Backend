@@ -198,16 +198,16 @@ const runGateChecks = async () => {
   {
     const t = RESTRICTED;
 
-    await checkAllowed("campaign_list", t, "campaign_list", read);
-    await checkAllowed("campaign_get", t, "campaign_get", read);
+    await checkAllowed("xtend_campaign_list", t, "xtend_campaign_list", read);
+    await checkAllowed("xtend_campaign_get", t, "xtend_campaign_get", read);
 
-    await checkDenied("campaign_create", t, "campaign_create", write);
-    await checkDenied("campaign_update", t, "campaign_update", write);
-    await checkDenied("campaign_delete", t, "campaign_delete", destructive);
+    await checkDenied("xtend_campaign_create", t, "xtend_campaign_create", write);
+    await checkDenied("xtend_campaign_update", t, "xtend_campaign_update", write);
+    await checkDenied("xtend_campaign_delete", t, "xtend_campaign_delete", destructive);
 
     // A different module, no grant at all.
-    await checkDenied("channel_get", t, "channel_get", read);
-    await checkDenied("task_delete", t, "task_delete", destructive);
+    await checkDenied("xtend_channel_get", t, "xtend_channel_get", read);
+    await checkDenied("xtend_task_delete", t, "xtend_task_delete", destructive);
 
     // The proxied Wrike surface is its own row, and the same rule applies to
     // it: no mcp_proxy read means no proxied call, whatever Wrike would allow.
@@ -221,21 +221,21 @@ const runGateChecks = async () => {
     );
 
     // …with two named exceptions, both of which read no record.
-    // The two helpers whose names carry no verb, datahub_list_fields and
-    // ids_convert, are governed too: they used to be exempt, and the cost of
-    // that was an admin switching every action off and still finding two
+    // The two helpers whose names carry no verb, xtend_datahub_list_fields and
+    // xtend_ids_convert, are governed too: they used to be exempt, and the cost
+    // of that was an admin switching every action off and still finding two
     // working tools. They are reads on the MCP row, so a token with no mcp_proxy
     // read is refused them as well.
-    await checkDenied("datahub_list_fields", t, "datahub_list_fields", read);
-    await checkDenied("ids_convert", t, "ids_convert", read);
+    await checkDenied("xtend_datahub_list_fields", t, "xtend_datahub_list_fields", read);
+    await checkDenied("xtend_ids_convert", t, "xtend_ids_convert", read);
   }
 
   console.log("\nThe refusal a caller gets");
   {
-    const result = await callTool(RESTRICTED, "campaign_delete", destructive);
+    const result = await callTool(RESTRICTED, "xtend_campaign_delete", destructive);
 
     checkTrue("it is an error result", result.isError);
-    checkTrue("it names the tool", result.text.includes('"campaign_delete"'));
+    checkTrue("it names the tool", result.text.includes('"xtend_campaign_delete"'));
     checkTrue(
       "it names the module and action",
       result.text.includes("delete campaign"),
@@ -260,13 +260,13 @@ const runGateChecks = async () => {
   {
     const t = WIDER;
 
-    await checkAllowed("campaign_delete", t, "campaign_delete", destructive);
-    await checkAllowed("campaign_create", t, "campaign_create", write);
+    await checkAllowed("xtend_campaign_delete", t, "xtend_campaign_delete", destructive);
+    await checkAllowed("xtend_campaign_create", t, "xtend_campaign_create", write);
 
     // The helpers need the MCP row's read, which this token has: a tool an
     // agent needs is a grant an admin makes, and this is where they make it.
-    await checkAllowed("datahub_list_fields", t, "datahub_list_fields", read);
-    await checkAllowed("ids_convert", t, "ids_convert", read);
+    await checkAllowed("xtend_datahub_list_fields", t, "xtend_datahub_list_fields", read);
+    await checkAllowed("xtend_ids_convert", t, "xtend_ids_convert", read);
 
     // Read on the proxy row is not write: the four actions stay separate on
     // the MCP surface exactly as they do over REST.
@@ -333,15 +333,15 @@ const runGateChecks = async () => {
   {
     const t = UNRESTRICTED;
 
-    await checkAllowed("campaign_delete", t, "campaign_delete", destructive);
+    await checkAllowed("xtend_campaign_delete", t, "xtend_campaign_delete", destructive);
     await checkAllowed("wrike_update_items", t, "wrike_update_items", write);
-    await checkAllowed("ids_convert", t, "ids_convert", read);
+    await checkAllowed("xtend_ids_convert", t, "xtend_ids_convert", read);
   }
 
   console.log("\nWhen the matrix cannot be read");
   {
     // Fail closed: a permission check with no answer must not become a grant.
-    const result = await callTool(UNREADABLE, "campaign_get", read);
+    const result = await callTool(UNREADABLE, "xtend_campaign_get", read);
     check("it is refused", result.isError, true);
     checkTrue(
       "with a reason code that says the check failed, not that the rule denied",
@@ -350,7 +350,7 @@ const runGateChecks = async () => {
 
     // And with no token id at all, which is what a half-resolved auth object
     // would look like: the controller throws, so the gate refuses.
-    const anonymous = await callTool(undefined, "campaign_get", read);
+    const anonymous = await callTool(undefined, "xtend_campaign_get", read);
     check(
       "an auth object with no token id is refused",
       anonymous.isError,
@@ -367,23 +367,23 @@ const runGateChecks = async () => {
     const unrestricted = UNRESTRICTED;
 
     await checkAllowed(
-      "campaign_get (the one module the environment grants)",
+      "xtend_campaign_get (the one module the environment grants)",
       unrestricted,
-      "campaign_get",
+      "xtend_campaign_get",
       read,
       ENV_RESTRICTED,
     );
     await checkDenied(
-      "campaign_delete in an environment that does not grant it",
+      "xtend_campaign_delete in an environment that does not grant it",
       unrestricted,
-      "campaign_delete",
+      "xtend_campaign_delete",
       destructive,
       ENV_RESTRICTED,
     );
     await checkDenied(
-      "channel_get, a module the environment never granted",
+      "xtend_channel_get, a module the environment never granted",
       unrestricted,
-      "channel_get",
+      "xtend_channel_get",
       read,
       ENV_RESTRICTED,
     );
@@ -397,7 +397,7 @@ const runGateChecks = async () => {
 
     const refused = await callTool(
       unrestricted,
-      "campaign_delete",
+      "xtend_campaign_delete",
       destructive,
       ENV_RESTRICTED,
     );
@@ -409,14 +409,14 @@ const runGateChecks = async () => {
     // Short-circuit: the token is not even asked once the environment has said
     // no, which is what "before token level" means at runtime.
     asked.length = 0;
-    await callTool(unrestricted, "channel_get", read, ENV_RESTRICTED);
+    await callTool(unrestricted, "xtend_channel_get", read, ENV_RESTRICTED);
     check("the token matrix is never read", asked.length, 0);
 
     // Fail closed on this layer too, and before the token is consulted.
     asked.length = 0;
     const unreadable = await callTool(
       unrestricted,
-      "campaign_get",
+      "xtend_campaign_get",
       read,
       ENV_UNREADABLE,
     );
@@ -433,15 +433,15 @@ const runGateChecks = async () => {
     // This is what the activity log writes onto the request's row: which tool,
     // and what was decided about it. It has to be reported for refused calls
     // as well, or a log would only ever show what ran.
-    const allowed = await callTool(WIDER, "campaign_get", read);
+    const allowed = await callTool(WIDER, "xtend_campaign_get", read);
     check("an allowed call is reported once", allowed.calls.length, 1);
-    check("with the tool name", allowed.calls[0].tool, "campaign_get");
+    check("with the tool name", allowed.calls[0].tool, "xtend_campaign_get");
     check("its module", allowed.calls[0].module, "campaign");
     check("its action", allowed.calls[0].action, "read");
     check("and the decision", allowed.calls[0].allowed, true);
     check("with no reason code", allowed.calls[0].code, null);
 
-    const refused = await callTool(RESTRICTED, "campaign_delete", destructive);
+    const refused = await callTool(RESTRICTED, "xtend_campaign_delete", destructive);
     check("a refused call is reported too", refused.calls.length, 1);
     check(
       "with the code that refused it",
@@ -458,7 +458,7 @@ const runGateChecks = async () => {
 
     const byEnvironment = await callTool(
       UNRESTRICTED,
-      "channel_get",
+      "xtend_channel_get",
       read,
       ENV_RESTRICTED,
     );
@@ -468,7 +468,7 @@ const runGateChecks = async () => {
       "ENVIRONMENT_MODULE_FORBIDDEN",
     );
 
-    const broken = await callTool(UNREADABLE, "campaign_get", read);
+    const broken = await callTool(UNREADABLE, "xtend_campaign_get", read);
     check(
       "a check that could not be answered is reported as such",
       broken.calls[0].code,
@@ -481,7 +481,7 @@ const runGateChecks = async () => {
     // The agent reads this out, and it is what the person can be searched by:
     // the log keeps one row per MCP request, so the reference on the row and
     // the one in the message have to be the same string.
-    const refused = await callTool(RESTRICTED, "campaign_delete", destructive);
+    const refused = await callTool(RESTRICTED, "xtend_campaign_delete", destructive);
     check(
       "the message quotes a reference",
       refused.text.includes(`Reference: ${refused.reference}.`),
@@ -515,11 +515,11 @@ const runGateChecks = async () => {
       { tokenId: RESTRICTED, envId: ENV_OPEN },
       (call) => calls.push(call),
     );
-    server.registerTool("campaign_delete", destructive, async () => RAN);
-    server.registerTool("campaign_update", write, async () => RAN);
+    server.registerTool("xtend_campaign_delete", destructive, async () => RAN);
+    server.registerTool("xtend_campaign_update", write, async () => RAN);
 
-    const first = await handlers.get("campaign_delete")({}, {});
-    const second = await handlers.get("campaign_update")({}, {});
+    const first = await handlers.get("xtend_campaign_delete")({}, {});
+    const second = await handlers.get("xtend_campaign_update")({}, {});
 
     check("both refusals report a reference", calls.length, 2);
     check(
@@ -533,7 +533,7 @@ const runGateChecks = async () => {
   {
     asked.length = 0;
     askedEnvironments.length = 0;
-    await callTool(WIDER, "campaign_get", read);
+    await callTool(WIDER, "xtend_campaign_get", read);
     check("one lookup per tool call", asked.length, 1);
     check("for that token", asked[0], WIDER);
     check("and one for its environment", askedEnvironments.length, 1);
@@ -576,7 +576,7 @@ const runCoverageChecks = () => {
   check("nothing is exempt from the matrix", ungoverned.join(","), "");
   check(
     "the two verbless helpers read the MCP row like everything else",
-    ["datahub_list_fields", "ids_convert"]
+    ["xtend_datahub_list_fields", "xtend_ids_convert"]
       .map((name) => {
         const route = mcp.resolveToolRoute(name, { readOnlyHint: true });
         return `${route.module}/${route.action}`;

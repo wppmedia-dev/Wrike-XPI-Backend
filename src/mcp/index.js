@@ -14,14 +14,15 @@ import { permissionDenied, resolveToolRoute } from "./tools/permission.js";
 /**
  * Top-level instructions surfaced to the connected agent during handshake.
  *
- * This server now merges TWO tool families — native XPI business tools and
- * Wrike's own hosted MCP tools (proxied with a `wrike_` prefix). The
- * guidance tells the agent which family to reach for, so the two never
- * conflict and it always has enough context to pick the right tool.
+ * This server now merges TWO tool families — native XPI business tools
+ * (prefixed `xtend_`) and Wrike's own hosted MCP tools (proxied with a
+ * `wrike_` prefix). The guidance tells the agent which family to reach for,
+ * so the two never conflict and it always has enough context to pick the
+ * right tool.
  */
 const MCP_INSTRUCTIONS = `You are connected to the WrikeXPI MCP server. This server exposes TWO tool families that complement — not duplicate — each other.
 
-1. NATIVE XPI TOOLS (no prefix)
+1. NATIVE XPI TOOLS (prefix "xtend_")
    Business operations for WrikeXPI-managed resources: campaigns, channels, tasks, and Datahub records/fields. They are scoped to the environment of your authenticated token and apply XPI rules (enrichment, validation, request forms, datahub IDs) on top of Wrike.
    Prefer these whenever the user is talking about an XPI resource: a campaign, a channel, a Datahub field/record, or a task that belongs to an XPI campaign/channel flow.
 
@@ -30,30 +31,30 @@ const MCP_INSTRUCTIONS = `You are connected to the WrikeXPI MCP server. This ser
    Use these when the ask concerns raw Wrike objects that XPI tools do not model — comments, approvals, inbox, spaces, users/groups, attachments, generic item search/hierarchy, custom item types, workflows/statuses — or to read/update an item that lives outside an XPI flow.
 
 HOW TO CHOOSE — avoid conflict
-- Let the resource decide the family, not the tool list: XPI-managed resource -> XPI tool; a generic Wrike item/space/user/approval/comment/etc. -> wrike_* tool.
-- Never call an XPI tool and a wrike_* tool for the same job, and never invent a combined flow when a single call does it.
-- If an expected wrike_* tool is missing, fall back to the XPI toolset (always present) or tell the user it is unavailable — do not improvise a substitute.
+- Let the resource decide the family, not the tool list: XPI-managed resource -> xtend_* tool; a generic Wrike item/space/user/approval/comment/etc. -> wrike_* tool.
+- Never call an xtend_* tool and a wrike_* tool for the same job, and never invent a combined flow when a single call does it.
+- If an expected wrike_* tool is missing, fall back to the xtend_* toolset (always present) or tell the user it is unavailable — do not improvise a substitute.
 
 CONFIRMING WRITE OPERATIONS — every update and delete is gated
-- All mutating tools are gated: the native update/delete tools (campaign_update, campaign_delete, channel_update, channel_delete, task_update, task_delete) and every mutating wrike_* tool (update_items, create_task_item, add_attachments_to_item, and any other that writes).
+- All mutating tools are gated: the native update/delete tools (xtend_campaign_update, xtend_campaign_delete, xtend_channel_update, xtend_channel_delete, xtend_task_update, xtend_task_delete) and every mutating wrike_* tool (update_items, create_task_item, add_attachments_to_item, and any other that writes).
 - A gated tool called WITHOUT confirm: true performs NO write. It returns a preview naming the requested action and the exact arguments that would be applied. That return value is the confirmation step, not a failure and not a completed change.
 - On receiving a preview: show the user the requested action and those arguments in plain language, then ask them to approve it. Never assume approval, never approve on the user's behalf, and never treat an earlier approval of a different change as consent for this one.
 - Only after the user explicitly approves that specific change, call the same tool again with the identical arguments plus confirm: true. Do not add, drop, or re-scope arguments on the confirmed call — if the change differs, restart the sequence with a fresh preview.
 - If the user declines, or does not answer, stop and report that nothing was changed. Do not retry the call, and do not reach for a different tool that would achieve the same write.
 - Never state or imply that a change was made until a call carrying confirm: true has actually returned successfully.
-- Creating a campaign (campaign_create) is not gated — it destroys nothing and has no prior state to preview.
+- Creating a campaign (xtend_campaign_create) is not gated — it destroys nothing and has no prior state to preview.
 
 MODULE PERMISSIONS: a token may be narrower than the tool list
 - The tool list is what the *surface* can do. What your token is *allowed* to do is granted per module (campaign, channel, task, master data, amoeba, Wrike MCP tools) and per action (read, create, update, delete), and a token nobody has restricted can do everything.
-- A tool call outside those grants returns FORBIDDEN with isError: true, naming the module and action that is missing. That is a final answer, not a transient one: retrying, or reaching for a different tool that would achieve the same change (for example wrike_update_items instead of campaign_update), is not permitted.
+- A tool call outside those grants returns FORBIDDEN with isError: true, naming the module and action that is missing. That is a final answer, not a transient one: retrying, or reaching for a different tool that would achieve the same change (for example wrike_update_items instead of xtend_campaign_update), is not permitted.
 - When you get FORBIDDEN: report the missing module and action to the user and stop. An administrator can change it in the admin portal; you cannot, and nothing was changed.
 
 MECHANICS
 - Authentication is already resolved per request; never pass tokens or credentials.
 - Read each tool's schema before calling; arguments are validated.
 - IDs returned by tools feed into the matching tools unchanged (XPI IDs are Wrike-based; wrike_* tools accept Wrike item/folder/task IDs).
-- All campaign, channel, campaign-task, and channel-task tools (campaign_get/update/delete, channel_get/update/delete, task_get/update/delete, task_list_campaign, task_list_channel) require an API v4 ID for their campaignId/channelId/taskId parameter. If the user gives you a legacy API v2 ID instead (a short numeric-looking id, or one sourced from an old API v2 integration/export/URL), do not guess or pad it into a v4 ID. Call ids_convert first (type ApiV2Folder for campaigns/channels, ApiV2Task for tasks) to resolve it to the matching v4 ID, then use that v4 ID for the call.
-- If the user gives you a Wrike link instead of an ID (a permalink such as https://www.wrike.com/open.htm?id=... or https://app-eu.wrike.com/open.htm?id=...), do not parse or guess the ID from the URL yourself. Pass the permalink itself into get_item_details. The response's id field is the resolved v4 ID for that folder or task. Use that v4 ID for every following call, including native XPI tools.
+- All campaign, channel, campaign-task, and channel-task tools (xtend_campaign_get/update/delete, xtend_channel_get/update/delete, xtend_task_get/update/delete, xtend_task_list_campaign, xtend_task_list_channel) require an API v4 ID for their campaignId/channelId/taskId parameter. If the user gives you a legacy API v2 ID instead (a short numeric-looking id, or one sourced from an old API v2 integration/export/URL), do not guess or pad it into a v4 ID. Call xtend_ids_convert first (type ApiV2Folder for campaigns/channels, ApiV2Task for tasks) to resolve it to the matching v4 ID, then use that v4 ID for the call.
+- If the user gives you a Wrike link instead of an ID (a permalink such as https://www.wrike.com/open.htm?id=... or https://app-eu.wrike.com/open.htm?id=...), do not parse or guess the ID from the URL yourself. Pass the permalink itself into get_item_details. The response's id field is the resolved v4 ID for that folder or task. Use that v4 ID for every following call, including native xtend_* tools.
 - If the user identifies someone by email address for an action that needs a user ID (assigning a task, adding a follower, and similar), do not guess or invent a user ID from the email. Call wrike_get_users first to look up that email and read the matching user's id from the response. Use that id for the action.
 - Respect limits and pagination: wrike_* tools cap results (e.g. 200 newest comments, pageSize on search_items) and return truncation/next-page signals — page through or narrow the query as each tool's description explains.`;
 
@@ -159,7 +160,7 @@ export const createMcpServer = async (fastify, serverUrl, auth, onToolCall) => {
       title: "WrikeXPI",
       version: "1.0.0",
       description:
-        "Hybrid WrikeXPI MCP: native XPI business tools (campaigns, channels, tasks, Datahub) + Wrike's own tools exposed as wrike_*.",
+        "Hybrid WrikeXPI MCP: native XPI business tools (campaigns, channels, tasks, Datahub) exposed as xtend_* + Wrike's own tools exposed as wrike_*.",
       websiteUrl: serverUrl,
       icons: [
         {

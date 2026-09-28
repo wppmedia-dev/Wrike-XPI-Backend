@@ -379,29 +379,29 @@ module.exports = async function (fastify, opts) {
             ["Tool", "What it does"],
             [
               [
-                "<code>campaign_list</code>",
+                "<code>xtend_campaign_list</code>",
                 "List campaigns with OData filters.",
               ],
               [
-                "<code>campaign_create</code>",
+                "<code>xtend_campaign_create</code>",
                 "Create a campaign from a request form.",
               ],
-              ["<code>campaign_get</code>", "Read a single campaign."],
-              ["<code>campaign_update</code>", "Update campaign fields."],
-              ["<code>campaign_delete</code>", "Delete a campaign."],
-              ["<code>channel_list</code>", "List channels under a campaign."],
-              ["<code>channel_get</code>", "Read a single channel."],
-              ["<code>channel_update</code>", "Update channel fields."],
-              ["<code>channel_delete</code>", "Delete a channel."],
+              ["<code>xtend_campaign_get</code>", "Read a single campaign."],
+              ["<code>xtend_campaign_update</code>", "Update campaign fields."],
+              ["<code>xtend_campaign_delete</code>", "Delete a campaign."],
+              ["<code>xtend_channel_list</code>", "List channels under a campaign."],
+              ["<code>xtend_channel_get</code>", "Read a single channel."],
+              ["<code>xtend_channel_update</code>", "Update channel fields."],
+              ["<code>xtend_channel_delete</code>", "Delete a channel."],
               [
-                "<code>task_list</code>",
+                "<code>xtend_task_list_campaign</code> / <code>xtend_task_list_channel</code>",
                 "List tasks for a campaign or channel.",
               ],
-              ["<code>task_get</code>", "Read a single task."],
-              ["<code>task_update</code>", "Update task fields."],
-              ["<code>task_delete</code>", "Delete a task."],
+              ["<code>xtend_task_get</code>", "Read a single task."],
+              ["<code>xtend_task_update</code>", "Update task fields."],
+              ["<code>xtend_task_delete</code>", "Delete a task."],
               [
-                "<code>datahub_list_fields</code>",
+                "<code>xtend_datahub_list_fields</code>",
                 "Discover DataHub field mappings.",
               ],
             ],
@@ -609,12 +609,12 @@ description:
               ["XPI tool", "Wrike counterpart", "Reasoning"],
               [
                 [
-                  "<code>datahub_list_fields</code>",
+                  "<code>xtend_datahub_list_fields</code>",
                   "<i>none</i>",
                   "The short-code field dictionary every other XPI tool depends on.",
                 ],
                 [
-                  "<code>campaign_create</code>",
+                  "<code>xtend_campaign_create</code>",
                   "<code>wrike_create_project_folder_item</code>",
                   "Goes through the request-form workflow XPI campaigns require.",
                 ],
@@ -629,12 +629,12 @@ description:
                   '"This is the ONLY delete operation exposed — Wrike\'s MCP tools do not provide a delete."',
                 ],
                 [
-                  "<code>task_get</code> / <code>task_list_*</code>",
+                  "<code>xtend_task_get</code> / <code>xtend_task_list_*</code>",
                   "<code>wrike_get_item_details</code>, <code>wrike_get_items_children</code>",
                   "Validates XPI task type and translates fields to short codes.",
                 ],
                 [
-                  "<code>ids_convert</code>",
+                  "<code>xtend_ids_convert</code>",
                   "<i>none</i>",
                   "Converts legacy API v2 IDs — pure XPI plumbing.",
                 ],
@@ -648,7 +648,7 @@ description:
             ${callout("tip", "The pattern", "XPI wins wherever it layers meaning onto a resource (short codes, validation, request-forms). Wrike wins wherever the resource is something XPI never modeled — comments, approvals, users, spaces.")}
 
             <h3 class="pg-h3">Worked example</h3>
-            <p class="pg-p"><b>Request:</b> "Set task <code>MQAAAAELy_uV</code> to In Progress." (1) Server rule: resource is a task. (2) <code>task_update</code>'s own text names <code>wrike_update_items</code> and the risk. (3) <code>taskstatus</code> is a short code Wrike's tool can't interpret. <b>Result:</b> <code>task_update</code> is called; <code>wrike_update_items</code> is never touched.</p>
+            <p class="pg-p"><b>Request:</b> "Set task <code>MQAAAAELy_uV</code> to In Progress." (1) Server rule: resource is a task. (2) <code>xtend_task_update</code>'s own text names <code>wrike_update_items</code> and the risk. (3) <code>taskstatus</code> is a short code Wrike's tool can't interpret. <b>Result:</b> <code>xtend_task_update</code> is called; <code>wrike_update_items</code> is never touched.</p>
             `,
             `
             <h3 class="pg-h3">The general rulebook</h3>
@@ -758,7 +758,7 @@ async ({ taskId, confirm }, extra) => {
   // NEW — no write until the user has seen this and approved it
   if (!isConfirmed(confirm)) {
     return confirmationRequest({
-      toolName: "task_update",
+      toolName: "xtend_task_update",
       action: "update this task",
       target: \`task \${taskId}\`,
       arguments: { taskId, formFields },
@@ -772,8 +772,8 @@ async ({ taskId, confirm }, extra) => {
             )}
             ${callout("warn", "Why a flag and not a prompt", "The gate cannot be skipped by the model: without <code>confirm: true</code> the write path is never reached, and <code>isConfirmed</code> accepts only a strict boolean <code>true</code>. Repeating the call without the flag just returns the same preview, so there is no way to hammer through it.")}
 
-            <h3 class="pg-h3">Worked example — an elicitation prompt for <code>task_delete</code></h3>
-            <p class="pg-p"><code>task_delete</code> is already gated by option 4, so an unconfirmed delete cannot happen today. This example is for layering the client's own rendered prompt on top of that guarantee.</p>
+            <h3 class="pg-h3">Worked example — an elicitation prompt for <code>xtend_task_delete</code></h3>
+            <p class="pg-p"><code>xtend_task_delete</code> is already gated by option 4, so an unconfirmed delete cannot happen today. This example is for layering the client's own rendered prompt on top of that guarantee.</p>
             ${codeBlock(
               "js",
               `// src/mcp/tools/task.js — inside task_delete's handler
@@ -811,7 +811,7 @@ async ({ taskId }, extra) => {
                 [
                   "Cap deletes per session",
                   "Handler code",
-                  "Add a counter check inside the handler, like <code>ids_convert</code>'s existing <code>MAX_IDS_PER_CALL</code> cap (<code>ids.js:16</code>).",
+                  "Add a counter check inside the handler, like <code>xtend_ids_convert</code>'s existing <code>MAX_IDS_PER_CALL</code> cap (<code>ids.js:16</code>).",
                 ],
                 [
                   "Hide specific <code>wrike_*</code> tools",
@@ -826,7 +826,7 @@ async ({ taskId }, extra) => {
                 [
                   "Extra approval on high-value fields (e.g. budget)",
                   "① + ⑤ combined",
-                  "Describe the rule in <code>campaign_update</code>'s description, then gate an <code>elicitInput</code> call on whether <code>formFields.campaignbudget</code> is present.",
+                  "Describe the rule in <code>xtend_campaign_update</code>'s description, then gate an <code>elicitInput</code> call on whether <code>formFields.campaignbudget</code> is present.",
                 ],
               ],
             )}
