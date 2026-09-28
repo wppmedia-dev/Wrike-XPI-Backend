@@ -26,7 +26,7 @@ const MAX_IDS_PER_CALL = 1000;
  */
 export const registerIdsTools = (server, serverUrl, auth) => {
   server.registerTool(
-    "ids_convert",
+    "xtend_ids_convert",
 
     {
       description:
@@ -34,19 +34,19 @@ export const registerIdsTools = (server, serverUrl, auth) => {
         "integrations, imports, and API v2 links) into API v4 IDs — the opaque " +
         "alphanumeric IDs (e.g. MQAAAAELy_uV, IEAC7PRTI5OAO7EP) this server's other " +
         "tools require.\n\n" +
-        "WHY THIS MATTERS: campaign_get / campaign_update / campaign_delete, " +
-        "channel_get / channel_update / channel_delete, task_get / task_update / " +
-        "task_delete, and task_list_campaign / task_list_channel (campaignId / " +
+        "WHY THIS MATTERS: xtend_campaign_get / xtend_campaign_update / xtend_campaign_delete, " +
+        "xtend_channel_get / xtend_channel_update / xtend_channel_delete, xtend_task_get / xtend_task_update / " +
+        "xtend_task_delete, and xtend_task_list_campaign / xtend_task_list_channel (campaignId / " +
         "channelId / taskId parameters) all require a v4 ID. If you only have a " +
         "legacy v2 ID (a short numeric id, or one sourced from an old API v2 " +
         "integration/export), call this tool FIRST to resolve it to the matching " +
         "v4 ID, then pass that v4 ID into the campaign/channel/task tool.\n\n" +
         "INPUT:\n" +
         "  type – the entity type the ids belong to. One of:\n" +
-        "    ApiV2Task         – tasks (feeds task_get/task_update/task_delete taskId)\n" +
+        "    ApiV2Task         – tasks (feeds xtend_task_get/xtend_task_update/xtend_task_delete taskId)\n" +
         "    ApiV2Folder       – folders/projects, including campaigns and channels " +
-        "(feeds campaign_get/campaign_update/campaign_delete campaignId, and " +
-        "channel_get/channel_update/channel_delete channelId)\n" +
+        "(feeds xtend_campaign_get/xtend_campaign_update/xtend_campaign_delete campaignId, and " +
+        "xtend_channel_get/xtend_channel_update/xtend_channel_delete channelId)\n" +
         "    ApiV2Attachment   – attachments\n" +
         "    ApiV2Comment      – comments\n" +
         "    ApiV2Timelog      – time tracking entries\n" +

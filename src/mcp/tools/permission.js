@@ -67,9 +67,17 @@ const ACTION_BY_SEGMENT = [
 ];
 
 /**
+ * Every native XPI tool is registered under this prefix (xtend_campaign_list,
+ * xtend_task_delete, ...) so it reads distinctly from the proxied wrike_*
+ * family at a glance. Stripped before the module/verb lookup below, so the
+ * rest of this file still reasons in terms of the plain family name.
+ */
+const NATIVE_TOOL_PREFIX = "xtend_";
+
+/**
  * Native tool families that map onto an XPI module. Keyed by the tool name's
- * first underscore-separated segment: campaign_list → campaign,
- * task_list_campaign → task.
+ * first underscore-separated segment, after the xtend_ prefix is stripped:
+ * campaign_list → campaign, task_list_campaign → task.
  */
 const MODULE_BY_PREFIX = {
   campaign: "campaign",
@@ -123,8 +131,8 @@ const actionForTool = (subject, annotations) => {
  *
  * Null now means only one thing: there is no tool name to resolve. Every tool
  * the server registers is governed, including the two helpers whose names
- * carry no verb — datahub_list_fields and ids_convert declare themselves
- * read-only, so the fallback below reads them as mcp_proxy/read.
+ * carry no verb — xtend_datahub_list_fields and xtend_ids_convert declare
+ * themselves read-only, so the fallback below reads them as mcp_proxy/read.
  *
  * They used to be exempt, on the argument that neither touches a record: one
  * reads Datahub field definitions, the other converts a legacy id. The argument
@@ -140,7 +148,7 @@ const actionForTool = (subject, annotations) => {
  * instead of the MCP one; "some_future_tool" in test/tokenPermissions.test.js
  * pins that down.
  *
- * @param {string} name - registered tool name, e.g. "campaign_update"
+ * @param {string} name - registered tool name, e.g. "xtend_campaign_update"
  * @param {{readOnlyHint?: boolean, destructiveHint?: boolean}} [annotations]
  * @returns {{module: string, action: string} | null}
  */
@@ -157,7 +165,14 @@ export const resolveToolRoute = (name, annotations) => {
     };
   }
 
-  const [prefix, ...rest] = toolName.split("_");
+  // Every native tool registers as xtend_<family>_..., so the family lookup
+  // below has to see past that prefix — "xtend_campaign_create" and
+  // "campaign_create" must resolve identically.
+  const nativeSubject = toolName.startsWith(NATIVE_TOOL_PREFIX)
+    ? toolName.slice(NATIVE_TOOL_PREFIX.length)
+    : toolName;
+
+  const [prefix, ...rest] = nativeSubject.split("_");
   const module = MODULE_BY_PREFIX[prefix];
   if (module) {
     // "campaign_create" → create. Stripping the module prefix matters: without
@@ -167,10 +182,11 @@ export const resolveToolRoute = (name, annotations) => {
   }
 
   // No module of its own: the MCP row, with the verb read off the whole name
-  // or, if the name says nothing, off the tool's own annotations.
+  // (prefix stripped, so xtend_ids_convert and ids_convert agree) or, if the
+  // name says nothing, off the tool's own annotations.
   return {
     module: WRIKE_PROXY_MODULE,
-    action: actionForTool(toolName, annotations),
+    action: actionForTool(nativeSubject, annotations),
   };
 };
 

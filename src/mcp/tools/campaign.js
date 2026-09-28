@@ -32,14 +32,14 @@ const serializeResult = (result) => {
  */
 export const registerCampaignTools = (server, fastify, serverUrl, auth) => {
   server.registerTool(
-    "campaign_list",
+    "xtend_campaign_list",
 
     {
       description:
         "List campaigns using the existing campaign API logic. " +
         "Supports OData-style filters and pagination.\n\n" +
         "FILTER PARAMETERS:\n" +
-        "  Field names are the short codes returned by datahub_list_fields (e.g. agency, campaignname, campaignbudget, brand, client).\n" +
+        "  Field names are the short codes returned by xtend_datahub_list_fields (e.g. agency, campaignname, campaignbudget, brand, client).\n" +
         "\n" +
         "  OPERATORS:\n" +
         "    eq         – equals\n" +
@@ -82,7 +82,7 @@ export const registerCampaignTools = (server, fastify, serverUrl, auth) => {
           .describe(
             "OData filter expression. Use 'and' to combine conditions. OR not supported. " +
               "Example: (agency eq 'EssenceMediacom' and campaignname eq 'Campaign Name'). " +
-              "Field names are the short codes from datahub_list_fields.",
+              "Field names are the short codes from xtend_datahub_list_fields.",
           ),
         pageSize: z
           .number()
@@ -123,7 +123,7 @@ export const registerCampaignTools = (server, fastify, serverUrl, auth) => {
   );
 
   server.registerTool(
-    "campaign_get",
+    "xtend_campaign_get",
 
     {
       description: "Read a single campaign by its Wrike folder ID.",
@@ -166,7 +166,7 @@ export const registerCampaignTools = (server, fastify, serverUrl, auth) => {
   );
 
   server.registerTool(
-    "campaign_create",
+    "xtend_campaign_create",
 
     {
       description:
@@ -178,7 +178,7 @@ export const registerCampaignTools = (server, fastify, serverUrl, auth) => {
         "    entity     – the request-form entity/type configured for campaigns\n" +
         "    variantId  – the request-form variant id to submit against\n" +
         "  Optional:\n" +
-        "    fields          – campaign field values (see datahub_list_fields for valid keys)\n" +
+        "    fields          – campaign field values (see xtend_datahub_list_fields for valid keys)\n" +
         "    isCreatedByURL  – true returns a pre-fill URL instead of submitting",
       inputSchema: {
         space: z.string().describe("Wrike space identifier"),
@@ -231,13 +231,13 @@ export const registerCampaignTools = (server, fastify, serverUrl, auth) => {
   );
 
   server.registerTool(
-    "campaign_update",
+    "xtend_campaign_update",
 
     {
       description:
         "Update an XPI campaign (Wrike folder) by its Wrike folder ID. " +
         "Pass formFields keyed by the campaign field SHORT CODES from " +
-        "datahub_list_fields (isCampaignField=true), e.g. " +
+        "xtend_datahub_list_fields (isCampaignField=true), e.g. " +
         "{ campaignbudget: 50000, campaignenddate: '2026-12-31' }. Only keys " +
         "marked isWritable are applied; Datahub-linked custom fields are " +
         "resolved to record ids automatically; dates must be YYYY-MM-DD. " +
@@ -270,7 +270,7 @@ export const registerCampaignTools = (server, fastify, serverUrl, auth) => {
       if (!auth) return getAuthError(serverUrl);
       if (!isConfirmed(confirm)) {
         return confirmationRequest({
-          toolName: "campaign_update",
+          toolName: "xtend_campaign_update",
           action: "update this campaign",
           target: `campaign ${campaignId}`,
           arguments: { campaignId, formFields },
@@ -299,7 +299,7 @@ export const registerCampaignTools = (server, fastify, serverUrl, auth) => {
   );
 
   server.registerTool(
-    "campaign_delete",
+    "xtend_campaign_delete",
 
     {
       description:
@@ -329,7 +329,7 @@ export const registerCampaignTools = (server, fastify, serverUrl, auth) => {
       if (!auth) return getAuthError(serverUrl);
       if (!isConfirmed(confirm)) {
         return confirmationRequest({
-          toolName: "campaign_delete",
+          toolName: "xtend_campaign_delete",
           action: "delete this campaign",
           target: `campaign ${campaignId}`,
           arguments: { campaignId },

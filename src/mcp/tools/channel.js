@@ -30,12 +30,12 @@ const serializeResult = (result) => {
  */
 export const registerChannelTools = (server, serverUrl, auth) => {
   server.registerTool(
-    "channel_list",
+    "xtend_channel_list",
     {
       description:
         "List channels for a campaign using the existing channel list workflow.\n\n" +
         "FILTER PARAMETERS:\n" +
-        "  Field names are the short codes from datahub_list_fields where isChannelField=true.\n" +
+        "  Field names are the short codes from xtend_datahub_list_fields where isChannelField=true.\n" +
         "\n" +
         "  OPERATORS: eq, ne, lt, le, gt, ge, has, startswith, endswith\n" +
         "\n" +
@@ -102,7 +102,7 @@ export const registerChannelTools = (server, serverUrl, auth) => {
   );
 
   server.registerTool(
-    "channel_get",
+    "xtend_channel_get",
 
     {
       description: "Read a single channel by its Wrike task/folder ID.",
@@ -145,12 +145,12 @@ export const registerChannelTools = (server, serverUrl, auth) => {
   );
 
   server.registerTool(
-    "channel_update",
+    "xtend_channel_update",
 
     {
       description:
         "Update an XPI channel by its Wrike ID. Pass formFields keyed by the " +
-        "channel field SHORT CODES from datahub_list_fields (isChannelField=" +
+        "channel field SHORT CODES from xtend_datahub_list_fields (isChannelField=" +
         "true), e.g. { channelname: 'TV Spot' }. Only writable keys are " +
         "applied; dates must be YYYY-MM-DD. Prefer this over wrike_update_items " +
         "for XPI channel data." + CONFIRMATION_TOOL_NOTE,
@@ -181,7 +181,7 @@ export const registerChannelTools = (server, serverUrl, auth) => {
       if (!auth) return getAuthError(serverUrl);
       if (!isConfirmed(confirm)) {
         return confirmationRequest({
-          toolName: "channel_update",
+          toolName: "xtend_channel_update",
           action: "update this channel",
           target: `channel ${channelId}`,
           arguments: { channelId, formFields },
@@ -210,7 +210,7 @@ export const registerChannelTools = (server, serverUrl, auth) => {
   );
 
   server.registerTool(
-    "channel_delete",
+    "xtend_channel_delete",
 
     {
       description:
@@ -240,7 +240,7 @@ export const registerChannelTools = (server, serverUrl, auth) => {
       if (!auth) return getAuthError(serverUrl);
       if (!isConfirmed(confirm)) {
         return confirmationRequest({
-          toolName: "channel_delete",
+          toolName: "xtend_channel_delete",
           action: "delete this channel",
           target: `channel ${channelId}`,
           arguments: { channelId },
