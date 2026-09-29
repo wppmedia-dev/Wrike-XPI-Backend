@@ -6,17 +6,20 @@
  */
 
 /** Column order for the exported CSV — same fields the console's table and
-    detail drawer show, in the order the table reads. */
+    detail drawer show, in the order the table reads. IP is left out: this
+    export is for business reporting, not debugging, and a raw IP address is
+    exactly the kind of field that belongs in the console's own call-details
+    view rather than in a report someone downloads and forwards. */
 export const ACTIVITY_CSV_COLUMNS = [
   { key: "created_at", label: "Time" },
   { key: "actor_email", label: "Caller" },
   { key: "environment_name", label: "Environment" },
   { key: "token_id", label: "Token ID" },
   { key: "surface", label: "Surface" },
+  { key: "client", label: "Client" },
   { key: "method", label: "Method" },
   { key: "resource", label: "Resource" },
   { key: "mcp_tool", label: "MCP Tool" },
-  { key: "ip", label: "IP" },
   { key: "category", label: "Category" },
   { key: "action", label: "Action" },
   { key: "allowed", label: "Result" },

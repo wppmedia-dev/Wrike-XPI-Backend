@@ -181,7 +181,7 @@ export const portalActivityRoute = (fastify, opts, done) => {
 
   fastify.get("/", { ...ListSchema, ...guard }, async (req, reply) => {
     try {
-      const { search, surface, allowed, from, to, limit, offset } = req.query;
+      const { search, surface, allowed, agent, from, to, limit, offset } = req.query;
       const envId = await resolveAllowedEnvId(req.portalUser, req.query.env_id);
       const tokenFilter = await resolveAllowedTokenFilter(
         req.portalUser,
@@ -195,6 +195,7 @@ export const portalActivityRoute = (fastify, opts, done) => {
         search,
         surface,
         allowed: allowed === undefined ? undefined : allowed === "true",
+        agent,
         from,
         to,
         limit,
@@ -215,7 +216,7 @@ export const portalActivityRoute = (fastify, opts, done) => {
     { ...ExportSchema, ...guard },
     async (req, reply) => {
       try {
-        const { search, surface, allowed, from, to } = req.query;
+        const { search, surface, allowed, agent, from, to } = req.query;
         assertRangeWithinLimit(from, to);
         const envId = await resolveAllowedEnvId(req.portalUser, req.query.env_id);
         const tokenFilter = await resolveAllowedTokenFilter(
@@ -230,6 +231,7 @@ export const portalActivityRoute = (fastify, opts, done) => {
           search,
           surface,
           allowed: allowed === undefined ? undefined : allowed === "true",
+          agent,
           from,
           to,
         });

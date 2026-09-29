@@ -1,3 +1,10 @@
+import { AGENT_OPTIONS } from "../../../../utils/agentIdentity";
+
+// The set of client keys the "Client" filter accepts — kept in lockstep with
+// the detection list (src/utils/agentIdentity.js) rather than duplicated
+// here, so a client added to one is valid input on the other automatically.
+const AGENT_KEYS = AGENT_OPTIONS.map((o) => o.value);
+
 export const ListSchema = {
   schema: {
     querystring: {
@@ -14,6 +21,10 @@ export const ListSchema = {
         search: { type: "string", maxLength: 320 },
         surface: { type: "string", enum: ["rest", "mcp"] },
         allowed: { type: "string", enum: ["true", "false"] },
+        // The client that made the call (Claude, ChatGPT, VS Code, GitHub
+        // Copilot, …), derived from the stored User-Agent header — see
+        // src/utils/agentIdentity.js for why this isn't its own column.
+        agent: { type: "string", enum: AGENT_KEYS },
         from: { type: "string" },
         to: { type: "string" },
         limit: { type: "integer", minimum: 1, maximum: 200 },
@@ -47,6 +58,7 @@ export const ExportSchema = {
         search: { type: "string", maxLength: 320 },
         surface: { type: "string", enum: ["rest", "mcp"] },
         allowed: { type: "string", enum: ["true", "false"] },
+        agent: { type: "string", enum: AGENT_KEYS },
         from: { type: "string" },
         to: { type: "string" },
       },

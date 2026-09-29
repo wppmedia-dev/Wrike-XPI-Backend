@@ -52,6 +52,12 @@
 .fpop-body {
   padding: 14px;
   overflow-y: auto;
+  /* A flex child's default min-height is `auto`, which lets it refuse to
+     shrink below its own content size — the classic flexbox trap that
+     would push the footer out past the panel's max-height instead of the
+     body scrolling internally. 0 here is what actually lets overflow-y
+     take over once the content is taller than the space left for it. */
+  min-height: 0;
 }
 
 .fpop-footer {
@@ -63,6 +69,38 @@
   border-top: 1px solid var(--border);
   background: var(--bg-surface);
   flex-shrink: 0;
+}
+
+/* The footer's secondary action (Clear filters / Cancel / Clear all) — a
+   plain text button, not a bordered one: the primary action (Done /
+   Download CSV) is the only button-shaped control here, so the eye has one
+   thing to land on rather than two boxes of equal weight. */
+.fpop-text-btn {
+  padding: 6px 4px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.fpop-text-btn:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+.fpop-text-btn:disabled {
+  color: var(--text-muted);
+  opacity: 0.6;
+  cursor: default;
+}
+
+.fpop-text-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 /* ── Shared field layout inside a panel ────────────────────────────── */

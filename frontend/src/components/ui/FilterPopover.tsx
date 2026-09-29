@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { IconToolbarButton } from "./IconToolbarButton";
+import { isInsideAnyFloatingPanel, registerFloatingPanel } from "../../lib/floatingPanels";
 import "./FilterPopover.css";
 
 /**
@@ -69,6 +70,9 @@ export function FilterPopover({
     if (!trigger || !panel) return;
 
     const anchor = trigger.getBoundingClientRect();
+    // The panel's own CSS caps its height (max-height: min(70vh, 560px)), so
+    // this is already the clamped height when the content overflows — not
+    // the content's full, unclamped size.
     const { height } = panel.getBoundingClientRect();
 
     const spaceBelow = window.innerHeight - anchor.bottom - GAP - EDGE;
@@ -80,9 +84,15 @@ export function FilterPopover({
     const direction: "down" | "up" =
       height > spaceBelow && spaceAbove > spaceBelow ? "up" : "down";
 
+    // Neither direction is guaranteed to fully fit (a viewport shorter than
+    // the panel's own max-height fits in neither), so clamp `top` into the
+    // viewport either way — this is what keeps the footer from landing
+    // below the fold instead of just capping the direction choice. The
+    // outer Math.max keeps `top` from going negative when the panel is
+    // taller than the viewport has room for even pinned to the very top.
     const top =
       direction === "down"
-        ? anchor.bottom + GAP
+        ? Math.max(EDGE, Math.min(anchor.bottom + GAP, window.innerHeight - height - EDGE))
         : Math.max(EDGE, anchor.top - height - GAP);
 
     const left = Math.max(
@@ -103,9 +113,17 @@ export function FilterPopover({
   useEffect(() => {
     if (!open) return;
 
+    // A target inside this panel, or inside a floating panel nested inside
+    // it (AdminSelect's own dropdown for the Environment/Client fields) —
+    // registered separately since portaling both onto <body> makes them
+    // siblings in the DOM, not ancestor/descendant. See
+    // src/lib/floatingPanels.ts for why `.contains()` alone isn't enough.
+    const isInsideThisOrNested = (target: Node) =>
+      !!panelRef.current?.contains(target) || isInsideAnyFloatingPanel(target);
+
     const onPointerDown = (e: PointerEvent) => {
       const target = e.target as Node;
-      if (panelRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
+      if (isInsideThisOrNested(target) || triggerRef.current?.contains(target)) return;
       close();
     };
     const onKeyDown = (e: KeyboardEvent) => {
@@ -115,19 +133,39 @@ export function FilterPopover({
         triggerRef.current?.focus();
       }
     };
-    // A scroll/resize invalidates the measured position — closing is steadier
-    // than re-measuring on every frame while the page moves.
+    // A resize, or the page/table scrolling under the panel, invalidates the
+    // measured position — closing is steadier than re-measuring on every
+    // frame while that happens.
     const onReflow = () => close();
+
+    // Scroll events don't bubble, only capture, which is why this listens on
+    // window with `true` in the first place — but that means it also fires
+    // for a scroll confined entirely inside a nested widget, like the
+    // Client field's own AdminSelect dropdown list. That scroll never
+    // reaches outside the panel, so it must not close it.
+    const onScroll = (e: Event) => {
+      const target = e.target as Node;
+      if (isInsideThisOrNested(target)) return;
+      close();
+    };
 
     document.addEventListener("pointerdown", onPointerDown, true);
     document.addEventListener("keydown", onKeyDown, true);
     window.addEventListener("resize", onReflow);
-    window.addEventListener("scroll", onReflow, true);
+    window.addEventListener("scroll", onScroll, true);
+
+    // Registered for the same reason AdminSelect registers itself: a
+    // FilterPopover can itself be nested inside another floating panel in
+    // principle, and this keeps the registry symmetric regardless of nesting
+    // depth.
+    const unregister = panelRef.current ? registerFloatingPanel(panelRef.current) : undefined;
+
     return () => {
       document.removeEventListener("pointerdown", onPointerDown, true);
       document.removeEventListener("keydown", onKeyDown, true);
       window.removeEventListener("resize", onReflow);
-      window.removeEventListener("scroll", onReflow, true);
+      window.removeEventListener("scroll", onScroll, true);
+      unregister?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);

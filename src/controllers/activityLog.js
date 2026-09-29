@@ -1,6 +1,16 @@
 import models from "../../models";
+import { agentIdentityOf, agentFilterClause } from "../utils/agentIdentity";
 
 const { Op } = models.Sequelize;
+
+/**
+ * Adds the derived client label to a row already shaped by `.get({ plain:
+ * true })`. Computed here rather than stored on write, because the
+ * detection rules (src/utils/agentIdentity.js) are meant to improve over
+ * time as new clients show up — a stored value would go stale the moment a
+ * pattern changes, while a derived one is always read with today's rules.
+ */
+const withAgent = (row) => ({ ...row, client: agentIdentityOf(row).label });
 
 /**
  * API/MCP call activity log — storage only. Written on essentially every
@@ -103,6 +113,7 @@ export const List = async ({
   search,
   surface,
   allowed,
+  agent,
   from,
   to,
   limit = 50,
@@ -133,6 +144,17 @@ export const List = async ({
     if (from) where.created_at[Op.gte] = new Date(from);
     if (to) where.created_at[Op.lte] = new Date(to);
   }
+  // Derived from the stored User-Agent header, not its own column — see
+  // src/utils/agentIdentity.js for why (no MCP client-info handshake is
+  // captured anywhere in this codebase, so the HTTP header is what there is).
+  // Kept in its own Op.and entry rather than merged into `where` directly:
+  // the search clause above already owns the top-level Op.or key, and a
+  // second assignment to the same Symbol key would silently replace it
+  // instead of combining with it.
+  if (agent) {
+    const clause = agentFilterClause(agent, { Op });
+    if (clause) where[Op.and] = [...(where[Op.and] || []), clause];
+  }
 
   const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
   const safeOffset = Math.max(parseInt(offset, 10) || 0, 0);
@@ -146,7 +168,7 @@ export const List = async ({
   });
 
   return {
-    rows: rows.map((r) => r.get({ plain: true })),
+    rows: rows.map((r) => withAgent(r.get({ plain: true }))),
     total: count,
     limit: safeLimit,
     offset: safeOffset,
@@ -169,6 +191,7 @@ export const ExportRows = async ({
   search,
   surface,
   allowed,
+  agent,
   from,
   to,
 } = {}) => {
@@ -189,6 +212,10 @@ export const ExportRows = async ({
     if (from) where.created_at[Op.gte] = new Date(from);
     if (to) where.created_at[Op.lte] = new Date(to);
   }
+  if (agent) {
+    const clause = agentFilterClause(agent, { Op });
+    if (clause) where[Op.and] = [...(where[Op.and] || []), clause];
+  }
 
   const rows = await models.ApiActivityLogs.findAll({
     attributes: ROW_ATTRS,
@@ -197,7 +224,7 @@ export const ExportRows = async ({
     limit: EXPORT_MAX,
   });
 
-  return rows.map((r) => r.get({ plain: true }));
+  return rows.map((r) => withAgent(r.get({ plain: true })));
 };
 
 /** Quick counts for the console's summary strip. */

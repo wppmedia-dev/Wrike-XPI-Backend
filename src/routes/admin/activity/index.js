@@ -55,6 +55,7 @@ export const adminActivityRoute = (fastify, opts, done) => {
         search,
         surface,
         allowed,
+        agent,
         from,
         to,
         limit,
@@ -67,6 +68,7 @@ export const adminActivityRoute = (fastify, opts, done) => {
         search,
         surface,
         allowed: allowed === undefined ? undefined : allowed === "true",
+        agent,
         from,
         to,
         limit,
@@ -93,6 +95,7 @@ export const adminActivityRoute = (fastify, opts, done) => {
           search,
           surface,
           allowed,
+          agent,
           from,
           to,
         } = req.query;
@@ -103,6 +106,7 @@ export const adminActivityRoute = (fastify, opts, done) => {
           search,
           surface,
           allowed: allowed === undefined ? undefined : allowed === "true",
+          agent,
           from,
           to,
         });

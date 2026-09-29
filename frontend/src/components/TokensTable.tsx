@@ -21,6 +21,7 @@ import { Badge } from "./ui/Badge";
 import { IconToolbarButton } from "./ui/IconToolbarButton";
 import AdminSelect from "./AdminSelect";
 import { EMPTY, dateSortValue } from "../lib/format";
+import { isInsideAnyFloatingPanel, registerFloatingPanel } from "../lib/floatingPanels";
 import {
   ACCESS_BADGE,
   EXPIRY_WARNING_DAYS,
@@ -690,10 +691,26 @@ export function TokensTable({
       const target = event.target as Node;
       if (popupRef.current?.contains(target)) return;
       if (filterButtonRef.current?.contains(target)) return;
+      // The Environment field's own AdminSelect dropdown is portaled onto
+      // <body> too (so it isn't clipped by this popup's own scroll
+      // container — see AdminSelect.tsx), which makes it a DOM sibling of
+      // this popup rather than a descendant. Without this check, picking an
+      // environment from that dropdown would read as a click outside this
+      // popup and close it before the selection could apply.
+      if (isInsideAnyFloatingPanel(target)) return;
       closeFilters();
     };
     document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
+
+    // Registered so this popup's own AdminSelect field (Environment) can
+    // recognise a click/scroll here as "inside a panel I'm nested in" —
+    // see src/lib/floatingPanels.ts.
+    const unregister = popupRef.current ? registerFloatingPanel(popupRef.current) : undefined;
+
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      unregister?.();
+    };
   }, [filtersOpen, closeFilters]);
 
   /* Measure after paint but before the browser shows the frame, so the popup
@@ -855,7 +872,17 @@ export function TokensTable({
               {FILTER_DEFS.map((def) => (
                 <div className="tok-filter-field" key={def.key}>
                   <div className="tok-filter-labelrow">
-                    <label className="tok-filter-label" htmlFor={`tok-filter-${def.key}`}>
+                    {/* htmlFor only for a text input, where clicking the
+                        label to focus the box is normal and expected. An
+                        AdminSelect's trigger is a <button>, and the same
+                        pairing there would make clicking this label open
+                        the dropdown — surprising for what reads as a plain
+                        field heading. AdminSelect's own ariaLabel already
+                        names the control for a screen reader either way. */}
+                    <label
+                      className="tok-filter-label"
+                      htmlFor={def.kind === "text" ? `tok-filter-${def.key}` : undefined}
+                    >
                       {def.label}
                     </label>
                     {/* Per-field clear, so undoing one choice does not mean
@@ -914,7 +941,7 @@ export function TokensTable({
               <div className="tok-filter-popup-actions">
                 <button
                   type="button"
-                  className="btn btn-ghost"
+                  className="tok-filter-clear-btn"
                   onClick={() => setDraft(EMPTY_FILTERS)}
                   disabled={FILTER_KEYS.every((key) => !draft[key])}
                 >
