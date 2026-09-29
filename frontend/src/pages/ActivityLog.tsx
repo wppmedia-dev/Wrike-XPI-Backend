@@ -11,6 +11,7 @@ import {
 } from "../lib/activityLogApi";
 import type { AdminEnvironment } from "../lib/adminApi";
 import { toast } from "../lib/notify";
+import { AGENT_OPTIONS } from "../lib/agentIdentity";
 import AdminSelect from "../components/AdminSelect";
 import { CopyButton } from "../components/ui/CopyButton";
 import { PageInfo } from "../components/ui/PageInfo";
@@ -118,6 +119,10 @@ export default function ActivityLog({
   const [envFilter, setEnvFilter] = useState("");
   const [surfaceFilter, setSurfaceFilter] = useState<Surface | "">("");
   const [resultFilter, setResultFilter] = useState<"allowed" | "denied" | "">("");
+  // The client that made the call (Claude, ChatGPT, VS Code, …), derived
+  // server-side from the stored User-Agent header — see
+  // src/utils/agentIdentity.js for what "" (all), "other" and "unknown" mean.
+  const [agentFilter, setAgentFilter] = useState("");
   // The one search box. It matches the caller's email and the reference id of
   // a failed call, because those are the two things a person arrives here
   // holding — an email from the caller, or the id out of the error message.
@@ -128,10 +133,10 @@ export default function ActivityLog({
   const [fromFilter, setFromFilter] = useState("");
   const [toFilter, setToFilter] = useState("");
 
-  // The env/surface/result/date controls moved off the bar and into this
-  // popover (Advanced filters) — the bar now holds only search, which is
-  // free text and used on nearly every visit, plus the Filters and Export
-  // triggers.
+  // The env/surface/result/client/date controls moved off the bar and into
+  // this popover (Advanced filters) — the bar now holds only search, which
+  // is free text and used on nearly every visit, plus the Filters and
+  // Export triggers.
   const [filtersOpen, setFiltersOpen] = useState(false);
   // The popover's own copy of the filter fields: editing a chip or a date
   // inside it must not touch the table until "Done" is clicked — otherwise
@@ -142,6 +147,7 @@ export default function ActivityLog({
     envFilter: "",
     surfaceFilter: "" as Surface | "",
     resultFilter: "" as "allowed" | "denied" | "",
+    agentFilter: "",
     fromFilter: "",
     toFilter: "",
   });
@@ -155,6 +161,7 @@ export default function ActivityLog({
     envFilter: "",
     surfaceFilter: "" as Surface | "",
     resultFilter: "" as "allowed" | "denied" | "",
+    agentFilter: "",
     searchFilter: "",
     fromFilter: "",
     toFilter: "",
@@ -187,6 +194,7 @@ export default function ActivityLog({
             token_id: tokenFilterId,
             surface: surfaceFilter || undefined,
             allowed: resultFilter ? resultFilter === "allowed" : undefined,
+            agent: agentFilter || undefined,
             search: searchFilter.trim() || undefined,
             from: fromFilter || undefined,
             to: toFilter || undefined,
@@ -209,7 +217,7 @@ export default function ActivityLog({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [envFilter, surfaceFilter, resultFilter, searchFilter, fromFilter, toFilter, pageSize, tokenFilterId],
+    [envFilter, surfaceFilter, resultFilter, agentFilter, searchFilter, fromFilter, toFilter, pageSize, tokenFilterId],
   );
 
   useEffect(() => {
@@ -220,7 +228,7 @@ export default function ActivityLog({
     }
     load(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, envFilter, surfaceFilter, resultFilter, fromFilter, toFilter, pageSize, tokenFilterId]);
+  }, [active, envFilter, surfaceFilter, resultFilter, agentFilter, fromFilter, toFilter, pageSize, tokenFilterId]);
 
   // Top-bar Refresh — reload the current page (keeps filters + page) and the
   // summary stats without resetting the view.
@@ -251,12 +259,17 @@ export default function ActivityLog({
   // set, so a collapsed panel still tells you something is narrowing the
   // table. The token scope and search box have their own visible affordance
   // (the chip, the box itself), so they aren't counted here.
-  const advancedFilterCount = [envFilter, surfaceFilter, resultFilter, fromFilter, toFilter].filter(
-    Boolean,
-  ).length;
+  const advancedFilterCount = [
+    envFilter,
+    surfaceFilter,
+    resultFilter,
+    agentFilter,
+    fromFilter,
+    toFilter,
+  ].filter(Boolean).length;
 
   const openFilters = () => {
-    setFiltersDraft({ envFilter, surfaceFilter, resultFilter, fromFilter, toFilter });
+    setFiltersDraft({ envFilter, surfaceFilter, resultFilter, agentFilter, fromFilter, toFilter });
     setFiltersOpen(true);
   };
 
@@ -267,17 +280,26 @@ export default function ActivityLog({
     setEnvFilter(filtersDraft.envFilter);
     setSurfaceFilter(filtersDraft.surfaceFilter);
     setResultFilter(filtersDraft.resultFilter);
+    setAgentFilter(filtersDraft.agentFilter);
     setFromFilter(filtersDraft.fromFilter);
     setToFilter(filtersDraft.toFilter);
     setFiltersOpen(false);
   };
 
   const clearFilters = () => {
-    const cleared = { envFilter: "", surfaceFilter: "" as Surface | "", resultFilter: "" as "allowed" | "denied" | "", fromFilter: "", toFilter: "" };
+    const cleared = {
+      envFilter: "",
+      surfaceFilter: "" as Surface | "",
+      resultFilter: "" as "allowed" | "denied" | "",
+      agentFilter: "",
+      fromFilter: "",
+      toFilter: "",
+    };
     setFiltersDraft(cleared);
     setEnvFilter("");
     setSurfaceFilter("");
     setResultFilter("");
+    setAgentFilter("");
     setFromFilter("");
     setToFilter("");
   };
@@ -287,6 +309,7 @@ export default function ActivityLog({
       envFilter,
       surfaceFilter,
       resultFilter,
+      agentFilter,
       searchFilter,
       fromFilter,
       toFilter,
@@ -302,6 +325,7 @@ export default function ActivityLog({
         token_id: tokenFilterId,
         surface: exportDraft.surfaceFilter || undefined,
         allowed: exportDraft.resultFilter ? exportDraft.resultFilter === "allowed" : undefined,
+        agent: exportDraft.agentFilter || undefined,
         search: exportDraft.searchFilter.trim() || undefined,
         from: exportDraft.fromFilter || undefined,
         to: exportDraft.toFilter || undefined,
@@ -418,23 +442,34 @@ export default function ActivityLog({
           <div className="al-filterbar-actions">
           <FilterPopover
             label="Filters"
-            icon="fa-sliders"
+            icon="fa-filter"
             badge={advancedFilterCount}
             open={filtersOpen}
             onOpenChange={(v) => (v ? openFilters() : setFiltersOpen(false))}
             footer={
               <>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={clearFilters}>
+                <button
+                  type="button"
+                  className="fpop-text-btn"
+                  onClick={clearFilters}
+                  disabled={advancedFilterCount === 0}
+                >
                   Clear filters
                 </button>
-                <button type="button" className="btn btn-primary btn-sm" onClick={applyFilters}>
+                <button type="button" className="btn btn-primary" onClick={applyFilters}>
                   Done
                 </button>
               </>
             }
           >
             <div className="fpop-field">
-              <label htmlFor="al-flt-env">Environment</label>
+              {/* Not htmlFor-linked to the select: AdminSelect's trigger is a
+                  <button>, and a <label for> over a button makes clicking
+                  this plain heading open the dropdown — surprising, since
+                  every other field label here (Surface, Result) is inert.
+                  ariaLabel below already names the control for a screen
+                  reader, so nothing is lost by keeping this one visual-only. */}
+              <label>Environment</label>
               <AdminSelect
                 id="al-flt-env"
                 icon="fa-layer-group"
@@ -509,6 +544,19 @@ export default function ActivityLog({
             </div>
 
             <div className="fpop-field">
+              <label>Client</label>
+              <AdminSelect
+                id="al-flt-agent"
+                icon="fa-robot"
+                ariaLabel="Filter by client"
+                value={filtersDraft.agentFilter}
+                onChange={(v) => setFiltersDraft((d) => ({ ...d, agentFilter: v }))}
+                placeholder="All clients"
+                options={AGENT_OPTIONS}
+              />
+            </div>
+
+            <div className="fpop-field">
               <label>Date range</label>
               <div className="fpop-row">
                 <input
@@ -536,12 +584,12 @@ export default function ActivityLog({
             onOpenChange={(v) => (v ? openExport() : setExportOpen(false))}
             footer={
               <>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setExportOpen(false)}>
+                <button type="button" className="fpop-text-btn" onClick={() => setExportOpen(false)}>
                   Cancel
                 </button>
                 <button
                   type="button"
-                  className={`btn btn-primary btn-sm${exporting ? " loading" : ""}`}
+                  className={`btn btn-primary${exporting ? " loading" : ""}`}
                   disabled={exporting}
                   onClick={handleExport}
                 >
@@ -551,7 +599,7 @@ export default function ActivityLog({
             }
           >
             <div className="fpop-field">
-              <label htmlFor="al-exp-env">Environment</label>
+              <label>Environment</label>
               <AdminSelect
                 id="al-exp-env"
                 icon="fa-layer-group"
@@ -626,6 +674,19 @@ export default function ActivityLog({
             </div>
 
             <div className="fpop-field">
+              <label>Client</label>
+              <AdminSelect
+                id="al-exp-agent"
+                icon="fa-robot"
+                ariaLabel="Export: filter by client"
+                value={exportDraft.agentFilter}
+                onChange={(v) => setExportDraft((d) => ({ ...d, agentFilter: v }))}
+                placeholder="All clients"
+                options={AGENT_OPTIONS}
+              />
+            </div>
+
+            <div className="fpop-field">
               <label htmlFor="al-exp-search">Search</label>
               <div className="al-search al-search-in-popover">
                 <i className="fa-solid fa-magnifying-glass" aria-hidden="true" />
@@ -691,6 +752,7 @@ export default function ActivityLog({
                 <th scope="col">Caller</th>
                 <th scope="col">Token ID</th>
                 <th scope="col">Surface</th>
+                <th scope="col">Client</th>
                 <th scope="col">Called</th>
                 <th scope="col">IP</th>
                 <th scope="col">Result</th>
@@ -704,7 +766,7 @@ export default function ActivityLog({
               {loading &&
                 Array.from({ length: 6 }).map((_, i) => (
                   <tr className="ea-skeleton-row" key={i}>
-                    <td colSpan={8}>
+                    <td colSpan={9}>
                       <div className="ea-skeleton" />
                     </td>
                   </tr>
@@ -763,6 +825,7 @@ export default function ActivityLog({
                         {row.surface === "mcp" ? "MCP" : "API"}
                       </span>
                     </td>
+                    <td className="al-client">{row.client}</td>
                     <td className="al-called">
                       {row.method && <span className="al-method">{row.method}</span>}
                       {/* An MCP row's interesting half is the tool: the URL is
@@ -933,6 +996,10 @@ export default function ActivityLog({
                 <div>
                   <dt>Environment</dt>
                   <dd>{detailRow.environment_name || "—"}</dd>
+                </div>
+                <div>
+                  <dt>Client</dt>
+                  <dd>{detailRow.client}</dd>
                 </div>
                 <div>
                   <dt>Token ID</dt>

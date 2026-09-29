@@ -1,55 +1,54 @@
-/* Styles for <IconToolbarButton /> — an icon-only toolbar trigger with an
-   optional count badge, same footprint as RowMenu's ⋯ trigger (RowMenu.css
-   .row-menu-trigger) but square and slightly larger, sized for a primary
-   toolbar action rather than a per-row menu. */
+/* Styles for <IconToolbarButton /> — a bare icon toolbar trigger with an
+   optional count badge. No box, no border, not even on hover: just the
+   glyph, colour-shifting on hover/active/focus, the same restraint the
+   activity tables already use for a row's own icon actions (see
+   .env-actions-col .icon-btn in AdminDashboard.css, which drops the base
+   .icon-btn's hover box for exactly this reason in a dense row). Sized for
+   a primary toolbar action rather than a per-row menu, with a slightly
+   larger hit area than the glyph itself so it stays easy to aim at without
+   drawing a visible bound around it. */
 
 .itb {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   padding: 0;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-secondary);
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  background: transparent;
+  border: none;
   cursor: pointer;
-  transition:
-    border-color 0.15s ease,
-    color 0.15s ease,
-    background-color 0.15s ease;
+  transition: color 0.15s ease;
 }
 
 .itb:hover {
-  border-color: var(--accent);
   color: var(--accent);
 }
 
 .itb-active {
-  border-color: var(--accent);
   color: var(--accent);
-  background: var(--accent-soft);
 }
 
 .itb:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .itb-badge {
   position: absolute;
-  top: -6px;
-  right: -6px;
+  top: -2px;
+  right: -2px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 17px;
-  height: 17px;
+  min-width: 15px;
+  height: 15px;
   padding: 0 4px;
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: #ffffff;

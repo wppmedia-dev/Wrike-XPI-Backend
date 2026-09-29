@@ -11,6 +11,7 @@ import {
   type PortalSurface,
 } from "../lib/portalActivityApi";
 import { formatDateTime } from "../lib/format";
+import { AGENT_OPTIONS } from "../lib/agentIdentity";
 import AdminSelect from "../components/AdminSelect";
 import { CopyButton } from "../components/ui/CopyButton";
 import { PageInfo } from "../components/ui/PageInfo";
@@ -190,6 +191,10 @@ export default function PortalActivityPage({
   const [envFilter, setEnvFilter] = useState("");
   const [surfaceFilter, setSurfaceFilter] = useState<PortalSurface | "">("");
   const [resultFilter, setResultFilter] = useState<"allowed" | "denied" | "">("");
+  // The client that made the call (Claude, ChatGPT, VS Code, …), derived
+  // server-side from the stored User-Agent header — see
+  // src/utils/agentIdentity.js for what "" (all), "other" and "unknown" mean.
+  const [agentFilter, setAgentFilter] = useState("");
   // The one search box: the caller's email, or the reference id from an error
   // a caller reported — the two things someone arrives here holding.
   const [searchFilter, setSearchFilter] = useState("");
@@ -198,8 +203,9 @@ export default function PortalActivityPage({
   const [fromFilter, setFromFilter] = useState("");
   const [toFilter, setToFilter] = useState("");
 
-  // Environment/surface/result/date live in this popover instead of on the
-  // bar; the bar keeps only search, which is free text used on most visits.
+  // Environment/surface/result/client/date live in this popover instead of
+  // on the bar; the bar keeps only search, which is free text used on most
+  // visits.
   const [filtersOpen, setFiltersOpen] = useState(false);
   // The popover's own copy of the filter fields — editing it must not touch
   // the table until "Done" is clicked. Applied to the real filters (and so
@@ -208,6 +214,7 @@ export default function PortalActivityPage({
     envFilter: "",
     surfaceFilter: "" as PortalSurface | "",
     resultFilter: "" as "allowed" | "denied" | "",
+    agentFilter: "",
     fromFilter: "",
     toFilter: "",
   });
@@ -217,6 +224,7 @@ export default function PortalActivityPage({
     envFilter: "",
     surfaceFilter: "" as PortalSurface | "",
     resultFilter: "" as "allowed" | "denied" | "",
+    agentFilter: "",
     searchFilter: "",
     fromFilter: "",
     toFilter: "",
@@ -252,6 +260,7 @@ export default function PortalActivityPage({
             token_id: tokenFilterId,
             surface: surfaceFilter || undefined,
             allowed: resultFilter ? resultFilter === "allowed" : undefined,
+            agent: agentFilter || undefined,
             search: searchFilter.trim() || undefined,
             from: fromFilter || undefined,
             to: toFilter || undefined,
@@ -271,7 +280,7 @@ export default function PortalActivityPage({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [token, envFilter, surfaceFilter, resultFilter, searchFilter, fromFilter, toFilter, pageSize, tokenFilterId],
+    [token, envFilter, surfaceFilter, resultFilter, agentFilter, searchFilter, fromFilter, toFilter, pageSize, tokenFilterId],
   );
 
   useEffect(() => {
@@ -282,7 +291,7 @@ export default function PortalActivityPage({
     }
     load(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, token, envFilter, surfaceFilter, resultFilter, fromFilter, toFilter, pageSize, tokenFilterId]);
+  }, [active, token, envFilter, surfaceFilter, resultFilter, agentFilter, fromFilter, toFilter, pageSize, tokenFilterId]);
 
   // Top-bar Refresh — reload the current page (keeping filters and page) and
   // the summary stats without resetting the view.
@@ -330,12 +339,17 @@ export default function PortalActivityPage({
 
   const hasRows = !loading && !error && rows.length > 0;
 
-  const advancedFilterCount = [envFilter, surfaceFilter, resultFilter, fromFilter, toFilter].filter(
-    Boolean,
-  ).length;
+  const advancedFilterCount = [
+    envFilter,
+    surfaceFilter,
+    resultFilter,
+    agentFilter,
+    fromFilter,
+    toFilter,
+  ].filter(Boolean).length;
 
   const openFilters = () => {
-    setFiltersDraft({ envFilter, surfaceFilter, resultFilter, fromFilter, toFilter });
+    setFiltersDraft({ envFilter, surfaceFilter, resultFilter, agentFilter, fromFilter, toFilter });
     setFiltersOpen(true);
   };
 
@@ -345,6 +359,7 @@ export default function PortalActivityPage({
     setEnvFilter(filtersDraft.envFilter);
     setSurfaceFilter(filtersDraft.surfaceFilter);
     setResultFilter(filtersDraft.resultFilter);
+    setAgentFilter(filtersDraft.agentFilter);
     setFromFilter(filtersDraft.fromFilter);
     setToFilter(filtersDraft.toFilter);
     setFiltersOpen(false);
@@ -355,12 +370,14 @@ export default function PortalActivityPage({
       envFilter: "",
       surfaceFilter: "",
       resultFilter: "",
+      agentFilter: "",
       fromFilter: "",
       toFilter: "",
     });
     setEnvFilter("");
     setSurfaceFilter("");
     setResultFilter("");
+    setAgentFilter("");
     setFromFilter("");
     setToFilter("");
   };
@@ -370,6 +387,7 @@ export default function PortalActivityPage({
       envFilter,
       surfaceFilter,
       resultFilter,
+      agentFilter,
       searchFilter,
       fromFilter,
       toFilter,
@@ -386,6 +404,7 @@ export default function PortalActivityPage({
         token_id: tokenFilterId,
         surface: exportDraft.surfaceFilter || undefined,
         allowed: exportDraft.resultFilter ? exportDraft.resultFilter === "allowed" : undefined,
+        agent: exportDraft.agentFilter || undefined,
         search: exportDraft.searchFilter.trim() || undefined,
         from: exportDraft.fromFilter || undefined,
         to: exportDraft.toFilter || undefined,
@@ -492,16 +511,21 @@ export default function PortalActivityPage({
           <div className="pal-filterbar-actions">
           <FilterPopover
             label="Filters"
-            icon="fa-sliders"
+            icon="fa-filter"
             badge={advancedFilterCount}
             open={filtersOpen}
             onOpenChange={(v) => (v ? openFilters() : setFiltersOpen(false))}
             footer={
               <>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={clearFilters}>
+                <button
+                  type="button"
+                  className="fpop-text-btn"
+                  onClick={clearFilters}
+                  disabled={advancedFilterCount === 0}
+                >
                   Clear filters
                 </button>
-                <button type="button" className="btn btn-primary btn-sm" onClick={applyFilters}>
+                <button type="button" className="btn btn-primary" onClick={applyFilters}>
                   Done
                 </button>
               </>
@@ -509,7 +533,13 @@ export default function PortalActivityPage({
           >
             {environments.length > 0 && (
               <div className="fpop-field">
-                <label htmlFor="pal-flt-env">Environment</label>
+                {/* Not htmlFor-linked to the select: AdminSelect's trigger is
+                    a <button>, and a <label for> over a button makes
+                    clicking this plain heading open the dropdown —
+                    surprising, since every other field label here (Surface,
+                    Result) is inert. ariaLabel below already names the
+                    control for a screen reader. */}
+                <label>Environment</label>
                 <AdminSelect
                   id="pal-flt-env"
                   icon="fa-layer-group"
@@ -585,6 +615,19 @@ export default function PortalActivityPage({
             </div>
 
             <div className="fpop-field">
+              <label>Client</label>
+              <AdminSelect
+                id="pal-flt-agent"
+                icon="fa-robot"
+                ariaLabel="Filter by client"
+                value={filtersDraft.agentFilter}
+                onChange={(v) => setFiltersDraft((d) => ({ ...d, agentFilter: v }))}
+                placeholder="All clients"
+                options={AGENT_OPTIONS}
+              />
+            </div>
+
+            <div className="fpop-field">
               <label>Date range</label>
               <div className="fpop-row">
                 <input
@@ -622,12 +665,12 @@ export default function PortalActivityPage({
             onOpenChange={(v) => (v ? openExport() : setExportOpen(false))}
             footer={
               <>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setExportOpen(false)}>
+                <button type="button" className="fpop-text-btn" onClick={() => setExportOpen(false)}>
                   Cancel
                 </button>
                 <button
                   type="button"
-                  className={`btn btn-primary btn-sm${exporting ? " loading" : ""}`}
+                  className={`btn btn-primary${exporting ? " loading" : ""}`}
                   disabled={exporting}
                   onClick={handleExport}
                 >
@@ -638,7 +681,7 @@ export default function PortalActivityPage({
           >
             {environments.length > 0 && (
               <div className="fpop-field">
-                <label htmlFor="pal-exp-env">Environment</label>
+                <label>Environment</label>
                 <AdminSelect
                   id="pal-exp-env"
                   icon="fa-layer-group"
@@ -711,6 +754,19 @@ export default function PortalActivityPage({
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="fpop-field">
+              <label>Client</label>
+              <AdminSelect
+                id="pal-exp-agent"
+                icon="fa-robot"
+                ariaLabel="Export: filter by client"
+                value={exportDraft.agentFilter}
+                onChange={(v) => setExportDraft((d) => ({ ...d, agentFilter: v }))}
+                placeholder="All clients"
+                options={AGENT_OPTIONS}
+              />
             </div>
 
             <div className="fpop-field">
@@ -798,6 +854,7 @@ export default function PortalActivityPage({
                 <th scope="col">Caller</th>
                 <th scope="col">Token</th>
                 <th scope="col">Surface</th>
+                <th scope="col">Client</th>
                 <th scope="col">Called</th>
                 <th scope="col">IP</th>
                 <th scope="col">Result</th>
@@ -810,7 +867,7 @@ export default function PortalActivityPage({
               {loading &&
                 Array.from({ length: 6 }).map((_, i) => (
                   <tr className="pal-skeleton-row" key={`skeleton-${i}`}>
-                    <td colSpan={8}>
+                    <td colSpan={9}>
                       <div className="pal-skeleton" />
                     </td>
                   </tr>
@@ -870,6 +927,7 @@ export default function PortalActivityPage({
                         {row.surface === "mcp" ? "MCP" : "API"}
                       </span>
                     </td>
+                    <td className="pal-client">{row.client}</td>
                     <td className="pal-called">
                       {row.method && <span className="pal-method">{row.method}</span>}
                       {/* An MCP row's interesting half is the tool: the URL is
@@ -1054,6 +1112,10 @@ export default function PortalActivityPage({
                 <div>
                   <dt>Environment</dt>
                   <dd>{detailRow.environment_name || "—"}</dd>
+                </div>
+                <div>
+                  <dt>Client</dt>
+                  <dd>{detailRow.client}</dd>
                 </div>
                 <div>
                   <dt>Token</dt>

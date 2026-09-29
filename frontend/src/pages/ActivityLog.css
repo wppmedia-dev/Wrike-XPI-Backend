@@ -277,6 +277,15 @@
   color: var(--accent);
 }
 
+/* The client label (Claude, ChatGPT, VS Code, …) — plain text rather than a
+   badge, because unlike Surface (two states, always one of them) this has
+   a long, open-ended vocabulary that a badge's fixed-width pill fights. */
+.al-client {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
 .al-called {
   display: flex;
   align-items: center;

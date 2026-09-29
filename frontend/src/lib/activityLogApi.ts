@@ -23,6 +23,15 @@ export interface ActivityRow {
   ip: string | null;
   category: string | null;
   /**
+   * A friendly label for the caller's client (Claude, ChatGPT, VS Code,
+   * GitHub Copilot, …), derived server-side from the stored User-Agent
+   * header — there is no MCP client-info handshake captured anywhere in
+   * this codebase, so the HTTP header is the only signal available. "Other"
+   * means a header was captured but matched none of the known clients;
+   * "Unknown" means no header was captured at all.
+   */
+  client: string;
+  /**
    * The MCP tool(s) the agent called, in call order. Null for REST rows and for
    * an MCP request that only handshook — the row is written before the tool
    * runs, and annotated once it has (src/controllers/activityLog.js
@@ -67,6 +76,9 @@ export interface ActivityFilters {
   search?: string;
   surface?: Surface;
   allowed?: boolean;
+  /** The client key from AGENT_OPTIONS (src/utils/agentIdentity.js) — e.g.
+      "claude", "copilot", "vscode", "other", "unknown". */
+  agent?: string;
   from?: string;
   to?: string;
   limit?: number;
@@ -93,6 +105,7 @@ const qs = (filters: ActivityFilters): string => {
   if (filters.search) params.set("search", filters.search);
   if (filters.surface) params.set("surface", filters.surface);
   if (filters.allowed !== undefined) params.set("allowed", String(filters.allowed));
+  if (filters.agent) params.set("agent", filters.agent);
   if (filters.from) params.set("from", filters.from);
   if (filters.to) params.set("to", filters.to);
   if (filters.limit) params.set("limit", String(filters.limit));

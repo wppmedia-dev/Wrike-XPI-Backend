@@ -24,6 +24,13 @@ export interface PortalActivityRow {
   status_code: number | null;
   ip: string | null;
   category: string | null;
+  /**
+   * A friendly label for the caller's client (Claude, ChatGPT, VS Code,
+   * GitHub Copilot, …), derived server-side from the stored User-Agent
+   * header. "Other" means a header was captured but matched none of the
+   * known clients; "Unknown" means no header was captured at all.
+   */
+  client: string;
   /** The MCP tool(s) the agent called, in call order. Null for REST rows. */
   mcp_tool: string | null;
   /** The reference the caller was shown when this call failed ("XPI-XXXXXXXX").
@@ -60,6 +67,9 @@ export interface PortalActivityFilters {
   search?: string;
   surface?: PortalSurface;
   allowed?: boolean;
+  /** The client key from AGENT_OPTIONS (src/utils/agentIdentity.js) — e.g.
+      "claude", "copilot", "vscode", "other", "unknown". */
+  agent?: string;
   from?: string;
   to?: string;
   limit?: number;
@@ -84,6 +94,7 @@ const qs = (filters: PortalActivityFilters): string =>
     search: filters.search,
     surface: filters.surface,
     allowed: filters.allowed === undefined ? undefined : String(filters.allowed),
+    agent: filters.agent,
     from: filters.from,
     to: filters.to,
     limit: filters.limit,
