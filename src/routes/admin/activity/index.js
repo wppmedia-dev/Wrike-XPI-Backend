@@ -1,7 +1,9 @@
 import { verifyAdminJWT } from "../../../middlewares/adminAuth";
 import { ActivityLog } from "../../../controllers";
 import { retentionDays } from "../../../utils/activityLog";
-import { ListSchema, SummarySchema } from "./schema";
+import { toCsv } from "../../../utils/csv";
+import { ACTIVITY_CSV_COLUMNS, toCsvRow } from "../../../utils/activityCsv";
+import { ListSchema, SummarySchema, ExportSchema } from "./schema";
 
 /**
  * Read-only admin API over the API/MCP call activity log
@@ -76,6 +78,51 @@ export const adminActivityRoute = (fastify, opts, done) => {
       return fail(reply, err);
     }
   });
+
+  // Same filters as the list, no pagination: a CSV export means "everything
+  // that matches", not "whatever page is on screen" (ActivityLog.ExportRows
+  // caps the row count so this stays bounded).
+  fastify.get(
+    "/export",
+    { ...ExportSchema, ...guard },
+    async (req, reply) => {
+      try {
+        const {
+          env_id,
+          token_id,
+          search,
+          surface,
+          allowed,
+          from,
+          to,
+        } = req.query;
+
+        const rows = await ActivityLog.ExportRows({
+          envId: env_id,
+          tokenId: token_id,
+          search,
+          surface,
+          allowed: allowed === undefined ? undefined : allowed === "true",
+          from,
+          to,
+        });
+
+        const csv = toCsv(rows.map(toCsvRow), ACTIVITY_CSV_COLUMNS);
+        const stamp = new Date().toISOString().slice(0, 10);
+
+        return reply
+          .code(200)
+          .header("Content-Type", "text/csv; charset=utf-8")
+          .header(
+            "Content-Disposition",
+            `attachment; filename="activity-log-${stamp}.csv"`,
+          )
+          .send(csv);
+      } catch (err) {
+        return fail(reply, err);
+      }
+    },
+  );
 
   done();
 };

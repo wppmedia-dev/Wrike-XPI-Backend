@@ -107,3 +107,34 @@ export const getPortalActivityConfig = (token: string) =>
 
 export const listPortalActivity = (token: string, filters: PortalActivityFilters = {}) =>
   request<PortalActivityList>(token, qs(filters));
+
+/**
+ * GET /api/v1/portal/activity-logs/export — same filters as the list, minus
+ * pagination, streamed back as a CSV file. Read as a blob and handed to the
+ * browser as a download, same approach as the admin console's
+ * exportActivityCsv (frontend/src/lib/activityLogApi.ts).
+ */
+export const exportPortalActivity = async (
+  token: string,
+  filters: Omit<PortalActivityFilters, "limit" | "offset"> = {},
+): Promise<void> => {
+  const res = await portalFetch(`${BASE}/export${qs(filters)}`, token);
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.message || "Export failed");
+  }
+  const blob = await res.blob();
+  const match = res.headers.get("Content-Disposition")?.match(/filename="([^"]+)"/);
+  downloadBlob(blob, match?.[1] || "activity-log.csv");
+};
+
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}

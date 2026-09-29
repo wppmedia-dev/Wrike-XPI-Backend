@@ -69,62 +69,12 @@
   outline-offset: 2px;
 }
 
-.tok-filter-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 8px 12px;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition:
-    background-color 0.12s ease,
-    border-color 0.12s ease,
-    color 0.12s ease;
-}
+/* The Filters trigger itself is <IconToolbarButton /> (frontend/src/
+   components/ui/IconToolbarButton.tsx) — an icon button with its own badge
+   and hover tooltip, shared with the Activity Log pages' Filters/Export
+   triggers so all three read as one family.
 
-.tok-filter-toggle i {
-  font-size: 11px;
-}
-
-.tok-filter-toggle:hover {
-  color: var(--text-primary);
-  background: var(--bg-surface-2);
-}
-
-.tok-filter-toggle.is-open {
-  color: var(--accent);
-  background: var(--accent-soft);
-  border-color: var(--accent);
-}
-
-.tok-filter-toggle:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-/* How many filters are applied. Visible while the popup is closed, which is
-   the state where a filter is easiest to forget about. */
-.tok-filter-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 17px;
-  height: 17px;
-  padding: 0 5px;
-  font-size: 10.5px;
-  font-weight: 700;
-  color: #ffffff;
-  background: var(--accent);
-  border-radius: 999px;
-}
-
-/* Portalled onto <body> and positioned from the button's measured rect
+   Portalled onto <body> and positioned from the button's measured rect
    (TokensTable.tsx), so the card's overflow cannot clip it. Same panel
    treatment as AdminSelect's dropdown (same offset, radius and shadow), so a
    filter popup and a select inside it read as one family. */

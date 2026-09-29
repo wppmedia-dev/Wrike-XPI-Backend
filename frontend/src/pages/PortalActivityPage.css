@@ -97,43 +97,17 @@
 
 /* The portal module only ever grants "read", so the page states that once
    here instead of repeating it on every control. */
-.pal-readonly {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
 .pal-stats {
   margin-bottom: 18px;
 }
 
 /* ═══════════════════════════════════════════════════════════
-   FILTER BAR
-   One considered strip, not a pile of loose selects: a search box
-   with the primary signal (who), an environment select (where),
-   and two chip groups (what kind, what happened) — grouped so
-   the eye reads it as one control surface.
+   TABLE TOOLBAR
+   Search, the Filters/Export popovers, and rows-per-page, all
+   in one row at the top of the table card — the same shape as
+   the Sessions table's toolbar (DataTable.tsx .dt2-toolbar),
+   rather than a separate filter bar sitting above the card.
    ═══════════════════════════════════════════════════════════ */
-
-.pal-filterbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding: 12px 14px;
-  margin-bottom: 16px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
-}
 
 .pal-search {
   position: relative;
@@ -178,6 +152,18 @@
    it within the filter bar. */
 .pal-env-select {
   min-width: 190px;
+}
+
+/* Filters + Export triggers (FilterPopover) — environment/surface/result/
+   date all live inside the popovers instead of sitting on the toolbar. */
+.pal-filterbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pal-search-in-popover {
+  max-width: none;
 }
 
 /* Chip groups — a bordered pill holding buttons, one lit at a time. */
@@ -497,27 +483,27 @@
   border: 0;
 }
 
-/* ── Rows-per-page toolbar ──────────────────────────────────────────── */
+/* ── Table toolbar ──────────────────────────────────────────────────── */
 
+/* Token chip, search, Filters/Export, rows-per-page — all in the one row at
+   the top of the card. */
 .pal-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 16px;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--border);
   font-size: 12.5px;
   color: var(--text-muted);
 }
 
-.pal-range {
-  font-variant-numeric: tabular-nums;
-}
-
+/* Pinned to the end of the toolbar row, after search and Filters/Export. */
 .pal-pagesize {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+  margin-left: auto;
   white-space: nowrap;
 }
 
@@ -840,7 +826,7 @@
 }
 
 @media (max-width: 780px) {
-  .pal-filterbar {
+  .pal-toolbar {
     flex-direction: column;
     align-items: stretch;
   }
@@ -851,6 +837,11 @@
     width: 100%;
   }
 
+  .pal-pagesize {
+    margin-left: 0;
+    justify-content: space-between;
+  }
+
   .pal-chipgroup {
     justify-content: space-between;
   }
@@ -859,7 +850,6 @@
     max-width: 160px;
   }
 
-  .pal-toolbar,
   .pal-pagination {
     flex-wrap: wrap;
   }

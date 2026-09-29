@@ -18,6 +18,7 @@ import { RowMenu } from "./ui/RowMenu";
 import { CopyButton } from "./ui/CopyButton";
 import { Toggle } from "./ui/Toggle";
 import { Badge } from "./ui/Badge";
+import { IconToolbarButton } from "./ui/IconToolbarButton";
 import AdminSelect from "./AdminSelect";
 import { EMPTY, dateSortValue } from "../lib/format";
 import {
@@ -761,20 +762,16 @@ export function TokensTable({
   // the table, not a form.
   const filterControl = (
     <div className="tok-filter-wrap">
-      <button
+      <IconToolbarButton
         ref={filterButtonRef}
-        type="button"
-        className={`tok-filter-toggle${filtersOpen ? " is-open" : ""}`}
+        icon="fa-filter"
+        label="Filters"
+        badge={activeFilterCount}
+        active={filtersOpen}
         aria-expanded={filtersOpen}
         aria-haspopup="dialog"
         onClick={() => (filtersOpen ? closeFilters() : setFiltersOpen(true))}
-      >
-        <i className="fa-solid fa-filter" aria-hidden="true" />
-        Filters
-        {activeFilterCount > 0 && (
-          <span className="tok-filter-count">{activeFilterCount}</span>
-        )}
-      </button>
+      />
 
       {scopeLabel && (
         <span className="tok-scope-chip" title={`Showing tokens for ${scopeLabel} only`}>
