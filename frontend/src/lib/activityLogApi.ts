@@ -117,3 +117,34 @@ export const getActivitySummary = (
 
 export const listActivity = (filters: ActivityFilters = {}) =>
   request<ActivityList>(`${qs(filters)}`);
+
+/**
+ * GET /api/v1/admin/activity/export — same filters as the list, minus
+ * pagination, streamed back as a CSV file. Goes through adminFetch (not a
+ * plain <a href>) because the route needs the Bearer token; the response is
+ * read as a blob and handed to the browser as a download rather than
+ * navigated to, so the admin console never leaves the page.
+ */
+export const exportActivityCsv = async (
+  filters: Omit<ActivityFilters, "limit" | "offset"> = {},
+): Promise<void> => {
+  const res = await adminFetch(`${BASE}/export${qs(filters)}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.message || "Export failed");
+  }
+  const blob = await res.blob();
+  const match = res.headers.get("Content-Disposition")?.match(/filename="([^"]+)"/);
+  downloadBlob(blob, match?.[1] || "activity-log.csv");
+};
+
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}

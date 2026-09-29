@@ -1,0 +1,43 @@
+/* Styles for <Tooltip /> (Radix UI primitive, frontend/src/components/ui/
+   Tooltip.tsx). Dark-on-light, the classic tooltip treatment, so it reads as
+   a system overlay rather than another card floating on the page — the
+   inverse of every other popover in this console. */
+
+.ui-tooltip {
+  z-index: 4000;
+  max-width: 240px;
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #ffffff;
+  background: var(--text-primary);
+  border-radius: 6px;
+  box-shadow: var(--shadow-lg);
+  will-change: transform, opacity;
+}
+
+.ui-tooltip-arrow {
+  fill: var(--text-primary);
+}
+
+/* Radix sets data-state during the enter/exit transition — animate on that
+   rather than on mount, so the tooltip doesn't pop in as a hard cut. */
+@media (prefers-reduced-motion: no-preference) {
+  .ui-tooltip[data-state="delayed-open"],
+  .ui-tooltip[data-state="instant-open"] {
+    animation: ui-tooltip-in 0.12s ease-out;
+  }
+
+  @keyframes ui-tooltip-in {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+}

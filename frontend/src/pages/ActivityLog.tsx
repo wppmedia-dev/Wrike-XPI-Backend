@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  exportActivityCsv,
   getActivityConfig,
   getActivitySummary,
   listActivity,
@@ -17,6 +18,7 @@ import { ADMIN_HELP } from "../lib/pageHelp";
 import { callerNote } from "../lib/activityCaller";
 import { InfoTip } from "../components/ui/InfoTip";
 import { PayloadBlock } from "../components/ui/PayloadBlock";
+import { FilterPopover } from "../components/ui/FilterPopover";
 import "./ActivityLog.css";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
@@ -120,6 +122,43 @@ export default function ActivityLog({
   // a failed call, because those are the two things a person arrives here
   // holding — an email from the caller, or the id out of the error message.
   const [searchFilter, setSearchFilter] = useState("");
+  // Date range — the one filter the console didn't have a control for at all;
+  // <input type="date"> gives whole-day boundaries, which is what "show me
+  // last Tuesday" actually means to a person filtering an audit log.
+  const [fromFilter, setFromFilter] = useState("");
+  const [toFilter, setToFilter] = useState("");
+
+  // The env/surface/result/date controls moved off the bar and into this
+  // popover (Advanced filters) — the bar now holds only search, which is
+  // free text and used on nearly every visit, plus the Filters and Export
+  // triggers.
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  // The popover's own copy of the filter fields: editing a chip or a date
+  // inside it must not touch the table until "Done" is clicked — otherwise
+  // every click mid-adjustment (e.g. picking "From" before "To" is set)
+  // fires a fetch for a half-finished filter. Applied to the real filters,
+  // and so to the table, only on commit.
+  const [filtersDraft, setFiltersDraft] = useState({
+    envFilter: "",
+    surfaceFilter: "" as Surface | "",
+    resultFilter: "" as "allowed" | "denied" | "",
+    fromFilter: "",
+    toFilter: "",
+  });
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  // The export dialog's own copy of the filter fields: it opens pre-filled
+  // from whatever is currently applied, but editing it (e.g. widening the
+  // date range for a bigger report) must not also change what the table on
+  // screen is showing.
+  const [exportDraft, setExportDraft] = useState({
+    envFilter: "",
+    surfaceFilter: "" as Surface | "",
+    resultFilter: "" as "allowed" | "denied" | "",
+    searchFilter: "",
+    fromFilter: "",
+    toFilter: "",
+  });
 
   const loadedOnce = useRef(false);
   const searchDebounce = useRef<number | null>(null);
@@ -149,6 +188,8 @@ export default function ActivityLog({
             surface: surfaceFilter || undefined,
             allowed: resultFilter ? resultFilter === "allowed" : undefined,
             search: searchFilter.trim() || undefined,
+            from: fromFilter || undefined,
+            to: toFilter || undefined,
             limit: pageSize,
             offset: nextOffset,
           }),
@@ -168,7 +209,7 @@ export default function ActivityLog({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [envFilter, surfaceFilter, resultFilter, searchFilter, pageSize, tokenFilterId],
+    [envFilter, surfaceFilter, resultFilter, searchFilter, fromFilter, toFilter, pageSize, tokenFilterId],
   );
 
   useEffect(() => {
@@ -179,7 +220,7 @@ export default function ActivityLog({
     }
     load(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, envFilter, surfaceFilter, resultFilter, pageSize, tokenFilterId]);
+  }, [active, envFilter, surfaceFilter, resultFilter, fromFilter, toFilter, pageSize, tokenFilterId]);
 
   // Top-bar Refresh — reload the current page (keeps filters + page) and the
   // summary stats without resetting the view.
@@ -205,6 +246,73 @@ export default function ActivityLog({
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const rangeFrom = total === 0 ? 0 : offset + 1;
   const rangeTo = Math.min(offset + rows.length, total);
+
+  // Badge on the Filters trigger — how many of the drawer's own filters are
+  // set, so a collapsed panel still tells you something is narrowing the
+  // table. The token scope and search box have their own visible affordance
+  // (the chip, the box itself), so they aren't counted here.
+  const advancedFilterCount = [envFilter, surfaceFilter, resultFilter, fromFilter, toFilter].filter(
+    Boolean,
+  ).length;
+
+  const openFilters = () => {
+    setFiltersDraft({ envFilter, surfaceFilter, resultFilter, fromFilter, toFilter });
+    setFiltersOpen(true);
+  };
+
+  // Commits the draft to the real filters — this is the one place that
+  // triggers the table's fetch, so every edit inside the popover until now
+  // has been free.
+  const applyFilters = () => {
+    setEnvFilter(filtersDraft.envFilter);
+    setSurfaceFilter(filtersDraft.surfaceFilter);
+    setResultFilter(filtersDraft.resultFilter);
+    setFromFilter(filtersDraft.fromFilter);
+    setToFilter(filtersDraft.toFilter);
+    setFiltersOpen(false);
+  };
+
+  const clearFilters = () => {
+    const cleared = { envFilter: "", surfaceFilter: "" as Surface | "", resultFilter: "" as "allowed" | "denied" | "", fromFilter: "", toFilter: "" };
+    setFiltersDraft(cleared);
+    setEnvFilter("");
+    setSurfaceFilter("");
+    setResultFilter("");
+    setFromFilter("");
+    setToFilter("");
+  };
+
+  const openExport = () => {
+    setExportDraft({
+      envFilter,
+      surfaceFilter,
+      resultFilter,
+      searchFilter,
+      fromFilter,
+      toFilter,
+    });
+    setExportOpen(true);
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      await exportActivityCsv({
+        env_id: exportDraft.envFilter || undefined,
+        token_id: tokenFilterId,
+        surface: exportDraft.surfaceFilter || undefined,
+        allowed: exportDraft.resultFilter ? exportDraft.resultFilter === "allowed" : undefined,
+        search: exportDraft.searchFilter.trim() || undefined,
+        from: exportDraft.fromFilter || undefined,
+        to: exportDraft.toFilter || undefined,
+      });
+      setExportOpen(false);
+    } catch (err: any) {
+      toast(err?.message || "Could not export the activity log", "error");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // Numbered pager with ellipses for large result sets — stays compact and
   // readable even when the log spans many pages.
@@ -269,111 +377,294 @@ export default function ActivityLog({
         </div>
       </div>
 
-      <div className="al-filterbar">
-        {/* The token scope, shown before the other filters because it is the
-            one the admin did not set from this page, and removable right
-            here, so arriving from a token row never traps them. */}
-        {tokenFilter && (
-          <span className="al-token-chip" title={`Filtered to ${tokenFilter.label}`}>
-            <i className="fa-solid fa-key" aria-hidden="true" />
-            <span className="al-token-chip-label">{tokenFilter.label}</span>
-            {onClearTokenFilter && (
-              <button
-                type="button"
-                className="al-token-chip-clear"
-                onClick={onClearTokenFilter}
-                aria-label="Clear the token filter"
-                title="Clear the token filter"
-              >
-                <i className="fa-solid fa-xmark" aria-hidden="true" />
-              </button>
-            )}
-          </span>
-        )}
-
-        <div className="al-search">
-          <i className="fa-solid fa-magnifying-glass" aria-hidden="true" />
-          <input
-            type="search"
-            placeholder="Search caller or reference…"
-            value={searchFilter}
-            onChange={(e) => setSearchFilter(e.target.value)}
-            aria-label="Search by caller email or reference id"
-          />
-        </div>
-
-        <div className="al-env-select">
-          <AdminSelect
-            icon="fa-layer-group"
-            ariaLabel="Filter by environment"
-            value={envFilter}
-            onChange={setEnvFilter}
-            placeholder="All environments"
-            options={[
-              { value: "", label: "All environments" },
-              ...environments.map((env) => ({ value: env.id, label: env.environment_name })),
-            ]}
-          />
-        </div>
-
-        <div className="al-chipgroup" role="group" aria-label="Filter by surface">
-          {(
-            [
-              { value: "", label: "All surfaces" },
-              { value: "rest", label: "API" },
-              { value: "mcp", label: "MCP" },
-            ] as const
-          ).map((opt) => (
-            <button
-              key={opt.value || "all"}
-              type="button"
-              className="al-chip"
-              aria-pressed={surfaceFilter === opt.value}
-              onClick={() => setSurfaceFilter(opt.value as Surface | "")}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="al-chipgroup" role="group" aria-label="Filter by result">
-          {(
-            [
-              { value: "", label: "All results" },
-              { value: "allowed", label: "Allowed" },
-              { value: "denied", label: "Denied" },
-            ] as const
-          ).map((opt) => (
-            <button
-              key={opt.value || "all"}
-              type="button"
-              className={`al-chip${
-                opt.value === "denied"
-                  ? " al-chip-danger"
-                  : opt.value === "allowed"
-                    ? " al-chip-success"
-                    : ""
-              }`}
-              aria-pressed={resultFilter === opt.value}
-              onClick={() => setResultFilter(opt.value as "allowed" | "denied" | "")}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
       <div className="ea-table-card">
-        {/* Rows-per-page + live count range, so admins can size the audit
-            log to their reading pace without losing count context. */}
+        {/* The table's own toolbar, same shape as the Sessions table's
+            (frontend/src/components/ui/DataTable.tsx .dt2-toolbar): search,
+            the filter/export controls, and rows-per-page all live at the top
+            of the card instead of above it. */}
         <div className="al-toolbar">
-          <span className="al-range" aria-live="polite">
-            {loading
-              ? "Loading…"
-              : total === 0
-                ? "No calls"
-                : `Showing ${rangeFrom}–${rangeTo} of ${total}`}
-          </span>
+          {/* The token scope, shown before the other filters because it is
+              the one the admin did not set from this page, and removable
+              right here, so arriving from a token row never traps them. */}
+          {tokenFilter && (
+            <span className="al-token-chip" title={`Filtered to ${tokenFilter.label}`}>
+              <i className="fa-solid fa-key" aria-hidden="true" />
+              <span className="al-token-chip-label">{tokenFilter.label}</span>
+              {onClearTokenFilter && (
+                <button
+                  type="button"
+                  className="al-token-chip-clear"
+                  onClick={onClearTokenFilter}
+                  aria-label="Clear the token filter"
+                  title="Clear the token filter"
+                >
+                  <i className="fa-solid fa-xmark" aria-hidden="true" />
+                </button>
+              )}
+            </span>
+          )}
+
+          <div className="al-search">
+            <i className="fa-solid fa-magnifying-glass" aria-hidden="true" />
+            <input
+              type="search"
+              placeholder="Search caller or reference…"
+              value={searchFilter}
+              onChange={(e) => setSearchFilter(e.target.value)}
+              aria-label="Search by caller email or reference id"
+            />
+          </div>
+
+          <div className="al-filterbar-actions">
+          <FilterPopover
+            label="Filters"
+            icon="fa-sliders"
+            badge={advancedFilterCount}
+            open={filtersOpen}
+            onOpenChange={(v) => (v ? openFilters() : setFiltersOpen(false))}
+            footer={
+              <>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={clearFilters}>
+                  Clear filters
+                </button>
+                <button type="button" className="btn btn-primary btn-sm" onClick={applyFilters}>
+                  Done
+                </button>
+              </>
+            }
+          >
+            <div className="fpop-field">
+              <label htmlFor="al-flt-env">Environment</label>
+              <AdminSelect
+                id="al-flt-env"
+                icon="fa-layer-group"
+                ariaLabel="Filter by environment"
+                value={filtersDraft.envFilter}
+                onChange={(v) => setFiltersDraft((d) => ({ ...d, envFilter: v }))}
+                placeholder="All environments"
+                options={[
+                  { value: "", label: "All environments" },
+                  ...environments.map((env) => ({ value: env.id, label: env.environment_name })),
+                ]}
+              />
+            </div>
+
+            <div className="fpop-field">
+              <label>Surface</label>
+              <div className="al-chipgroup" role="group" aria-label="Filter by surface">
+                {(
+                  [
+                    { value: "", label: "All surfaces" },
+                    { value: "rest", label: "API" },
+                    { value: "mcp", label: "MCP" },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.value || "all"}
+                    type="button"
+                    className="al-chip"
+                    aria-pressed={filtersDraft.surfaceFilter === opt.value}
+                    onClick={() =>
+                      setFiltersDraft((d) => ({ ...d, surfaceFilter: opt.value as Surface | "" }))
+                    }
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="fpop-field">
+              <label>Result</label>
+              <div className="al-chipgroup" role="group" aria-label="Filter by result">
+                {(
+                  [
+                    { value: "", label: "All results" },
+                    { value: "allowed", label: "Allowed" },
+                    { value: "denied", label: "Denied" },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.value || "all"}
+                    type="button"
+                    className={`al-chip${
+                      opt.value === "denied"
+                        ? " al-chip-danger"
+                        : opt.value === "allowed"
+                          ? " al-chip-success"
+                          : ""
+                    }`}
+                    aria-pressed={filtersDraft.resultFilter === opt.value}
+                    onClick={() =>
+                      setFiltersDraft((d) => ({
+                        ...d,
+                        resultFilter: opt.value as "allowed" | "denied" | "",
+                      }))
+                    }
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="fpop-field">
+              <label>Date range</label>
+              <div className="fpop-row">
+                <input
+                  type="date"
+                  value={filtersDraft.fromFilter}
+                  max={filtersDraft.toFilter || undefined}
+                  onChange={(e) => setFiltersDraft((d) => ({ ...d, fromFilter: e.target.value }))}
+                  aria-label="From date"
+                />
+                <input
+                  type="date"
+                  value={filtersDraft.toFilter}
+                  min={filtersDraft.fromFilter || undefined}
+                  onChange={(e) => setFiltersDraft((d) => ({ ...d, toFilter: e.target.value }))}
+                  aria-label="To date"
+                />
+              </div>
+            </div>
+          </FilterPopover>
+
+          <FilterPopover
+            label="Export"
+            icon="fa-file-arrow-down"
+            open={exportOpen}
+            onOpenChange={(v) => (v ? openExport() : setExportOpen(false))}
+            footer={
+              <>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setExportOpen(false)}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-primary btn-sm${exporting ? " loading" : ""}`}
+                  disabled={exporting}
+                  onClick={handleExport}
+                >
+                  <i className="fa-solid fa-download" aria-hidden="true" /> Download CSV
+                </button>
+              </>
+            }
+          >
+            <div className="fpop-field">
+              <label htmlFor="al-exp-env">Environment</label>
+              <AdminSelect
+                id="al-exp-env"
+                icon="fa-layer-group"
+                ariaLabel="Export: filter by environment"
+                value={exportDraft.envFilter}
+                onChange={(v) => setExportDraft((d) => ({ ...d, envFilter: v }))}
+                placeholder="All environments"
+                options={[
+                  { value: "", label: "All environments" },
+                  ...environments.map((env) => ({ value: env.id, label: env.environment_name })),
+                ]}
+              />
+            </div>
+
+            <div className="fpop-field">
+              <label>Surface</label>
+              <div className="al-chipgroup" role="group" aria-label="Export: filter by surface">
+                {(
+                  [
+                    { value: "", label: "All surfaces" },
+                    { value: "rest", label: "API" },
+                    { value: "mcp", label: "MCP" },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.value || "all"}
+                    type="button"
+                    className="al-chip"
+                    aria-pressed={exportDraft.surfaceFilter === opt.value}
+                    onClick={() =>
+                      setExportDraft((d) => ({ ...d, surfaceFilter: opt.value as Surface | "" }))
+                    }
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="fpop-field">
+              <label>Result</label>
+              <div className="al-chipgroup" role="group" aria-label="Export: filter by result">
+                {(
+                  [
+                    { value: "", label: "All results" },
+                    { value: "allowed", label: "Allowed" },
+                    { value: "denied", label: "Denied" },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.value || "all"}
+                    type="button"
+                    className={`al-chip${
+                      opt.value === "denied"
+                        ? " al-chip-danger"
+                        : opt.value === "allowed"
+                          ? " al-chip-success"
+                          : ""
+                    }`}
+                    aria-pressed={exportDraft.resultFilter === opt.value}
+                    onClick={() =>
+                      setExportDraft((d) => ({
+                        ...d,
+                        resultFilter: opt.value as "allowed" | "denied" | "",
+                      }))
+                    }
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="fpop-field">
+              <label htmlFor="al-exp-search">Search</label>
+              <div className="al-search al-search-in-popover">
+                <i className="fa-solid fa-magnifying-glass" aria-hidden="true" />
+                <input
+                  id="al-exp-search"
+                  type="search"
+                  placeholder="Caller or reference…"
+                  value={exportDraft.searchFilter}
+                  onChange={(e) => setExportDraft((d) => ({ ...d, searchFilter: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="fpop-field">
+              <label>Date range</label>
+              <div className="fpop-row">
+                <input
+                  type="date"
+                  value={exportDraft.fromFilter}
+                  max={exportDraft.toFilter || undefined}
+                  onChange={(e) => setExportDraft((d) => ({ ...d, fromFilter: e.target.value }))}
+                  aria-label="Export: from date"
+                />
+                <input
+                  type="date"
+                  value={exportDraft.toFilter}
+                  min={exportDraft.fromFilter || undefined}
+                  onChange={(e) => setExportDraft((d) => ({ ...d, toFilter: e.target.value }))}
+                  aria-label="Export: to date"
+                />
+              </div>
+            </div>
+
+          </FilterPopover>
+          </div>
+
+          {/* Rows-per-page, pinned to the end of the same toolbar row —
+              search, filters, export and page size all live in one place at
+              the top of the card. */}
           <label className="al-pagesize">
             Show
             <select
@@ -391,6 +682,7 @@ export default function ActivityLog({
             rows
           </label>
         </div>
+
         <div className="ea-scroll">
           <table className="ea-table al-table">
             <thead>
@@ -547,9 +839,14 @@ export default function ActivityLog({
           </div>
         )}
 
-        {!loading && (
+        {!loading && total > 0 && (
           <div className="al-pagination">
-            <span className="al-pageinfo">Page {page} of {pageCount}</span>
+            {/* Same left/right split as the Sessions table's footer
+                (frontend/src/components/ui/DataTable.tsx .dt2-footer): the
+                live range on the left, the pager on the right. */}
+            <span className="al-pageinfo" aria-live="polite">
+              Showing {rangeFrom}–{rangeTo} of {total}
+            </span>
             <nav className="al-page-numbers" aria-label="Pagination">
               <button
                 type="button"

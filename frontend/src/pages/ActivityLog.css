@@ -34,25 +34,12 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   FILTER BAR
-   One considered strip, not three loose selects: a search box
-   with the primary signal (who), an environment select (where),
-   and two chip groups (what kind, what happened) — grouped so
-   the eye reads it as one control surface.
+   TABLE TOOLBAR
+   Search, the Filters/Export popovers, and rows-per-page, all
+   in one row at the top of the table card — the same shape as
+   the Sessions table's toolbar (DataTable.tsx .dt2-toolbar),
+   rather than a separate filter bar sitting above the card.
    ═══════════════════════════════════════════════════════════ */
-
-.al-filterbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding: 12px 14px;
-  margin-bottom: 16px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
-}
 
 .al-search {
   position: relative;
@@ -97,6 +84,20 @@
    trigger/panel chrome — this wrapper only sizes it within the filter bar. */
 .al-env-select {
   min-width: 190px;
+}
+
+/* Filters + Export triggers (FilterPopover) — environment/surface/result/
+   date all live inside the popovers instead of sitting on the toolbar. */
+.al-filterbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The export dialog's own search field, reusing .al-search's look inside a
+   fpop-field instead of the filter bar's flex sizing. */
+.al-search-in-popover {
+  max-width: none;
 }
 
 /* Chip groups — a bordered pill holding buttons, one lit at a time. Same
@@ -389,27 +390,28 @@
   color: var(--text-muted);
 }
 
-/* Rows-per-page toolbar — sits above the table, mirrors the "Show X rows"
-   length control used by the DataTables pages in this console. */
+/* The table's toolbar — token chip, search, Filters/Export, rows-per-page —
+   all in the one row at the top of the card. Same padding/border rhythm as
+   the Sessions table's .dt2-toolbar, but kept under the al- prefix since it
+   also hosts this page's own token-scope chip. */
 .al-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 16px;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--border);
   font-size: 12.5px;
   color: var(--text-muted);
 }
 
-.al-range {
-  font-variant-numeric: tabular-nums;
-}
-
+/* Pinned to the end of the toolbar row — the last control after search and
+   Filters/Export, same position DataTable gives .dt2-pagesize. */
 .al-pagesize {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+  margin-left: auto;
   white-space: nowrap;
 }
 
@@ -550,7 +552,7 @@
 }
 
 @media (max-width: 780px) {
-  .al-filterbar {
+  .al-toolbar {
     flex-direction: column;
     align-items: stretch;
   }
@@ -561,6 +563,11 @@
     width: 100%;
   }
 
+  .al-pagesize {
+    margin-left: 0;
+    justify-content: space-between;
+  }
+
   .al-chipgroup {
     justify-content: space-between;
   }
@@ -569,7 +576,6 @@
     max-width: 160px;
   }
 
-  .al-toolbar,
   .al-pagination {
     flex-wrap: wrap;
   }

@@ -153,6 +153,53 @@ export const List = async ({
   };
 };
 
+/**
+ * The full filtered set, for CSV export — same filters as `List` but with no
+ * page: pagination is a table-reading concern, and an export is "everything
+ * that matches", not "whatever page I'm looking at". Capped at EXPORT_MAX
+ * rows so one export can't try to pull the whole table into memory; a filter
+ * narrow enough to export usefully (a day, an environment, a token) will
+ * never get near that cap.
+ */
+const EXPORT_MAX = 20000;
+
+export const ExportRows = async ({
+  envId,
+  tokenId,
+  search,
+  surface,
+  allowed,
+  from,
+  to,
+} = {}) => {
+  const where = {};
+  if (envId) where.env_id = envId;
+  if (tokenId) where.token_id = tokenId;
+  if (search) {
+    const term = `%${String(search).trim().toLowerCase()}%`;
+    where[Op.or] = [
+      { actor_email: { [Op.iLike]: term } },
+      { reference_id: { [Op.iLike]: term } },
+    ];
+  }
+  if (surface) where.surface = surface;
+  if (allowed !== undefined && allowed !== null) where.allowed = allowed;
+  if (from || to) {
+    where.created_at = {};
+    if (from) where.created_at[Op.gte] = new Date(from);
+    if (to) where.created_at[Op.lte] = new Date(to);
+  }
+
+  const rows = await models.ApiActivityLogs.findAll({
+    attributes: ROW_ATTRS,
+    where,
+    order: [["created_at", "DESC"]],
+    limit: EXPORT_MAX,
+  });
+
+  return rows.map((r) => r.get({ plain: true }));
+};
+
 /** Quick counts for the console's summary strip. */
 export const Summary = async ({ envId, tokenId, since } = {}) => {
   const where = {};

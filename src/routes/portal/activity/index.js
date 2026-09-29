@@ -1,10 +1,12 @@
 import { ActivityLog, Tokens, WrikeCredentials } from "../../../controllers";
 import { retentionDays } from "../../../utils/activityLog";
+import { toCsv } from "../../../utils/csv";
+import { ACTIVITY_CSV_COLUMNS, toCsvRow } from "../../../utils/activityCsv";
 import {
   isEnvironmentInScope,
   scopedEnvironmentIdsFor,
 } from "../../../utils/portalScope";
-import { ListSchema, SummarySchema } from "../../admin/activity/schema";
+import { ListSchema, SummarySchema, ExportSchema } from "../../admin/activity/schema";
 import {
   verifyPortalJWT,
   requirePasswordChanged,
@@ -36,6 +38,39 @@ import {
  * the one value no row can legitimately carry.
  */
 const NO_MATCH_UUID = "00000000-0000-0000-0000-000000000000";
+
+/**
+ * The portal's CSV export is capped at a one-week date range — the "/"
+ * list route below has no such limit, same as the admin console
+ * (src/routes/admin/activity/index.js). Export is the one that pulls every
+ * matching row in a single response rather than a page at a time, so it's
+ * the one whose date span actually needs bounding; the console already
+ * clamps the export inputs to this (frontend/src/pages/PortalActivityPage.tsx),
+ * but that is a UI convenience, not enforcement — a caller hitting this
+ * route directly could otherwise export an unbounded range.
+ */
+const MAX_RANGE_DAYS = 7;
+const MAX_RANGE_MS = MAX_RANGE_DAYS * 24 * 60 * 60 * 1000;
+
+/**
+ * Throws when `from`/`to` are both given and span more than MAX_RANGE_DAYS.
+ * Either end alone (an open-ended range) is left alone — the cap is on the
+ * width of an explicit window, not on how far back a single bound can reach,
+ * which the server's own row limit and retention window already bound.
+ */
+const assertRangeWithinLimit = (from, to) => {
+  if (!from || !to) return;
+  const fromMs = new Date(from).getTime();
+  const toMs = new Date(to).getTime();
+  if (Number.isNaN(fromMs) || Number.isNaN(toMs)) return;
+  if (toMs - fromMs > MAX_RANGE_MS) {
+    const err = new Error(
+      `The date range can span at most ${MAX_RANGE_DAYS} days.`,
+    );
+    err.statusCode = 400;
+    throw err;
+  }
+};
 
 export const portalActivityRoute = (fastify, opts, done) => {
   const guard = {
@@ -171,6 +206,50 @@ export const portalActivityRoute = (fastify, opts, done) => {
       return fail(reply, err);
     }
   });
+
+  // Same filters and the same row-level scoping as the list above, minus
+  // pagination — "export everything that matches", capped server-side
+  // (ActivityLog.ExportRows) rather than trusting the caller.
+  fastify.get(
+    "/export",
+    { ...ExportSchema, ...guard },
+    async (req, reply) => {
+      try {
+        const { search, surface, allowed, from, to } = req.query;
+        assertRangeWithinLimit(from, to);
+        const envId = await resolveAllowedEnvId(req.portalUser, req.query.env_id);
+        const tokenFilter = await resolveAllowedTokenFilter(
+          req.portalUser,
+          req.query.token_id,
+          envId,
+        );
+
+        const rows = await ActivityLog.ExportRows({
+          envId: tokenFilter.envId,
+          tokenId: tokenFilter.tokenId,
+          search,
+          surface,
+          allowed: allowed === undefined ? undefined : allowed === "true",
+          from,
+          to,
+        });
+
+        const csv = toCsv(rows.map(toCsvRow), ACTIVITY_CSV_COLUMNS);
+        const stamp = new Date().toISOString().slice(0, 10);
+
+        return reply
+          .code(200)
+          .header("Content-Type", "text/csv; charset=utf-8")
+          .header(
+            "Content-Disposition",
+            `attachment; filename="activity-log-${stamp}.csv"`,
+          )
+          .send(csv);
+      } catch (err) {
+        return fail(reply, err);
+      }
+    },
+  );
 
   done();
 };

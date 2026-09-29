@@ -35,3 +35,21 @@ export const SummarySchema = {
     },
   },
 };
+
+// Same shape as ListSchema minus limit/offset — export has no page.
+export const ExportSchema = {
+  schema: {
+    querystring: {
+      type: "object",
+      properties: {
+        env_id: { type: "string", format: "uuid" },
+        token_id: { type: "string", format: "uuid" },
+        search: { type: "string", maxLength: 320 },
+        surface: { type: "string", enum: ["rest", "mcp"] },
+        allowed: { type: "string", enum: ["true", "false"] },
+        from: { type: "string" },
+        to: { type: "string" },
+      },
+    },
+  },
+};
