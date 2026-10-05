@@ -44,6 +44,11 @@ const PALETTES: Record<string, Palette> = {
     accentHover: "#075985",
     accentSoft: "rgba(3, 105, 161, 0.12)",
   },
+  staging: {
+    accent: "#0f766e", // teal
+    accentHover: "#115e59",
+    accentSoft: "rgba(15, 118, 110, 0.12)",
+  },
 };
 
 // One shared GET /api/v1/app-config for the whole page, reused by the accent
