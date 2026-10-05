@@ -225,7 +225,15 @@ export const registerCampaignTools = (server, fastify, serverUrl, auth) => {
           ],
         };
       } catch (err) {
-        throw new Error(err?.message || "Failed to create campaign");
+        const message = err?.message || "Failed to create campaign";
+        // MCP errors are plain text, so fold the handler's `details` into the message
+        const details =
+          typeof err?.details === "string"
+            ? err.details
+            : err?.details
+              ? JSON.stringify(err.details)
+              : "";
+        throw new Error(details ? `${message} Details: ${details}` : message);
       }
     },
   );
