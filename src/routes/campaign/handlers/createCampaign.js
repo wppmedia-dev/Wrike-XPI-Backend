@@ -84,12 +84,36 @@ export const CreateCampaign = (
 
       const requestFormId = requestForm?.requiredFormId;
 
-      if (!requestFormId)
+      if (!requestFormId) {
+        // The form is looked up by space, entity and variantId, so report exactly which ones are blank or unrecognized
+        const missingFields = [];
+        const unmatchedFields = [];
+
+        if (!space?.trim()) missingFields.push("space");
+        else if (!datahubSpaceData?.[space.trim().toLowerCase()])
+          unmatchedFields.push(`space "${space}"`);
+
+        if (!entity?.trim()) missingFields.push("entity");
+        else if (!datahubEntityData?.[entity.trim().toLowerCase()])
+          unmatchedFields.push(`entity "${entity}"`);
+
+        if (!variantId) missingFields.push("variantId");
+
+        const details = [];
+        if (missingFields.length)
+          details.push(`Missing required fields: ${missingFields.join(", ")}.`);
+        if (unmatchedFields.length)
+          details.push(`Unrecognized values: ${unmatchedFields.join(", ")}.`);
+        if (!details.length)
+          details.push(
+            `No request form is mapped to space "${space}", entity "${entity}" and variantId "${variantId}".`,
+          );
+
         return reject({
           statusCode: 403,
-          message:
-            "Missing parameter! Required parameter requestForm field is missing for the requested operation.",
+          message: `Missing parameter! Required parameter requestForm field is missing for the requested operation. ${details.join(" ")}`,
         });
+      }
 
       // if (Object.keys(datahubCustomFieldsData).length === 0) {
       const datahubCustomFieldsData = await getDatahubCustomFields(
