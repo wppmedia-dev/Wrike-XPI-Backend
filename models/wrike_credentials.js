@@ -110,7 +110,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       allowlist_check_enabled: {
         type: DataTypes.BOOLEAN,
-        defaultValue: true,
+        defaultValue: false,
         comment: "Gate 1 master switch — email/domain/IP allow list (src/utils/environmentAccess.js)",
       },
       custom_field_check_enabled: {
