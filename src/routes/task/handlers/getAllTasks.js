@@ -119,7 +119,7 @@ export const GetAllTasks = (wrikeToken, params, taskType) => {
         value: "Task",
       });
 
-      let getChannelTaskData;
+      let getChannelTaskData, subTaskId;
 
       if (taskType == "channel") {
         try {
@@ -143,15 +143,15 @@ export const GetAllTasks = (wrikeToken, params, taskType) => {
         //   getChannelTaskData?.errorDescription,
         // );
 
-        channelId = getChannelTaskData?.data[0]?.subTaskIds;
+        subTaskId = getChannelTaskData?.data[0]?.subTaskIds;
       }
 
       // Get task data
       let wrikeTaskData;
 
-      if (taskType == "channel")
+      if (taskType == "channel" && subTaskId)
         // Channel id may change in the previous if condition
-        wrikeTaskData = await getTask(wrikeToken, channelId);
+        wrikeTaskData = await getTask(wrikeToken, subTaskId);
       else
         wrikeTaskData = await getTasksByFolderId(
           wrikeToken,
