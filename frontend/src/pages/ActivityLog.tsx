@@ -18,7 +18,7 @@ import { PageInfo } from "../components/ui/PageInfo";
 import { ADMIN_HELP } from "../lib/pageHelp";
 import { callerNote } from "../lib/activityCaller";
 import { InfoTip } from "../components/ui/InfoTip";
-import { mcpMethodInfo } from "../lib/mcpMethod";
+import { mcpMethodInfo, mcpRowMethod } from "../lib/mcpMethod";
 import { PayloadBlock } from "../components/ui/PayloadBlock";
 import { FilterPopover } from "../components/ui/FilterPopover";
 import "./ActivityLog.css";
@@ -836,12 +836,12 @@ export default function ActivityLog({
                         <code className="al-tool" title={`MCP tool · ${row.resource}`}>
                           {row.mcp_tool}
                         </code>
-                      ) : row.surface === "mcp" && mcpMethodInfo(row.action) ? (
+                      ) : row.surface === "mcp" && mcpMethodInfo(mcpRowMethod(row)) ? (
                         <span
                           className="al-muted"
-                          title={`${mcpMethodInfo(row.action)!.hint} (${row.action})`}
+                          title={`${mcpMethodInfo(mcpRowMethod(row))!.hint} (${mcpRowMethod(row)})`}
                         >
-                          {mcpMethodInfo(row.action)!.label}
+                          {mcpMethodInfo(mcpRowMethod(row))!.label}
                         </span>
                       ) : (
                         <code>{row.resource}</code>
@@ -1042,8 +1042,8 @@ export default function ActivityLog({
                 <div>
                   <dt>Action</dt>
                   <dd>
-                    {detailRow.surface === "mcp" && mcpMethodInfo(detailRow.action)
-                      ? `${mcpMethodInfo(detailRow.action)!.label} (${detailRow.action}): ${mcpMethodInfo(detailRow.action)!.hint}`
+                    {detailRow.surface === "mcp" && mcpMethodInfo(mcpRowMethod(detailRow))
+                      ? `${mcpMethodInfo(mcpRowMethod(detailRow))!.label} (${mcpRowMethod(detailRow)}): ${mcpMethodInfo(mcpRowMethod(detailRow))!.hint}`
                       : detailRow.action || "—"}
                   </dd>
                 </div>
@@ -1065,6 +1065,19 @@ export default function ActivityLog({
                     </dd>
                   </div>
                 )}
+                {/* No tool ran: say what the request was instead of leaving the
+                    MCP fields blank. */}
+                {detailRow.surface === "mcp" &&
+                  !detailRow.mcp_tool &&
+                  mcpMethodInfo(mcpRowMethod(detailRow)) && (
+                    <div>
+                      <dt>MCP request</dt>
+                      <dd>
+                        {mcpMethodInfo(mcpRowMethod(detailRow))!.label}{" "}
+                        <code>{mcpRowMethod(detailRow)}</code>
+                      </dd>
+                    </div>
+                  )}
                 <div>
                   <dt>Status</dt>
                   <dd>{detailRow.status_code ?? "—"}</dd>

@@ -27,6 +27,24 @@ const MCP_METHOD_LABELS: Record<string, { label: string; hint: string }> = {
   },
 };
 
+/**
+ * The JSON-RPC method of an MCP row. New rows store it in `action`; rows
+ * written before that fall back to the method inside the captured request body,
+ * so old and new rows read the same.
+ */
+export const mcpRowMethod = (row: {
+  action?: string | null;
+  request_payload?: unknown;
+}): string | null => {
+  if (row.action) return row.action;
+  const body = (row.request_payload as { body?: unknown } | null | undefined)?.body;
+  const methods = ([] as unknown[])
+    .concat(body ?? [])
+    .map((msg) => (msg as { method?: unknown } | null)?.method)
+    .filter((m): m is string => typeof m === "string" && m.length > 0);
+  return methods.length ? [...new Set(methods)].join(", ") : null;
+};
+
 /** The label for a stored MCP method, or the raw method when it is not one we know. */
 export const mcpMethodInfo = (method: string | null | undefined) => {
   if (!method) return null;
