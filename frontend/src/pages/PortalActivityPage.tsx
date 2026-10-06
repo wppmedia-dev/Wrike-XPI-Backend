@@ -12,7 +12,7 @@ import {
 } from "../lib/portalActivityApi";
 import { formatDateTime } from "../lib/format";
 import { AGENT_OPTIONS } from "../lib/agentIdentity";
-import { mcpMethodInfo } from "../lib/mcpMethod";
+import { mcpMethodInfo, mcpRowMethod } from "../lib/mcpMethod";
 import AdminSelect from "../components/AdminSelect";
 import { CopyButton } from "../components/ui/CopyButton";
 import { PageInfo } from "../components/ui/PageInfo";
@@ -937,12 +937,12 @@ export default function PortalActivityPage({
                         <code className="pal-tool" title={`MCP tool · ${row.resource}`}>
                           {row.mcp_tool}
                         </code>
-                      ) : row.surface === "mcp" && mcpMethodInfo(row.action) ? (
+                      ) : row.surface === "mcp" && mcpMethodInfo(mcpRowMethod(row)) ? (
                         <span
                           className="pal-muted"
-                          title={`${mcpMethodInfo(row.action)!.hint} (${row.action})`}
+                          title={`${mcpMethodInfo(mcpRowMethod(row))!.hint} (${mcpRowMethod(row)})`}
                         >
-                          {mcpMethodInfo(row.action)!.label}
+                          {mcpMethodInfo(mcpRowMethod(row))!.label}
                         </span>
                       ) : (
                         <code>{row.resource}</code>
