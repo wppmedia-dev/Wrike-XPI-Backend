@@ -3,6 +3,7 @@ import { parseODataFilters } from "../../../utils/odataFilter";
 import {
   getCustomFields,
   getDatahubCustomFields,
+  getFolder,
   getTask,
   getTasksByFolderId,
 } from "../../../utils/wrike";
@@ -118,29 +119,38 @@ export const GetAllTasks = (wrikeToken, params, taskType) => {
         value: "Task",
       });
 
-      if (taskType == "channel") {
-        const getTaskData = await getTask(wrikeToken, channelId);
+      let getChannelTaskData;
 
-        const channelCFValue = getTaskData?.data[0]?.customFields.find(
+      if (taskType == "channel") {
+        try {
+          getChannelTaskData = await getTask(wrikeToken, channelId);
+        } catch (err) {
+          if (err?.errorDescription == "Invalid Task ID") {
+            getChannelTaskData = await getFolder(wrikeToken, channelId);
+          }
+        }
+
+        const channelCFValue = getChannelTaskData?.data[0]?.customFields.find(
           (cf) => cf.id == datahubCustomFieldsData["workitemlevel"]["cfId"],
         )?.value;
 
         if (channelCFValue != "Channel/Media Type")
           throw { message: "Invalid channel ID" };
 
-        if (getTaskData?.errorDescription) throw err;
+        if (getChannelTaskData?.errorDescription) throw err;
         // console.log(
         //   "Error while retriving chennel task",
-        //   getTaskData?.errorDescription,
+        //   getChannelTaskData?.errorDescription,
         // );
 
-        channelId = getTaskData?.data[0]?.subTaskIds;
+        channelId = getChannelTaskData?.data[0]?.subTaskIds;
       }
 
       // Get task data
       let wrikeTaskData;
 
       if (taskType == "channel")
+        // Channel id may change in the previous if condition
         wrikeTaskData = await getTask(wrikeToken, channelId);
       else
         wrikeTaskData = await getTasksByFolderId(
