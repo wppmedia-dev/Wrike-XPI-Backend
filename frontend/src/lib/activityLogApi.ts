@@ -98,6 +98,20 @@ async function request<T>(path: string): Promise<T> {
   return json?.data as T;
 }
 
+/**
+ * A date input gives "YYYY-MM-DD". Sent as-is the server reads it as UTC
+ * midnight, so a "to" date excluded its whole day and both ends were off by
+ * the viewer's UTC offset. Turn it into the viewer's local start / end of that
+ * day, as an absolute instant.
+ */
+const dayBoundary = (value: string, end: boolean): string => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!m) return value;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]) - 1, Number(m[3])];
+  const date = end ? new Date(y, mo, d, 23, 59, 59, 999) : new Date(y, mo, d, 0, 0, 0, 0);
+  return date.toISOString();
+};
+
 const qs = (filters: ActivityFilters): string => {
   const params = new URLSearchParams();
   if (filters.env_id) params.set("env_id", filters.env_id);
@@ -106,8 +120,8 @@ const qs = (filters: ActivityFilters): string => {
   if (filters.surface) params.set("surface", filters.surface);
   if (filters.allowed !== undefined) params.set("allowed", String(filters.allowed));
   if (filters.agent) params.set("agent", filters.agent);
-  if (filters.from) params.set("from", filters.from);
-  if (filters.to) params.set("to", filters.to);
+  if (filters.from) params.set("from", dayBoundary(filters.from, false));
+  if (filters.to) params.set("to", dayBoundary(filters.to, true));
   if (filters.limit) params.set("limit", String(filters.limit));
   if (filters.offset) params.set("offset", String(filters.offset));
   const s = params.toString();
