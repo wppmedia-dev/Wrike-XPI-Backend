@@ -18,6 +18,7 @@ import { PageInfo } from "../components/ui/PageInfo";
 import { ADMIN_HELP } from "../lib/pageHelp";
 import { callerNote } from "../lib/activityCaller";
 import { InfoTip } from "../components/ui/InfoTip";
+import { mcpMethodInfo } from "../lib/mcpMethod";
 import { PayloadBlock } from "../components/ui/PayloadBlock";
 import { FilterPopover } from "../components/ui/FilterPopover";
 import "./ActivityLog.css";
@@ -835,6 +836,13 @@ export default function ActivityLog({
                         <code className="al-tool" title={`MCP tool · ${row.resource}`}>
                           {row.mcp_tool}
                         </code>
+                      ) : row.surface === "mcp" && mcpMethodInfo(row.action) ? (
+                        <span
+                          className="al-muted"
+                          title={`${mcpMethodInfo(row.action)!.hint} (${row.action})`}
+                        >
+                          {mcpMethodInfo(row.action)!.label}
+                        </span>
                       ) : (
                         <code>{row.resource}</code>
                       )}
@@ -1033,7 +1041,11 @@ export default function ActivityLog({
                 </div>
                 <div>
                   <dt>Action</dt>
-                  <dd>{detailRow.action || "—"}</dd>
+                  <dd>
+                    {detailRow.surface === "mcp" && mcpMethodInfo(detailRow.action)
+                      ? `${mcpMethodInfo(detailRow.action)!.label} (${detailRow.action}): ${mcpMethodInfo(detailRow.action)!.hint}`
+                      : detailRow.action || "—"}
+                  </dd>
                 </div>
                 <div>
                   <dt>Method</dt>

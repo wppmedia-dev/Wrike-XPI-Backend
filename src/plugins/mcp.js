@@ -125,7 +125,19 @@ module.exports = async function (fastify, opts) {
         tokenId: tokenId || null,
         surface: "mcp",
         actorEmail: actorEmail || null,
-        action: null,
+        // The JSON-RPC method ("tools/call", "server/discover", ...), so a row
+        // with no tool still says what the request was for.
+        action:
+          [
+            ...new Set(
+              []
+                .concat(req.body || [])
+                .map((msg) => msg?.method)
+                .filter((name) => typeof name === "string" && name),
+            ),
+          ]
+            .join(", ")
+            .slice(0, 255) || null,
         resource: req.raw?.url || "/mcp",
         method: null,
         allowed,
