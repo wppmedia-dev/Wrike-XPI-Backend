@@ -266,25 +266,41 @@ export const AmoebaHandler = (wrikeToken, req, environmentName) => {
 
       // -------------------- Executing target API call --------------------
       // Prepare headers for the target API
-      const targetHeaders = {
-        // ...req.headers,
-        "Content-Type": req.headers["content-type"] || "application/json",
-        Accept: "application/json",
-      };
+      // This is a proxy, so the caller's headers go through to the next stage
+      // as they came in, minus the ones that describe the inbound connection.
+      const targetHeaders = {};
+      for (const [name, value] of Object.entries(req.headers || {})) {
+        const key = name.toLowerCase();
+        if (HOP_BY_HOP_HEADERS.has(key) || value === undefined) continue;
+        targetHeaders[key] = value;
+      }
 
-      // Add authentication headers based on isAuthFree flag
+      targetHeaders["content-type"] =
+        targetHeaders["content-type"] || "application/json";
+      targetHeaders["accept"] = targetHeaders["accept"] || "application/json";
+
+      // Authorization is the one header this service decides: the exchanged
+      // Wrike token, the caller's own value, or nothing at all.
+      delete targetHeaders["authorization"];
       const authToken = isWrikeToken
         ? `Bearer ${wrikeToken}`
         : req.headers.authorization;
 
-      if (!isAuthFree && authToken) targetHeaders.Authorization = authToken;
+      if (!isAuthFree && authToken) targetHeaders["authorization"] = authToken;
 
       // Make the API call to the target URL
       const targetResponse = await GetResponseWithStatusCode(
         fullTargetUrl,
         method,
         targetHeaders,
-        req.body ? req.body : ["POST", "PUT"].includes(method) ? {} : undefined,
+        req.rawFormBody
+          ? req.rawFormBody
+          : req.body
+            ? req.body
+            : ["POST", "PUT"].includes(method)
+              ? {}
+              : undefined,
+        Boolean(req.rawFormBody),
       );
 
       if (targetResponse?.status >= 400)
@@ -338,6 +354,24 @@ export const AmoebaHandler = (wrikeToken, req, environmentName) => {
     }
   });
 };
+
+// Describe the inbound connection or body, not the request. The body is
+// re-serialised and the target host differs, so forwarding these would break
+// the call (wrong host, wrong length, double encoding).
+const HOP_BY_HOP_HEADERS = new Set([
+  "host",
+  "content-length",
+  "connection",
+  "keep-alive",
+  "transfer-encoding",
+  "te",
+  "trailer",
+  "upgrade",
+  "proxy-authorization",
+  "proxy-connection",
+  "accept-encoding",
+  "expect",
+]);
 
 const getDatahubIdForEnvironment = (environmentName, idKey, envVarKey) => {
   if (!environmentName) {
