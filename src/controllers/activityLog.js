@@ -104,6 +104,23 @@ export const SetMcpTools = async (id, { tool, code, referenceId } = {}) => {
 };
 
 /**
+ * The created_at bounds for a from/to filter. A bare "YYYY-MM-DD" `to` means
+ * the whole of that day, so it runs to the end of it instead of stopping at
+ * midnight and dropping every row from that day.
+ */
+const createdAtRange = (from, to) => {
+  const range = {};
+  if (from) range[Op.gte] = new Date(from);
+  if (to) {
+    const end = new Date(to);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(to).trim()))
+      end.setUTCHours(23, 59, 59, 999);
+    range[Op.lte] = end;
+  }
+  return range;
+};
+
+/**
  * Paginated, filtered listing for the admin console. `limit` is capped hard
  * (this table can get large fast) rather than trusting the caller.
  */
@@ -139,11 +156,7 @@ export const List = async ({
   }
   if (surface) where.surface = surface;
   if (allowed !== undefined && allowed !== null) where.allowed = allowed;
-  if (from || to) {
-    where.created_at = {};
-    if (from) where.created_at[Op.gte] = new Date(from);
-    if (to) where.created_at[Op.lte] = new Date(to);
-  }
+  if (from || to) where.created_at = createdAtRange(from, to);
   // Derived from the stored User-Agent header, not its own column — see
   // src/utils/agentIdentity.js for why (no MCP client-info handshake is
   // captured anywhere in this codebase, so the HTTP header is what there is).
@@ -207,11 +220,7 @@ export const ExportRows = async ({
   }
   if (surface) where.surface = surface;
   if (allowed !== undefined && allowed !== null) where.allowed = allowed;
-  if (from || to) {
-    where.created_at = {};
-    if (from) where.created_at[Op.gte] = new Date(from);
-    if (to) where.created_at[Op.lte] = new Date(to);
-  }
+  if (from || to) where.created_at = createdAtRange(from, to);
   if (agent) {
     const clause = agentFilterClause(agent, { Op });
     if (clause) where[Op.and] = [...(where[Op.and] || []), clause];
