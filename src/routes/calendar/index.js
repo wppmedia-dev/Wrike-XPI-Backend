@@ -30,6 +30,7 @@ import { denialFor } from "../../utils/tokenPermissionMap";
 import { CALENDAR_SYNC_MODULE } from "../../utils/tokenPurpose";
 import { PUBLIC_DENIAL_MESSAGE } from "../../utils/environmentAccess";
 import { AmoebaHandler } from "../amoeba/handlers/amoebaHandler";
+import { registerRawFormBodyParsers } from "../../utils/rawFormBody";
 import {
   CalendarAmoebaSchema,
   CalendarAmoebaWildcardSchema,
@@ -53,6 +54,11 @@ const calendarDenial = (req) => {
 };
 
 export const calendarRoute = (fastify, opts, done) => {
+  // The forwarder below shares AmoebaHandler, which sends form bodies on as the
+  // raw bytes the caller posted; without these parsers Fastify answers a form
+  // post with 415 before the handler runs.
+  registerRawFormBodyParsers(fastify);
+
   fastify.get("/validate", async (req, reply) => {
     const denial = calendarDenial(req);
 

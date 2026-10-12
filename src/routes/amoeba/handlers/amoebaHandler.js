@@ -169,9 +169,14 @@ export const AmoebaHandler = (wrikeToken, req, environmentName) => {
 
       // -------------------- Redis Caching data check --------------------
       // Generate cache key
+      // The token id is part of the key: a target behind token exchange can
+      // answer differently per caller, and a hit skips the call (and with it
+      // the target's own authorisation), so entries must never be shared
+      // between tokens.
       const cacheKey = redisClient.generateKey(
         "amoeba_data",
         datahubId,
+        req.tokenId ?? "no-token",
         originalUrl?.replace("/api/v1/wrikexpi/amoeba/", ""),
       );
 
@@ -264,14 +269,26 @@ export const AmoebaHandler = (wrikeToken, req, environmentName) => {
         });
       }
 
+      // The destination comes from a datahub record, and it may be about to
+      // receive a Wrike token, so it has to pass the outbound policy first.
+      const targetPolicyError = checkTargetPolicy(fullTargetUrl);
+      if (targetPolicyError)
+        return reject({ statusCode: 400, message: targetPolicyError });
+
       // -------------------- Executing target API call --------------------
       // Prepare headers for the target API
       // This is a proxy, so the caller's headers go through to the next stage
-      // as they came in, minus the ones that describe the inbound connection.
+      // as they came in, minus the ones that describe the inbound connection
+      // and the ones that identify the caller to this service or its network.
       const targetHeaders = {};
       for (const [name, value] of Object.entries(req.headers || {})) {
         const key = name.toLowerCase();
-        if (HOP_BY_HOP_HEADERS.has(key) || value === undefined) continue;
+        if (
+          HOP_BY_HOP_HEADERS.has(key) ||
+          CALLER_IDENTITY_HEADERS.has(key) ||
+          value === undefined
+        )
+          continue;
         targetHeaders[key] = value;
       }
 
@@ -279,14 +296,25 @@ export const AmoebaHandler = (wrikeToken, req, environmentName) => {
         targetHeaders["content-type"] || "application/json";
       targetHeaders["accept"] = targetHeaders["accept"] || "application/json";
 
-      // Authorization is the one header this service decides: the exchanged
-      // Wrike token, the caller's own value, or nothing at all.
+      // Authorization is the one header this service decides. The caller's own
+      // authorization header is their credential to THIS service (Basic / JWE),
+      // so it is never handed on to a destination. What is sent instead is, in
+      // order: a Wrike token the caller supplied in x-wrike-token (passed as-is,
+      // Wrike validates it on the destination call), the exchanged Wrike token,
+      // or nothing.
       delete targetHeaders["authorization"];
-      const authToken = isWrikeToken
-        ? `Bearer ${wrikeToken}`
-        : req.headers.authorization;
+      delete targetHeaders["x-wrike-token"];
 
-      if (!isAuthFree && authToken) targetHeaders["authorization"] = authToken;
+      const callerWrikeToken = String(req.headers?.["x-wrike-token"] ?? "")
+        .replace(/^Bearer\s+/i, "")
+        .trim();
+
+      if (!isAuthFree) {
+        if (callerWrikeToken)
+          targetHeaders["authorization"] = `Bearer ${callerWrikeToken}`;
+        else if (isWrikeToken)
+          targetHeaders["authorization"] = `Bearer ${wrikeToken}`;
+      }
 
       // Make the API call to the target URL
       const targetResponse = await GetResponseWithStatusCode(
@@ -372,6 +400,67 @@ const HOP_BY_HOP_HEADERS = new Set([
   "accept-encoding",
   "expect",
 ]);
+
+// Headers that carry who the caller is, or where they came from, rather than
+// anything the destination API needs: session cookies for this service's own
+// origin and the forwarding chain added by our load balancer.
+const CALLER_IDENTITY_HEADERS = new Set([
+  "cookie",
+  "cookie2",
+  "origin",
+  "referer",
+  "forwarded",
+  "via",
+  "x-forwarded-for",
+  "x-forwarded-host",
+  "x-forwarded-proto",
+  "x-forwarded-port",
+  "x-real-ip",
+  "x-client-ip",
+  "x-original-forwarded-for",
+  "true-client-ip",
+  "cf-connecting-ip",
+]);
+
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+// Outbound policy for the datahub-configured destination. Returns an error
+// message, or null when the URL may be called.
+//  - Plain http is allowed by default. Set AMOEBA_ALLOW_INSECURE_TARGETS=false
+//    to require https (loopback stays allowed), so a Wrike token is never sent
+//    in clear text.
+//  - AMOEBA_ALLOWED_TARGET_HOSTS (comma separated, "host" or "*.suffix"), when
+//    set, restricts destinations to those hosts. Unset means no host
+//    restriction, so existing deployments keep working until it is configured.
+const checkTargetPolicy = (fullTargetUrl) => {
+  const url = new URL(fullTargetUrl);
+  const host = url.hostname.toLowerCase();
+
+  if (url.protocol !== "https:") {
+    const insecureAllowed =
+      url.protocol === "http:" &&
+      (LOCAL_HOSTS.has(host) ||
+        process.env.AMOEBA_ALLOW_INSECURE_TARGETS !== "false");
+    if (!insecureAllowed)
+      return "Target URL must use https";
+  }
+
+  const allowed = (process.env.AMOEBA_ALLOWED_TARGET_HOSTS || "")
+    .split(",")
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (allowed.length) {
+    const isAllowed = allowed.some((entry) =>
+      entry.startsWith("*.")
+        ? host.endsWith(entry.slice(1))
+        : host === entry,
+    );
+    if (!isAllowed) return `Target host '${host}' is not an allowed destination`;
+  }
+
+  return null;
+};
 
 const getDatahubIdForEnvironment = (environmentName, idKey, envVarKey) => {
   if (!environmentName) {

@@ -1524,6 +1524,78 @@ async ({ taskId }, extra) => {
           )}`,
       },
       {
+        id: "api/amoeba",
+        group: "XPI API Docs",
+        groupId: "api",
+        label: "AMOEBA proxy",
+        keywords:
+          "amoeba proxy passthrough module service slug forward headers x-wrike-token authorization cache https",
+        html: `
+          <div class="pg-eyebrow">XPI API Docs</div>
+          <h1 class="pg-title">AMOEBA proxy</h1>
+          <p class="pg-lede">Calls an external API that has been registered as a module or service, and returns its response. The method, path, query and body are passed through as you send them.</p>
+
+          <h2 class="pg-h2">Endpoints</h2>
+          ${endpoint("ANY", "/wrikexpi/amoeba/:moduleSlug", "Call the module's base URL.")}
+          ${endpoint("ANY", "/wrikexpi/amoeba/:moduleSlug/*", "Call the module's base URL with the remaining path appended.")}
+          ${endpoint("ANY", "/wrikexpi/amoeba/:moduleSlug/:serviceSlug/*", "Call a specific service of the module. If the service slug is not configured, the module's own configuration is used.")}
+
+          <h2 class="pg-h2">What is passed on</h2>
+          ${table(
+            ["Part", "Behaviour"],
+            [
+              ["Method", "Any HTTP method, sent to the destination unchanged."],
+              [
+                "Path and query",
+                "Everything after the module (or service) slug is appended to the configured destination URL. If both have a query string they are merged.",
+              ],
+              [
+                "Body",
+                "JSON is forwarded as JSON. <code>multipart/form-data</code> and <code>application/x-www-form-urlencoded</code> are forwarded byte for byte, including the boundary.",
+              ],
+              [
+                "Headers",
+                "Your headers are forwarded, including <code>Content-Type</code> and <code>Accept</code> (which default to <code>application/json</code> if you omit them). Connection-level headers and headers that identify you or your network (<code>Cookie</code>, <code>Origin</code>, <code>Referer</code>, <code>X-Forwarded-*</code>, <code>X-Real-IP</code>) are not forwarded.",
+              ],
+              [
+                "Response",
+                "The destination's JSON response. A non-JSON response is not supported.",
+              ],
+            ],
+          )}
+
+          <h2 class="pg-h2">Authorization</h2>
+          <p class="pg-p">Your <code>Authorization</code> header authenticates you to this service and is <b>never</b> sent to the destination. The destination receives an <code>Authorization</code> header chosen in this order:</p>
+          <ul class="bullets">
+            <li>The Wrike token you send in the <code>X-Wrike-Token</code> header, as <code>Bearer &lt;token&gt;</code>.</li>
+            <li>Otherwise, the Wrike token stored for your access token, if the module or service has token exchange turned on.</li>
+            <li>Otherwise, no <code>Authorization</code> header.</li>
+          </ul>
+          <p class="pg-p">The service does not check an <code>X-Wrike-Token</code> value itself. Wrike validates it when the destination receives it, so an invalid or expired token comes back as the destination's own error. A module or service set to send no authentication token never receives one.</p>
+          ${callout(
+            "warn",
+            "Treat X-Wrike-Token like a password",
+            "It is a live Wrike credential. Send it over HTTPS only, and don't put it in URLs or client-side code.",
+          )}
+
+          <h2 class="pg-h2">Example</h2>
+          ${codeBlock(
+            "bash",
+            `curl -X POST "${apiUrl}/wrikexpi/amoeba/<moduleSlug>/<serviceSlug>/orders" \\
+  -H "Authorization: Bearer <access_token>" \\
+  -H "X-Wrike-Token: <wrike_token>" \\
+  -H "Content-Type: application/json" \\
+  -d '{ "name": "Example" }'`,
+          )}
+
+          <h2 class="pg-h2">Good to know</h2>
+          <ul class="bullets">
+            <li>Destinations must use <code>https</code> when the deployment enforces it, and may be limited to an approved host list.</li>
+            <li>Responses from services with caching on are cached per access token, so you never receive another caller's data.</li>
+            <li>A <code>400</code> with a message about the target URL means the module's destination is not allowed. Contact your administrator.</li>
+          </ul>`,
+      },
+      {
         id: "api/errors",
         group: "XPI API Docs",
         groupId: "api",
@@ -2220,6 +2292,7 @@ async ({ taskId }, extra) => {
     .method.post { background: rgba(2,132,199,0.12); color: #0369a1; }
     .method.put { background: rgba(217,119,6,0.14); color: #b45309; }
     .method.delete { background: rgba(220,38,38,0.12); color: #dc2626; }
+    .method.any { background: rgba(100,116,139,0.14); color: #475569; }
     .ep-path { font-family: var(--mono); font-size: 0.84rem; color: #0f172a; background: none; border: none; padding: 0; white-space: normal; }
     .ep-desc { color: var(--fg-dim); font-size: 0.84rem; }
 

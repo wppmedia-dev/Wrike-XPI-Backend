@@ -4,30 +4,12 @@ import { AmoebaHandler } from "./handlers/amoebaHandler";
 // Schema
 import { AmoebaSchema } from "./schema/amoebaSchema";
 
-// Form bodies are a proxy concern here: the target needs the exact bytes the
-// caller sent, boundary and all, so they are kept raw instead of being parsed
-// and re-serialised as JSON (which would also contradict the forwarded
-// content-type). Scoped to this plugin, so no other route's parsing changes.
-// The raw buffer rides on the request; req.body is only a short placeholder so
-// the activity log does not try to snapshot file bytes.
-const FORM_TYPES = ["multipart/form-data", "application/x-www-form-urlencoded"];
+// Raw form bodies (see src/utils/rawFormBody.js), shared with the calendar
+// forwarder that calls the same handler.
+import { registerRawFormBodyParsers } from "../../utils/rawFormBody";
 
 export const amoebaRoute = (fastify, opts, done) => {
-  FORM_TYPES.forEach((type) => {
-    // @fastify/multipart registers its own multipart parser on the root
-    // instance; this plugin's copy is replaced without touching the root's.
-    if (fastify.hasContentTypeParser(type))
-      fastify.removeContentTypeParser(type);
-
-    fastify.addContentTypeParser(
-      type,
-      { parseAs: "buffer", bodyLimit: 50 * 1024 * 1024 },
-      (req, body, parsed) => {
-        req.rawFormBody = body;
-        parsed(null, `[${type} body, ${body.length} bytes]`);
-      },
-    );
-  });
+  registerRawFormBodyParsers(fastify);
 
   // Custom Field endpoint - supports both single value and list
   fastify.all("/:moduleSlug/*", AmoebaSchema, async (req, reply) => {
