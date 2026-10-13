@@ -56,6 +56,7 @@ import {
   type TokenFilters,
 } from "../components/TokensTable";
 import EnvBadge from "../components/EnvBadge";
+import WrikeEndpointPreview from "../components/WrikeEndpointPreview";
 import BuildTag from "../components/BuildTag";
 import { CopyButton } from "../components/ui/CopyButton";
 import { PageInfo } from "../components/ui/PageInfo";
@@ -2617,6 +2618,7 @@ export default function AdminDashboard() {
                   value={envForm.wrike_api_host}
                   onChange={(e) => setEnvForm((f) => ({ ...f, wrike_api_host: e.target.value }))}
                 />
+                <WrikeEndpointPreview host={envForm.wrike_api_host} />
               </div>
 
               <hr className="form-divider" />

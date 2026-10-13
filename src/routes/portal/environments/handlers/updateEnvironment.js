@@ -1,6 +1,7 @@
 import { WrikeCredentials } from "../../../../controllers";
 import { encryptField, decryptField } from "../../../../utils/crypto";
 import { syncWrikeCredentialsFromDB } from "../../../../utils/wrikeCredentials";
+import { normalizeWrikeApiHost } from "../../../../utils/wrikeEndpoint";
 
 export const UpdateEnvironment = (portalUser, id, body) => {
   return new Promise(async (resolve, reject) => {
@@ -41,6 +42,7 @@ export const UpdateEnvironment = (portalUser, id, body) => {
         xpi_request_form_mapping_datahub_id,
         xpi_space_name_datahub_id,
         campaign_space_id,
+        wrike_api_host,
         is_active,
         is_visible,
       } = body;
@@ -106,6 +108,8 @@ export const UpdateEnvironment = (portalUser, id, body) => {
           xpi_space_name_datahub_id || null;
       if (campaign_space_id !== undefined)
         updateData.campaign_space_id = campaign_space_id || null;
+      if (wrike_api_host !== undefined)
+        updateData.wrike_api_host = normalizeWrikeApiHost(wrike_api_host);
       if (is_active !== undefined) updateData.is_active = Boolean(is_active);
       if (is_visible !== undefined) updateData.is_visible = Boolean(is_visible);
 

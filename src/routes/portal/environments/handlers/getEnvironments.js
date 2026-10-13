@@ -38,6 +38,7 @@ export const GetMyEnvironments = (portalUser) => {
           env.xpi_request_form_mapping_datahub_id || null,
         xpi_space_name_datahub_id: env.xpi_space_name_datahub_id || null,
         campaign_space_id: env.campaign_space_id || null,
+        wrike_api_host: env.wrike_api_host || null,
         is_active: env.is_active,
         is_visible: env.is_visible,
         // Read by the portal's environment-access drawer (EnvironmentAccess
