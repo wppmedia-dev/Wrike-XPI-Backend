@@ -134,7 +134,7 @@ export default function RootLogin() {
         <div className="logo">
           <span>W</span>
         </div>
-        <h1>Connect Your Wrike Account</h1>
+        <h1>Connect to Wrike Xtend</h1>
 
         <div className="env-select-wrapper">
           <label htmlFor="envSelect" className="env-select-label">
