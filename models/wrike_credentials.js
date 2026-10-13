@@ -99,6 +99,12 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
         comment: "Campaign Space ID for Wrike DataHub",
       },
+      wrike_api_host: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+        comment:
+          "Wrike API host for this environment (e.g. https://app-us.wrike.com). Null falls back to WRIKE_ENDPOINT",
+      },
       is_visible: {
         type: DataTypes.BOOLEAN,
         defaultValue: true,

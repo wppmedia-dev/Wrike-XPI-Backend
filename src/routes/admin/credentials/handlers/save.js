@@ -1,6 +1,7 @@
 import { encryptField, decryptField } from "../../../../utils/crypto";
 import { syncWrikeCredentialsFromDB } from "../../../../utils/wrikeCredentials";
 import { WrikeCredentials } from "../../../../controllers";
+import { normalizeWrikeApiHost } from "../../../../utils/wrikeEndpoint";
 
 export const Save = (body) => {
   return new Promise(async (resolve, reject) => {
@@ -19,6 +20,7 @@ export const Save = (body) => {
         xpi_request_form_mapping_datahub_id,
         xpi_space_name_datahub_id,
         campaign_space_id,
+        wrike_api_host,
         is_visible,
         is_active,
       } = body;
@@ -34,6 +36,8 @@ export const Save = (body) => {
           statusCode: 400,
           message: "At least one credential field is required",
         });
+
+      const apiHost = normalizeWrikeApiHost(wrike_api_host);
 
       const existing = await WrikeCredentials.GetByType(environment_name);
       if (existing)
@@ -57,6 +61,7 @@ export const Save = (body) => {
           xpi_request_form_mapping_datahub_id || null,
         xpi_space_name_datahub_id: xpi_space_name_datahub_id || null,
         campaign_space_id: campaign_space_id || null,
+        wrike_api_host: apiHost,
         is_visible: is_visible !== undefined ? is_visible : true,
         is_active: is_active !== undefined ? is_active : true,
       });
@@ -91,6 +96,7 @@ const formatCredential = (cred) => ({
     cred.xpi_request_form_mapping_datahub_id || null,
   xpi_space_name_datahub_id: cred.xpi_space_name_datahub_id || null,
   campaign_space_id: cred.campaign_space_id || null,
+  wrike_api_host: cred.wrike_api_host || null,
   is_active: cred.is_active,
   is_visible: cred.is_visible,
 });
