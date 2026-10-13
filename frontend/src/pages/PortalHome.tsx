@@ -20,6 +20,7 @@ import { fetchAppConfig, DEFAULT_CONFIG, type AppConfig } from "../lib/appConfig
 import type { AdminToken } from "../lib/tokenPermissionsApi";
 import { useHashPage } from "../lib/useHashPage";
 import EnvBadge from "../components/EnvBadge";
+import WrikeEndpointPreview from "../components/WrikeEndpointPreview";
 import BuildTag from "../components/BuildTag";
 import PortalActivityPage from "./PortalActivityPage";
 import PortalCachePage from "./PortalCachePage";
@@ -186,6 +187,7 @@ const EMPTY_FORM = {
   xpiReqFormMapping: "",
   xpiSpaceName: "",
   campaignSpace: "",
+  wrikeApiHost: "",
   active: true,
   visible: true,
 };
@@ -206,6 +208,7 @@ function formFromEnv(env: PortalEnvironmentFull): EnvForm {
     xpiReqFormMapping: env.xpi_request_form_mapping_datahub_id || "",
     xpiSpaceName: env.xpi_space_name_datahub_id || "",
     campaignSpace: env.campaign_space_id || "",
+    wrikeApiHost: env.wrike_api_host || "",
     active: !!env.is_active,
     visible: !!env.is_visible,
   };
@@ -506,6 +509,7 @@ export default function PortalHome() {
         xpi_request_form_mapping_datahub_id: xpiReqFormMapping,
         xpi_space_name_datahub_id: xpiSpaceName,
         campaign_space_id: campaignSpace,
+        wrike_api_host: form.wrikeApiHost.trim(),
         is_active: form.active,
         is_visible: form.visible,
       };
@@ -1378,6 +1382,23 @@ export default function PortalHome() {
                 value={form.campaignSpace}
                 onChange={(e) => setField("campaignSpace", e.target.value)}
               />
+            </div>
+
+            <div className="form-section-label">Wrike API</div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="envModalWrikeApiHost">
+                Wrike API Host
+              </label>
+              <input
+                type="text"
+                className="form-control"
+                id="envModalWrikeApiHost"
+                placeholder="https://app-us.wrike.com (blank uses app-eu.wrike.com)"
+                value={form.wrikeApiHost}
+                onChange={(e) => setField("wrikeApiHost", e.target.value)}
+              />
+              <WrikeEndpointPreview host={form.wrikeApiHost} />
             </div>
 
             <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "8px 0 14px" }} />

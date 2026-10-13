@@ -173,6 +173,7 @@ export interface PortalEnvironmentFull {
   xpi_request_form_mapping_datahub_id: string;
   xpi_space_name_datahub_id: string;
   campaign_space_id: string;
+  wrike_api_host?: string | null;
   is_active: boolean;
   is_visible: boolean;
   /** Gate 1 master switch — email/domain/IP allow list. Read by the
@@ -247,6 +248,7 @@ export interface PortalEnvironmentInput {
   xpi_request_form_mapping_datahub_id: string;
   xpi_space_name_datahub_id: string;
   campaign_space_id: string;
+  wrike_api_host?: string | null;
   is_active: boolean;
   is_visible: boolean;
 }
