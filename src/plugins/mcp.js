@@ -12,6 +12,7 @@ const {
   SURFACE,
   PUBLIC_DENIAL_MESSAGE,
 } = require("../utils/environmentAccess.js");
+const { MCP_RATE_LIMIT } = require("../utils/mcpRateLimit.js");
 const { log: logActivity } = require("../utils/activityLog.js");
 const { referenceFor } = require("../utils/activityReference.js");
 const { SetMcpTools } = require("../controllers/activityLog.js");
@@ -322,8 +323,13 @@ module.exports = async function (fastify, opts) {
     }
   };
 
-  fastify.post("/mcp", handleMcpPost(baseResourceMetadataUrl));
-  fastify.post("/mcp/:environmentId", (req, reply) =>
+  // Both POST routes carry their own rate limit, per bearer token rather than
+  // the global per-IP one (src/utils/mcpRateLimit.js). The GET health checks
+  // below stay on the global limit: they are not what an agent loops on.
+  const rateLimited = { config: { rateLimit: MCP_RATE_LIMIT } };
+
+  fastify.post("/mcp", rateLimited, handleMcpPost(baseResourceMetadataUrl));
+  fastify.post("/mcp/:environmentId", rateLimited, (req, reply) =>
     handleMcpPost(`${baseResourceMetadataUrl}/${req.params.environmentId}`)(
       req,
       reply,
