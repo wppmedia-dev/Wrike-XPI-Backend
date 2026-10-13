@@ -49,6 +49,7 @@ export const GetAll = ({ search } = {}) => {
           cred.xpi_request_form_mapping_datahub_id || null,
         xpi_space_name_datahub_id: cred.xpi_space_name_datahub_id || null,
         campaign_space_id: cred.campaign_space_id || null,
+        wrike_api_host: cred.wrike_api_host || null,
         owners: ownersByEnvId[cred.id] || [],
         // No rows means unrestricted, which summarisePermissions already says
         // without this module having to repeat the rule.

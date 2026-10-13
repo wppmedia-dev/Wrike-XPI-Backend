@@ -40,6 +40,7 @@ import {
 } from "./task/schema/getAllChannelTasks";
 import { GetAllCampaignTasksSchema } from "./task/schema/getAllCampaignTasks";
 import { getDatahubCustomFields } from "../utils/wrike";
+import { runWithWrikeEnvironment } from "../utils/wrikeEndpoint";
 import { getBuildInfo } from "../utils/version";
 
 //Public Routes
@@ -119,6 +120,13 @@ export const PrivateRouters = (fastify, opts, done) => {
   // this) stay distinguishable in the code and in the audit trail.
   fastify.addHook("onRequest", (req, reply) =>
     requireModulePermissions(req, reply),
+  );
+
+  // From here on every Wrike call made for this request resolves the host of
+  // the token's environment (src/utils/wrikeEndpoint.js). Callback style on
+  // purpose: the rest of the hook chain and the handler run inside done().
+  fastify.addHook("onRequest", (req, reply, done) =>
+    runWithWrikeEnvironment(req.environmentName, done),
   );
 
   // Store the response body for everything EXCEPT the 200/201 success path —

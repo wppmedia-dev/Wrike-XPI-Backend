@@ -2,6 +2,7 @@ import { getSecrets } from "./azure_vault";
 import { getCachedWrikeCredentials } from "./wrikeCredentials";
 import { GetResponse, GetResponseWithStatusCode } from "./node-fetch";
 import redisClient from "./redis";
+import { getWrikeEndpoints } from "./wrikeEndpoint";
 require("dotenv").config();
 
 const { WRIKE_LOGIN_ENDPOINT, WRIKE_REDIRECT_URL } = process.env;
@@ -94,7 +95,7 @@ export const getWrikeTokens = async ({ code, env, refresh_token }) => {
 export const getUserData = async (access_token) => {
   try {
     const userData = await GetResponse(
-      `${process.env.WRIKE_ENDPOINT}/contacts?me`,
+      `${getWrikeEndpoints().api}/contacts?me`,
       "GET",
       {
         "content-type": "application/json",
@@ -121,7 +122,7 @@ export const getDatahubFields = async (wrikeToken, databaseId) => {
 
     // Get folder data
     const datahubFields = await GetResponse(
-      `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/fields`,
+      `${getWrikeEndpoints().datahub}/databases/${databaseId}/fields`,
       "GET",
       {
         "content-type": "application/json",
@@ -144,7 +145,7 @@ export const getDatahubRecord = async (wrikeToken, databaseId, recordId) => {
     }
 
     let url = `${
-      process.env.WRIKE_DATAHUB_ENDPOINT
+      getWrikeEndpoints().datahub
     }/databases/${databaseId}/records/${recordId}`;
 
     // Pass Service Account Token
@@ -216,7 +217,7 @@ export const getDatahubRecords = async (
     }
 
     let url = `${
-      process.env.WRIKE_DATAHUB_ENDPOINT
+      getWrikeEndpoints().datahub
     }/databases/${databaseId}/records?limit=${
       limit ?? process.env.WRIKE_DATAHUB_RECORDS_LIMIT ?? "300"
     }&nextPageToken=${pageToken ?? ""}`;
@@ -1009,7 +1010,7 @@ export const createDatahubRecord = async (
     wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
 
     const customFieldsData = await GetResponse(
-      `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/records`,
+      `${getWrikeEndpoints().datahub}/databases/${databaseId}/records`,
       "POST",
       {
         "content-type": "application/json",
@@ -1077,7 +1078,7 @@ export const updateDatahubRecord = async (
     wrikeToken = secretValues?.["XPI-API-Token"] ?? wrikeToken;
 
     const customFieldsData = await GetResponseWithStatusCode(
-      `${process.env.WRIKE_DATAHUB_ENDPOINT}/databases/${databaseId}/records/${recordId}`,
+      `${getWrikeEndpoints().datahub}/databases/${databaseId}/records/${recordId}`,
       "PUT",
       {
         "content-type": "application/json",
@@ -1116,7 +1117,7 @@ export const deleteDatahubRecord = async (
 
     const customFieldsData = await GetResponse(
       `${
-        process.env.WRIKE_DATAHUB_ENDPOINT
+        getWrikeEndpoints().datahub
       }/databases/${databaseId}/records?recordIds=${recordIds.join(",")}`,
       "DELETE",
       {
@@ -1149,7 +1150,7 @@ export const deleteDatahubRecord = async (
 
 export const getCustomFields = async (wrikeToken, customFieldId = null) => {
   try {
-    let url = `${process.env.WRIKE_ENDPOINT}/customfields`;
+    let url = `${getWrikeEndpoints().api}/customfields`;
 
     // If specific custom field ID is provided
     if (customFieldId) {
@@ -1172,7 +1173,7 @@ export const getCustomFields = async (wrikeToken, customFieldId = null) => {
 // Legacy API v2 ID converter
 export const convertLegacyIds = async (wrikeToken, type, ids) => {
   try {
-    const url = `${process.env.WRIKE_ENDPOINT}/ids?type=${encodeURIComponent(
+    const url = `${getWrikeEndpoints().api}/ids?type=${encodeURIComponent(
       type,
     )}&ids=${encodeURIComponent(JSON.stringify(ids))}`;
 
@@ -1199,7 +1200,7 @@ export const getRequestForm = async (wrikeToken, requestFormSpaceId) => {
 
     // Get folder data
     const wrikeRequestFormData = await GetResponse(
-      `${process.env.WRIKE_ENDPOINT}/spaces/${requestFormSpaceId}/request_forms`,
+      `${getWrikeEndpoints().api}/spaces/${requestFormSpaceId}/request_forms`,
       "GET",
       {
         "content-type": "application/json",
@@ -1225,7 +1226,7 @@ export const getRequestFormById = async (wrikeToken, requestFormId) => {
 
     // Get folder data
     const wrikeRequestFormData = await GetResponse(
-      `${process.env.WRIKE_ENDPOINT}/request_forms/${requestFormId}`,
+      `${getWrikeEndpoints().api}/request_forms/${requestFormId}`,
       "GET",
       {
         "content-type": "application/json",
@@ -1249,7 +1250,7 @@ export const submitRequestForm = async (
   try {
     // Get folder data
     const wrikeRequestFormData = await GetResponse(
-      `${process.env.WRIKE_ENDPOINT}/request_forms/${requetFormId}/submit`,
+      `${getWrikeEndpoints().api}/request_forms/${requetFormId}/submit`,
       "POST",
       {
         "content-type": "application/json",
@@ -1276,7 +1277,7 @@ export const submitRequestPreFillForm = async (
   try {
     // Get folder data
     const wrikeRequestFormData = await GetResponse(
-      `${process.env.WRIKE_ENDPOINT}/request_forms/${requetFormId}/prefill_url`,
+      `${getWrikeEndpoints().api}/request_forms/${requetFormId}/prefill_url`,
       "POST",
       {
         "content-type": "application/json",
@@ -1303,7 +1304,7 @@ export const getRequestFormStatus = async (
   try {
     // Get async job status (should be GET, not POST)
     const wrikeRequestFormData = await GetResponse(
-      `${process.env.WRIKE_ENDPOINT}/async_job/${asyncJobId}`,
+      `${getWrikeEndpoints().api}/async_job/${asyncJobId}`,
       "GET",
       {
         "content-type": "application/json",
@@ -1338,7 +1339,7 @@ export const getFoldersBySpace = async (
   customFields,
 ) => {
   try {
-    let url = `${process.env.WRIKE_ENDPOINT}/spaces/${
+    let url = `${getWrikeEndpoints().api}/spaces/${
       spaceId
     }/folders?deleted=false&fields=[customFields]&nextPageToken=${
       nextPageToken || ""
@@ -1366,7 +1367,7 @@ export const getFolder = async (wrikeToken, folderId) => {
   try {
     // Get folder data
     const wrikeRequestFormData = await GetResponse(
-      `${process.env.WRIKE_ENDPOINT}/folders/${folderId}`,
+      `${getWrikeEndpoints().api}/folders/${folderId}`,
       "GET",
       {
         "content-type": "application/json",
@@ -1411,7 +1412,7 @@ export const getFoldersByFolderId = async (
       params.append("customFields", JSON.stringify(customFields));
     }
 
-    let url = `${process.env.WRIKE_ENDPOINT}/folders/${folderId}/folders?${params}`;
+    let url = `${getWrikeEndpoints().api}/folders/${folderId}/folders?${params}`;
 
     if (limit) {
       url += `&pageSize=${limit}`;
@@ -1441,7 +1442,7 @@ export const updateFolder = async (
 ) => {
   try {
     // Get folder data
-    let url = `${process.env.WRIKE_ENDPOINT}/folders/${folderId}`;
+    let url = `${getWrikeEndpoints().api}/folders/${folderId}`;
 
     if (
       folderFieldsUpdateData &&
@@ -1494,7 +1495,7 @@ export const deleteFolder = async (wrikeToken, folderId) => {
   try {
     // Get folder data
     const wrikeRequestFormData = await GetResponse(
-      `${process.env.WRIKE_ENDPOINT}/folders/${folderId}`,
+      `${getWrikeEndpoints().api}/folders/${folderId}`,
       "DELETE",
       {
         "content-type": "application/json",
@@ -1512,7 +1513,7 @@ export const deleteFolder = async (wrikeToken, folderId) => {
 
 export const uploadAttachment = async (wrikeToken, fileBuffer, fileName) => {
   try {
-    const url = `${process.env.WRIKE_ENDPOINT}/attachments`;
+    const url = `${getWrikeEndpoints().api}/attachments`;
 
     const headers = {
       Authorization: `Bearer ${wrikeToken}`,
@@ -1537,7 +1538,7 @@ export const getTask = async (wrikeToken, folderId) => {
   try {
     // Get folder data
     const wrikeRequestFormData = await GetResponse(
-      `${process.env.WRIKE_ENDPOINT}/tasks/${folderId}`,
+      `${getWrikeEndpoints().api}/tasks/${folderId}`,
       "GET",
       {
         "content-type": "application/json",
@@ -1582,7 +1583,7 @@ export const getTasksByFolderId = async (
       params.append("customFields", JSON.stringify(customFields));
     }
 
-    let url = `${process.env.WRIKE_ENDPOINT}/folders/${folderId}/tasks?${params}`;
+    let url = `${getWrikeEndpoints().api}/folders/${folderId}/tasks?${params}`;
 
     if (limit) {
       url += `&pageSize=${limit}`;
@@ -1613,7 +1614,7 @@ export const updateTask = async (
   try {
     // Get folder data
 
-    let url = `${process.env.WRIKE_ENDPOINT}/tasks/${taskId}`;
+    let url = `${getWrikeEndpoints().api}/tasks/${taskId}`;
 
     if (taskFieldsUpdateData && Object.keys(taskFieldsUpdateData).length > 0) {
       Object.entries(taskFieldsUpdateData).map(([key, value]) => {
@@ -1663,7 +1664,7 @@ export const deleteTask = async (wrikeToken, taskId) => {
   try {
     // Get folder data
     const wrikeRequestFormData = await GetResponse(
-      `${process.env.WRIKE_ENDPOINT}/tasks/${taskId}`,
+      `${getWrikeEndpoints().api}/tasks/${taskId}`,
       "DELETE",
       {
         "content-type": "application/json",

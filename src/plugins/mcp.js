@@ -12,6 +12,7 @@ const {
   SURFACE,
   PUBLIC_DENIAL_MESSAGE,
 } = require("../utils/environmentAccess.js");
+const { runWithWrikeEnvironment } = require("../utils/wrikeEndpoint.js");
 const { MCP_RATE_LIMIT } = require("../utils/mcpRateLimit.js");
 const { log: logActivity } = require("../utils/activityLog.js");
 const { referenceFor } = require("../utils/activityReference.js");
@@ -284,14 +285,21 @@ module.exports = async function (fastify, opts) {
       // Fresh server + transport per request — no shared session state. The
       // gate is handed the collector, so every tool call this request makes
       // is reported as it happens.
-      const server = await createMcpServer(fastify, serverUrl, auth, (call) =>
-        toolCalls.push(call),
-      );
-      const transport = new StreamableHTTPServerTransport({
-        enableJsonResponse: true,
+      // Tool calls run inside this context, so Wrike requests go to the
+      // host configured for the token's environment.
+      await runWithWrikeEnvironment(auth.environmentName, async () => {
+        const server = await createMcpServer(
+          fastify,
+          serverUrl,
+          auth,
+          (call) => toolCalls.push(call),
+        );
+        const transport = new StreamableHTTPServerTransport({
+          enableJsonResponse: true,
+        });
+        await server.connect(transport);
+        await transport.handleRequest(req.raw, reply.raw, req.body);
       });
-      await server.connect(transport);
-      await transport.handleRequest(req.raw, reply.raw, req.body);
     } catch (err) {
       const code = err?.statusCode || 500;
       failureReference = referenceOnce(req);

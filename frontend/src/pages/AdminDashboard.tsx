@@ -117,6 +117,7 @@ interface EnvFormState {
   xpi_request_form_mapping_datahub_id: string;
   xpi_space_name_datahub_id: string;
   campaign_space_id: string;
+  wrike_api_host: string;
   is_visible: boolean;
   is_active: boolean;
 }
@@ -134,6 +135,7 @@ const EMPTY_ENV_FORM: EnvFormState = {
   xpi_request_form_mapping_datahub_id: "",
   xpi_space_name_datahub_id: "",
   campaign_space_id: "",
+  wrike_api_host: "",
   is_visible: true,
   is_active: true,
 };
@@ -152,6 +154,7 @@ function envToForm(env: AdminEnvironment): EnvFormState {
     xpi_request_form_mapping_datahub_id: env.xpi_request_form_mapping_datahub_id,
     xpi_space_name_datahub_id: env.xpi_space_name_datahub_id,
     campaign_space_id: env.campaign_space_id,
+    wrike_api_host: env.wrike_api_host,
     is_visible: env.is_visible,
     is_active: env.is_active,
   };
@@ -425,6 +428,7 @@ export default function AdminDashboard() {
       xpi_request_form_mapping_datahub_id: f.xpi_request_form_mapping_datahub_id.trim(),
       xpi_space_name_datahub_id: f.xpi_space_name_datahub_id.trim(),
       campaign_space_id: f.campaign_space_id.trim(),
+      wrike_api_host: f.wrike_api_host.trim(),
     };
 
     if (!trimmed.environment_name) return toast("Environment name is required", "error");
@@ -2596,6 +2600,22 @@ export default function AdminDashboard() {
                   required
                   value={envForm.campaign_space_id}
                   onChange={(e) => setEnvForm((f) => ({ ...f, campaign_space_id: e.target.value }))}
+                />
+              </div>
+
+              <div className="form-section-label">Wrike API</div>
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="wrikeApiHost">
+                  Wrike API Host
+                </label>
+                <input
+                  className="form-control"
+                  type="text"
+                  id="wrikeApiHost"
+                  placeholder="https://app-us.wrike.com (blank uses app-eu.wrike.com)"
+                  value={envForm.wrike_api_host}
+                  onChange={(e) => setEnvForm((f) => ({ ...f, wrike_api_host: e.target.value }))}
                 />
               </div>
 

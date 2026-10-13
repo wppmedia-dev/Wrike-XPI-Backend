@@ -28,6 +28,7 @@ export const SaveSchema = {
         xpi_request_form_mapping_datahub_id: { type: "string" },
         xpi_space_name_datahub_id: { type: "string" },
         campaign_space_id: { type: "string" },
+        wrike_api_host: { type: "string" },
         is_visible: { type: "boolean" },
       },
     },
