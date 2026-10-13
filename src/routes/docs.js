@@ -1663,6 +1663,7 @@ async ({ taskId }, extra) => {
             <li><code>pageSize</code> caps page length — large reads should paginate with <code>nextPageToken</code>.</li>
             <li>List endpoints return at most one page of records per call.</li>
             <li>Rate limiting is applied per client. Back off exponentially on <code>429</code> responses.</li>
+            <li>The MCP endpoint is limited per connection (per bearer token) rather than per IP address, so one agent cannot use up another's allowance. Past the limit it returns <code>429</code> with a <code>Retry-After</code> header.</li>
             <li>Reuse your access token until it expires; don't re-authenticate per request.</li>
           </ul>
           ${callout(

@@ -166,7 +166,7 @@ const renderEnvironmentPicker = ({ visibleCreds, query }) => {
 </head>
 <body>
   <div class="card">
-    <h1>Connect an MCP client to WrikeXPI</h1>
+    <h1>Connect to Wrike Xtend</h1>
     <p>Choose which Wrike environment this connection should use.</p>
     <form method="GET" action="/oauth/authorize">
       ${hiddenFields}
