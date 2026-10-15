@@ -79,15 +79,23 @@ export const isCalendarSyncFlag = (value) => value === "true" || value === "1";
  * job that asked for it. Widening it is an administrator's decision taken on
  * purpose in the console, not a default nobody looked at.
  *
- * Read only, and that is a floor rather than a limit on what the module can do.
- * The calendar surface forwards to amoeba, so the module expresses Create,
- * Update and Delete too (src/utils/tokenPermissionCatalog.js) and an
- * administrator can grant them per token. What a token is MINTED with stays
- * the narrowest thing that works, because a credential with no expiry should
- * not arrive holding write access nobody asked for.
+ * Every action on that one module: Read, Create, Update and Delete. The
+ * calendar surface forwards to amoeba, and the forwarder carries whatever
+ * method the caller used, so a list-style service called with POST is a Create
+ * as far as the gate is concerned. A token minted with Read alone was refused
+ * on those calls (MODULE_FORBIDDEN, calendar_sync/create) until an
+ * administrator opened it up by hand. Only the calendar module is widened;
+ * every other module stays off.
  *
  * Built through normaliseMatrix so the shape is the catalogue's: every module
  * present, and any action a module does not declare forced off.
  */
 export const calendarSyncMatrix = () =>
-  normaliseMatrix({ [CALENDAR_SYNC_MODULE]: { read: true } });
+  normaliseMatrix({
+    [CALENDAR_SYNC_MODULE]: {
+      read: true,
+      create: true,
+      update: true,
+      delete: true,
+    },
+  });
