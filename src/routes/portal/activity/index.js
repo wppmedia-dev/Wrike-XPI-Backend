@@ -93,7 +93,8 @@ export const portalActivityRoute = (fastify, opts, done) => {
    * /Summary already give an absent envId). Everyone else is restricted to
    * their own environments — a requested env_id outside that set is dropped
    * rather than honoured, so the caller silently gets "no rows" instead of
-   * someone else's data.
+   * someone else's data. With no env_id requested the result is the array of
+   * every environment mapped to them.
    */
   const resolveAllowedEnvId = async (portalUser, requestedEnvId) => {
     if (portalUser.role === "admin") return requestedEnvId;
@@ -104,11 +105,13 @@ export const portalActivityRoute = (fastify, opts, done) => {
     if (requestedEnvId) {
       return ownedIds.has(requestedEnvId) ? requestedEnvId : NO_MATCH_UUID;
     }
-    // No env_id requested: summary/list would otherwise span every
-    // environment. A portal user has no "all environments" view, so fall
-    // back to their first owned environment, or a sentinel that matches
-    // nothing if they own none.
-    return owned?.[0]?.id || NO_MATCH_UUID;
+    // No env_id requested: span every environment mapped to this user, as
+    // an IN list (a Sequelize array value), and nothing beyond them. Falling
+    // back to a single environment made a user with several mappings see an
+    // empty log whenever that one had no traffic. The sentinel still stands
+    // in when they own none, so "no environments" matches nothing rather
+    // than dropping the filter.
+    return ownedIds.size ? [...ownedIds] : NO_MATCH_UUID;
   };
 
   /**
