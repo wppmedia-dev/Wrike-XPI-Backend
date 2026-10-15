@@ -40,12 +40,14 @@ export const fetchRedirectUrl = async (params: {
   redirectUri?: string;
   accountId?: string;
   purpose?: string;
+  scope?: string;
 }): Promise<string | null> => {
   const query = new URLSearchParams();
   if (params.environment) query.append("environment", params.environment);
   if (params.redirectUri) query.append("redirectUri", params.redirectUri);
   if (params.accountId) query.append("accountId", params.accountId);
   if (params.purpose) query.append("purpose", params.purpose);
+  if (params.scope) query.append("scope", params.scope);
 
   try {
     const res = await fetch(`/get-redirect-url?${query.toString()}`);

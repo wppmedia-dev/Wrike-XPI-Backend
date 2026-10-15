@@ -240,6 +240,7 @@ export const oauthRoute = (fastify, opts, done) => {
         code_challenge_method,
         environment,
         accountId,
+        scope,
       } = req.query;
       const environment_id = environmentId || req.query.environment_id;
 
@@ -304,6 +305,9 @@ export const oauthRoute = (fastify, opts, done) => {
           environment,
           redirectUri: redirect_uri,
           accountId,
+          // The standard OAuth `scope` the MCP client asked for, handed to
+          // Wrike so the Wrike token is created with only those scopes.
+          scope,
           extra: {
             code_challenge,
             code_challenge_method,

@@ -15,6 +15,9 @@ import "./RootLogin.css";
 const searchParams = new URLSearchParams(window.location.search);
 const initialRedirectUri = searchParams.get("redirectUri") || "";
 const initialAccountId = searchParams.get("accountId") || "";
+// Wrike OAuth scopes the link asked for, passed on so the Wrike token is
+// created with only those (validated server-side in src/utils/wrikeRedirect.js).
+const initialScope = searchParams.getAll("scope").join(",");
 
 /**
  * The two sign-ins this page offers, as two buttons.
@@ -68,6 +71,7 @@ export default function RootLogin() {
       environment,
       redirectUri: initialRedirectUri,
       accountId: initialAccountId,
+      scope: initialScope,
     };
 
     Promise.all([
