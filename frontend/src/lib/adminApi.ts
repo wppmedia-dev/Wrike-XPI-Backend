@@ -19,6 +19,8 @@ export interface AdminEnvironment {
   xpi_request_form_mapping_datahub_id: string;
   xpi_space_name_datahub_id: string;
   campaign_space_id: string;
+  /** Wrike API host for this environment; empty means the server default (app-eu.wrike.com). */
+  wrike_api_host: string;
   is_active: boolean;
   is_visible: boolean;
   /** Gate 1 master switch — email/domain/IP allow list. */
@@ -54,6 +56,7 @@ export interface EnvironmentPayload {
   xpi_request_form_mapping_datahub_id?: string;
   xpi_space_name_datahub_id?: string;
   campaign_space_id?: string;
+  wrike_api_host?: string;
   is_visible: boolean;
   is_active: boolean;
 }
@@ -94,6 +97,7 @@ export const listEnvironments = async (
         c.xpi_request_form_mapping_datahub_id || "",
       xpi_space_name_datahub_id: c.xpi_space_name_datahub_id || "",
       campaign_space_id: c.campaign_space_id || "",
+      wrike_api_host: c.wrike_api_host || "",
       is_active: !!c.is_active,
       is_visible: !!c.is_visible,
       allowlist_check_enabled: c.allowlist_check_enabled !== false,
