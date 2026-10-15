@@ -12,7 +12,7 @@
      3. the mint acts on it: the claim, the row, the client name and the
         permission matrix all come out of the same decision;
      4. the matrix it seeds is the catalogue's "everything", including the
-        read-only calendar_sync scope.
+        full-access calendar_sync scope.
 
    No database, Redis or Wrike account required. Every side effect the mint
    reaches for is stubbed on the very object the handler reads it from, which
@@ -260,9 +260,11 @@ const {
     true,
   );
   check(
-    "and the calendar scope unable to write",
-    calendar.seeded.matrix.calendar_sync.update,
-    false,
+    "and every calendar action granted",
+    ["read", "create", "update", "delete"].every(
+      (action) => calendar.seeded.matrix.calendar_sync[action] === true,
+    ),
+    true,
   );
   /* Only what it is for. A calendar token minted with campaigns, tasks and
      master data available would be a credential far wider than the job that
