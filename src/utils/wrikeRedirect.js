@@ -19,6 +19,28 @@ export const RETURN_TARGETS = {
   "calendar-docs": "/docs/calendar#/calendar/setup",
 };
 
+/**
+ * The Wrike OAuth scopes a caller asked for, as the value for the authorize
+ * URL's `scope` parameter, or "" when none were asked for (Wrike then grants
+ * the scopes the application is configured with).
+ *
+ * Accepts a comma or space separated string, or an array of them. Names are
+ * not checked against a list of Wrike's scopes: that list belongs to Wrike and
+ * changes with it, and a scope the application is not entitled to is refused
+ * by Wrike at the authorize step, which is the authority on it. What is
+ * checked is the shape, so nothing but scope-like words can end up in the
+ * redirect URL.
+ */
+const MAX_SCOPES = 25;
+
+export const normaliseWrikeScope = (value) => {
+  const parts = (Array.isArray(value) ? value : [value])
+    .flatMap((v) => String(v ?? "").split(/[\s,]+/))
+    .filter((s) => /^[A-Za-z0-9_.:-]{1,64}$/.test(s));
+
+  return [...new Set(parts)].slice(0, MAX_SCOPES).join(",");
+};
+
 /** Look up a named return target, or null for anything unrecognised. */
 export const resolveReturnTarget = (name) =>
   RETURN_TARGETS[String(name ?? "")] || null;
@@ -33,6 +55,7 @@ export const findRedirectionURL = (
     extra,
     purpose,
     returnTo,
+    scope,
   },
   fastify,
 ) => {
@@ -133,6 +156,11 @@ export const findRedirectionURL = (
 
     const accountIdToUse = selectedCred?.accountId || accountId;
     if (accountIdToUse) redirectUrl += `&accountId=${accountIdToUse}`;
+
+    // Passed straight to Wrike, so the Wrike token it creates carries only
+    // these scopes rather than everything the application is configured for.
+    const wrikeScope = normaliseWrikeScope(scope);
+    if (wrikeScope) redirectUrl += `&scope=${encodeURIComponent(wrikeScope)}`;
 
     return { redirectUrl, selectedEnvironment };
   } catch (err) {
