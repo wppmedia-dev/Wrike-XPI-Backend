@@ -49,6 +49,10 @@ MODULE PERMISSIONS: a token may be narrower than the tool list
 - A tool call outside those grants returns FORBIDDEN with isError: true, naming the module and action that is missing. That is a final answer, not a transient one: retrying, or reaching for a different tool that would achieve the same change (for example wrike_update_items instead of xtend_campaign_update), is not permitted.
 - When you get FORBIDDEN: report the missing module and action to the user and stop. An administrator can change it in the admin portal; you cannot, and nothing was changed.
 
+WRIKE SCOPES: the Wrike token may be narrower than the tool list
+- The connection may have been authorized with a limited set of Wrike OAuth scopes (for example read only). When none were requested at sign-in, the default applies and the token carries every scope the application is configured with.
+- If a wrike_* tool fails because the Wrike token lacks a scope, report that to the user and stop. Do not retry or switch to another tool for the same job. The scopes are chosen when the connection is authorized, not by you: the user reconnects with an optional scope parameter on the authorize request (for example scope=wsReadOnly amReadOnlyUser) to change them.
+
 MECHANICS
 - Authentication is already resolved per request; never pass tokens or credentials.
 - Read each tool's schema before calling; arguments are validated.
