@@ -207,6 +207,7 @@ module.exports = async function (fastify, opts) {
     try {
       access = await evaluateAccess({
         envId: auth.envId,
+        environmentName: auth.environmentName,
         wrikeToken: auth.wrikeToken,
         ip: clientIp(req),
         // This is the MCP path, so entries scoped to the REST API only do

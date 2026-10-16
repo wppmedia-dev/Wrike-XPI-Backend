@@ -1,11 +1,11 @@
 import { getUserData } from "../../../utils/wrike";
 
-export const GetUserData = (token, fastify) => {
+export const GetUserData = (token, fastify, environmentName) => {
   return new Promise(async (resolve, reject) => {
     try {
       if (!token) return reject({ message: "Access Token must not be empty" });
 
-      const wrikeData = await getUserData(token);
+      const wrikeData = await getUserData(token, environmentName);
 
       // Sending final response
       resolve(wrikeData);

@@ -109,7 +109,7 @@ const loadSwitches = async (envId) => {
  * entry when one exists — a Wrike blip should not lock out a known-good
  * caller mid-session.
  */
-const loadIdentity = async (wrikeToken) => {
+const loadIdentity = async (wrikeToken, environmentName) => {
   const key = identityKey(fingerprint(wrikeToken));
 
   const local = memoryGet(key);
@@ -122,7 +122,7 @@ const loadIdentity = async (wrikeToken) => {
   }
 
   try {
-    const contact = await getUserData(wrikeToken);
+    const contact = await getUserData(wrikeToken, environmentName);
     const me = contact?.data?.[0];
     if (!me) throw new Error("Wrike returned no contact for this token");
 
@@ -248,6 +248,8 @@ const gate = (status, detail) => ({ status, detail });
  * @param {string} [input.wrikeToken]  Caller's decrypted Wrike access token
  *                                      (resolves email — omit if you already
  *                                      have it via `email`)
+ * @param {string} [input.environmentName]  Name of that environment, so the
+ *                                      email lookup goes to its Wrike host
  * @param {string} [input.email]     Pre-resolved email (admin check tool)
  * @param {string} [input.ip]        Caller's request IP
  * @param {string} [input.surface]   Which surface the request arrived on,
@@ -258,6 +260,7 @@ const gate = (status, detail) => ({ status, detail });
  */
 export const evaluateAccess = async ({
   envId,
+  environmentName,
   wrikeToken,
   email: knownEmail,
   ip,
@@ -286,7 +289,7 @@ export const evaluateAccess = async ({
 
   if (!email && wrikeToken) {
     try {
-      const identity = await loadIdentity(wrikeToken);
+      const identity = await loadIdentity(wrikeToken, environmentName);
       email = identity.email || null;
     } catch (err) {
       return {

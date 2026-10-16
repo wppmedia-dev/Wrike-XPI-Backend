@@ -51,14 +51,14 @@ export const normalizeWrikeApiHost = (value) => {
 };
 
 /**
- * Wrike REST and Datahub base URLs for an environment (defaults to the
- * environment of the current request). Falls back to the env vars when the
+ * Wrike REST and Datahub base URLs for an environment. When no name is given
+ * the environment of the current request is used; code that runs before that
+ * context exists (sign-in, the access check) must pass the name explicitly. Falls back to the env vars when the
  * environment has no host of its own.
  */
-export const getWrikeEndpoints = (environmentName = currentWrikeEnvironment()) => {
-  const host = environmentName
-    ? getCachedWrikeCredentials(environmentName)?.wrikeApiHost
-    : null;
+export const getWrikeEndpoints = (environmentName) => {
+  const name = environmentName || currentWrikeEnvironment();
+  const host = name ? getCachedWrikeCredentials(name)?.wrikeApiHost : null;
 
   if (host) {
     return { api: `${host}${API_PATH}`, datahub: `${host}${DATAHUB_PATH}` };

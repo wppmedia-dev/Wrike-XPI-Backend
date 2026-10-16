@@ -85,7 +85,7 @@ export const WrikeTokenExchange = (
       console.log("Retrieved wrike tokens");
 
       // Get user data from Wrike API
-      const wrikeUserData = await getUserData(access_token);
+      const wrikeUserData = await getUserData(access_token, env);
       const {
         id: wrikeUserId,
         firstName,
