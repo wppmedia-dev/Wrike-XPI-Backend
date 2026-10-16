@@ -325,7 +325,7 @@ export const AmoebaHandler = (wrikeToken, req, environmentName) => {
           ? req.rawFormBody
           : req.body
             ? req.body
-            : ["POST", "PUT"].includes(method)
+            : ["POST", "PUT", "PATCH"].includes(method)
               ? {}
               : undefined,
         Boolean(req.rawFormBody),
