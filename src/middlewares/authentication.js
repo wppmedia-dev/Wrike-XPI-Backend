@@ -164,6 +164,7 @@ export const ValidateToken = async (req, reply, fastify) => {
     // src/utils/environmentAccess.js for the match rules.
     const access = await evaluateAccess({
       envId: token.env_id,
+      environmentName: token.environment_name,
       wrikeToken: accessToken,
       ip: clientIp(req),
       // This is the REST path, so entries scoped to MCP only do not apply.

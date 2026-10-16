@@ -92,10 +92,10 @@ export const getWrikeTokens = async ({ code, env, refresh_token }) => {
   }
 };
 
-export const getUserData = async (access_token) => {
+export const getUserData = async (access_token, environmentName = null) => {
   try {
     const userData = await GetResponse(
-      `${getWrikeEndpoints().api}/contacts?me`,
+      `${getWrikeEndpoints(environmentName).api}/contacts?me`,
       "GET",
       {
         "content-type": "application/json",

@@ -4,7 +4,7 @@ import { Tokens } from "../../controllers";
 
 import { WrikeTokenExchangeSchema } from "./schema/wrikeTokenExchange";
 import { GetUserDataSchema } from "./schema/getUserData";
-import { ValidateJWT } from "../../middlewares/authentication";
+import { ResolveAuthFromJWT } from "../../middlewares/authentication";
 import { log as logActivity } from "../../utils/activityLog";
 import { referenceFor } from "../../utils/activityReference";
 import { resolveReturnTarget } from "../../utils/wrikeRedirect";
@@ -104,9 +104,9 @@ export const tokenRoute = (fastify, opts, done) => {
 
       if (!token) return reject({ message: "Access Token must not be empty" });
 
-      const wrikeToken = await ValidateJWT(token);
+      const { wrikeToken, environmentName } = await ResolveAuthFromJWT(token);
 
-      const result = await GetUserData(wrikeToken, fastify);
+      const result = await GetUserData(wrikeToken, fastify, environmentName);
 
       // The token was validated and Wrike was asked who it belongs to, so the
       // caller is known here even though nothing authenticated them to us: the
