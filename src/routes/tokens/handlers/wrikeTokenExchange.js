@@ -127,12 +127,26 @@ export const WrikeTokenExchange = (
       // environment's allow list could still complete the OAuth exchange and
       // walk away with valid, persistent XPI credentials for it, leaving the
       // allow list to start blocking them only on their first API call.
-      const access = await evaluateAccess({
+      //
+      // Signing in is not tied to a surface: the token minted here is used on
+      // the API and on MCP alike. So the person is let in when the list covers
+      // them on EITHER surface; every later request is still judged against
+      // its own surface (ValidateToken for API, src/plugins/mcp.js for MCP).
+      let access = await evaluateAccess({
         envId: environmentId,
         email: primaryEmail,
         ip,
         surface: SURFACE.API,
       });
+      if (!access.allowed) {
+        const viaMcp = await evaluateAccess({
+          envId: environmentId,
+          email: primaryEmail,
+          ip,
+          surface: SURFACE.MCP,
+        });
+        if (viaMcp.allowed) access = viaMcp;
+      }
 
       if (!access.allowed) {
         // Detailed reasoning stays server-side only (server log here, full
