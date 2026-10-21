@@ -33,7 +33,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       surface: { type: DataTypes.ENUM("rest", "mcp"), allowNull: false },
       actor_email: { type: DataTypes.STRING(320), allowNull: true },
-      action: { type: DataTypes.STRING(16), allowNull: true },
+      action: { type: DataTypes.STRING(255), allowNull: true },
       resource: { type: DataTypes.STRING(255), allowNull: false },
       method: { type: DataTypes.STRING(8), allowNull: true },
       allowed: { type: DataTypes.BOOLEAN, allowNull: false },
