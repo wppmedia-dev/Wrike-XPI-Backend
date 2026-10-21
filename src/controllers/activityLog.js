@@ -1,5 +1,6 @@
 import models from "../../models";
 import { agentIdentityOf, agentFilterClause } from "../utils/agentIdentity";
+import { buildResponseSnapshot } from "../utils/capture";
 
 const { Op } = models.Sequelize;
 
@@ -80,10 +81,23 @@ export const Record = async (entry) => {
  * error response on this surface, and the row is where the reference the agent
  * was given has to end up (see src/mcp/tools/permission.js).
  */
-export const SetMcpTools = async (id, { tool, code, referenceId } = {}) => {
+export const SetMcpTools = async (
+  id,
+  { tool, code, referenceId, failure } = {},
+) => {
   if (!id || !tool) return null;
 
   const patch = { mcp_tool: String(tool).slice(0, 255) };
+  // The tool ran and failed (not refused): the request row was written as 200
+  // before the call, so record the real status and the message, as the REST
+  // path does for its 4xx/5xx rows. `allowed` stays as it is.
+  if (failure?.statusCode >= 400) {
+    patch.status_code = failure.statusCode;
+    patch.response_payload = buildResponseSnapshot(failure.statusCode, {
+      success: false,
+      message: failure.message,
+    });
+  }
   if (code) {
     patch.allowed = false;
     patch.code = code;

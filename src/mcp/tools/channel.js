@@ -4,6 +4,7 @@ import { GetChannel } from "../../routes/channel/handlers/getChannel";
 import { UpdateChannel } from "../../routes/channel/handlers/updateChannel";
 import { DeleteChannel } from "../../routes/channel/handlers/deleteChannel";
 import { getAuthError } from "./auth.js";
+import { toolError } from "./toolError.js";
 import {
   CONFIRMATION_TOOL_NOTE,
   confirmField,
@@ -96,7 +97,7 @@ export const registerChannelTools = (server, serverUrl, auth) => {
           ],
         };
       } catch (err) {
-        throw new Error(err?.message || "Failed to list channels");
+        throw toolError(err, "Failed to list channels");
       }
     },
   );
@@ -139,7 +140,7 @@ export const registerChannelTools = (server, serverUrl, auth) => {
           ],
         };
       } catch (err) {
-        throw new Error(err?.message || "Failed to get channel");
+        throw toolError(err, "Failed to get channel");
       }
     },
   );
@@ -204,7 +205,7 @@ export const registerChannelTools = (server, serverUrl, auth) => {
           ],
         };
       } catch (err) {
-        throw new Error(err?.message || "Failed to update channel");
+        throw toolError(err, "Failed to update channel");
       }
     },
   );
@@ -263,7 +264,7 @@ export const registerChannelTools = (server, serverUrl, auth) => {
           ],
         };
       } catch (err) {
-        throw new Error(err?.message || "Failed to delete channel");
+        throw toolError(err, "Failed to delete channel");
       }
     },
   );

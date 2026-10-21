@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { convertLegacyIds } from "../../utils/wrike.js";
 import { getAuthError } from "./auth.js";
+import { toolError } from "./toolError.js";
 
 const LEGACY_ID_TYPES = [
   "ApiV2Task",
@@ -98,7 +99,7 @@ export const registerIdsTools = (server, serverUrl, auth) => {
           ],
         };
       } catch (err) {
-        throw new Error(err?.message || "Failed to convert legacy IDs");
+        throw toolError(err, "Failed to convert legacy IDs");
       }
     },
   );
