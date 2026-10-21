@@ -327,6 +327,9 @@ module.exports = async function (fastify, opts) {
           // before any tool ran stores its own, which is the one its caller
           // was shown.
           referenceId: refusal?.reference || failureReference || null,
+          // A tool that was allowed but failed: the row says so instead of
+          // keeping the 200 it was written with.
+          failure: toolCalls.find((call) => call.failure)?.failure || null,
         });
       });
     }

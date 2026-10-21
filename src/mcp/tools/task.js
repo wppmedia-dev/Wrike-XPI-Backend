@@ -4,6 +4,7 @@ import { GetTask } from "../../routes/task/handlers/getTask";
 import { UpdateTask } from "../../routes/task/handlers/updateTask";
 import { DeleteTask } from "../../routes/task/handlers/deleteTask";
 import { getAuthError } from "./auth.js";
+import { toolError } from "./toolError.js";
 import {
   CONFIRMATION_TOOL_NOTE,
   confirmField,
@@ -87,7 +88,7 @@ export const registerTaskTools = (server, serverUrl, auth) => {
           ],
         };
       } catch (err) {
-        throw new Error(err?.message || "Failed to list channel tasks");
+        throw toolError(err, "Failed to list channel tasks");
       }
     },
   );
@@ -165,7 +166,7 @@ export const registerTaskTools = (server, serverUrl, auth) => {
           ],
         };
       } catch (err) {
-        throw new Error(err?.message || "Failed to list campaign tasks");
+        throw toolError(err, "Failed to list campaign tasks");
       }
     },
   );
@@ -214,7 +215,7 @@ export const registerTaskTools = (server, serverUrl, auth) => {
           ],
         };
       } catch (err) {
-        throw new Error(err?.message || "Failed to get task");
+        throw toolError(err, "Failed to get task");
       }
     },
   );
@@ -281,7 +282,7 @@ export const registerTaskTools = (server, serverUrl, auth) => {
           ],
         };
       } catch (err) {
-        throw new Error(err?.message || "Failed to update task");
+        throw toolError(err, "Failed to update task");
       }
     },
   );
@@ -341,7 +342,7 @@ export const registerTaskTools = (server, serverUrl, auth) => {
           ],
         };
       } catch (err) {
-        throw new Error(err?.message || "Failed to delete task");
+        throw toolError(err, "Failed to delete task");
       }
     },
   );

@@ -5,6 +5,7 @@ import { CreateCampaign } from "../../routes/campaign/handlers/createCampaign";
 import { UpdateCampaign } from "../../routes/campaign/handlers/updateCampaign";
 import { DeleteCampaign } from "../../routes/campaign/handlers/deleteCampaign";
 import { getAuthError } from "./auth.js";
+import { toolError } from "./toolError.js";
 import {
   CONFIRMATION_TOOL_NOTE,
   confirmField,
@@ -117,7 +118,7 @@ export const registerCampaignTools = (server, fastify, serverUrl, auth) => {
           ],
         };
       } catch (err) {
-        throw new Error(err?.message || "Failed to list campaigns");
+        throw toolError(err, "Failed to list campaigns");
       }
     },
   );
@@ -160,7 +161,7 @@ export const registerCampaignTools = (server, fastify, serverUrl, auth) => {
           ],
         };
       } catch (err) {
-        throw new Error(err?.message || "Failed to get campaign");
+        throw toolError(err, "Failed to get campaign");
       }
     },
   );
@@ -233,7 +234,10 @@ export const registerCampaignTools = (server, fastify, serverUrl, auth) => {
             : err?.details
               ? JSON.stringify(err.details)
               : "";
-        throw new Error(details ? `${message} Details: ${details}` : message);
+        throw toolError(
+          { statusCode: err?.statusCode },
+          details ? `${message} Details: ${details}` : message,
+        );
       }
     },
   );
@@ -301,7 +305,7 @@ export const registerCampaignTools = (server, fastify, serverUrl, auth) => {
           ],
         };
       } catch (err) {
-        throw new Error(err?.message || "Failed to update campaign");
+        throw toolError(err, "Failed to update campaign");
       }
     },
   );
@@ -360,7 +364,7 @@ export const registerCampaignTools = (server, fastify, serverUrl, auth) => {
           ],
         };
       } catch (err) {
-        throw new Error(err?.message || "Failed to delete campaign");
+        throw toolError(err, "Failed to delete campaign");
       }
     },
   );

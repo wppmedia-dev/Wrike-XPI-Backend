@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getDatahubCustomFields } from "../../utils/wrike";
 import { getAuthError } from "./auth.js";
+import { toolError } from "./toolError.js";
 
 const normalizeFieldMap = (fieldMapping = {}) => {
   if (!fieldMapping || typeof fieldMapping !== "object") return {};
@@ -97,7 +98,7 @@ export const registerDatahubTools = (server, serverUrl, auth) => {
           ],
         };
       } catch (err) {
-        throw new Error(err?.message || "Failed to list Datahub custom fields");
+        throw toolError(err, "Failed to list Datahub custom fields");
       }
     },
   );

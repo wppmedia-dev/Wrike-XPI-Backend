@@ -62,6 +62,14 @@ MECHANICS
 - If the user identifies someone by email address for an action that needs a user ID (assigning a task, adding a follower, and similar), do not guess or invent a user ID from the email. Call wrike_get_users first to look up that email and read the matching user's id from the response. Use that id for the action.
 - Respect limits and pagination: wrike_* tools cap results (e.g. 200 newest comments, pageSize on search_items) and return truncation/next-page signals — page through or narrow the query as each tool's description explains.`;
 
+/** The text of an `isError` tool result, for the activity log. */
+const failureText = (result) =>
+  (result?.content || [])
+    .map((part) => part?.text)
+    .filter(Boolean)
+    .join("\n")
+    .slice(0, 1000) || "Tool call failed.";
+
 /**
  * Wrap server.registerTool so every tool checks module permissions before its
  * handler runs — both layers, in the same order the REST gate uses
@@ -141,7 +149,36 @@ export const installPermissionGate = (server, auth, onToolCall) => {
       }
 
       report({ tool: name, ...route, allowed: true, code: null });
-      return handler(args, extra);
+
+      // The call above says the tool was allowed to run; this says how it went.
+      // The request row is written before any tool runs, so without it a tool
+      // that failed (bad filter, Wrike error) would sit behind a 200 row.
+      // `failure` leaves `allowed` alone: the call was permitted, it just failed.
+      try {
+        const result = await handler(args, extra);
+        if (result?.isError) {
+          report({
+            tool: name,
+            ...route,
+            allowed: true,
+            code: null,
+            failure: { statusCode: 400, message: failureText(result) },
+          });
+        }
+        return result;
+      } catch (err) {
+        report({
+          tool: name,
+          ...route,
+          allowed: true,
+          code: null,
+          failure: {
+            statusCode: err?.statusCode || 400,
+            message: err?.message || "Tool call failed.",
+          },
+        });
+        throw err;
+      }
     });
 };
 
