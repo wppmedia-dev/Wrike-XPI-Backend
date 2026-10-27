@@ -101,6 +101,39 @@ const refreshTokens = async (encRefreshToken, dek, createdBy, tid, env) => {
   }
 };
 
+// Wrike rotates the refresh token on every use, so two requests that refresh
+// at once (an MCP client fires several in parallel) make the second one present
+// an already-spent refresh token and fail. One refresh per token row at a time;
+// latecomers share its result, and re-read the row so a refresh that finished
+// just before they started is reused instead of repeated.
+const inflightRefreshes = new Map();
+
+const refreshOnce = (token, dek) => {
+  if (inflightRefreshes.has(token.id)) return inflightRefreshes.get(token.id);
+
+  const dekBuffer = Buffer.isBuffer(dek) ? dek : Buffer.from(dek, "base64");
+  const run = (async () => {
+    const fresh = (await Tokens.GetById(token.id)) || token;
+    const current = crypto
+      .decrypt(Buffer.from(fresh.encrypted_access_token, "base64"), dekBuffer)
+      .toString();
+    const decoded = jwt.decode(current);
+    if (decoded?.exp && decoded.exp - Date.now() / 1000 >= 1800) {
+      return current;
+    }
+    return refreshTokens(
+      Buffer.from(fresh.encrypted_refresh_token, "base64"),
+      dekBuffer,
+      fresh.created_by,
+      fresh.id,
+      fresh.environment_name,
+    );
+  })().finally(() => inflightRefreshes.delete(token.id));
+
+  inflightRefreshes.set(token.id, run);
+  return run;
+};
+
 export const ValidateToken = async (req, reply, fastify) => {
   try {
     const authHeader = req.headers.authorization;
@@ -144,17 +177,7 @@ export const ValidateToken = async (req, reply, fastify) => {
 
     if (decodedToken.exp - now < 1800) {
       // 30 minutes
-      const refreshTokenBuf = Buffer.from(
-        token.encrypted_refresh_token,
-        "base64",
-      );
-      accessToken = await refreshTokens(
-        refreshTokenBuf,
-        dek,
-        token.created_by,
-        token.id,
-        token.environment_name,
-      );
+      accessToken = await refreshOnce(token, dek);
     }
 
     // Environment-level access scope — evaluated immediately after the token
@@ -220,13 +243,7 @@ const resolveAuth = async (token, dek) => {
   if (decodedToken && decodedToken.exp) {
     const now = Date.now() / 1000;
     if (decodedToken.exp - now < 1800) {
-      accessToken = await refreshTokens(
-        Buffer.from(token.encrypted_refresh_token, "base64"),
-        dekBuffer,
-        token.created_by,
-        token.id,
-        token.environment_name,
-      );
+      accessToken = await refreshOnce(token, dekBuffer);
     }
   }
 
