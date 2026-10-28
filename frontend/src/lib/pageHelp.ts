@@ -20,6 +20,7 @@ export type AdminHelpKey =
   | "tokens"
   | "settings"
   | "cache"
+  | "sync"
   | "activity";
 
 export const ADMIN_HELP: Record<AdminHelpKey, PageHelp> = {
@@ -85,6 +86,17 @@ export const ADMIN_HELP: Record<AdminHelpKey, PageHelp> = {
       "Delete one key, or select several, to force a fresh read.",
     ],
     note: "Nothing is lost. Every entry is rebuilt on the next request, just more slowly.",
+  },
+
+  sync: {
+    summary:
+      "Reload the Azure Key Vault secrets the service keeps in memory, without a restart.",
+    points: [
+      "Sync now runs a source straight away, for example after rotating a secret in the vault.",
+      "Each card shows the last run: when, who ran it, from which IP, how many items and how long it took.",
+      "Partial means some items could not be loaded. The server log says which.",
+    ],
+    note: "Only the latest run of each source is kept. A new run replaces the old one.",
   },
 
   activity: {

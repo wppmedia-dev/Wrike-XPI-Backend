@@ -9,3 +9,6 @@ reference
 
 public/app
 .tastemaker
+
+data/sync-state.json
+reference
