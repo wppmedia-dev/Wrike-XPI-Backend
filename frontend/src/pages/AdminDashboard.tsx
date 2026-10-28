@@ -47,6 +47,7 @@ import {
 } from "../lib/environmentModulePermissionsApi";
 import ActivityLog from "./ActivityLog";
 import MfaSettings from "./MfaSettings";
+import SyncSettings from "./SyncSettings";
 import { EnvironmentsTable } from "./admin/EnvironmentsTable";
 import { PortalUsersTable } from "./admin/PortalUsersTable";
 import {
@@ -74,6 +75,7 @@ type PageId =
   | "users"
   | "settings"
   | "cache-settings"
+  | "sync"
   | "activity-log";
 
 const PAGE_NAMES: Record<PageId, string> = {
@@ -83,6 +85,7 @@ const PAGE_NAMES: Record<PageId, string> = {
   users: "Users",
   settings: "Settings",
   "cache-settings": "Cache Settings",
+  sync: "Sync",
   "activity-log": "Activity Log",
 };
 
@@ -233,6 +236,8 @@ export default function AdminDashboard() {
   // Bumped every time the top-bar Refresh is hit while the Activity Log page
   // is open; passed to <ActivityLog> so it re-fetches rows + summary.
   const [activityRefreshKey, setActivityRefreshKey] = useState(0);
+  // Same idea for the Sync page, which owns its own fetch.
+  const [syncRefreshKey, setSyncRefreshKey] = useState(0);
 
   /* ── Environments ─────────────────────────────────────────────────── */
   /* Two lists, deliberately.
@@ -1235,6 +1240,9 @@ export default function AdminDashboard() {
       refreshPromise = loadPortalUsers();
     } else if (activePage === "sessions") {
       refreshPromise = loadTokens();
+    } else if (activePage === "sync") {
+      setSyncRefreshKey((k) => k + 1);
+      refreshPromise = Promise.resolve();
     } else if (activePage === "activity-log") {
       // The Activity Log owns its own fetch (rows + summary) — bump its key
       // and let the child reload the current page.
@@ -1388,6 +1396,16 @@ export default function AdminDashboard() {
               <i className="fa-solid fa-database" />
             </span>
             <span className="nl">Cache Settings</span>
+          </div>
+
+          <div
+            className={`nav-item${activePage === "sync" ? " active" : ""}`}
+            onClick={() => handleNav("sync")}
+          >
+            <span className="ni">
+              <i className="fa-solid fa-arrows-rotate" />
+            </span>
+            <span className="nl">Sync</span>
           </div>
 
           <div
@@ -1738,6 +1756,22 @@ export default function AdminDashboard() {
                 />
               </div>
             </div>
+          </div>
+
+          {/* ══════ SYNC PAGE ══════ */}
+          <div className={`page${activePage === "sync" ? " active" : ""}`} id="page-sync">
+            <div className="section-header">
+              <div>
+                <div className="section-title">
+                  Sync <PageInfo help={ADMIN_HELP.sync} />
+                </div>
+                <div className="section-subtitle">
+                  Reload secrets without restarting the service
+                </div>
+              </div>
+            </div>
+
+            <SyncSettings refreshKey={syncRefreshKey} />
           </div>
 
           {/* ══════ ACTIVITY LOG PAGE ══════ */}

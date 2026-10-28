@@ -10,3 +10,4 @@ export * as TokenPermissions from "./tokenPermissions";
 // any token's own matrix is consulted (src/middlewares/modulePermissions.js).
 export * as EnvironmentModulePermissions from "./environmentModulePermissions";
 export * as ActivityLog from "./activityLog";
+export * as SyncRuns from "./syncRuns";

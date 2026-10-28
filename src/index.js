@@ -17,6 +17,7 @@ import mcpDocsRoute from "./routes/mcpDocs";
 import docsRoute from "./routes/docs";
 import wrikeIconDataUri from "./mcp/wrikeIcon";
 import { syncSecrets } from "./utils/azure_vault";
+import { AZURE_SECRET_NAMES } from "./utils/syncSources";
 import { findRedirectionURL } from "./utils/wrikeRedirect";
 import { isCalendarSyncFlag, TOKEN_PURPOSE } from "./utils/tokenPurpose";
 import {
@@ -106,11 +107,7 @@ import { getBuildInfo } from "./utils/version";
   });
 
   // Sync Secrets from Azure Vault at Startup
-  await syncSecrets([
-    "XPI-API-ClientId",
-    "XPI-API-ClientSecret",
-    "XPI-API-Token",
-  ]);
+  await syncSecrets(AZURE_SECRET_NAMES);
 
   // Sync Wrike Credentials from Database at Startup
   try {
@@ -129,11 +126,7 @@ import { getBuildInfo } from "./utils/version";
 
   fastify.get("/api/v1/sync-secrets", async (req, res) => {
     try {
-      await syncSecrets([
-        "XPI-API-ClientId",
-        "XPI-API-ClientSecret",
-        "XPI-API-Token",
-      ]);
+      await syncSecrets(AZURE_SECRET_NAMES);
       console.log("Secrets synchronized successfully");
       res.send({ success: true, message: "Secrets synchronized successfully" });
     } catch (err) {
