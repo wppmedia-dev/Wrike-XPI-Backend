@@ -2,12 +2,18 @@ import crypto from "crypto";
 import { findRedirectionURL } from "../../utils/wrikeRedirect";
 import { getCachedVisibleWrikeCredentials } from "../../utils/wrikeCredentials";
 import { WrikeTokenExchange } from "../tokens/handlers/wrikeTokenExchange";
-import { ResolveAuthFromJWT } from "../../middlewares/authentication";
 import { clientIp } from "../../utils/environmentAccess";
-import { TOKEN_TTL_SECONDS } from "../../utils/tokenTtl";
+import { McpTokens } from "../../controllers";
+import { getMcpTokenLifetimes } from "../../utils/mcpTokenSettings";
 
-const ACCESS_TOKEN_TTL_SECONDS = TOKEN_TTL_SECONDS; // the JWE lifetime, one authority (src/utils/tokenTtl.js)
-const AUTH_CODE_TTL = "60s";
+// Marks a signed token as an MCP access token. Only /mcp accepts one, and /mcp
+// accepts nothing else (src/middlewares/authentication.js verifyJWE).
+export const MCP_TOKEN_USE = "mcp";
+
+// OAuth responses carry credentials, so no cache or intermediary may keep them
+// (RFC 6749 section 5.1).
+const noStore = (reply) =>
+  reply.header("Cache-Control", "no-store").header("Pragma", "no-cache");
 
 const isLoopback = (urlString) => {
   try {
@@ -223,6 +229,15 @@ export const oauthRoute = (fastify, opts, done) => {
     },
   );
 
+  // The access token: short-lived, signed, and good only on /mcp. `t` is the
+  // token row, `d` the DEK that opens its stored Wrike credential, `f` the
+  // refresh token family it belongs to, which is what revocation switches off.
+  const signAccessToken = ({ tokenId, familyId, dek, ttlSeconds }) =>
+    fastify.jwt.sign(
+      { t: tokenId, d: dek.toString("base64"), f: familyId, s: MCP_TOKEN_USE },
+      { expiresIn: ttlSeconds },
+    );
+
   /**
    * Shared body for both /authorize routes below. `environmentId` is passed
    * in explicitly rather than read from req.query, so it can come from a URL
@@ -402,12 +417,28 @@ export const oauthRoute = (fastify, opts, done) => {
               clientNameFrom(fastify, decoded.client_id) || "MCP client",
           },
           fastify,
+          req,
+          { mcp: true },
         );
 
+        const lifetimes = await getMcpTokenLifetimes();
+        const issued = await McpTokens.Issue({
+          tokenId: result.tokenId,
+          dek: result.dek,
+          refreshTtlSeconds: lifetimes.refreshTtlSeconds,
+        });
+
+        noStore(reply);
         return reply.code(200).send({
-          access_token: result.token,
+          access_token: signAccessToken({
+            tokenId: result.tokenId,
+            familyId: issued.familyId,
+            dek: result.dek,
+            ttlSeconds: lifetimes.accessTtlSeconds,
+          }),
           token_type: "Bearer",
-          expires_in: ACCESS_TOKEN_TTL_SECONDS,
+          expires_in: lifetimes.accessTtlSeconds,
+          refresh_token: issued.refreshToken,
         });
       }
 
@@ -416,22 +447,42 @@ export const oauthRoute = (fastify, opts, done) => {
         if (!refresh_token) {
           return reply.code(400).send({ error: "invalid_request" });
         }
+
+        const lifetimes = await getMcpTokenLifetimes();
+        let rotated;
         try {
-          // Re-validates (and, if near expiry, transparently refreshes the
-          // underlying Wrike token server-side). See authentication.js
-          // resolveAuth().
-          await ResolveAuthFromJWT(refresh_token);
-        } catch {
-          return reply.code(400).send({ error: "invalid_grant" });
+          rotated = await McpTokens.Rotate({
+            refreshToken: refresh_token,
+            refreshTtlSeconds: lifetimes.refreshTtlSeconds,
+          });
+        } catch (err) {
+          if (err?.code === "invalid_grant") {
+            return reply.code(400).send({
+              error: "invalid_grant",
+              error_description: err.message,
+            });
+          }
+          // Anything else is on our side (database down, lock timeout). Saying
+          // invalid_grant would make the client throw away a refresh token
+          // that is still good, and its user would have to sign in again.
+          console.log("Refresh failed:", err?.message || err);
+          return reply.code(503).send({
+            error: "temporarily_unavailable",
+            error_description: "Try again shortly",
+          });
         }
 
-        // The JWE is its own refresh handle: it already self-refreshes the
-        // underlying Wrike access token server-side, so no separate refresh
-        // token needs to be minted. It is echoed back with a fresh TTL.
+        noStore(reply);
         return reply.code(200).send({
-          access_token: refresh_token,
+          access_token: signAccessToken({
+            tokenId: rotated.tokenId,
+            familyId: rotated.familyId,
+            dek: rotated.dek,
+            ttlSeconds: lifetimes.accessTtlSeconds,
+          }),
           token_type: "Bearer",
-          expires_in: ACCESS_TOKEN_TTL_SECONDS,
+          expires_in: lifetimes.accessTtlSeconds,
+          refresh_token: rotated.refreshToken,
         });
       }
 
@@ -452,6 +503,19 @@ export const oauthRoute = (fastify, opts, done) => {
         error_description: err?.message || "Token exchange failed",
       });
     }
+  });
+
+  // RFC 7009 token revocation. A client signing out revokes its refresh token,
+  // which switches off the whole family, access tokens included. Always 200,
+  // known token or not, so the endpoint cannot be used to probe for valid ones.
+  fastify.post("/revoke", async (req, reply) => {
+    try {
+      const { token } = req.body || {};
+      await McpTokens.RevokeByRefreshToken(token);
+    } catch (err) {
+      console.log("Error while revoking a token:", err?.message || err);
+    }
+    return reply.code(200).send({});
   });
 
   fastify.post("/register", async (req, reply) => {

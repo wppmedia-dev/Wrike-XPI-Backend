@@ -1,4 +1,4 @@
-import { Tokens } from "../controllers";
+import { Tokens, McpTokens } from "../controllers";
 import { getWrikeTokens } from "../utils/wrike";
 import * as crypto from "../utils/crypto";
 import jwt from "jsonwebtoken";
@@ -40,9 +40,27 @@ const verifyBasicAuth = async (credentials) => {
   return { token, dek };
 };
 
+// Which door a bearer token is presented at. The Xtend API's 180-day token and
+// the MCP OAuth access token are signed with the same secret and carry the same
+// `t` and `d`, so without this a token for one would open the other.
+const MCP_TOKEN_USE = "mcp";
+
 // Verify the XPI token and extract the token-record id + DEK.
-const verifyJWE = async (jweToken) => {
+//
+// `surface` is "rest" (the default) or "mcp". /mcp accepts only MCP access
+// tokens, and those are refused everywhere else. An MCP access token is also
+// only as good as its refresh token family: revoking the family (sign-out,
+// admin revoke, a replayed refresh token) kills it before its own expiry.
+const verifyJWE = async (jweToken, surface = "rest") => {
   const payload = jwt.verify(jweToken, process.env.JWT_SECRET);
+
+  const isMcpToken = payload.s === MCP_TOKEN_USE;
+  if ((surface === "mcp") !== isMcpToken) {
+    throw new Error("Invalid token");
+  }
+  if (isMcpToken && !(await McpTokens.IsFamilyActive(payload.f))) {
+    throw new Error("Invalid token");
+  }
 
   // Current tokens carry the record id as `t` and the DEK inline as `d`.
   // Older tokens used `tid` plus `enc`, a second signed JWT wrapping the
@@ -259,11 +277,11 @@ const resolveAuth = async (token, dek) => {
   };
 };
 
-export const ResolveAuthFromJWT = async (jweToken) => {
+export const ResolveAuthFromJWT = async (jweToken, { surface = "rest" } = {}) => {
   try {
     if (!jweToken) throw new Error("No token provided");
 
-    const { token, dek } = await verifyJWE(jweToken);
+    const { token, dek } = await verifyJWE(jweToken, surface);
     return resolveAuth(token, dek);
   } catch (err) {
     console.error(new Date().toISOString(), err);

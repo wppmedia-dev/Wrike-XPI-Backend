@@ -24,6 +24,7 @@ import {
   getCachedVisibleWrikeCredentials,
 } from "./utils/wrikeCredentials";
 import { startRetentionSweep } from "./utils/activityLog";
+import { startMcpTokenSweep } from "./utils/mcpTokenSweep";
 import { getBuildInfo } from "./utils/version";
 
 (async () => {
@@ -126,6 +127,7 @@ import { getBuildInfo } from "./utils/version";
   // never grows unbounded. Idempotent; safe even if something elsewhere
   // imports src/utils/activityLog.js first.
   startRetentionSweep();
+  startMcpTokenSweep();
 
   fastify.get("/api/v1/sync-secrets", async (req, res) => {
     try {

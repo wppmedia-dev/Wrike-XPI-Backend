@@ -47,6 +47,7 @@ import {
 } from "../lib/environmentModulePermissionsApi";
 import ActivityLog from "./ActivityLog";
 import MfaSettings from "./MfaSettings";
+import McpTokenSettings from "./McpTokenSettings";
 import { EnvironmentsTable } from "./admin/EnvironmentsTable";
 import { PortalUsersTable } from "./admin/PortalUsersTable";
 import {
@@ -1700,6 +1701,10 @@ export default function AdminDashboard() {
 
             <div className="card">
               <MfaSettings />
+            </div>
+
+            <div className="card" style={{ marginTop: 16 }}>
+              <McpTokenSettings />
             </div>
           </div>
 

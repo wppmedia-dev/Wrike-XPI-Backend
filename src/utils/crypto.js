@@ -210,3 +210,43 @@ export const decryptField = (encryptedData) => {
     decipher.final(),
   ]).toString("utf8");
 };
+
+// ── MCP refresh tokens ──────────────────────────────────────────────────
+// A refresh token is 256 bits of randomness handed to the client once. The
+// database keeps only its SHA-256 (a high-entropy secret needs no slow hash)
+// and the DEK wrapped under a key derived from the token itself, so a leaked
+// database cannot decrypt anything and the server holds no standing key.
+
+const REFRESH_TOKEN_PREFIX = "xpi_rt_";
+const REFRESH_WRAP_INFO = "wrikexpi-mcp-refresh-dek-v1";
+
+/** A new random refresh token. */
+export const generateRefreshToken = () =>
+  REFRESH_TOKEN_PREFIX + crypto.randomBytes(32).toString("base64url");
+
+/** What the database stores in place of the refresh token. */
+export const hashRefreshToken = (refreshToken) =>
+  crypto.createHash("sha256").update(String(refreshToken)).digest("hex");
+
+/** The 32-byte key that wraps the DEK for this refresh token. */
+export const deriveRefreshWrapKey = (refreshToken) =>
+  Buffer.from(
+    crypto.hkdfSync(
+      "sha256",
+      Buffer.from(String(refreshToken)),
+      Buffer.alloc(0),
+      Buffer.from(REFRESH_WRAP_INFO),
+      DEK_LENGTH,
+    ),
+  );
+
+/** Wrap a DEK for storage next to a refresh token's hash (base64). */
+export const wrapDekForRefreshToken = (dek, refreshToken) =>
+  wrapDEK(dek, deriveRefreshWrapKey(refreshToken)).toString("base64");
+
+/** Recover the DEK from what wrapDekForRefreshToken stored. */
+export const unwrapDekForRefreshToken = (wrappedDekBase64, refreshToken) =>
+  unwrapDEK(
+    Buffer.from(wrappedDekBase64, "base64"),
+    deriveRefreshWrapKey(refreshToken),
+  );

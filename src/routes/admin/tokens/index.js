@@ -1,11 +1,12 @@
 import { verifyAdminJWT } from "../../../middlewares/adminAuth";
-import { Tokens, TokenPermissions } from "../../../controllers";
+import { Tokens, TokenPermissions, McpTokens } from "../../../controllers";
 import { catalog } from "../../../utils/tokenPermissionCatalog";
 import { parseTokenFilters } from "../../../utils/tokenFilters";
 
 import {
   IdParamSchema,
   ListSchema,
+  RevokeMcpSchema,
   SetPermissionsSchema,
   SetStatusSchema,
 } from "./schema";
@@ -122,6 +123,33 @@ export const adminTokensRoute = (fastify, opts, done) => {
           reply,
           { id: req.params.id, is_active },
           `Token ${is_active ? "activated" : "deactivated"}.`,
+        );
+      } catch (err) {
+        return fail(reply, err);
+      }
+    },
+  );
+
+  // POST /admin/tokens/:id/revoke-mcp: signs out every MCP connection behind a
+  // token. Their access tokens stop working at once and their refresh tokens
+  // can no longer be exchanged, so each client has to sign in again. The token
+  // record itself stays active, which is what separates this from the switch
+  // below.
+  fastify.post(
+    "/:id/revoke-mcp",
+    { ...RevokeMcpSchema, ...guard },
+    async (req, reply) => {
+      try {
+        const record = await Tokens.GetRecord(req.params.id);
+        if (!record) throw { statusCode: 404, message: "Token not found." };
+
+        const revoked = await McpTokens.RevokeByTokenId(req.params.id);
+        return ok(
+          reply,
+          { id: req.params.id, revoked },
+          revoked
+            ? "MCP sign-ins revoked. The client must sign in again."
+            : "No active MCP sign-ins for this token.",
         );
       } catch (err) {
         return fail(reply, err);

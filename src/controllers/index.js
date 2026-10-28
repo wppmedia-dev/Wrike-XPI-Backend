@@ -10,3 +10,6 @@ export * as TokenPermissions from "./tokenPermissions";
 // any token's own matrix is consulted (src/middlewares/modulePermissions.js).
 export * as EnvironmentModulePermissions from "./environmentModulePermissions";
 export * as ActivityLog from "./activityLog";
+export * as AppSettings from "./appSettings";
+// The MCP OAuth flow's rotating refresh tokens (src/routes/oauth).
+export * as McpTokens from "./mcpTokens";
