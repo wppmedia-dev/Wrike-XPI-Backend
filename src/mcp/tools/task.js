@@ -4,6 +4,13 @@ import { GetTask } from "../../routes/task/handlers/getTask";
 import { UpdateTask } from "../../routes/task/handlers/updateTask";
 import { DeleteTask } from "../../routes/task/handlers/deleteTask";
 import { getAuthError } from "./auth.js";
+import { toolError } from "./toolError.js";
+import {
+  CONFIRMATION_TOOL_NOTE,
+  confirmField,
+  confirmationRequest,
+  isConfirmed,
+} from "./confirmation.js";
 
 const serializeResult = (result) => {
   if (!result) return { success: true, data: null };
@@ -23,18 +30,18 @@ const serializeResult = (result) => {
  */
 export const registerTaskTools = (server, serverUrl, auth) => {
   server.registerTool(
-    "task_list_channel",
+    "xtend_task_list_channel",
     {
       description:
         "List the XPI tasks under a channel (Wrike task children of an XPI channel). " +
         "Returns each task's readable Datahub fields keyed by their XPI SHORT CODES " +
-        "(see datahub_list_fields, isTaskField=true), with Datahub-linked values " +
+        "(see xtend_datahub_list_fields, isTaskField=true), with Datahub-linked values " +
         "translated to friendly names.\n\n" +
         "FILTER SYNTAX (OData):\n" +
         "  Operators: eq, ne, lt, le, gt, ge, startswith, endswith, has\n" +
         "  Values in single quotes.\n" +
         "  Example: (taskstatus eq 'In Progress')\n" +
-        "  Field keys from datahub_list_fields where isTaskField=true.\n\n" +
+        "  Field keys from xtend_datahub_list_fields where isTaskField=true.\n\n" +
         "Prefer this over wrike_get_items_children / wrike_search_items when the ask is " +
         "XPI tasks inside an XPI channel flow and you want short-code fields; the wrike_* " +
         "alternatives return raw Wrike items with custom field IDs instead.",
@@ -81,21 +88,21 @@ export const registerTaskTools = (server, serverUrl, auth) => {
           ],
         };
       } catch (err) {
-        throw new Error(err?.message || "Failed to list channel tasks");
+        throw toolError(err, "Failed to list channel tasks");
       }
     },
   );
 
   server.registerTool(
-    "task_list_campaign",
+    "xtend_task_list_campaign",
     {
       description:
         "List the XPI tasks under a campaign (Wrike task children of an XPI campaign). " +
         "Returns each task's readable Datahub fields keyed by their XPI SHORT CODES " +
-        "(see datahub_list_fields, isTaskField=true), with Datahub-linked values " +
+        "(see xtend_datahub_list_fields, isTaskField=true), with Datahub-linked values " +
         "translated to friendly names.\n\n" +
         "FILTER PARAMETERS:\n" +
-        "  Field names are the short codes from datahub_list_fields where isTaskField=true.\n" +
+        "  Field names are the short codes from xtend_datahub_list_fields where isTaskField=true.\n" +
         "\n" +
         "  OPERATORS: eq, ne, lt, le, gt, ge, has, startswith, endswith\n" +
         "\n" +
@@ -159,13 +166,13 @@ export const registerTaskTools = (server, serverUrl, auth) => {
           ],
         };
       } catch (err) {
-        throw new Error(err?.message || "Failed to list campaign tasks");
+        throw toolError(err, "Failed to list campaign tasks");
       }
     },
   );
 
   server.registerTool(
-    "task_get",
+    "xtend_task_get",
     {
       description:
         "Read a single XPI task by its Wrike task ID. Validates the item is an XPI Task " +
@@ -208,22 +215,23 @@ export const registerTaskTools = (server, serverUrl, auth) => {
           ],
         };
       } catch (err) {
-        throw new Error(err?.message || "Failed to get task");
+        throw toolError(err, "Failed to get task");
       }
     },
   );
 
   server.registerTool(
-    "task_update",
+    "xtend_task_update",
 
     {
       description:
         "Update an XPI task by its Wrike task ID. Pass formFields keyed by the task " +
-        "field SHORT CODES from datahub_list_fields (isTaskField=true), e.g. " +
+        "field SHORT CODES from xtend_datahub_list_fields (isTaskField=true), e.g. " +
         "{ taskstatus: 'In Progress' }. Only writable XPI task keys are applied; dates " +
         "must be YYYY-MM-DD; Datahub-linked values are translated automatically.\n\n" +
         "Prefer this over wrike_update_items for XPI task data — wrike_update_items " +
-        "writes raw custom field IDs directly and bypasses XPI field mapping/validation.",
+        "writes raw custom field IDs directly and bypasses XPI field mapping/validation." +
+        CONFIRMATION_TOOL_NOTE,
       inputSchema: {
         taskId: z
           .string()
@@ -237,17 +245,28 @@ export const registerTaskTools = (server, serverUrl, auth) => {
           .record(z.any())
           .default({})
           .describe("Key-value map of field names to new values"),
+        confirm: confirmField("update to this task"),
       },
       annotations: {
         title: "Update Task",
         readOnlyHint: false,
-        destructiveHint: false,
+        destructiveHint: true,
         idempotentHint: true,
         openWorldHint: true,
       },
     },
-    async ({ taskId, formFields }, extra) => {
+    async ({ taskId, formFields, confirm }, extra) => {
       if (!auth) return getAuthError(serverUrl);
+      if (!isConfirmed(confirm)) {
+        return confirmationRequest({
+          toolName: "xtend_task_update",
+          action: "update this task",
+          target: `task ${taskId}`,
+          arguments: { taskId, formFields },
+          warning:
+            "Approving this overwrites the current values of the fields listed above.",
+        });
+      }
       try {
         const result = await UpdateTask(
           auth.wrikeToken,
@@ -263,19 +282,20 @@ export const registerTaskTools = (server, serverUrl, auth) => {
           ],
         };
       } catch (err) {
-        throw new Error(err?.message || "Failed to update task");
+        throw toolError(err, "Failed to update task");
       }
     },
   );
 
   server.registerTool(
-    "task_delete",
+    "xtend_task_delete",
 
     {
       description:
         "Delete an XPI task by its Wrike task ID. This is the ONLY delete operation " +
         "exposed by this server — Wrike's own MCP tools do not provide a delete, so " +
-        "do not look for a wrike_* delete alternative.",
+        "do not look for a wrike_* delete alternative." +
+        CONFIRMATION_TOOL_NOTE,
       inputSchema: {
         taskId: z
           .string()
@@ -285,6 +305,7 @@ export const registerTaskTools = (server, serverUrl, auth) => {
               "(letters/digits, may include - or _). NOT the task title. Copy the exact " +
               "id from a task list/get result.",
           ),
+        confirm: confirmField("delete of this task"),
       },
       annotations: {
         title: "Delete Task",
@@ -294,8 +315,18 @@ export const registerTaskTools = (server, serverUrl, auth) => {
         openWorldHint: true,
       },
     },
-    async ({ taskId }, extra) => {
+    async ({ taskId, confirm }, extra) => {
       if (!auth) return getAuthError(serverUrl);
+      if (!isConfirmed(confirm)) {
+        return confirmationRequest({
+          toolName: "xtend_task_delete",
+          action: "delete this task",
+          target: `task ${taskId}`,
+          arguments: { taskId },
+          warning:
+            "Deleting is permanent — there is no undo for this operation.",
+        });
+      }
       try {
         const result = await DeleteTask(
           auth.wrikeToken,
@@ -311,7 +342,7 @@ export const registerTaskTools = (server, serverUrl, auth) => {
           ],
         };
       } catch (err) {
-        throw new Error(err?.message || "Failed to delete task");
+        throw toolError(err, "Failed to delete task");
       }
     },
   );

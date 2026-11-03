@@ -43,6 +43,45 @@ export const MODULES = [
     actions: ALL,
   },
   {
+    key: "api_tokens",
+    label: "Token management",
+    description:
+      "The tokens issued for the environments this user can see: what each one is allowed to do, and whether it is switched on.",
+    // Two actions, one per route in src/routes/portal/apiTokens: read lists the
+    // tokens of the user's own environments, update edits a token's module
+    // matrix.
+    //
+    // No create, deliberately. A token is minted in exactly two places, and
+    // neither of them is a console: the token service's root login page, and an
+    // MCP client's OAuth flow. Both exchange a Wrike authorization code for it,
+    // which only a person signing in can produce, so there is no create route
+    // to grant. An unticked Create box would have been a promise nothing could
+    // keep, and a ticked one would have bought a button that could not do it.
+    //
+    // No delete. A token's availability is a narrowing decision, not a
+    // destructive one: switching a token off is the same kind of act as editing
+    // its module matrix, and it is reversible from the same page. So update
+    // carries both, and delete has nothing of its own left to grant. A tick that
+    // authorises nothing is the same dead control as the untickable Create box
+    // above, so it is not offered either.
+    actions: ["read", "update"],
+  },
+  {
+    key: "environment_modules",
+    label: "Environment Modules",
+    description:
+      "Which API modules each environment this user can see allows at all — the ceiling every token in that environment is held to. Reached from a row of the Environments page, so it is worth granting alongside it.",
+    // Two actions, one per route in src/routes/portal/environmentModules: read
+    // lists and fetches a grid, update replaces one.
+    //
+    // Its own module rather than a wider `environments` grant, so "may this
+    // person see the company's module ceiling?" and "may they change it?" are
+    // answered separately: reading it is what lets somebody explain why a call
+    // was refused, and changing it changes what every token in that
+    // environment may do.
+    actions: ["read", "update"],
+  },
+  {
     key: "activity_logs",
     label: "Activity Logs",
     description:

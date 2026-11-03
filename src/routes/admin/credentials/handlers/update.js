@@ -1,6 +1,7 @@
 import { encryptField, decryptField } from "../../../../utils/crypto";
 import { syncWrikeCredentialsFromDB } from "../../../../utils/wrikeCredentials";
 import { WrikeCredentials } from "../../../../controllers";
+import { normalizeWrikeApiHost } from "../../../../utils/wrikeEndpoint";
 
 export const Update = (profile_id, { id }, body) => {
   return new Promise(async (resolve, reject) => {
@@ -18,6 +19,7 @@ export const Update = (profile_id, { id }, body) => {
         xpi_request_form_mapping_datahub_id,
         xpi_space_name_datahub_id,
         campaign_space_id,
+        wrike_api_host,
         is_visible,
         is_active,
       } = body;
@@ -33,6 +35,8 @@ export const Update = (profile_id, { id }, body) => {
           statusCode: 400,
           message: "At least one credential field is required",
         });
+
+      const apiHost = normalizeWrikeApiHost(wrike_api_host);
 
       const credential = await WrikeCredentials.GetById(id);
       if (!credential)
@@ -58,6 +62,7 @@ export const Update = (profile_id, { id }, body) => {
           xpi_request_form_mapping_datahub_id || null,
         xpi_space_name_datahub_id: xpi_space_name_datahub_id || null,
         campaign_space_id: campaign_space_id || null,
+        wrike_api_host: apiHost,
       };
       if (client_id) {
         const currentClientId = credential.client_id

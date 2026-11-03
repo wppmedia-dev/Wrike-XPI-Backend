@@ -4,8 +4,9 @@ import { getCachedVisibleWrikeCredentials } from "../../utils/wrikeCredentials";
 import { WrikeTokenExchange } from "../tokens/handlers/wrikeTokenExchange";
 import { ResolveAuthFromJWT } from "../../middlewares/authentication";
 import { clientIp } from "../../utils/environmentAccess";
+import { TOKEN_TTL_SECONDS } from "../../utils/tokenTtl";
 
-const ACCESS_TOKEN_TTL_SECONDS = 180 * 24 * 60 * 60; // matches the 180d JWE minted by WrikeTokenExchange
+const ACCESS_TOKEN_TTL_SECONDS = TOKEN_TTL_SECONDS; // the JWE lifetime, one authority (src/utils/tokenTtl.js)
 const AUTH_CODE_TTL = "60s";
 
 const isLoopback = (urlString) => {
@@ -40,6 +41,26 @@ const resolveRegisteredRedirectUris = (fastify, clientId) => {
   }
 };
 
+// The display name a client registered at /register, read back out of the
+// signed client_id it was given. This is what labels the token that client ends
+// up minting, and the only thing that distinguishes two tokens a user holds for
+// the same environment in the admin console.
+//
+// Verification can fail for reasons that are not the client's fault and an
+// unlabelled token is perfectly usable, so every failure returns null rather
+// than throwing: a missing label must never be a reason to refuse a token.
+const clientNameFrom = (fastify, clientId) => {
+  if (!clientId) return null;
+  try {
+    const decoded = fastify.jwt.verify(clientId);
+    const name = decoded?.client_name;
+    if (typeof name !== "string") return null;
+    return name.trim().slice(0, 100) || null;
+  } catch {
+    return null;
+  }
+};
+
 const renderEnvironmentPicker = ({ visibleCreds, query }) => {
   const hiddenFields = Object.entries(query)
     .filter(([key]) => key !== "environment_id" && key !== "environmentId")
@@ -50,7 +71,10 @@ const renderEnvironmentPicker = ({ visibleCreds, query }) => {
     .join("\n");
 
   const options = Object.entries(visibleCreds || {})
-    .map(([envName, envData]) => `<option value="${envData.id}">${envName}</option>`)
+    .map(
+      ([envName, envData]) =>
+        `<option value="${envData.id}">${envName}</option>`,
+    )
     .join("");
 
   return `
@@ -113,13 +137,36 @@ const renderEnvironmentPicker = ({ visibleCreds, query }) => {
       border: none;
       border-radius: 12px;
       cursor: pointer;
+      position: relative;
+      transition: background 0.15s;
     }
-    button:hover { background: #45a049; }
+    button:hover:not(:disabled) { background: #45a049; }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+    /* Submitting this form leaves the page: the browser waits on the server,
+       which then redirects to Wrike. That wait is long enough to be felt, and
+       an unchanged button reads as a click that did nothing, so people click
+       it again. Same treatment as the console's Sign In button: hide the
+       label and draw a spinner over it, so the button keeps its size. */
+    button.loading { color: transparent; pointer-events: none; }
+    button.loading::after {
+      content: "";
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      top: 50%;
+      left: 50%;
+      margin: -8px 0 0 -8px;
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.65s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>Connect an MCP client to WrikeXPI</h1>
+    <h1>Connect to Wrike Xtend</h1>
     <p>Choose which Wrike environment this connection should use.</p>
     <form method="GET" action="/oauth/authorize">
       ${hiddenFields}
@@ -130,9 +177,33 @@ const renderEnvironmentPicker = ({ visibleCreds, query }) => {
           ${options}
         </select>
       </div>
-      <button type="submit">Continue</button>
+      <button type="submit" id="continueBtn">Continue</button>
     </form>
   </div>
+  <script>
+    // Only runs once the form actually passes validation, so the spinner can
+    // never get stuck on a form the browser refused to submit (the select is
+    // required, and its own message is the feedback in that case).
+    (function () {
+      var form = document.querySelector("form");
+      var button = document.getElementById("continueBtn");
+
+      form.addEventListener("submit", function () {
+        button.classList.add("loading");
+        button.disabled = true;
+        button.setAttribute("aria-busy", "true");
+      });
+
+      // Coming back through the browser's cache restores the page as it was
+      // left, spinner and all. Put the button back so it can be used again.
+      window.addEventListener("pageshow", function (event) {
+        if (!event.persisted) return;
+        button.classList.remove("loading");
+        button.disabled = false;
+        button.removeAttribute("aria-busy");
+      });
+    })();
+  </script>
 </body>
 </html>`;
 };
@@ -152,7 +223,13 @@ export const oauthRoute = (fastify, opts, done) => {
     },
   );
 
-  fastify.get("/authorize", async (req, reply) => {
+  /**
+   * Shared body for both /authorize routes below. `environmentId` is passed
+   * in explicitly rather than read from req.query, so it can come from a URL
+   * path segment (env-specific route) as well as the query string (generic
+   * route) — see the two registrations right after this.
+   */
+  const handleAuthorize = async (req, reply, environmentId) => {
     try {
       const {
         response_type,
@@ -161,34 +238,39 @@ export const oauthRoute = (fastify, opts, done) => {
         state,
         code_challenge,
         code_challenge_method,
-        environment_id,
         environment,
         accountId,
+        scope,
       } = req.query;
+      const environment_id = environmentId || req.query.environment_id;
 
       if (!redirect_uri) {
-        return reply
-          .code(400)
-          .send({ error: "invalid_request", error_description: "redirect_uri is required" });
+        return reply.code(400).send({
+          error: "invalid_request",
+          error_description: "redirect_uri is required",
+        });
       }
       if (response_type && response_type !== "code") {
-        return reply
-          .code(400)
-          .send({ error: "unsupported_response_type" });
+        return reply.code(400).send({ error: "unsupported_response_type" });
       }
       if (!code_challenge || code_challenge_method !== "S256") {
         return reply.code(400).send({
           error: "invalid_request",
-          error_description: "PKCE (code_challenge + code_challenge_method=S256) is required",
+          error_description:
+            "PKCE (code_challenge + code_challenge_method=S256) is required",
         });
       }
 
-      const allowedRedirects = resolveRegisteredRedirectUris(fastify, client_id);
+      const allowedRedirects = resolveRegisteredRedirectUris(
+        fastify,
+        client_id,
+      );
       if (allowedRedirects) {
         if (!allowedRedirects.includes(redirect_uri)) {
           return reply.code(400).send({
             error: "invalid_request",
-            error_description: "redirect_uri is not registered for this client_id",
+            error_description:
+              "redirect_uri is not registered for this client_id",
           });
         }
       } else if (!isLoopback(redirect_uri)) {
@@ -223,6 +305,9 @@ export const oauthRoute = (fastify, opts, done) => {
           environment,
           redirectUri: redirect_uri,
           accountId,
+          // The standard OAuth `scope` the MCP client asked for, handed to
+          // Wrike so the Wrike token is created with only those scopes.
+          scope,
           extra: {
             code_challenge,
             code_challenge_method,
@@ -240,6 +325,24 @@ export const oauthRoute = (fastify, opts, done) => {
         error_description: err?.message || "Failed to start authorization",
       });
     }
+  };
+
+  // Generic route: environment_id (if any) comes from the query string,
+  // same as every other OAuth param. This is what a client reaches when it
+  // omits environment_id entirely (the picker) or merges it correctly.
+  fastify.get("/authorize", async (req, reply) => {
+    return handleAuthorize(req, reply, null);
+  });
+
+  // Env-specific route: environment_id comes from the URL path instead of
+  // the query string, so it can never collide with a client's own OAuth
+  // params — a client that naively appends "?response_type=...&client_id=..."
+  // to whatever authorization_endpoint it was given (rather than parsing and
+  // merging query strings) cannot corrupt this the way it could corrupt
+  // "/authorize?environment_id=...". This is what /.well-known/oauth-authorization-server/env/:environmentId
+  // now advertises as authorization_endpoint (see ./wellKnown.js).
+  fastify.get("/authorize/env/:environmentId", async (req, reply) => {
+    return handleAuthorize(req, reply, req.params.environmentId);
   });
 
   fastify.post("/token", async (req, reply) => {
@@ -263,10 +366,15 @@ export const oauthRoute = (fastify, opts, done) => {
           });
         }
 
-        if (redirect_uri && decoded.redirect_uri && redirect_uri !== decoded.redirect_uri) {
+        if (
+          redirect_uri &&
+          decoded.redirect_uri &&
+          redirect_uri !== decoded.redirect_uri
+        ) {
           return reply.code(400).send({
             error: "invalid_grant",
-            error_description: "redirect_uri does not match the one used at /authorize",
+            error_description:
+              "redirect_uri does not match the one used at /authorize",
           });
         }
 
@@ -286,6 +394,12 @@ export const oauthRoute = (fastify, opts, done) => {
             code: decoded.wrikeCode,
             environmentId: decoded.environmentId,
             ip: clientIp(req),
+            // What to call the token this mints in the admin console. The
+            // registered client name where there is one, otherwise a generic
+            // label that is at least honest: reaching this line means something
+            // completed a PKCE flow, so it is an MCP client.
+            clientName:
+              clientNameFrom(fastify, decoded.client_id) || "MCP client",
           },
           fastify,
         );
@@ -304,7 +418,8 @@ export const oauthRoute = (fastify, opts, done) => {
         }
         try {
           // Re-validates (and, if near expiry, transparently refreshes the
-          // underlying Wrike token server-side) — see authentication.js resolveAuth().
+          // underlying Wrike token server-side). See authentication.js
+          // resolveAuth().
           await ResolveAuthFromJWT(refresh_token);
         } catch {
           return reply.code(400).send({ error: "invalid_grant" });
@@ -312,7 +427,7 @@ export const oauthRoute = (fastify, opts, done) => {
 
         // The JWE is its own refresh handle: it already self-refreshes the
         // underlying Wrike access token server-side, so no separate refresh
-        // token needs to be minted — we just echo it back with a fresh TTL.
+        // token needs to be minted. It is echoed back with a fresh TTL.
         return reply.code(200).send({
           access_token: refresh_token,
           token_type: "Bearer",
@@ -324,11 +439,12 @@ export const oauthRoute = (fastify, opts, done) => {
     } catch (err) {
       if (err?.statusCode === 403) {
         // Environment allow list rejected this caller (see
-        // WrikeTokenExchange -> evaluateAccess) — a real OAuth2 error code,
+        // WrikeTokenExchange -> evaluateAccess): a real OAuth2 error code,
         // not a malformed/expired grant.
         return reply.code(403).send({
           error: "access_denied",
-          error_description: err?.message || "Access denied for this environment",
+          error_description:
+            err?.message || "Access denied for this environment",
         });
       }
       return reply.code(400).send({
@@ -344,7 +460,8 @@ export const oauthRoute = (fastify, opts, done) => {
     if (!Array.isArray(redirect_uris) || redirect_uris.length === 0) {
       return reply.code(400).send({
         error: "invalid_client_metadata",
-        error_description: "redirect_uris is required and must be a non-empty array",
+        error_description:
+          "redirect_uris is required and must be a non-empty array",
       });
     }
 
@@ -358,7 +475,7 @@ export const oauthRoute = (fastify, opts, done) => {
     }
 
     // Stateless DCR: client_id is a signed JWT embedding the registered
-    // redirect_uris — verified later at /authorize and /token, no DB row.
+    // redirect_uris, verified later at /authorize and /token. No DB row.
     const client_id = fastify.jwt.sign(
       { redirect_uris, client_name: client_name || null },
       { expiresIn: "3650d" },

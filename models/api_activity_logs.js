@@ -22,10 +22,18 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: DataTypes.UUIDV4,
       },
       env_id: { type: DataTypes.UUID, allowNull: true },
-      environment_name: { type: DataTypes.STRING(255), allowNull: true },
+      environment_name: { type: DataTypes.STRING(255), allowNull: true }, // Which token made the call. Null for rows written before this column
+      // existed, for the public token-service routes, and for any call that
+      // fails before a token is identified. See
+      // migrations/20260917000001-add-token-id-to-api-activity-logs.js.
+      token_id: {
+        type: DataTypes.UUID,
+        allowNull: true,
+        comment: "user_tokens.id of the token that made the call",
+      },
       surface: { type: DataTypes.ENUM("rest", "mcp"), allowNull: false },
       actor_email: { type: DataTypes.STRING(320), allowNull: true },
-      action: { type: DataTypes.STRING(16), allowNull: true },
+      action: { type: DataTypes.STRING(255), allowNull: true },
       resource: { type: DataTypes.STRING(255), allowNull: false },
       method: { type: DataTypes.STRING(8), allowNull: true },
       allowed: { type: DataTypes.BOOLEAN, allowNull: false },
@@ -33,6 +41,21 @@ module.exports = (sequelize, DataTypes) => {
       status_code: { type: DataTypes.INTEGER, allowNull: true },
       ip: { type: DataTypes.STRING(64), allowNull: true },
       category: { type: DataTypes.STRING(32), allowNull: true },
+      /**
+       * The MCP tool(s) this request called, comma-separated in call order.
+       * Null for REST rows, and for an MCP request that only handshook (an
+       * `initialize` or `tools/list` exchanges no tool call). Written after the
+       * call completes, onto the row the request already wrote — see
+       * migrations/20260918150000-add-mcp-tool-to-api-activity-logs.js.
+       */
+      mcp_tool: { type: DataTypes.STRING(255), allowNull: true },
+      /**
+       * The reference the caller was shown when this request failed, so the
+       * message they are holding can be looked up. Null on a successful call —
+       * a reference is only created for an error response. See
+       * migrations/20260918160000-add-reference-id-to-api-activity-logs.js.
+       */
+      reference_id: { type: DataTypes.STRING(32), allowNull: true },
       request_payload: { type: DataTypes.JSON, allowNull: true },
       response_payload: { type: DataTypes.JSON, allowNull: true },
       created_at: { type: DataTypes.DATE },

@@ -84,12 +84,38 @@ export const CreateCampaign = (
 
       const requestFormId = requestForm?.requiredFormId;
 
-      if (!requestFormId)
+      if (!requestFormId) {
+        // The form is looked up by space, entity and variantId, so report exactly which ones are blank or unrecognized
+        const missingFields = [];
+        const unmatchedFields = [];
+
+        if (!space?.trim()) missingFields.push("space");
+        else if (!datahubSpaceData?.[space.trim().toLowerCase()])
+          unmatchedFields.push(`space "${space}"`);
+
+        if (!entity?.trim()) missingFields.push("entity");
+        else if (!datahubEntityData?.[entity.trim().toLowerCase()])
+          unmatchedFields.push(`entity "${entity}"`);
+
+        if (!variantId) missingFields.push("variantId");
+
+        const details = [];
+        if (missingFields.length)
+          details.push(`Missing required fields: ${missingFields.join(", ")}.`);
+        if (unmatchedFields.length)
+          details.push(`Unrecognized values: ${unmatchedFields.join(", ")}.`);
+        if (!details.length)
+          details.push(
+            `No request form is mapped to space "${space}", entity "${entity}" and variantId "${variantId}".`,
+          );
+
         return reject({
           statusCode: 403,
           message:
             "Missing parameter! Required parameter requestForm field is missing for the requested operation.",
+          details: details.join(" "),
         });
+      }
 
       // if (Object.keys(datahubCustomFieldsData).length === 0) {
       const datahubCustomFieldsData = await getDatahubCustomFields(
@@ -246,6 +272,46 @@ export const CreateCampaign = (
         });
       }
 
+      // Wrike only answers "submit_required_value_not_found" without naming the
+      // field, so work out which mandatory form fields have no value in the payload
+      const describeSubmitError = (wrikeMessage) => {
+        if (!`${wrikeMessage}`.includes("submit_required_value_not_found"))
+          return undefined;
+
+        const fieldNameById = new Map(
+          Object.entries(datahubRequestFormFieldsData || {}).map(
+            ([name, value]) => [value?.fieldId, name],
+          ),
+        );
+
+        const missingFields = [];
+        for (const page of requestFormPages) {
+          for (const formField of page?.fields || []) {
+            if (!formField?.mandatory || formField?.type === "Separator")
+              continue;
+
+            const submitted = submitRequestFieldsPayload.find(
+              (param) => param.fieldId === formField.id,
+            );
+            const hasValue = submitted?.values?.some(
+              (v) => v !== undefined && v !== null && `${v}`.trim() !== "",
+            );
+            if (hasValue) continue;
+
+            const name = fieldNameById.get(formField.id);
+            missingFields.push(
+              name && name !== formField.title
+                ? `"${name}" (form label: "${formField.title}")`
+                : `"${formField.title ?? formField.id}"`,
+            );
+          }
+        }
+
+        if (!missingFields.length) return undefined;
+
+        return `Missing required fields for the request form: ${missingFields.join(", ")}. Please provide a value for each and try again.`;
+      };
+
       if (isCreatedByURL) {
         const submittedRequestFormData = await submitRequestPreFillForm(
           wrikeToken,
@@ -277,7 +343,12 @@ export const CreateCampaign = (
 
       // Sending submit request form error response
       if (submittedRequestFormData?.errorDescription) {
-        return reject({ message: submittedRequestFormData?.errorDescription });
+        return reject({
+          message: submittedRequestFormData?.errorDescription,
+          details: describeSubmitError(
+            submittedRequestFormData?.errorDescription,
+          ),
+        });
       }
 
       const asynJobData = await getRequestFormStatus(
@@ -287,7 +358,10 @@ export const CreateCampaign = (
 
       // Sending folder update error response
       if (asynJobData?.errorMessage) {
-        return reject({ message: asynJobData?.errorMessage });
+        return reject({
+          message: asynJobData?.errorMessage,
+          details: describeSubmitError(asynJobData?.errorMessage),
+        });
       }
 
       let outputData = {};
@@ -368,6 +442,9 @@ export const CreateCampaign = (
       });
     } catch (err) {
       console.log(err?.message || err);
+      // Deliberate errors carry a statusCode and a user-facing message; pass
+      // them through instead of masking as fatal.
+      if (err?.statusCode) return reject(err);
       reject({
         message:
           "Fatal error Unexpected error occurred and service is unable complete the request.",

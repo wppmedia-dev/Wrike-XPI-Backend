@@ -101,6 +101,39 @@ const refreshTokens = async (encRefreshToken, dek, createdBy, tid, env) => {
   }
 };
 
+// Wrike rotates the refresh token on every use, so two requests that refresh
+// at once (an MCP client fires several in parallel) make the second one present
+// an already-spent refresh token and fail. One refresh per token row at a time;
+// latecomers share its result, and re-read the row so a refresh that finished
+// just before they started is reused instead of repeated.
+const inflightRefreshes = new Map();
+
+const refreshOnce = (token, dek) => {
+  if (inflightRefreshes.has(token.id)) return inflightRefreshes.get(token.id);
+
+  const dekBuffer = Buffer.isBuffer(dek) ? dek : Buffer.from(dek, "base64");
+  const run = (async () => {
+    const fresh = (await Tokens.GetById(token.id)) || token;
+    const current = crypto
+      .decrypt(Buffer.from(fresh.encrypted_access_token, "base64"), dekBuffer)
+      .toString();
+    const decoded = jwt.decode(current);
+    if (decoded?.exp && decoded.exp - Date.now() / 1000 >= 1800) {
+      return current;
+    }
+    return refreshTokens(
+      Buffer.from(fresh.encrypted_refresh_token, "base64"),
+      dekBuffer,
+      fresh.created_by,
+      fresh.id,
+      fresh.environment_name,
+    );
+  })().finally(() => inflightRefreshes.delete(token.id));
+
+  inflightRefreshes.set(token.id, run);
+  return run;
+};
+
 export const ValidateToken = async (req, reply, fastify) => {
   try {
     const authHeader = req.headers.authorization;
@@ -144,17 +177,7 @@ export const ValidateToken = async (req, reply, fastify) => {
 
     if (decodedToken.exp - now < 1800) {
       // 30 minutes
-      const refreshTokenBuf = Buffer.from(
-        token.encrypted_refresh_token,
-        "base64",
-      );
-      accessToken = await refreshTokens(
-        refreshTokenBuf,
-        dek,
-        token.created_by,
-        token.id,
-        token.environment_name,
-      );
+      accessToken = await refreshOnce(token, dek);
     }
 
     // Environment-level access scope — evaluated immediately after the token
@@ -164,6 +187,7 @@ export const ValidateToken = async (req, reply, fastify) => {
     // src/utils/environmentAccess.js for the match rules.
     const access = await evaluateAccess({
       envId: token.env_id,
+      environmentName: token.environment_name,
       wrikeToken: accessToken,
       ip: clientIp(req),
       // This is the REST path, so entries scoped to MCP only do not apply.
@@ -186,8 +210,13 @@ export const ValidateToken = async (req, reply, fastify) => {
       });
     }
 
-    // Store the decrypted token for route handlers.
+    // Store the decrypted token for route handlers, and the row id of the
+    // token it came from. The id is what the per-token module gate keys its
+    // lookup on (src/middlewares/tokenPermissions.js), and it is set here, on
+    // the far side of the environment gate, so a request that was refused
+    // above never looks like an authenticated one to that gate.
     req.wrikeToken = accessToken;
+    req.tokenId = token.id;
   } catch (err) {
     console.error(new Date().toISOString(), err);
     reply.code(401).send({
@@ -214,13 +243,7 @@ const resolveAuth = async (token, dek) => {
   if (decodedToken && decodedToken.exp) {
     const now = Date.now() / 1000;
     if (decodedToken.exp - now < 1800) {
-      accessToken = await refreshTokens(
-        Buffer.from(token.encrypted_refresh_token, "base64"),
-        dekBuffer,
-        token.created_by,
-        token.id,
-        token.environment_name,
-      );
+      accessToken = await refreshOnce(token, dekBuffer);
     }
   }
 
@@ -228,8 +251,11 @@ const resolveAuth = async (token, dek) => {
     wrikeToken: accessToken,
     environmentName: token.environment_name,
     // Carried so the MCP layer can scope the environment access check to the
-    // same environment the token belongs to (src/plugins/mcp.js).
+    // same environment the token belongs to (src/plugins/mcp.js), and so the
+    // per-tool permission gate knows which token's matrix to read
+    // (src/mcp/index.js installPermissionGate).
     envId: token.env_id,
+    tokenId: token.id,
   };
 };
 

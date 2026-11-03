@@ -1,4 +1,5 @@
 import { adminFetch } from "./authApi";
+import type { PermissionSummary } from "./tokenDisplay";
 
 /* ── Environments (credentials) ─────────────────────────────────────────
    Mirrors GET/POST /api/v1/admin/credentials and PUT/DELETE
@@ -18,6 +19,8 @@ export interface AdminEnvironment {
   xpi_request_form_mapping_datahub_id: string;
   xpi_space_name_datahub_id: string;
   campaign_space_id: string;
+  /** Wrike API host for this environment; empty means the server default (app-eu.wrike.com). */
+  wrike_api_host: string;
   is_active: boolean;
   is_visible: boolean;
   /** Gate 1 master switch — email/domain/IP allow list. */
@@ -30,6 +33,13 @@ export interface AdminEnvironment {
   /** Portal users currently mapped to this environment — an environment can
       be mapped to more than one user at once, each managing it independently. */
   owners?: { id: string; username: string }[];
+  /**
+   * The module ceiling over everything in this environment
+   * (src/controllers/environmentModulePermissions.js). Same shape as a token's
+   * summary, so the list can show at a glance which environments are
+   * restricted; `configured: false` means no ceiling, not "no access".
+   */
+  module_permissions: PermissionSummary;
   deleted_at?: string | null;
 }
 
@@ -46,6 +56,7 @@ export interface EnvironmentPayload {
   xpi_request_form_mapping_datahub_id?: string;
   xpi_space_name_datahub_id?: string;
   campaign_space_id?: string;
+  wrike_api_host?: string;
   is_visible: boolean;
   is_active: boolean;
 }
@@ -54,8 +65,20 @@ async function parseJson(res: Response): Promise<any> {
   return res.json().catch(() => null);
 }
 
-export const listEnvironments = async (): Promise<AdminEnvironment[]> => {
-  const res = await adminFetch("/api/v1/admin/credentials");
+/**
+ * The environments (credentials) list.
+ *
+ * `search` is the Environments table's search box, applied by the server: an
+ * environment id in it names that one environment, and anything else is
+ * matched against the name and the two Wrike values. Omitted when blank, so an
+ * empty box asks for the whole list rather than for rows matching "".
+ */
+export const listEnvironments = async (
+  search = "",
+): Promise<AdminEnvironment[]> => {
+  const term = search.trim();
+  const query = term ? `?search=${encodeURIComponent(term)}` : "";
+  const res = await adminFetch(`/api/v1/admin/credentials${query}`);
   const json = await parseJson(res);
   if (json?.success && Array.isArray(json.data)) {
     return json.data.map((c: any) => ({
@@ -74,6 +97,7 @@ export const listEnvironments = async (): Promise<AdminEnvironment[]> => {
         c.xpi_request_form_mapping_datahub_id || "",
       xpi_space_name_datahub_id: c.xpi_space_name_datahub_id || "",
       campaign_space_id: c.campaign_space_id || "",
+      wrike_api_host: c.wrike_api_host || "",
       is_active: !!c.is_active,
       is_visible: !!c.is_visible,
       allowlist_check_enabled: c.allowlist_check_enabled !== false,
@@ -81,6 +105,13 @@ export const listEnvironments = async (): Promise<AdminEnvironment[]> => {
       created_at: c.created_at,
       updated_at: c.updated_at,
       owners: Array.isArray(c.owners) ? c.owners : [],
+      // Absent from an older server means no ceiling, which is the same thing
+      // an empty matrix list means: unrestricted.
+      module_permissions: c.module_permissions || {
+        configured: false,
+        granted: 0,
+        total: 0,
+      },
       deleted_at: c.deleted_at,
     }));
   }

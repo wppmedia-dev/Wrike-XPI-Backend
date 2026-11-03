@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import xtendIcon from "../assets/xtend-logo-icon.png";
 import {
   canPortal,
   clearPortalSession,
@@ -16,20 +17,55 @@ import {
   type PortalPermissionMatrix,
 } from "../lib/portalAuthApi";
 import { fetchAppConfig, DEFAULT_CONFIG, type AppConfig } from "../lib/appConfig";
+import type { AdminToken } from "../lib/tokenPermissionsApi";
 import { useHashPage } from "../lib/useHashPage";
 import EnvBadge from "../components/EnvBadge";
+import WrikeEndpointPreview from "../components/WrikeEndpointPreview";
 import BuildTag from "../components/BuildTag";
 import PortalActivityPage from "./PortalActivityPage";
 import PortalCachePage from "./PortalCachePage";
+import PortalApiTokensPage from "./PortalApiTokensPage";
 import PortalEnvironmentAccess from "./PortalEnvironmentAccess";
 import { PortalEnvironmentsTable } from "./PortalEnvironmentsTable";
+import { PageInfo } from "../components/ui/PageInfo";
+import { PORTAL_HELP } from "../lib/pageHelp";
+import TokenPermissions, {
+  ENVIRONMENT_MODULES_COPY,
+  type TokenPermissionsApi,
+} from "./TokenPermissions";
+import {
+  getPortalEnvironmentModulePermissions,
+  getPortalEnvironmentModulesCatalog,
+  savePortalEnvironmentModulePermissions,
+} from "../lib/portalEnvironmentModulesApi";
 import "./PortalHome.css";
 
-type PageId = "overview" | "environments" | "activity" | "cache";
+type PageId = "overview" | "environments" | "api-tokens" | "activity" | "cache";
+
+/**
+ * The environment module-permission grid, pointed at the portal's own
+ * endpoints. Module scope so its identity is stable: the editor's load effect
+ * deliberately does not depend on it, and an object rebuilt on every render
+ * would either refetch constantly or read a stale session. `getPortalToken()`
+ * is called at request time for the same reason, so a re-login is picked up.
+ */
+const PORTAL_ENVIRONMENT_MODULES_API: TokenPermissionsApi = {
+  loadCatalog: async () =>
+    getPortalEnvironmentModulesCatalog(getPortalToken() || ""),
+  load: async (envId) =>
+    getPortalEnvironmentModulePermissions(getPortalToken() || "", envId),
+  save: async (envId, permissions) =>
+    savePortalEnvironmentModulePermissions(
+      getPortalToken() || "",
+      envId,
+      permissions,
+    ),
+};
 
 const PAGE_NAMES: Record<PageId, string> = {
   overview: "Overview",
   environments: "My Environments",
+  "api-tokens": "Sessions",
   activity: "Activity Logs",
   cache: "Cache Settings",
 };
@@ -151,6 +187,7 @@ const EMPTY_FORM = {
   xpiReqFormMapping: "",
   xpiSpaceName: "",
   campaignSpace: "",
+  wrikeApiHost: "",
   active: true,
   visible: true,
 };
@@ -171,6 +208,7 @@ function formFromEnv(env: PortalEnvironmentFull): EnvForm {
     xpiReqFormMapping: env.xpi_request_form_mapping_datahub_id || "",
     xpiSpaceName: env.xpi_space_name_datahub_id || "",
     campaignSpace: env.campaign_space_id || "",
+    wrikeApiHost: env.wrike_api_host || "",
     active: !!env.is_active,
     visible: !!env.is_visible,
   };
@@ -221,15 +259,25 @@ export default function PortalHome() {
 
   const canSeeOverview = can("overview", "read");
   const canSeeEnvironments = can("environments", "read");
+  const canSeeApiTokens = can("api_tokens", "read");
   const canSeeActivity = can("activity_logs", "read");
   const canSeeCache = can("cache", "read");
   const canSeeEnvironmentAccess = can("environment_access", "read");
+  // The module ceiling of each environment. Read shows the Modules column and
+  // the row action; update opens that grid as an editor. It hangs off the
+  // Environments page, so it is only reachable alongside environments:read.
+  const canSeeEnvironmentModules = can("environment_modules", "read");
+  const canUpdateEnvironmentModules = can("environment_modules", "update");
 
   /** A portal user can legitimately be created with nothing granted; the
       shell then has no page to show, so it says so instead of rendering an
       empty frame. */
   const hasAnyAccess =
-    canSeeOverview || canSeeEnvironments || canSeeActivity || canSeeCache;
+    canSeeOverview ||
+    canSeeEnvironments ||
+    canSeeApiTokens ||
+    canSeeActivity ||
+    canSeeCache;
 
   /* ── Session guard (mirrors the EJS inline script exactly) ──────────── */
   useEffect(() => {
@@ -303,17 +351,25 @@ export default function PortalHome() {
   useEffect(() => {
     if (!permissionsLoaded) return;
 
+    /* Every page the shell can show, and the grant it needs. The type is what
+       keeps this honest: a page missing from the map reads as "not granted",
+       and the guard below then bounces it to another page, which is how the
+       API Tokens page first shipped (reachable from the nav, then straight
+       back to Overview). `Record<PageId, boolean>` is what turns a forgotten
+       entry into a compile error rather than a mysterious redirect. */
     const granted: Record<PageId, boolean> = {
       overview: canSeeOverview,
       environments: canSeeEnvironments,
+      "api-tokens": canSeeApiTokens,
       activity: canSeeActivity,
       cache: canSeeCache,
     };
     if (granted[activePage]) return;
 
-    const fallback = (["overview", "environments", "activity", "cache"] as PageId[]).find(
-      (page) => granted[page],
-    );
+    // Order matters: this is where a user with a stale link lands.
+    const fallback = (
+      ["overview", "environments", "api-tokens", "activity", "cache"] as PageId[]
+    ).find((page) => granted[page]);
     if (fallback) setActivePage(fallback);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -321,6 +377,7 @@ export default function PortalHome() {
     activePage,
     canSeeOverview,
     canSeeEnvironments,
+    canSeeApiTokens,
     canSeeActivity,
     canSeeCache,
   ]);
@@ -335,10 +392,49 @@ export default function PortalHome() {
   const [accessEnvName, setAccessEnvName] = useState<string | null>(null);
   const [accessOpen, setAccessOpen] = useState(false);
 
+  /* The token whose activity log is being viewed. Set by the API Tokens
+     table's "Activity logs" action, cleared either from the chip on the log
+     page or by opening that page from the sidebar, so it never outlives the
+     visit that set it. */
+  const [activityToken, setActivityToken] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
+
+  /* The environment whose tokens are being viewed. Set by the Environments
+     table's "View tokens" action, cleared by the chip on the API Tokens page
+     or by opening that page from the sidebar. */
+  const [tokensEnvScope, setTokensEnvScope] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+
+  /* The environment whose activity log is being viewed. Set by the
+     Environments table's "Activity logs" action. The log's own environment
+     filter is a first-class control, so this pre-selects it rather than adding
+     a second way to see the same scope. */
+  const [activityEnv, setActivityEnv] = useState<{ id: string; name: string } | null>(
+    null,
+  );
+
   function openAccessDrawer(env: PortalEnvironmentFull) {
     setAccessEnvId(env.id);
     setAccessEnvName(env.environment_name);
     setAccessOpen(true);
+  }
+
+  /* ── Environment module permissions ──────────────────────────────────── */
+  // The ceiling this environment holds every token to, opened from its row.
+  // The same grid the admin console opens for a token, with the environment's
+  // copy and API, so the two layers are one control rather than two.
+  const [envModsEnvId, setEnvModsEnvId] = useState<string | null>(null);
+  const [envModsLabel, setEnvModsLabel] = useState<string | null>(null);
+  const [envModsOpen, setEnvModsOpen] = useState(false);
+
+  function openEnvironmentModules(env: PortalEnvironmentFull) {
+    setEnvModsEnvId(env.id);
+    setEnvModsLabel(env.environment_name);
+    setEnvModsOpen(true);
   }
 
   /* ── Add/Edit Environment modal ────────────────────────────────────── */
@@ -413,6 +509,7 @@ export default function PortalHome() {
         xpi_request_form_mapping_datahub_id: xpiReqFormMapping,
         xpi_space_name_datahub_id: xpiSpaceName,
         campaign_space_id: campaignSpace,
+        wrike_api_host: form.wrikeApiHost.trim(),
         is_active: form.active,
         is_visible: form.visible,
       };
@@ -524,6 +621,46 @@ export default function PortalHome() {
     setMobileOpen(false);
   };
 
+  /**
+   * The API Tokens page's "Activity logs" row action: switch to the log with
+   * that one token's rows filtered in. Same flow as the admin console's
+   * (frontend/src/pages/AdminDashboard.tsx openTokenActivityLogs), including
+   * the removable chip on the log, and it is only offered at all when this
+   * user may read the log (the table drops the action when no handler is
+   * passed, so nobody is sent to a page the guard would bounce them off).
+   */
+  const openTokenActivityLogs = (row: AdminToken) => {
+    setActivityToken({
+      id: row.id,
+      label:
+        [row.environment_name, row.account_id].filter(Boolean).join(" · ") ||
+        row.id,
+    });
+    setActivePage("activity");
+  };
+
+  /**
+   * The Environments table's "View tokens" action: the tokens issued for one
+   * environment, with that filter already applied on arrival. The same pair of
+   * props the admin console hands its table (envScope + onClearEnvScope), so
+   * the chip behaves identically in both consoles.
+   */
+  const openTokensForEnv = (env: PortalEnvironmentFull) => {
+    setTokensEnvScope({ id: env.id, name: env.environment_name });
+    setActivePage("api-tokens");
+  };
+
+  /**
+   * The Environments table's "Activity logs" action: the log filtered to one
+   * environment. Offered only with activity_logs:read (the table drops the
+   * action when no handler is passed), because the page and its API are behind
+   * that grant and a row action that 403s would sign the user out.
+   */
+  const openEnvActivityLogs = (env: PortalEnvironmentFull) => {
+    setActivityEnv({ id: env.id, name: env.environment_name });
+    setActivePage("activity");
+  };
+
   const handleRefresh = () => {
     setRefreshing(true);
     setDataRefreshKey((k) => k + 1);
@@ -564,9 +701,7 @@ export default function PortalHome() {
         <div className="sidebar-logo-row">
           <a className="sidebar-logo" href="/portal/home">
             <div className="logo-mark">
-              <svg viewBox="0 0 31 20" role="img" aria-label="Wrike symbol" aria-hidden="true">
-                <path d="M20.78 1.404C21.885.298 22.587 0 24.113 0h6.878c.561 0 .684.509.35.842l-11.49 11.491c-.176.176-.246.21-.352.246-.035.018-.087.018-.122.018s-.088 0-.123-.018c-.106-.035-.176-.07-.351-.246L14.85 8.281c-.175-.176-.21-.246-.245-.351-.018-.035-.018-.088-.018-.123s0-.088.018-.123c.035-.105.07-.175.245-.35l5.93-5.93zM10.745 8.649C9.64 7.544 8.92 7.263 7.395 7.263H.534c-.562 0-.685.509-.351.842l11.49 11.492c.176.175.246.21.352.245a.299.299 0 00.123.018c.035 0 .087 0 .122-.018.105-.035.176-.07.351-.245l4.053-4.07c.175-.176.21-.246.245-.351a.3.3 0 00.018-.123c0-.035 0-.088-.018-.123-.035-.105-.07-.175-.245-.351l-5.93-5.93z" />
-              </svg>
+              <img src={xtendIcon} alt="Xtend" />
             </div>
             <div className="logo-text">
               <span className="brand">
@@ -616,6 +751,23 @@ export default function PortalHome() {
               <span className="nav-badge">{environments.length}</span>
             </div>
           )}
+          {canSeeApiTokens && (
+            <div
+              className={`nav-item${activePage === "api-tokens" ? " active" : ""}`}
+              onClick={() => {
+                // Opening the page from the sidebar means "all my tokens", so a
+                // scope set by an environment row's action does not persist
+                // under a nav click that did not ask for it.
+                setTokensEnvScope(null);
+                handleNav("api-tokens");
+              }}
+            >
+              <span className="ni">
+                <i className="fa-solid fa-key" />
+              </span>
+              <span className="nl">Sessions</span>
+            </div>
+          )}
 
           {(canSeeCache || canSeeActivity) && (
             <div className="nav-group-label" style={{ marginTop: 6 }}>
@@ -636,7 +788,15 @@ export default function PortalHome() {
           {canSeeActivity && (
             <div
               className={`nav-item${activePage === "activity" ? " active" : ""}`}
-              onClick={() => handleNav("activity")}
+              onClick={() => {
+                // Opening the log from the sidebar means "the whole log", so a
+                // token or environment scope left over from a row action does
+                // not persist silently under a nav click that did not ask for
+                // it.
+                setActivityToken(null);
+                setActivityEnv(null);
+                handleNav("activity");
+              }}
             >
               <span className="ni">
                 <i className="fa-solid fa-clock-rotate-left" />
@@ -709,7 +869,9 @@ export default function PortalHome() {
           <div className={`page${activePage === "overview" ? " active" : ""}`} id="page-overview">
             <div className="section-header">
               <div>
-                <div className="section-title">Dashboard Overview</div>
+                <div className="section-title">
+                  Dashboard Overview <PageInfo help={PORTAL_HELP.overview} />
+                </div>
                 <div className="section-subtitle">Welcome back, {username}</div>
               </div>
             </div>
@@ -834,7 +996,9 @@ export default function PortalHome() {
           <div className={`page${activePage === "environments" ? " active" : ""}`} id="page-environments">
             <div className="section-header">
               <div>
-                <div className="section-title">My Environments</div>
+                <div className="section-title">
+                  My Environments <PageInfo help={PORTAL_HELP.environments} />
+                </div>
                 <div className="section-subtitle">Manage your Wrike environments</div>
               </div>
               {can("environments", "create") && (
@@ -853,13 +1017,41 @@ export default function PortalHome() {
                   canUpdate={can("environments", "update")}
                   canDelete={can("environments", "delete")}
                   canSeeAccess={canSeeEnvironmentAccess}
+                  // The admin console's Environments table offers this too; a
+                  // portal user with api_tokens:read gets the same shortcut
+                  // (the server scopes the list to their own environments).
+                  canViewTokens={canSeeApiTokens}
+                  canSeeModules={canSeeEnvironmentModules}
+                  canUpdateModules={canUpdateEnvironmentModules}
+                  onModulePermissions={openEnvironmentModules}
+                  // Only with the grant: the log page and its API sit behind
+                  // activity_logs:read, and portalFetch signs a user out on a
+                  // 403, so offering this without it would be a trap.
+                  canSeeActivity={canSeeActivity}
                   onEdit={openEnvModal}
                   onDelete={(env) => handleDeleteEnvironment(env.id, env.environment_name)}
                   onManageAccess={openAccessDrawer}
+                  onViewTokens={openTokensForEnv}
+                  onViewActivityLogs={openEnvActivityLogs}
                   onAdd={() => openEnvModal(null)}
                 />
               </div>
             </div>
+          </div>
+          )}
+
+          {/* ══════ TOKENS PAGE ══════ */}
+          {canSeeApiTokens && (
+          <div className={`page${activePage === "api-tokens" ? " active" : ""}`} id="page-api-tokens">
+            <PortalApiTokensPage
+              // Update is this module's one write grant: it opens the editor in
+              // the permissions popup and it draws the Status switch.
+              canUpdate={can("api_tokens", "update")}
+              // Only offered when this user may read the log at all.
+              onViewActivityLogs={canSeeActivity ? openTokenActivityLogs : undefined}
+              envScope={tokensEnvScope}
+              onClearEnvScope={() => setTokensEnvScope(null)}
+            />
           </div>
           )}
 
@@ -870,6 +1062,9 @@ export default function PortalHome() {
               active={activePage === "activity"}
               environments={environments}
               refreshKey={dataRefreshKey}
+              tokenFilter={activityToken}
+              onClearTokenFilter={() => setActivityToken(null)}
+              envScope={activityEnv}
             />
           </div>
           )}
@@ -894,6 +1089,23 @@ export default function PortalHome() {
         canCreate={can("environment_access", "create")}
         canUpdate={can("environment_access", "update")}
         canDelete={can("environment_access", "delete")}
+      />
+
+      {/* ════════ ENVIRONMENT MODULE PERMISSIONS GRID ════════ */}
+      {/* The other half of "who may call this, and what may they reach": the
+          access drawer above decides who gets in, this decides what any of
+          them can touch once they are in. Read-only without the update grant,
+          which the server enforces again (requirePortalPermission). */}
+      <TokenPermissions
+        tokenId={envModsEnvId}
+        tokenLabel={envModsLabel}
+        open={envModsOpen}
+        onClose={() => setEnvModsOpen(false)}
+        readOnly={!canUpdateEnvironmentModules}
+        copy={ENVIRONMENT_MODULES_COPY}
+        api={PORTAL_ENVIRONMENT_MODULES_API}
+        // The Modules column is derived from what this saves.
+        onSaved={loadEnvironments}
       />
 
       {/* ════════════ REDIRECT URL SUCCESS MODAL ════════════ */}
@@ -1170,6 +1382,23 @@ export default function PortalHome() {
                 value={form.campaignSpace}
                 onChange={(e) => setField("campaignSpace", e.target.value)}
               />
+            </div>
+
+            <div className="form-section-label">Wrike API</div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="envModalWrikeApiHost">
+                Wrike API Host
+              </label>
+              <input
+                type="text"
+                className="form-control"
+                id="envModalWrikeApiHost"
+                placeholder="https://app-us.wrike.com (blank uses app-eu.wrike.com)"
+                value={form.wrikeApiHost}
+                onChange={(e) => setField("wrikeApiHost", e.target.value)}
+              />
+              <WrikeEndpointPreview host={form.wrikeApiHost} />
             </div>
 
             <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "8px 0 14px" }} />

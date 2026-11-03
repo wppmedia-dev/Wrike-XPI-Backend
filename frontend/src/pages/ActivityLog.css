@@ -34,25 +34,12 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   FILTER BAR
-   One considered strip, not three loose selects: a search box
-   with the primary signal (who), an environment select (where),
-   and two chip groups (what kind, what happened) — grouped so
-   the eye reads it as one control surface.
+   TABLE TOOLBAR
+   Search, the Filters/Export popovers, and rows-per-page, all
+   in one row at the top of the table card — the same shape as
+   the Sessions table's toolbar (DataTable.tsx .dt2-toolbar),
+   rather than a separate filter bar sitting above the card.
    ═══════════════════════════════════════════════════════════ */
-
-.al-filterbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding: 12px 14px;
-  margin-bottom: 16px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
-}
 
 .al-search {
   position: relative;
@@ -97,6 +84,20 @@
    trigger/panel chrome — this wrapper only sizes it within the filter bar. */
 .al-env-select {
   min-width: 190px;
+}
+
+/* Filters + Export triggers (FilterPopover) — environment/surface/result/
+   date all live inside the popovers instead of sitting on the toolbar. */
+.al-filterbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The export dialog's own search field, reusing .al-search's look inside a
+   fpop-field instead of the filter bar's flex sizing. */
+.al-search-in-popover {
+  max-width: none;
 }
 
 /* Chip groups — a bordered pill holding buttons, one lit at a time. Same
@@ -149,6 +150,59 @@
   outline-offset: 2px;
 }
 
+/* The token scope, set by the API Tokens table's "Activity logs" row action
+   rather than by anything on this page, so it reads as an applied filter
+   (accent tint, removable) instead of as one more control. */
+.al-token-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 320px;
+  padding: 6px 6px 6px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+}
+
+.al-token-chip i {
+  font-size: 11px;
+}
+
+.al-token-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.al-token-chip-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  padding: 0;
+  font-size: 11px;
+  color: var(--accent);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.al-token-chip-clear:hover {
+  background: var(--bg-card);
+}
+
+.al-token-chip-clear:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* ═══════════════════════════════════════════════════════════
    TABLE
    ═══════════════════════════════════════════════════════════ */
@@ -171,6 +225,15 @@
 
 .al-table tbody tr.al-row-denied {
   border-left-color: var(--danger);
+}
+
+/* The call detail's version of the same cell: the same word and the same
+   explanation icon, without the table's warning colour (nothing is wrong with
+   one row of a detail view). */
+.al-unresolved-detail {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .al-time {
@@ -214,6 +277,15 @@
   color: var(--accent);
 }
 
+/* The client label (Claude, ChatGPT, VS Code, …) — plain text rather than a
+   badge, because unlike Surface (two states, always one of them) this has
+   a long, open-ended vocabulary that a badge's fixed-width pill fights. */
+.al-client {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
 .al-called {
   display: flex;
   align-items: center;
@@ -240,6 +312,16 @@
   background: var(--accent-soft);
   color: var(--accent);
   flex-shrink: 0;
+}
+
+/* The MCP tool an agent called. Outlined rather than plain, because unlike the
+   URL beside it this is something the agent chose, and it is the only name in
+   the row that a support question will quote. */
+.al-called .al-tool {
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-primary);
 }
 
 /* Result — an icon chip, not just a text badge, so allowed/denied reads as a
@@ -285,6 +367,25 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* The reference column: the id a caller reads out of an error and support
+   searches for, so it is set in mono and carries a copy button. Only a call
+   that failed has one, which is why the empty state is a dash rather than a
+   blank (a gap would read as data that failed to load). */
+.al-ref-cell {
+  font-size: 12px;
+}
+
+.al-ref-code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+}
+
+/* The reference box: mono, because what is typed into it is an id that has to
+   match character for character. */
+
 /* ── Pagination ─────────────────────────────────────────────────────── */
 
 .al-pagination {
@@ -298,27 +399,28 @@
   color: var(--text-muted);
 }
 
-/* Rows-per-page toolbar — sits above the table, mirrors the "Show X rows"
-   length control used by the DataTables pages in this console. */
+/* The table's toolbar — token chip, search, Filters/Export, rows-per-page —
+   all in the one row at the top of the card. Same padding/border rhythm as
+   the Sessions table's .dt2-toolbar, but kept under the al- prefix since it
+   also hosts this page's own token-scope chip. */
 .al-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 16px;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--border);
   font-size: 12.5px;
   color: var(--text-muted);
 }
 
-.al-range {
-  font-variant-numeric: tabular-nums;
-}
-
+/* Pinned to the end of the toolbar row — the last control after search and
+   Filters/Export, same position DataTable gives .dt2-pagesize. */
 .al-pagesize {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+  margin-left: auto;
   white-space: nowrap;
 }
 
@@ -459,7 +561,7 @@
 }
 
 @media (max-width: 780px) {
-  .al-filterbar {
+  .al-toolbar {
     flex-direction: column;
     align-items: stretch;
   }
@@ -470,6 +572,11 @@
     width: 100%;
   }
 
+  .al-pagesize {
+    margin-left: 0;
+    justify-content: space-between;
+  }
+
   .al-chipgroup {
     justify-content: space-between;
   }
@@ -478,7 +585,6 @@
     max-width: 160px;
   }
 
-  .al-toolbar,
   .al-pagination {
     flex-wrap: wrap;
   }
@@ -505,8 +611,36 @@
   color: var(--text-secondary);
 }
 
+/* The token a call was made with. The id in full rather than a short prefix:
+   it is what support asks for and what the token's permissions are keyed on,
+   and a truncated one only ever gets copied from the copy button anyway. The
+   table scrolls sideways (src/pages/ActivityLog.css .ea-scroll), so the column
+   costs width rather than legibility. */
+.al-token-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.al-token-code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
 .al-muted {
   color: var(--text-muted);
+}
+
+/* The sentence under "Unresolved" in the call detail: why this row has no
+   caller, rather than leaving the reader to guess whether the log is broken.
+   Quiet and indented under the value it explains, not a callout. */
+.al-detail-note {
+  margin-top: 3px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-muted);
+  max-width: 46ch;
 }
 
 .al-detail-grid {
@@ -609,6 +743,85 @@
   color: var(--text-primary);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* Preview / Raw, shown only when the captured body is a rendered page (an
+   HTML error from the token surface). Same pill as the filter chips, so it
+   reads as a view switch rather than as two more actions. */
+.al-payload-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  /* The head sets uppercase for the title; the controls inside it are
+     sentence case, like every other button in the console. */
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 600;
+}
+
+.al-payload-tabs {
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.al-payload-tab {
+  padding: 4px 10px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.al-payload-tab:hover {
+  color: var(--text-primary);
+}
+
+.al-payload-tab[aria-pressed="true"] {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.al-payload-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* The captured page, rendered. White behind it on purpose: these pages bring
+   their own dark background, and a preview that inherits the console's theme
+   would misrepresent what the caller saw. */
+.al-payload-frame {
+  display: block;
+  width: 100%;
+  height: 360px;
+  background: #ffffff;
+  border: 0;
+}
+
+.al-payload-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 9px 12px;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--warning);
+}
+
+.al-payload-note i {
+  margin-top: 2px;
+  font-size: 10px;
 }
 
 .al-no-payload {

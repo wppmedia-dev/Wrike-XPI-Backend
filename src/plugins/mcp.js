@@ -12,7 +12,11 @@ const {
   SURFACE,
   PUBLIC_DENIAL_MESSAGE,
 } = require("../utils/environmentAccess.js");
+const { runWithWrikeEnvironment } = require("../utils/wrikeEndpoint.js");
+const { MCP_RATE_LIMIT } = require("../utils/mcpRateLimit.js");
 const { log: logActivity } = require("../utils/activityLog.js");
+const { referenceFor } = require("../utils/activityReference.js");
+const { SetMcpTools } = require("../controllers/activityLog.js");
 const {
   captureRequest,
   buildResponseSnapshot,
@@ -59,14 +63,36 @@ module.exports = async function (fastify, opts) {
     done();
   });
 
-  const sendUnauthorized = (reply, description, resourceMetadataUrl) => {
+  /**
+   * The reference for this request: created on first use, then the same value
+   * for the rest of the request.
+   *
+   * MCP mints it itself instead of letting the generic error-reference hook do
+   * it, because on this surface the row is written BEFORE the response goes
+   * out (see recordActivity below). The row and the message have to name each
+   * other, so whoever gets there first mints it and the other reuses it.
+   */
+  const referenceOnce = (req) => referenceFor(req, "mcp");
+
+  /* The 401 this surface sends carries the reference too, so the row it just
+     wrote and the message the client reads agree. */
+  const sendUnauthorized = (
+    reply,
+    description,
+    resourceMetadataUrl,
+    reference,
+  ) => {
     reply
       .code(401)
       .header(
         "WWW-Authenticate",
         `Bearer error="invalid_token", error_description="${description}", resource_metadata="${resourceMetadataUrl}"`,
       )
-      .send({ error: "invalid_token", error_description: description });
+      .send({
+        error: "invalid_token",
+        error_description: description,
+        reference,
+      });
   };
 
   // Shared POST handler for both /mcp and /mcp/:environmentId — auth
@@ -77,55 +103,101 @@ module.exports = async function (fastify, opts) {
   // (see routes/oauth/wellKnown.js) instead of the generic picker flow.
   const handleMcpPost = (resourceMetadataUrl) => async (req, reply) => {
     // Activity log — one row per MCP request (the REST path logs one row
-    // per HTTP call the same way; MCP has no per-tool-call hook to attach to
-    // in this build, so the request itself is the unit logged here).
+    // per HTTP call the same way). Which TOOL that request called is only
+    // known once the call has happened, so the row is annotated afterwards:
+    // the permission gate reports every call through `onToolCall` below, and
+    // the summary is written onto this row when the request is done. See
+    // SetMcpTools in src/controllers/activityLog.js for why it is an update
+    // rather than a second row, and why a refused tool call also flips the
+    // row's outcome.
+    const toolCalls = [];
     const recordActivity = ({
       envId,
       environmentName,
       actorEmail,
+      tokenId,
       allowed,
       code,
       statusCode,
+      referenceId,
     }) =>
       logActivity({
         envId: envId || null,
         environmentName: environmentName || null,
+        tokenId: tokenId || null,
         surface: "mcp",
         actorEmail: actorEmail || null,
-        action: null,
+        // The JSON-RPC method ("tools/call", "server/discover", ...), so a row
+        // with no tool still says what the request was for.
+        action:
+          [
+            ...new Set(
+              []
+                .concat(req.body || [])
+                .map((msg) => msg?.method)
+                .filter((name) => typeof name === "string" && name),
+            ),
+          ]
+            .join(", ")
+            .slice(0, 255) || null,
         resource: req.raw?.url || "/mcp",
         method: null,
         allowed,
         code,
         statusCode,
+        referenceId: referenceId || null,
         ip: clientIp(req),
         category: "mcp",
         requestPayload: captureRequest(req),
         responsePayload: req.activityResponsePayload || null,
       });
 
+    /**
+     * The tool summary for this request, or null when it called no tool (an
+     * `initialize` or `tools/list` handshake). Names in call order, deduped:
+     * an agent that calls the same tool twice asked one question twice, and
+     * the row is a summary rather than a transcript.
+     */
+    const toolSummary = () => {
+      const names = [...new Set(toolCalls.map((call) => call.tool))];
+      return names.length ? names.join(", ").slice(0, 255) : null;
+    };
+
+    /** The first refusal, if any tool call was refused. */
+    const firstDenial = () => toolCalls.find((call) => !call.allowed) || null;
+
     const authHeader = req.headers.authorization || "";
     const [scheme, token] = authHeader.split(" ");
     if (scheme?.toLowerCase() !== "bearer" || !token) {
-      recordActivity({ allowed: false, code: "UNAUTHORIZED", statusCode: 401 });
+      const reference = referenceOnce(req);
+      recordActivity({
+        allowed: false,
+        code: "UNAUTHORIZED",
+        statusCode: 401,
+        referenceId: reference,
+      });
       return sendUnauthorized(
         reply,
         "Authorization required",
         resourceMetadataUrl,
+        reference,
       );
     }
 
     const auth = await resolveAuth(token);
     if (!auth) {
+      const reference = referenceOnce(req);
       recordActivity({
         allowed: false,
         code: "TOKEN_INVALID",
         statusCode: 401,
+        referenceId: reference,
       });
       return sendUnauthorized(
         reply,
         "Token is invalid or expired",
         resourceMetadataUrl,
+        reference,
       );
     }
 
@@ -135,6 +207,7 @@ module.exports = async function (fastify, opts) {
     try {
       access = await evaluateAccess({
         envId: auth.envId,
+        environmentName: auth.environmentName,
         wrikeToken: auth.wrikeToken,
         ip: clientIp(req),
         // This is the MCP path, so entries scoped to the REST API only do
@@ -145,14 +218,17 @@ module.exports = async function (fastify, opts) {
       recordActivity({
         envId: auth.envId,
         environmentName: auth.environmentName,
+        tokenId: auth.tokenId,
         allowed: false,
         code: "AUTHORIZATION_ERROR",
         statusCode: 403,
+        referenceId: referenceOnce(req),
       });
       return reply.code(403).send({
         error: "forbidden",
         error_description: "Access could not be verified for this token.",
         code: "AUTHORIZATION_ERROR",
+        reference: referenceOnce(req),
       });
     }
 
@@ -161,30 +237,41 @@ module.exports = async function (fastify, opts) {
         envId: auth.envId,
         environmentName: auth.environmentName,
         actorEmail: access.email,
+        tokenId: auth.tokenId,
         allowed: false,
         code: access.code,
         statusCode: 403,
+        referenceId: referenceOnce(req),
       });
       return reply.code(403).send({
         error: "forbidden",
         error_description: PUBLIC_DENIAL_MESSAGE,
         code: access.code,
+        reference: referenceOnce(req),
       });
     }
 
     // Logged as "accepted" here, before the response is hijacked for
     // streaming — this measures whether the MCP connection was authorized,
-    // not the success/failure of whatever tool calls happen over it.
-    recordActivity({
+    // not the success/failure of whatever tool calls happen over it. The
+    // handshake row's id is kept so the tool summary can be written onto it
+    // once the calls have happened.
+    const rowWritten = recordActivity({
       envId: auth.envId,
       environmentName: auth.environmentName,
       actorEmail: access.email,
+      tokenId: auth.tokenId,
       allowed: true,
       code: access.code,
       statusCode: 200,
     });
 
     if (typeof reply.hijack === "function") reply.hijack();
+
+    // The response is written straight to the socket from here on, so the
+    // generic error-reference hook never sees it: this surface mints its own
+    // reference, and keeps a failed request's one so the row can carry it.
+    let failureReference = null;
 
     try {
       // Ensure Accept header has both values required by the transport
@@ -196,27 +283,65 @@ module.exports = async function (fastify, opts) {
         req.raw.headers.accept = "application/json, text/event-stream";
       }
 
-      // Fresh server + transport per request — no shared session state
-      const server = await createMcpServer(fastify, serverUrl, auth);
-      const transport = new StreamableHTTPServerTransport({
-        enableJsonResponse: true,
+      // Fresh server + transport per request — no shared session state. The
+      // gate is handed the collector, so every tool call this request makes
+      // is reported as it happens.
+      // Tool calls run inside this context, so Wrike requests go to the
+      // host configured for the token's environment.
+      await runWithWrikeEnvironment(auth.environmentName, async () => {
+        const server = await createMcpServer(
+          fastify,
+          serverUrl,
+          auth,
+          (call) => toolCalls.push(call),
+        );
+        const transport = new StreamableHTTPServerTransport({
+          enableJsonResponse: true,
+        });
+        await server.connect(transport);
+        await transport.handleRequest(req.raw, reply.raw, req.body);
       });
-      await server.connect(transport);
-      await transport.handleRequest(req.raw, reply.raw, req.body);
     } catch (err) {
       const code = err?.statusCode || 500;
+      failureReference = referenceOnce(req);
       reply.raw.writeHead(code, { "Content-Type": "application/json" });
       reply.raw.end(
         JSON.stringify({
           success: false,
           message: err?.message || "MCP request handling failed.",
+          reference: failureReference,
         }),
       );
+    } finally {
+      // The tool names and any refusal, onto the row this request wrote. Chained
+      // off the (already started) write rather than awaited: the response is on
+      // the wire by now, and nothing about the caller's result depends on this.
+      rowWritten.then((row) => {
+        if (!row?.id) return null;
+        const refusal = firstDenial();
+        return SetMcpTools(row.id, {
+          tool: toolSummary(),
+          code: refusal?.code || null,
+          // Reported by the gate with the refusal, so it matches the id the
+          // agent was given in the FORBIDDEN result. A request that failed
+          // before any tool ran stores its own, which is the one its caller
+          // was shown.
+          referenceId: refusal?.reference || failureReference || null,
+          // A tool that was allowed but failed: the row says so instead of
+          // keeping the 200 it was written with.
+          failure: toolCalls.find((call) => call.failure)?.failure || null,
+        });
+      });
     }
   };
 
-  fastify.post("/mcp", handleMcpPost(baseResourceMetadataUrl));
-  fastify.post("/mcp/:environmentId", (req, reply) =>
+  // Both POST routes carry their own rate limit, per bearer token rather than
+  // the global per-IP one (src/utils/mcpRateLimit.js). The GET health checks
+  // below stay on the global limit: they are not what an agent loops on.
+  const rateLimited = { config: { rateLimit: MCP_RATE_LIMIT } };
+
+  fastify.post("/mcp", rateLimited, handleMcpPost(baseResourceMetadataUrl));
+  fastify.post("/mcp/:environmentId", rateLimited, (req, reply) =>
     handleMcpPost(`${baseResourceMetadataUrl}/${req.params.environmentId}`)(
       req,
       reply,

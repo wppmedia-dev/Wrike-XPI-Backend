@@ -1,17 +1,24 @@
-import { WrikeCredentials } from "../../../../controllers";
 import { decryptField } from "../../../../utils/crypto";
+import { scopedEnvironmentsFor } from "../../../../utils/portalScope";
+import { EnvironmentModulePermissions } from "../../../../controllers";
+import { summarisePermissions } from "../../../../utils/tokenPermissionSummary";
 
 export const GetMyEnvironments = (portalUser) => {
   return new Promise(async (resolve, reject) => {
     try {
-      let environments;
+      // Admin role sees ALL environments; regular users see only those mapped
+      // to them. The rule itself lives in src/utils/portalScope.js, shared with
+      // the API Tokens page so the two cannot disagree about what a user can
+      // see (a token list is scoped by exactly this).
+      const environments = await scopedEnvironmentsFor(portalUser);
 
-      // Admin role sees ALL environments; regular users see only those mapped to them
-      if (portalUser.role === "admin") {
-        environments = await WrikeCredentials.GetAllForPortal();
-      } else {
-        environments = await WrikeCredentials.GetByOwnerId(portalUser.id);
-      }
+      // The module ceiling each of these environments holds its tokens to, in
+      // the same summary shape the admin console shows. One extra query for the
+      // page, not one per row.
+      const matrices =
+        await EnvironmentModulePermissions.GetMatrixForEnvironments(
+          (environments || []).map((env) => env.id),
+        );
 
       const data = (environments || []).map((env) => ({
         id: env.id,
@@ -31,6 +38,7 @@ export const GetMyEnvironments = (portalUser) => {
           env.xpi_request_form_mapping_datahub_id || null,
         xpi_space_name_datahub_id: env.xpi_space_name_datahub_id || null,
         campaign_space_id: env.campaign_space_id || null,
+        wrike_api_host: env.wrike_api_host || null,
         is_active: env.is_active,
         is_visible: env.is_visible,
         // Read by the portal's environment-access drawer (EnvironmentAccess
@@ -40,6 +48,9 @@ export const GetMyEnvironments = (portalUser) => {
         // showing access scope accurately.
         allowlist_check_enabled: env.allowlist_check_enabled !== false,
         custom_field_check_enabled: !!env.custom_field_check_enabled,
+        // No rows means no ceiling, which summarisePermissions already says
+        // without this handler repeating the rule.
+        module_permissions: summarisePermissions(matrices[env.id]),
         created_at: env.created_at,
         updated_at: env.updated_at,
       }));

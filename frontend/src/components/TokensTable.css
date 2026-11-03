@@ -1,0 +1,509 @@
+/* API Tokens table, rendered by both consoles (the admin console's API Tokens
+   page and the portal's, see frontend/src/pages/PortalApiTokensPage.tsx).
+   Tokens, radii and type come from the shell's stylesheet; nothing new is
+   defined here. Column-specific rules are `tok-` prefixed so they cannot
+   collide with the env- / pu- tables that share the DataTable styling. */
+
+/* ── Advanced filters ─────────────────────────────────────────────────
+   The control sits in the table's toolbar slot, immediately right of the
+   search box, and the fields open in a popup under it, so the default view
+   of this page stays the table rather than a form. */
+.tok-filter-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The environment scope, set by the Environments table's "View tokens" action
+   rather than by anything on this page. Accent tinted and removable, so it
+   reads as "a filter is applied" instead of as one more control, and an admin
+   who did not expect a short list can see why. Same treatment as the token
+   chip on the Activity Log page. */
+.tok-scope-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 240px;
+  padding: 6px 6px 6px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+}
+
+.tok-scope-chip i {
+  font-size: 11px;
+}
+
+.tok-scope-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tok-scope-chip-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  padding: 0;
+  font-size: 11px;
+  color: var(--accent);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.tok-scope-chip-clear:hover {
+  background: var(--bg-card);
+}
+
+.tok-scope-chip-clear:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The Filters trigger itself is <IconToolbarButton /> (frontend/src/
+   components/ui/IconToolbarButton.tsx) — an icon button with its own badge
+   and hover tooltip, shared with the Activity Log pages' Filters/Export
+   triggers so all three read as one family.
+
+   Portalled onto <body> and positioned from the button's measured rect
+   (TokensTable.tsx), so the card's overflow cannot clip it. Same panel
+   treatment as AdminSelect's dropdown (same offset, radius and shadow), so a
+   filter popup and a select inside it read as one family. */
+.tok-filter-popup {
+  position: fixed;
+  z-index: 120;
+  width: 460px;
+  max-width: calc(100vw - 32px);
+  display: flex;
+  flex-direction: column;
+  /* White, not the grey surface: this is a card, and grey fields on a grey
+     panel read as disabled controls. */
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+}
+
+.tok-filter-popup-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tok-filter-popup-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.tok-filter-popup-title i {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.tok-filter-popup-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  font-size: 14px;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.tok-filter-popup-close:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface);
+}
+
+.tok-filter-popup-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Two columns: seven fields, each a label over its control. */
+.tok-filter-popup-body {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 14px;
+}
+
+.tok-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Label row: the name on the left, this field's own clear on the right. */
+.tok-filter-labelrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 16px;
+}
+
+.tok-filter-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.tok-filter-fieldclear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  font-size: 10px;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition:
+    color 0.12s ease,
+    background-color 0.12s ease;
+}
+
+.tok-filter-fieldclear:hover {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.tok-filter-fieldclear:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* So the select fills its column the way the text inputs do. */
+.tok-filter-field > * {
+  width: 100%;
+}
+
+/* One step down from the form default: these sit two-to-a-row in a popup,
+   not one to a modal. White, like the popup: the form default is the grey
+   surface, which is right on a white modal and wrong inside a white popup. */
+.tok-filter-field .form-control {
+  font-size: 13px;
+  padding: 8px 11px;
+  background: var(--bg-card);
+}
+
+.tok-filter-field .adsel-trigger {
+  background: var(--bg-card);
+}
+
+.tok-filter-popup-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-card);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+.tok-filter-popup-count {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.tok-filter-popup-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Clear all — a plain text button, not a bordered one: Done is the only
+   button-shaped control in this footer, so the eye has one thing to land on
+   rather than two boxes of equal weight. Same treatment as the Activity Log
+   popovers' Clear filters/Cancel (frontend/src/components/ui/
+   FilterPopover.css .fpop-text-btn). */
+.tok-filter-clear-btn {
+  padding: 6px 4px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.tok-filter-clear-btn:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+.tok-filter-clear-btn:disabled {
+  color: var(--text-muted);
+  opacity: 0.6;
+  cursor: default;
+}
+
+.tok-filter-clear-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Done, while the panel holds something the table is not showing yet. The
+   count beside it already says "Not applied yet"; this is the button that
+   changes that, so it is the one that carries the ring. The fallback matters
+   for the same reason it does in Toggle.css: this stylesheet is shared by both
+   consoles and --accent-soft is defined in each page's own scope. */
+.tok-filter-apply {
+  box-shadow: 0 0 0 3px var(--accent-soft, rgba(0, 130, 98, 0.12));
+}
+
+/* ── Bottom sheet (mobile) ────────────────────────────────────────────
+   Below 640px the popup stops being a floating panel and becomes a sheet
+   pinned to the bottom of the screen. A 460px panel on a 360px viewport is
+   unusable either way. The class is applied from TokensTable.tsx (a matchMedia
+   check), not from a media query here, because the JS also has to stop
+   measuring and positioning the popup at the same breakpoint. */
+.tok-filter-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 119;
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(2px);
+}
+
+.tok-filter-sheet {
+  top: auto;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  max-width: 100%;
+  max-height: 86vh;
+  border-bottom: none;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  animation: tokFilterSheetUp 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes tokFilterSheetUp {
+  from {
+    transform: translateY(16px);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* The grab handle: the visual cue that this is a sheet, not a dialog. */
+.tok-filter-sheet-handle {
+  display: none;
+}
+
+.tok-filter-sheet .tok-filter-sheet-handle {
+  display: block;
+  width: 36px;
+  height: 4px;
+  margin: 8px auto 0;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+/* One field per row on a phone, and the body scrolls inside the sheet so the
+   footer (Clear all / Done) stays reachable with the keyboard open. */
+.tok-filter-sheet .tok-filter-popup-body {
+  grid-template-columns: minmax(0, 1fr);
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.tok-filter-sheet .tok-filter-popup-foot {
+  padding-bottom: calc(11px + env(safe-area-inset-bottom));
+}
+/* Slightly tighter cells than the shared default: seven columns of
+   identifiers is the widest list in either console, and two pixels a side
+   across eight columns is most of a column's width back. Scoped to the table
+   rather than to a page id, so the portal gets the same treatment without a
+   second copy of this file. */
+.tok-table .dt2-table thead th,
+.tok-table .dt2-table tbody td {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+/* Nothing in this table is prose (environment names, account ids, emails,
+   UUIDs, timestamps), so nothing wraps. On a narrow viewport the table
+   scrolls sideways (DataTable's own .dt2-scroll) instead of breaking a UUID
+   or an email across two lines, which is what made the rows look ragged. */
+.tok-table tbody td {
+  white-space: nowrap;
+}
+
+.tok-table .tok-name-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+
+/* The name line of a stacked cell: the environment name in the Environment
+   column, or the client pill in the Token column. A person can hold several
+   tokens in one environment, so the pill is what stops two rows in the same
+   environment from reading as duplicates. */
+.tok-table .tok-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tok-table .tok-client {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 7px;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tok-table .tok-id-row {
+  gap: 4px;
+}
+
+.tok-table .tok-id-row .icon-btn {
+  width: 22px;
+  height: 22px;
+}
+
+/* The Wrike account the token acts in, on the line under its id.
+
+   A chip rather than plain text, and a different KIND of chip from the client
+   pill beside it: that one is a word (sans-serif, solid outline, filled), this
+   one is a reference (monospace, dashed outline, hollow). Same size, same
+   weight, different grammar, so a row reads as "who this is for" and "which
+   account it acts in" without either competing with the two ids above them. */
+.tok-table .tok-account {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  /* Dashed, and left hollow: an identifier a reader may want, not an action
+     they can take. */
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  padding: 1px 6px;
+  max-width: 180px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.tok-table .tok-account-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.tok-table .tok-account-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--text-secondary);
+  /* min-width: 0 or the ellipsis below never fires inside a flex row. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The identifying UUID under a cell's name line: the token id in the Token
+   column, the environment id in the Environment column. Monospace and quiet,
+   like the env table's env-id-code. */
+.tok-table .tok-id-code {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.tok-table .tok-creator {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tok-table .tok-creator-name {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Actions column stays put while the rest of a wide table scrolls
+   horizontally underneath it (same treatment as env-actions-col /
+   pu-actions-col, which are declared in AdminDashboard.css for the tables
+   that live on that page). */
+.tok-actions-col {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  box-shadow: -8px 0 8px -8px rgba(15, 23, 42, 0.12);
+}
+
+th.tok-actions-col {
+  background: var(--bg-surface);
+}
+
+td.tok-actions-col {
+  background: var(--bg-card);
+  text-align: center;
+}
+
+/* The sticky cell keeps its resting background on row hover, so it doesn't
+   flash the hover tint while the rest of the row highlights. */
+.dt2-table tbody tr:hover td.tok-actions-col {
+  background: var(--bg-card);
+}
+
+.tok-actions-col .icon-btn {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  font-size: 16px;
+  border: none;
+}
+
+.tok-actions-col .icon-btn:hover {
+  border-color: transparent;
+}

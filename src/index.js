@@ -17,7 +17,9 @@ import mcpDocsRoute from "./routes/mcpDocs";
 import docsRoute from "./routes/docs";
 import wrikeIconDataUri from "./mcp/wrikeIcon";
 import { syncSecrets } from "./utils/azure_vault";
+import { AZURE_SECRET_NAMES } from "./utils/syncSources";
 import { findRedirectionURL } from "./utils/wrikeRedirect";
+import { isCalendarSyncFlag, TOKEN_PURPOSE } from "./utils/tokenPurpose";
 import {
   syncWrikeCredentialsFromDB,
   getCachedVisibleWrikeCredentials,
@@ -105,11 +107,7 @@ import { getBuildInfo } from "./utils/version";
   });
 
   // Sync Secrets from Azure Vault at Startup
-  await syncSecrets([
-    "XPI-API-ClientId",
-    "XPI-API-ClientSecret",
-    "XPI-API-Token",
-  ]);
+  await syncSecrets(AZURE_SECRET_NAMES);
 
   // Sync Wrike Credentials from Database at Startup
   try {
@@ -128,11 +126,7 @@ import { getBuildInfo } from "./utils/version";
 
   fastify.get("/api/v1/sync-secrets", async (req, res) => {
     try {
-      await syncSecrets([
-        "XPI-API-ClientId",
-        "XPI-API-ClientSecret",
-        "XPI-API-Token",
-      ]);
+      await syncSecrets(AZURE_SECRET_NAMES);
       console.log("Secrets synchronized successfully");
       res.send({ success: true, message: "Secrets synchronized successfully" });
     } catch (err) {
@@ -195,7 +189,11 @@ import { getBuildInfo } from "./utils/version";
       ? selectedEnvironment
       : environments[0] || "";
 
-    res.send({ success: true, environments, selectedEnvironment: resolvedSelection });
+    res.send({
+      success: true,
+      environments,
+      selectedEnvironment: resolvedSelection,
+    });
   });
 
   // View Handlers
@@ -206,8 +204,28 @@ import { getBuildInfo } from "./utils/version";
   // client-side via /environments and /get-redirect-url instead of being
   // injected into the served HTML, same plain-sendFile pattern as every
   // other migrated page.
+  //
+  // `calendarSync` is the same idea as `autoRedirect`, for the other sign-in:
+  // one address that goes straight to the Calendar Sync flow instead of
+  // stopping on this page. It exists so a caller can hand somebody a single
+  // link for "put my Wrike tasks in my calendar" without explaining which of
+  // the two buttons to press. Like autoRedirect it carries the environment in
+  // the same query (environmentId=…), and with neither, the most recently
+  // added environment is used.
   fastify.get("/", async (req, res) => {
-    const { autoRedirect } = req.query;
+    const { autoRedirect, calendarSync } = req.query;
+
+    // The purpose is set here rather than taken from the query, so a link
+    // carrying this flag cannot ask for an ordinary token instead. This is the
+    // same rule /docs/calendar/connect follows, and the flag is spelled out
+    // rather than "anything truthy" so a typo starts no sign-in at all.
+    if (isCalendarSyncFlag(calendarSync)) {
+      const { redirectUrl } = findRedirectionURL(
+        { ...req.query, purpose: TOKEN_PURPOSE.CALENDAR_SYNC },
+        fastify,
+      );
+      return res.redirect(redirectUrl);
+    }
 
     if (autoRedirect == "true" || autoRedirect == "1") {
       const { redirectUrl } = findRedirectionURL(req.query, fastify);

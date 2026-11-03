@@ -1,6 +1,7 @@
 import { WrikeCredentials, PortalAuth } from "../../../../controllers";
 import { encryptField } from "../../../../utils/crypto";
 import { syncWrikeCredentialsFromDB } from "../../../../utils/wrikeCredentials";
+import { normalizeWrikeApiHost } from "../../../../utils/wrikeEndpoint";
 
 export const CreateEnvironment = (portalUser, body) => {
   return new Promise(async (resolve, reject) => {
@@ -18,6 +19,7 @@ export const CreateEnvironment = (portalUser, body) => {
         xpi_request_form_mapping_datahub_id,
         xpi_space_name_datahub_id,
         campaign_space_id,
+        wrike_api_host,
         is_active,
         is_visible,
       } = body;
@@ -81,6 +83,8 @@ export const CreateEnvironment = (portalUser, body) => {
           message: "Campaign Space ID is required",
         });
 
+      const apiHost = normalizeWrikeApiHost(wrike_api_host);
+
       const data = {
         environment_name: environment_name.trim(),
         client_id: encryptField(client_id.trim()),
@@ -96,6 +100,7 @@ export const CreateEnvironment = (portalUser, body) => {
           xpi_request_form_mapping_datahub_id.trim(),
         xpi_space_name_datahub_id: xpi_space_name_datahub_id.trim(),
         campaign_space_id: campaign_space_id.trim(),
+        wrike_api_host: apiHost,
         is_active: is_active !== undefined ? Boolean(is_active) : true,
         is_visible: is_visible !== undefined ? Boolean(is_visible) : true,
       };

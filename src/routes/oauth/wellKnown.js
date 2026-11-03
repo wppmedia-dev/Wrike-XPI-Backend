@@ -17,19 +17,28 @@ module.exports = async function (fastify, opts) {
   // a specific environment when `environmentId` is given — per RFC 8414's
   // path-based-issuer convention, a per-env issuer of "{base}/env/{id}" is
   // discoverable at "{base}/.well-known/oauth-authorization-server/env/{id}".
-  // The env-specific authorization_endpoint has `environment_id` baked in as
-  // a fixed query param, which MCP clients merge with their own OAuth params
-  // (response_type, client_id, code_challenge, ...) rather than overwrite —
-  // that's what lets /oauth/authorize skip the environment picker.
+  //
+  // The env-specific authorization_endpoint carries environmentId as a URL
+  // PATH segment ("/oauth/authorize/env/{id}"), not a baked-in query param.
+  // A query param there used to read "/oauth/authorize?environment_id={id}",
+  // which relied on every client parsing that existing query string and
+  // MERGING its own params into it with "&". A client that instead does
+  // naive string concatenation — appending "?response_type=...&client_id=..."
+  // straight onto whatever authorization_endpoint it was given — corrupts
+  // that URL into "...?environment_id={id}?response_type=...", a second "?"
+  // that gets swallowed into the environment_id value instead of starting a
+  // new param, silently dropping client_id/redirect_uri/etc. A path segment
+  // can't collide with a client's own query string, so this route shape is
+  // safe regardless of how naive the client's URL-building is.
   const authServerMetadata = (environmentId) => {
     const base = appUrl();
     const issuer = environmentId ? `${base}/env/${environmentId}` : base;
-    const authorizeQuery = environmentId
-      ? `?environment_id=${encodeURIComponent(environmentId)}`
-      : "";
+    const authorizePath = environmentId
+      ? `/oauth/authorize/env/${encodeURIComponent(environmentId)}`
+      : "/oauth/authorize";
     return {
       issuer,
-      authorization_endpoint: `${base}/oauth/authorize${authorizeQuery}`,
+      authorization_endpoint: `${base}${authorizePath}`,
       token_endpoint: `${base}/oauth/token`,
       registration_endpoint: `${base}/oauth/register`,
       response_types_supported: ["code"],

@@ -1,4 +1,4 @@
-import { memo, useId } from "react";
+import { memo, useId, useMemo } from "react";
 import type { CSSProperties, ReactElement, ReactNode } from "react";
 import type { ColumnDef, TableApi } from "./useTable";
 import "./DataTable.css";
@@ -79,6 +79,21 @@ export function DataTable<T>({
 
   const showingEmptySource = !loading && totalCount === 0;
   const showingNoMatches = !loading && totalCount > 0 && filteredCount === 0;
+
+  /* Numbered pager with ellipses for large result sets — the same shape as
+     the Activity Log pager (‹ 1 2 3 … 12 ›), so every table in the admin and
+     portal consoles paginates identically. */
+  const pageItems = useMemo<Array<number | "…">>(() => {
+    if (pageCount <= 7) return Array.from({ length: pageCount }, (_, i) => i + 1);
+    const items: Array<number | "…"> = [1];
+    const left = Math.max(2, page - 2);
+    const right = Math.min(pageCount - 1, page + 2);
+    if (left > 2) items.push("…");
+    for (let p = left; p <= right; p++) items.push(p);
+    if (right < pageCount - 1) items.push("…");
+    items.push(pageCount);
+    return items;
+  }, [page, pageCount]);
 
   return (
     <div className="dt2">
@@ -232,17 +247,35 @@ export function DataTable<T>({
             <nav className="dt2-pager" aria-label={`${caption} pagination`}>
               <button
                 type="button"
+                className="dt2-page-arrow"
                 onClick={() => table.setPage(page - 1)}
                 disabled={page <= 1}
                 aria-label="Previous page"
               >
                 <i className="fa-solid fa-chevron-left" aria-hidden="true" />
               </button>
-              <span className="dt2-pager-status">
-                Page {page} of {pageCount}
-              </span>
+
+              {pageItems.map((item, idx) =>
+                typeof item === "number" ? (
+                  <button
+                    key={item}
+                    type="button"
+                    className={`dt2-page-btn${item === page ? " current" : ""}`}
+                    aria-current={item === page ? "page" : undefined}
+                    onClick={() => table.setPage(item)}
+                  >
+                    {item}
+                  </button>
+                ) : (
+                  <span key={`gap-${idx}`} className="dt2-page-ellipsis" aria-hidden="true">
+                    …
+                  </span>
+                ),
+              )}
+
               <button
                 type="button"
+                className="dt2-page-arrow"
                 onClick={() => table.setPage(page + 1)}
                 disabled={page >= pageCount}
                 aria-label="Next page"

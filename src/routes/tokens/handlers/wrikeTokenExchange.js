@@ -1,5 +1,5 @@
 import * as crypto from "../../../utils/crypto";
-import { Tokens, Users } from "../../../controllers";
+import { Tokens, Users, TokenPermissions } from "../../../controllers";
 import { getWrikeTokens, getUserData } from "../../../utils/wrike";
 import models from "../../../../models";
 import { GetById } from "../../../controllers/wrikeCredentials";
@@ -8,10 +8,44 @@ import {
   SURFACE,
   PUBLIC_DENIAL_MESSAGE,
 } from "../../../utils/environmentAccess";
+import { tokenExpiryFrom, TOKEN_TTL_DAYS } from "../../../utils/tokenTtl";
+import {
+  CALENDAR_SYNC_CLIENT_NAME,
+  TOKEN_PURPOSE,
+  calendarSyncMatrix,
+  normalisePurpose,
+} from "../../../utils/tokenPurpose";
+import { usernameFor } from "../../../utils/tokenUsername";
+import { v4 as uuidv4 } from "uuid";
 
-export const WrikeTokenExchange = ({ code, environmentId, ip }, fastify) => {
+/**
+ * Mint, or refuse to mint, an XPI token for whoever just signed in at Wrike.
+ *
+ * Two sign-ins reach this function and they differ in exactly one thing: how
+ * long the token they get lives. A normal sign-in (the default, and the only
+ * thing the MCP OAuth flow can be) mints a 180-day token. `purpose:
+ * "calendar_sync"` — the Calendar Sync option on the root login page — mints
+ * one with no expiry, labelled in the console, and seeded with an explicit
+ * permission matrix. src/utils/tokenPurpose.js owns that vocabulary and the
+ * reasoning behind it; the decision here is only which branch this call is.
+ *
+ * `req` is optional and used for one thing: attributing the request in the
+ * activity log. Wrike's contact response a few lines below is the only place
+ * this flow learns a person's email, and without this the log row for a
+ * sign-in that created a token — or for one refused before it could — said
+ * "Unresolved" about somebody we had just looked up.
+ *
+ * @param {{code: string, environmentId: string, ip?: string, clientName?: string, purpose?: string}} data
+ * @param {object} fastify - the app, for jwt.sign
+ * @param {object} [req] - the request, so its log row can name the caller
+ */
+export const WrikeTokenExchange = (
+  { code, environmentId, ip, clientName, purpose },
+  fastify,
+  req,
+) => {
   return new Promise(async (resolve, reject) => {
-    // Transaction is opened later, right before the first write — it must
+    // Transaction is opened later, right before the first write. It must
     // not span the outbound Wrike API calls or the access check below, since
     // holding a pooled connection idle for the length of an external HTTP
     // round-trip is what was starving the (small) connection pool for every
@@ -22,6 +56,13 @@ export const WrikeTokenExchange = ({ code, environmentId, ip }, fastify) => {
       if (!code) return reject({ message: "Access Token must not be empty" });
       if (!environmentId)
         return reject({ message: "Environment must not be empty" });
+
+      // Which of the two sign-ins this is. Everything below that differs
+      // between them hangs off this one value, and anything unrecognised is
+      // treated as a normal 180-day sign-in rather than read as a request for
+      // a token that never expires.
+      const isCalendarSync =
+        normalisePurpose(purpose) === TOKEN_PURPOSE.CALENDAR_SYNC;
 
       const envData = await GetById(environmentId);
       const env = envData?.environment_name;
@@ -44,7 +85,7 @@ export const WrikeTokenExchange = ({ code, environmentId, ip }, fastify) => {
       console.log("Retrieved wrike tokens");
 
       // Get user data from Wrike API
-      const wrikeUserData = await getUserData(access_token);
+      const wrikeUserData = await getUserData(access_token, env);
       const {
         id: wrikeUserId,
         firstName,
@@ -60,22 +101,56 @@ export const WrikeTokenExchange = ({ code, environmentId, ip }, fastify) => {
 
       console.log("Fetched Wrike user data");
 
-      // Environment-level access scope — same gate ValidateToken applies to
+      // Set before the access check rather than after it: a refusal is exactly
+      // the row an admin wants to be able to attribute ("who tried, and who was
+      // turned away?"), and the email is already in hand. It rides on the
+      // request because the log is written by the route's onResponse hook.
+      if (req) {
+        req.callerEmail = primaryEmail
+          ? String(primaryEmail).trim().toLowerCase()
+          : null;
+      }
+
+      // Set here rather than after the access check: a refusal is exactly the
+      // row an admin wants to be able to attribute ("who tried, and who was
+      // turned away?"), and the email is already known. It rides on the request
+      // because the log is written by the route's onResponse hook.
+      if (req) {
+        req.callerEmail = primaryEmail
+          ? String(primaryEmail).trim().toLowerCase()
+          : null;
+      }
+
+      // Environment-level access scope: same gate ValidateToken applies to
       // every subsequent API call, run here BEFORE any credentials or token
       // record are created. Without this, a caller who is not on the
       // environment's allow list could still complete the OAuth exchange and
-      // walk away with valid, persistent XPI credentials for it — the
-      // allow list would only start blocking them on their first API call.
-      const access = await evaluateAccess({
+      // walk away with valid, persistent XPI credentials for it, leaving the
+      // allow list to start blocking them only on their first API call.
+      //
+      // Signing in is not tied to a surface: the token minted here is used on
+      // the API and on MCP alike. So the person is let in when the list covers
+      // them on EITHER surface; every later request is still judged against
+      // its own surface (ValidateToken for API, src/plugins/mcp.js for MCP).
+      let access = await evaluateAccess({
         envId: environmentId,
         email: primaryEmail,
         ip,
         surface: SURFACE.API,
       });
+      if (!access.allowed) {
+        const viaMcp = await evaluateAccess({
+          envId: environmentId,
+          email: primaryEmail,
+          ip,
+          surface: SURFACE.MCP,
+        });
+        if (viaMcp.allowed) access = viaMcp;
+      }
 
       if (!access.allowed) {
         // Detailed reasoning stays server-side only (server log here, full
-        // decision in the admin console) — the caller gets the generic
+        // decision in the admin console). The caller gets the generic
         // denial message below, never the allow-list mechanics.
         console.log(
           `Environment access denied for ${primaryEmail || "unknown caller"}: ${access.code} (${access.message})`,
@@ -89,7 +164,7 @@ export const WrikeTokenExchange = ({ code, environmentId, ip }, fastify) => {
 
       const accountId = profiles?.[0]?.accountId;
 
-      // Start database transaction for data consistency — from here on,
+      // Start database transaction for data consistency. From here on,
       // only DB writes happen, no more outbound HTTP calls.
       transaction = await models.sequelize.transaction();
 
@@ -112,8 +187,25 @@ export const WrikeTokenExchange = ({ code, environmentId, ip }, fastify) => {
 
       console.log("Fetched exising user data from DB");
 
-      // Generate username from email + account_id
-      const username = `${accountId}-${environmentId}-${primaryEmail}`;
+      // One row per token, never one row per user and environment.
+      //
+      // The DEK that decrypts a token's stored Wrike credential travels inside
+      // the token itself (the JWE carries `d` inline). Reusing a row therefore
+      // means re-encrypting that credential under a new DEK, and the older
+      // token is left pointing at ciphertext it can no longer decrypt: it dies
+      // the moment the second one is issued. Separate rows are also what lets
+      // two tokens for the same environment carry different permissions.
+      const tokenId = uuidv4();
+
+      // Named after its own id, so the username is unique to this token and
+      // still says who it belongs to. See src/utils/tokenUsername.js for why
+      // the id has to be part of it at all.
+      const username = usernameFor({
+        accountId,
+        environmentId,
+        email: primaryEmail,
+        tokenId,
+      });
 
       // Generate random strong password
       const password = crypto.generateSecurePassword();
@@ -135,63 +227,78 @@ export const WrikeTokenExchange = ({ code, environmentId, ip }, fastify) => {
         .encrypt(Buffer.from(refresh_token), dek)
         .toString("base64");
 
-      // Get existing user token if any
-      const userTokenData = await Tokens.GetByUserAccountEnvId(
+      // When the token minted below stops being accepted. Computed once, here,
+      // so the row and the signature cannot disagree about it, and stored on
+      // the row because nothing reads the JWE's own payload back: without this,
+      // "when does this integration stop working?" has no answer until it does.
+      //
+      // Null for a Calendar Sync token, deliberately, and the signature below
+      // leaves out its own expiry to match: the two halves of one lifetime are
+      // decided together, so a row can never say "no expiry" while the token in
+      // the caller's hands quietly stops after 180 days.
+      const tokenExpiresAt = isCalendarSync ? null : tokenExpiryFrom();
+
+      const newUserTokenData = await Tokens.Insert(
         userId,
-        accountId,
-        environmentId,
+        {
+          id: tokenId,
+          account_id: accountId,
+          env_id: environmentId,
+          encrypted_access_token: encryptedAccessToken,
+          encrypted_refresh_token: encryptedRefreshToken,
+          username,
+          password_hash: passwordHash,
+          salt: salt.toString("base64"),
+          wrapped_dek: wrappedDEK.toString("base64"),
+          is_active: true,
+          // Null when the caller did not say what it is. Guessing here would
+          // put a label on a row that the console presents as fact. Truncated
+          // because the column is a STRING(100) and one of the callers passes a
+          // value that came in from outside.
+          //
+          // A Calendar Sync token is named here rather than by the route that
+          // asked for it: that name is what the console's Client column shows,
+          // and it is the one thing that tells an admin which of the two
+          // sign-ins produced this row.
+          client_name: isCalendarSync
+            ? CALENDAR_SYNC_CLIENT_NAME
+            : clientName
+              ? String(clientName).slice(0, 100)
+              : null,
+          token_expires_at: tokenExpiresAt,
+        },
+        { transaction },
       );
-      let userTokenId = userTokenData?.id;
+      const userTokenId = newUserTokenData?.id;
 
-      console.log("Retrieved exising user token data");
+      console.log("Inserted a new token record", userTokenId);
 
-      // Update or create token record
-      if (userTokenId) {
-        await Tokens.Update(
-          userId,
+      // A Calendar Sync token is handed an explicit matrix — the calendar
+      // module granted and every other module off — instead of being left
+      // unrestricted like an ordinary sign-in, in the mint's own transaction so
+      // the token never exists for a moment with no permissions recorded
+      // against it. src/utils/tokenPurpose.js owns that matrix and the
+      // reasoning behind it.
+      if (isCalendarSync) {
+        await TokenPermissions.SeedMatrix(
           userTokenId,
-          {
-            encrypted_access_token: encryptedAccessToken,
-            encrypted_refresh_token: encryptedRefreshToken,
-            username,
-            password_hash: passwordHash,
-            salt: salt.toString("base64"),
-            wrapped_dek: wrappedDEK.toString("base64"),
-          },
-          { transaction },
+          calendarSyncMatrix(),
+          transaction,
         );
-
-        console.log("Updated user token meta data");
-      } else {
-        const newUserTokenData = await Tokens.Insert(
-          userId,
-          {
-            account_id: accountId,
-            env_id: environmentId,
-            encrypted_access_token: encryptedAccessToken,
-            encrypted_refresh_token: encryptedRefreshToken,
-            username,
-            password_hash: passwordHash,
-            salt: salt.toString("base64"),
-            wrapped_dek: wrappedDEK.toString("base64"),
-            is_active: true,
-          },
-          { transaction },
-        );
-        userTokenId = newUserTokenData?.id;
-
-        console.log("Inserted a new token meta data");
+        console.log("Seeded the Calendar Sync permission matrix");
       }
 
       // Sign the XPI token. It carries the token-record id (t) and the DEK
       // (d, base64) inline. The DEK is not secret from whoever holds this
-      // token; the signature is what protects the payload from tampering.
+      // token; the signature is what protects the payload from tampering. The
+      // lifetime is the same constant the row above was stamped with — or, for
+      // Calendar Sync, the absence of one, matching the null expiry above.
       const jweToken = fastify.jwt.sign(
         {
           t: userTokenId,
           d: dek.toString("base64"),
         },
-        { expiresIn: "180d" },
+        isCalendarSync ? undefined : { expiresIn: `${TOKEN_TTL_DAYS}d` },
       );
 
       await transaction.commit();
@@ -209,7 +316,7 @@ export const WrikeTokenExchange = ({ code, environmentId, ip }, fastify) => {
         },
       });
     } catch (err) {
-      // Rollback only if the transaction was actually opened — errors from
+      // Rollback only if the transaction was actually opened. Errors from
       // the pre-transaction steps (env lookup, Wrike API calls, access
       // check) have no transaction to roll back.
       if (transaction) {

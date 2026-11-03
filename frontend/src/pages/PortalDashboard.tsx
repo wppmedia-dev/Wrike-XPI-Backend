@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import xtendIcon from "../assets/xtend-logo-icon.png";
 import {
   clearPortalSession,
   getPortalRole,
@@ -10,6 +11,8 @@ import {
 import { useHashPage } from "../lib/useHashPage";
 import EnvBadge from "../components/EnvBadge";
 import BuildTag from "../components/BuildTag";
+import { PageInfo } from "../components/ui/PageInfo";
+import { PORTAL_ADMIN_HELP } from "../lib/pageHelp";
 import "./PortalDashboard.css";
 
 type PageId = "overview" | "environments";
@@ -428,9 +431,7 @@ export default function PortalDashboard() {
         <div className="sidebar-logo-row">
           <a className="sidebar-logo" href="#">
             <div className="logo-mark">
-              <svg viewBox="0 0 31 20" role="img" aria-label="Wrike symbol" aria-hidden="true">
-                <path d="M20.78 1.404C21.885.298 22.587 0 24.113 0h6.878c.561 0 .684.509.35.842l-11.49 11.491c-.176.176-.246.21-.352.246-.035.018-.087.018-.122.018s-.088 0-.123-.018c-.106-.035-.176-.07-.351-.246L14.85 8.281c-.175-.176-.21-.246-.245-.351-.018-.035-.018-.088-.018-.123s0-.088.018-.123c.035-.105.07-.175.245-.35l5.93-5.93zM10.745 8.649C9.64 7.544 8.92 7.263 7.395 7.263H.534c-.562 0-.685.509-.351.842l11.49 11.492c.176.175.246.21.352.245a.299.299 0 00.123.018c.035 0 .087 0 .122-.018.105-.035.176-.07.351-.245l4.053-4.07c.175-.176.21-.246.245-.351a.3.3 0 00.018-.123c0-.035 0-.088-.018-.123-.035-.105-.07-.175-.245-.351l-5.93-5.93z" />
-              </svg>
+              <img src={xtendIcon} alt="Xtend" />
             </div>
             <div className="logo-text">
               <span className="brand">
@@ -526,7 +527,10 @@ export default function PortalDashboard() {
           <div className={`page${activePage === "overview" ? " active" : ""}`} id="page-overview">
             <div className="section-header">
               <div>
-                <div className="section-title">Dashboard Overview</div>
+                <div className="section-title">
+                  Dashboard Overview{" "}
+                  <PageInfo help={PORTAL_ADMIN_HELP.overview} />
+                </div>
                 <div className="section-subtitle">
                   {loaded ? `Welcome back, ${username}` : "Welcome back"}
                 </div>
@@ -637,7 +641,9 @@ export default function PortalDashboard() {
           <div className={`page${activePage === "environments" ? " active" : ""}`} id="page-environments">
             <div className="section-header">
               <div>
-                <div className="section-title">Environments</div>
+                <div className="section-title">
+                  Environments <PageInfo help={PORTAL_ADMIN_HELP.environments} />
+                </div>
                 <div className="section-subtitle">Your assigned Wrike environments</div>
               </div>
             </div>

@@ -1,13 +1,13 @@
 {
   "name": "wrike-webhook",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "",
   "main": "src/index.js",
   "directories": {
     "test": "test"
   },
   "scripts": {
-    "start": "npm run build && node dist",
+    "start": "node dist",
     "dev": "nodemon --exec babel-node --max-old-space-size=4096 src/index.js",
     "clean": "rm -rf dist",
     "build:frontend": "cd frontend && npm install && npm run build",

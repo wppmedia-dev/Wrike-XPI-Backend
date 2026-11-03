@@ -4,6 +4,13 @@ import { GetChannel } from "../../routes/channel/handlers/getChannel";
 import { UpdateChannel } from "../../routes/channel/handlers/updateChannel";
 import { DeleteChannel } from "../../routes/channel/handlers/deleteChannel";
 import { getAuthError } from "./auth.js";
+import { toolError } from "./toolError.js";
+import {
+  CONFIRMATION_TOOL_NOTE,
+  confirmField,
+  confirmationRequest,
+  isConfirmed,
+} from "./confirmation.js";
 
 const serializeResult = (result) => {
   if (!result) return { success: true, data: null };
@@ -24,12 +31,12 @@ const serializeResult = (result) => {
  */
 export const registerChannelTools = (server, serverUrl, auth) => {
   server.registerTool(
-    "channel_list",
+    "xtend_channel_list",
     {
       description:
         "List channels for a campaign using the existing channel list workflow.\n\n" +
         "FILTER PARAMETERS:\n" +
-        "  Field names are the short codes from datahub_list_fields where isChannelField=true.\n" +
+        "  Field names are the short codes from xtend_datahub_list_fields where isChannelField=true.\n" +
         "\n" +
         "  OPERATORS: eq, ne, lt, le, gt, ge, has, startswith, endswith\n" +
         "\n" +
@@ -90,13 +97,13 @@ export const registerChannelTools = (server, serverUrl, auth) => {
           ],
         };
       } catch (err) {
-        throw new Error(err?.message || "Failed to list channels");
+        throw toolError(err, "Failed to list channels");
       }
     },
   );
 
   server.registerTool(
-    "channel_get",
+    "xtend_channel_get",
 
     {
       description: "Read a single channel by its Wrike task/folder ID.",
@@ -133,21 +140,21 @@ export const registerChannelTools = (server, serverUrl, auth) => {
           ],
         };
       } catch (err) {
-        throw new Error(err?.message || "Failed to get channel");
+        throw toolError(err, "Failed to get channel");
       }
     },
   );
 
   server.registerTool(
-    "channel_update",
+    "xtend_channel_update",
 
     {
       description:
         "Update an XPI channel by its Wrike ID. Pass formFields keyed by the " +
-        "channel field SHORT CODES from datahub_list_fields (isChannelField=" +
+        "channel field SHORT CODES from xtend_datahub_list_fields (isChannelField=" +
         "true), e.g. { channelname: 'TV Spot' }. Only writable keys are " +
         "applied; dates must be YYYY-MM-DD. Prefer this over wrike_update_items " +
-        "for XPI channel data.",
+        "for XPI channel data." + CONFIRMATION_TOOL_NOTE,
       inputSchema: {
         channelId: z
           .string()
@@ -161,17 +168,28 @@ export const registerChannelTools = (server, serverUrl, auth) => {
           .record(z.any())
           .default({})
           .describe("Key-value map of field names to new values"),
+        confirm: confirmField("update to this channel"),
       },
       annotations: {
         title: "Update Channel",
         readOnlyHint: false,
-        destructiveHint: false,
+        destructiveHint: true,
         idempotentHint: true,
         openWorldHint: true,
       },
     },
-    async ({ channelId, formFields }, extra) => {
+    async ({ channelId, formFields, confirm }, extra) => {
       if (!auth) return getAuthError(serverUrl);
+      if (!isConfirmed(confirm)) {
+        return confirmationRequest({
+          toolName: "xtend_channel_update",
+          action: "update this channel",
+          target: `channel ${channelId}`,
+          arguments: { channelId, formFields },
+          warning:
+            "Approving this overwrites the current values of the fields listed above.",
+        });
+      }
       try {
         const result = await UpdateChannel(
           auth.wrikeToken,
@@ -187,16 +205,19 @@ export const registerChannelTools = (server, serverUrl, auth) => {
           ],
         };
       } catch (err) {
-        throw new Error(err?.message || "Failed to update channel");
+        throw toolError(err, "Failed to update channel");
       }
     },
   );
 
   server.registerTool(
-    "channel_delete",
+    "xtend_channel_delete",
 
     {
-      description: "Delete a channel by its Wrike ID.",
+      description:
+        "Delete a channel by its Wrike ID. Deleting a channel cannot be undone " +
+        "from this server." +
+        CONFIRMATION_TOOL_NOTE,
       inputSchema: {
         channelId: z
           .string()
@@ -206,6 +227,7 @@ export const registerChannelTools = (server, serverUrl, auth) => {
               "(letters/digits, may include - or _). NOT the channel name. Copy the " +
               "exact id from a list/get result.",
           ),
+        confirm: confirmField("delete of this channel"),
       },
       annotations: {
         title: "Delete Channel",
@@ -215,8 +237,18 @@ export const registerChannelTools = (server, serverUrl, auth) => {
         openWorldHint: true,
       },
     },
-    async ({ channelId }, extra) => {
+    async ({ channelId, confirm }, extra) => {
       if (!auth) return getAuthError(serverUrl);
+      if (!isConfirmed(confirm)) {
+        return confirmationRequest({
+          toolName: "xtend_channel_delete",
+          action: "delete this channel",
+          target: `channel ${channelId}`,
+          arguments: { channelId },
+          warning:
+            "Deleting is permanent — there is no undo for this operation.",
+        });
+      }
       try {
         const result = await DeleteChannel(
           auth.wrikeToken,
@@ -232,7 +264,7 @@ export const registerChannelTools = (server, serverUrl, auth) => {
           ],
         };
       } catch (err) {
-        throw new Error(err?.message || "Failed to delete channel");
+        throw toolError(err, "Failed to delete channel");
       }
     },
   );

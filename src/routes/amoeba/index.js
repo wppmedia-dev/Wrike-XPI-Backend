@@ -4,7 +4,13 @@ import { AmoebaHandler } from "./handlers/amoebaHandler";
 // Schema
 import { AmoebaSchema } from "./schema/amoebaSchema";
 
+// Raw form bodies (see src/utils/rawFormBody.js), shared with the calendar
+// forwarder that calls the same handler.
+import { registerRawFormBodyParsers } from "../../utils/rawFormBody";
+
 export const amoebaRoute = (fastify, opts, done) => {
+  registerRawFormBodyParsers(fastify);
+
   // Custom Field endpoint - supports both single value and list
   fastify.all("/:moduleSlug/*", AmoebaSchema, async (req, reply) => {
     try {

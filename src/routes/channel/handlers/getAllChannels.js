@@ -101,6 +101,7 @@ export const GetAllChannels = (wrikeToken, params, environmentName) => {
 
           if (!recordId)
             throw {
+              statusCode: 400,
               message:
                 "The selected filters are invalid. Please review your filter values and try again.",
             };
@@ -199,6 +200,9 @@ export const GetAllChannels = (wrikeToken, params, environmentName) => {
       });
     } catch (err) {
       console.log(err?.message || err);
+      // Deliberate errors (e.g. invalid OData filters) carry a statusCode and a
+      // user-facing message; pass them through instead of masking as fatal.
+      if (err?.statusCode) return reject(err);
       reject({
         message:
           "Fatal error Unexpected error occurred and service is unable complete the request.",

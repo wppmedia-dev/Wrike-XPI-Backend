@@ -1,4 +1,4 @@
-package-lock.json
+# package-lock.json
 node_modules
 dist
 .env
@@ -9,3 +9,6 @@ reference
 
 public/app
 .tastemaker
+
+data/sync-state.json
+reference

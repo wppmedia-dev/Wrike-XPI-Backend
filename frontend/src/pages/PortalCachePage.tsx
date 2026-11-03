@@ -9,6 +9,8 @@ import {
   type PortalCacheEntry,
 } from "../lib/portalCacheApi";
 import { CacheTable } from "../components/CacheTable";
+import { PageInfo } from "../components/ui/PageInfo";
+import { PORTAL_HELP } from "../lib/pageHelp";
 import { confirmDanger, escHtml, toast } from "../lib/notify";
 import "./PortalCachePage.css";
 
@@ -194,7 +196,9 @@ export default function PortalCachePage({ active, canDelete }: Props) {
     <>
       <div className="section-header">
         <div>
-          <div className="section-title">Cache Settings</div>
+          <div className="section-title">
+            Cache Settings <PageInfo help={PORTAL_HELP.cache} />
+          </div>
           <div className="section-subtitle">
             {canDelete
               ? "Manage cache keys and inspect Redis data"

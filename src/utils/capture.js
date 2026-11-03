@@ -164,6 +164,7 @@ export const categoryForUrl = (url = "") => {
   if (module === "token") return "token";
   if (module === "v1.0" || module === "master") return "master";
   if (module === "amoeba") return "amoeba";
+  if (module === "calendar") return "calendar";
   if (module === "mcp") return "mcp";
   return "other";
 };

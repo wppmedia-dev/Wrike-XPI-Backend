@@ -1,4 +1,5 @@
 import { CacheTable } from "../components/CacheTable";
+import xtendIcon from "../assets/xtend-logo-icon.png";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { adminLogout, clearAdminSession, getAccessToken } from "../lib/authApi";
 import { fetchAppConfig, DEFAULT_CONFIG, type AppConfig } from "../lib/appConfig";
@@ -26,39 +27,83 @@ import {
   type CacheEntry,
   type PortalUser,
 } from "../lib/adminApi";
+import {
+  deactivateToken,
+  listTokens,
+  setTokenStatus,
+  type AdminToken,
+  type TokenListQuery,
+} from "../lib/tokenPermissionsApi";
 import EnvironmentAccess from "./EnvironmentAccess";
 import PortalUserPermissions from "./PortalUserPermissions";
+import TokenPermissions, {
+  ENVIRONMENT_MODULES_COPY,
+  type TokenPermissionsApi,
+} from "./TokenPermissions";
+import {
+  getEnvironmentModulePermissions,
+  getEnvironmentPermissionCatalog,
+  setEnvironmentModulePermissions,
+} from "../lib/environmentModulePermissionsApi";
 import ActivityLog from "./ActivityLog";
 import MfaSettings from "./MfaSettings";
+import SyncSettings from "./SyncSettings";
 import { EnvironmentsTable } from "./admin/EnvironmentsTable";
 import { PortalUsersTable } from "./admin/PortalUsersTable";
+import {
+  EMPTY_FILTERS,
+  TokensTable,
+  toTokenListQuery,
+  type TokenFilters,
+} from "../components/TokensTable";
 import EnvBadge from "../components/EnvBadge";
+import WrikeEndpointPreview from "../components/WrikeEndpointPreview";
 import BuildTag from "../components/BuildTag";
 import { CopyButton } from "../components/ui/CopyButton";
+import { PageInfo } from "../components/ui/PageInfo";
+import { ADMIN_HELP } from "../lib/pageHelp";
 import { ActiveBadge } from "../components/ui/Badge";
 import { MaskedValue } from "../components/ui/MaskedValue";
 import { copyToClipboard, formatDateTime } from "../lib/format";
-import { escHtml, toast } from "../lib/notify";
+import { confirmDanger, escHtml, toast } from "../lib/notify";
 import "./AdminDashboard.css";
 
 type PageId =
   | "overview"
   | "environments"
+  | "sessions"
   | "users"
   | "settings"
   | "cache-settings"
+  | "sync"
   | "activity-log";
 
 const PAGE_NAMES: Record<PageId, string> = {
   overview: "Overview",
   environments: "Environments",
+  sessions: "Sessions",
   users: "Users",
   settings: "Settings",
   "cache-settings": "Cache Settings",
+  sync: "Sync",
   "activity-log": "Activity Log",
 };
 
 const PAGE_IDS = Object.keys(PAGE_NAMES) as PageId[];
+
+/**
+ * Where the environment module-permission grid reads and writes. A
+ * module-scope constant because the editor's load effect deliberately does not
+ * depend on its `api` prop: an inline literal would refetch on every render
+ * (see the TokenPermissionsApi doc comment).
+ */
+const ENVIRONMENT_MODULES_API: TokenPermissionsApi = {
+  // Same vocabulary as the token grid: one catalogue, fetched from the one
+  // route that serves it (src/utils/tokenPermissionCatalog.js).
+  loadCatalog: getEnvironmentPermissionCatalog,
+  load: getEnvironmentModulePermissions,
+  save: setEnvironmentModulePermissions,
+};
 
 
 /* ── Environment form shape (mirrors the #envForm fields) ──────────────── */
@@ -76,6 +121,7 @@ interface EnvFormState {
   xpi_request_form_mapping_datahub_id: string;
   xpi_space_name_datahub_id: string;
   campaign_space_id: string;
+  wrike_api_host: string;
   is_visible: boolean;
   is_active: boolean;
 }
@@ -93,6 +139,7 @@ const EMPTY_ENV_FORM: EnvFormState = {
   xpi_request_form_mapping_datahub_id: "",
   xpi_space_name_datahub_id: "",
   campaign_space_id: "",
+  wrike_api_host: "",
   is_visible: true,
   is_active: true,
 };
@@ -111,6 +158,7 @@ function envToForm(env: AdminEnvironment): EnvFormState {
     xpi_request_form_mapping_datahub_id: env.xpi_request_form_mapping_datahub_id,
     xpi_space_name_datahub_id: env.xpi_space_name_datahub_id,
     campaign_space_id: env.campaign_space_id,
+    wrike_api_host: env.wrike_api_host,
     is_visible: env.is_visible,
     is_active: env.is_active,
   };
@@ -188,10 +236,34 @@ export default function AdminDashboard() {
   // Bumped every time the top-bar Refresh is hit while the Activity Log page
   // is open; passed to <ActivityLog> so it re-fetches rows + summary.
   const [activityRefreshKey, setActivityRefreshKey] = useState(0);
+  // Same idea for the Sync page, which owns its own fetch.
+  const [syncRefreshKey, setSyncRefreshKey] = useState(0);
 
   /* ── Environments ─────────────────────────────────────────────────── */
+  /* Two lists, deliberately.
+   *
+   * `environments` is the CATALOGUE: every environment, unfiltered. The nav
+   * badge, the dashboard stats, the API access drawer and the
+   * assign-environments picker all read it, and none of them may shrink to a
+   * search somebody typed into the table's search box.
+   *
+   * `envRows` is what the Environments TABLE shows: the same list, or the
+   * server's answer to the active search. The search is a query parameter
+   * rather than a filter applied in the browser (src/utils/
+   * environmentFilters.js), so the table renders what came back instead of
+   * deciding for itself which of those rows match.
+   */
   const [environments, setEnvironments] = useState<AdminEnvironment[]>([]);
+  const [envRows, setEnvRows] = useState<AdminEnvironment[]>([]);
   const [envLoaded, setEnvLoaded] = useState(false);
+  // The term the table is showing. A ref rather than state because the table
+  // owns the visible term (it is its own input) and nothing renders off this
+  // one; it exists so that a refresh triggered by a write re-asks the same
+  // question instead of silently widening the table back to everything.
+  const envSearchRef = useRef("");
+  // Guards against an earlier search landing after a later one: the box has
+  // moved on, so the older answer is not an answer any more.
+  const envRequestRef = useRef(0);
 
   // API access scope drawer — opened from an environment row's shield
   // button, scoped to that one environment (see EnvironmentAccess.tsx).
@@ -205,11 +277,31 @@ export default function AdminDashboard() {
     setAccessDrawerOpen(true);
   }
 
-  const loadEnvironments = async () => {
+  /**
+   * Load the environments, optionally as the answer to a search.
+   *
+   * Called with no argument by every write (an edit, a duplicate, a delete, a
+   * switch flip), and then it re-asks whatever the table is currently showing
+   * so a refresh cannot quietly widen the table while the box still displays a
+   * term. While a search is active that is two questions — the table's rows
+   * and the whole catalogue — because the catalogue is what the rest of the
+   * page reads and it must not be left stale by the write that got us here.
+   */
+  const loadEnvironments = async (term = envSearchRef.current) => {
+    const request = ++envRequestRef.current;
     window.NProgress?.start();
     try {
-      const data = await listEnvironments();
-      setEnvironments(data);
+      const rows = await listEnvironments(term);
+      if (request !== envRequestRef.current) return;
+      setEnvRows(rows);
+
+      if (term) {
+        const all = await listEnvironments();
+        if (request !== envRequestRef.current) return;
+        setEnvironments(all);
+      } else {
+        setEnvironments(rows);
+      }
     } catch (err) {
       toast("Failed to load environments", "error");
       console.error(err);
@@ -219,10 +311,39 @@ export default function AdminDashboard() {
     }
   };
 
+  /* The Environments table's search box, debounced there. */
+  const searchEnvironments = (term: string) => {
+    envSearchRef.current = term;
+    loadEnvironments(term);
+  };
+
+  /**
+   * Write one environment's changed fields into BOTH lists this page keeps.
+   *
+   * It holds two: `environments` — what the stats, the recent list and the edit
+   * modal read — and `envRows`, which is what the table actually renders (the
+   * server's answer, narrowed when a search is active). Updating only the first
+   * is why the Visibility switch flipped and snapped straight back: <Toggle />
+   * drops its optimistic value when the write resolves and re-reads its
+   * `checked` prop from the row, so a stale `envRows` put the switch back where
+   * it started and only a refresh — which replaces both lists — showed the new
+   * state.
+   */
+  const patchEnvironment = useCallback(
+    (id: string, fields: Partial<AdminEnvironment>) => {
+      const apply = (prev: AdminEnvironment[]) =>
+        prev.map((row) => (row.id === id ? { ...row, ...fields } : row));
+      setEnvironments(apply);
+      setEnvRows(apply);
+    },
+    [],
+  );
+
   useEffect(() => {
     window.NProgress?.configure({ showSpinner: false, minimum: 0.15 });
     loadEnvironments();
     loadPortalUsers();
+    loadTokens();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -313,6 +434,7 @@ export default function AdminDashboard() {
       xpi_request_form_mapping_datahub_id: f.xpi_request_form_mapping_datahub_id.trim(),
       xpi_space_name_datahub_id: f.xpi_space_name_datahub_id.trim(),
       campaign_space_id: f.campaign_space_id.trim(),
+      wrike_api_host: f.wrike_api_host.trim(),
     };
 
     if (!trimmed.environment_name) return toast("Environment name is required", "error");
@@ -391,15 +513,17 @@ export default function AdminDashboard() {
    *
    * No list re-fetch: only this environment's field changed, so patching it
    * into state keeps the rest of the dashboard (stats, recent list, edit
-   * modal) consistent without a round trip. <Toggle /> owns the in-flight
-   * spinner and reverts itself if this rejects, so the error is re-thrown
-   * rather than swallowed. */
+   * modal) consistent without a round trip. Both lists, through
+   * patchEnvironment — the table reads one of them and the stats read the
+   * other. <Toggle /> owns the in-flight spinner and reverts itself if this
+   * rejects, so the error is re-thrown rather than swallowed. */
   const handleEnvToggle = useCallback(
     async (env: AdminEnvironment, field: "is_active" | "is_visible", next: boolean) => {
       try {
         await toggleEnvironmentStatus(env.id, { [field]: next });
-        setEnvironments((prev) =>
-          prev.map((row) => (row.id === env.id ? { ...row, [field]: next } : row)),
+        patchEnvironment(
+          env.id,
+          field === "is_active" ? { is_active: next } : { is_visible: next },
         );
         toast(
           field === "is_active"
@@ -416,7 +540,7 @@ export default function AdminDashboard() {
         throw err;
       }
     },
-    [],
+    [patchEnvironment],
   );
 
   /* ── Redirect URL success modal ──────────────────────────────────────── */
@@ -456,7 +580,220 @@ export default function AdminDashboard() {
     };
   }, [redirectModalOpen]);
 
+  /* ── Tokens ───────────────────────────────────────────────────────── */
+  const [tokens, setTokens] = useState<AdminToken[]>([]);
+  // Mirrors envLoaded / puLoaded: the table shows its loading skeleton until
+  // the first fetch resolves, so it never flashes "no tokens" at an admin
+  // whose tokens are simply still in flight.
+  const [tokLoaded, setTokLoaded] = useState(false);
+
+  /** The filters the server was last asked for, and the search box's term.
+      Both live here rather than in the table because they are the two inputs
+      of one request: the table edits a draft and the server answers. */
+  const [tokenFilters, setTokenFilters] = useState<TokenFilters>(EMPTY_FILTERS);
+  const [tokenSearch, setTokenSearch] = useState("");
+  // The environment picker's options and the scope's size, both from the
+  // server's unfiltered view of the same request (see Tokens.ListForConsole).
+  const [tokenEnvironments, setTokenEnvironments] = useState<
+    { id: string; name: string }[]
+  >([]);
+  const [tokenHasUnassigned, setTokenHasUnassigned] = useState(false);
+  const [tokenTotal, setTokenTotal] = useState(0);
+
+  // Per-token module permission modal, opened from a token row. Held here
+  // (rather than inside the table) for the same reason the portal-user one
+  // is: the table stays presentational and the modal sits as a sibling of
+  // #main, above everything.
+  const [tokPermsTokenId, setTokPermsTokenId] = useState<string | null>(null);
+  const [tokPermsLabel, setTokPermsLabel] = useState<string | null>(null);
+  const [tokPermsOpen, setTokPermsOpen] = useState(false);
+
+  function openTokenPermissions(token: AdminToken) {
+    setTokPermsTokenId(token.id);
+    setTokPermsLabel(tokenLabel(token));
+    setTokPermsOpen(true);
+  }
+
+  // Per-environment module ceiling, opened from an environment's own row. The
+  // same editor as the token grid above, with the environment's copy and API:
+  // one component, two layers, so the two grids cannot drift apart.
+  const [envModsEnvId, setEnvModsEnvId] = useState<string | null>(null);
+  const [envModsLabel, setEnvModsLabel] = useState<string | null>(null);
+  const [envModsOpen, setEnvModsOpen] = useState(false);
+
+  function openEnvironmentModules(env: AdminEnvironment) {
+    setEnvModsEnvId(env.id);
+    setEnvModsLabel(env.environment_name);
+    setEnvModsOpen(true);
+  }
+
+  /**
+   * The list, fetched for whatever filters are currently applied.
+   *
+   * One request per committed change: the server filters, the table renders
+   * what came back, and the response also carries the picker's options and the
+   * unfiltered count, neither of which the table could derive from a filtered
+   * array. Called with no arguments after a write, to reload with the filters
+   * that are already applied.
+   */
+  const loadTokens = async (
+    query: TokenListQuery = toTokenListQuery(tokenFiltersRef.current, tokenSearchRef.current),
+  ) => {
+    try {
+      const data = await listTokens(query);
+      setTokens(data.tokens);
+      setTokenEnvironments(data.environments);
+      setTokenHasUnassigned(!!data.has_unassigned);
+      setTokenTotal(data.total);
+    } catch (err: any) {
+      toast(err?.message || "Failed to load tokens", "error");
+    } finally {
+      setTokLoaded(true);
+    }
+  };
+
+  /* Read by loadTokens for the reloads triggered by a write (a status flip, a
+     permission save), which must reuse the current query without making every
+     callback identity depend on it. */
+  const tokenFiltersRef = useRef(tokenFilters);
+  tokenFiltersRef.current = tokenFilters;
+  const tokenSearchRef = useRef(tokenSearch);
+  tokenSearchRef.current = tokenSearch;
+
+  /** A committed change: the new query is stored and fetched in one go. */
+  const fetchTokensFor = useCallback(
+    (filters: TokenFilters, search: string) => {
+      setTokenFilters(filters);
+      setTokenSearch(search);
+      loadTokens(toTokenListQuery(filters, search));
+    },
+    [],
+  );
+
+  const applyTokenFilters = useCallback(
+    (filters: TokenFilters) => fetchTokensFor(filters, tokenSearchRef.current),
+    [fetchTokensFor],
+  );
+
+  const searchTokens = useCallback(
+    (search: string) => {
+      if (search === tokenSearchRef.current) return;
+      fetchTokensFor(tokenFiltersRef.current, search);
+    },
+    [fetchTokensFor],
+  );
+
+  /**
+   * The API Tokens table's Status switch, in both directions.
+   *
+   * Switching a token OFF asks first: it takes effect on the next request, so
+   * whatever integration is using it starts failing 401 immediately, and that
+   * is worth one confirmation. Switching one back on asks nothing.
+   *
+   * The OFF direction only lands here for a caller with no delete route of its
+   * own. This console has one (DELETE /admin/tokens/:id, see
+   * handleTokenDeactivate below), so the table sends the switch's OFF position
+   * there instead, and that is the path an admin takes.
+   */
+  async function handleTokenToggle(token: AdminToken, next: boolean) {
+    if (!next) {
+      const confirmed = await confirmDanger({
+        title: "Deactivate this token?",
+        html: `Callers using <strong>${escHtml(
+          token.account_id || token.id,
+        )}</strong> on <strong>${escHtml(
+          token.environment_name || "this environment",
+        )}</strong> will start getting 401s on their next request.`,
+        confirmText: "Deactivate",
+      });
+      if (!confirmed) return;
+    }
+
+    try {
+      await setTokenStatus(token.id, next);
+      setTokens((prev) =>
+        prev.map((t) => (t.id === token.id ? { ...t, is_active: next } : t)),
+      );
+      toast(next ? "Token reactivated" : "Token deactivated", "success");
+    } catch (err: any) {
+      toast(err?.message || "Could not change the token status", "error");
+    }
+  }
+
   /* ── Portal users ─────────────────────────────────────────────────── */
+  // Identifies a token in the UI without ever showing its credential: the
+  // environment it acts for and the account it belongs to.
+  const tokenLabel = (token: AdminToken) =>
+    [token.environment_name, token.account_id].filter(Boolean).join(" · ") || token.id;
+
+  // Token whose activity log is being viewed. Set by the API Tokens table's
+  // "Activity logs" action, cleared either from the chip on the Activity Log
+  // page or by opening that page from the sidebar, where the same click
+  // means "the whole log", not "the last token I looked at".
+  const [activityToken, setActivityToken] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
+
+  // Environment whose activity log is being viewed, set by the Environments
+  // table's "Activity logs" action. The Activity Log page's environment filter
+  // is a first-class control there, so this pre-selects it rather than adding
+  // a second way to see the same scope.
+  const [activityEnv, setActivityEnv] = useState<{ id: string; name: string } | null>(null);
+
+  function openTokenActivityLogs(token: AdminToken) {
+    setActivityToken({ id: token.id, label: tokenLabel(token) });
+    handleNav("activity-log");
+  }
+
+  function openEnvActivityLogs(env: { id: string; environment_name: string }) {
+    setActivityEnv({ id: env.id, name: env.environment_name });
+    handleNav("activity-log");
+  }
+
+  // Environment the API Tokens page should open scoped to, set by the
+  // Environments table's "View tokens" action. A fresh object per click, so
+  // asking for the same environment twice re-applies the filter even if the
+  // admin cleared it in between.
+  const [tokensEnvScope, setTokensEnvScope] = useState<{ id: string; name: string } | null>(
+    null,
+  );
+
+  function openTokensForEnv(env: { id: string; environment_name: string }) {
+    setTokensEnvScope({ id: env.id, name: env.environment_name });
+    handleNav("sessions");
+  }
+
+  /**
+   * The Status switch's OFF position, which is the delete action and not the
+   * status write: both end with the token switched off and kept, but only this
+   * one goes through DELETE /admin/tokens/:id, so the console exercises the
+   * same verb the portal's delete uses. Which route the switch reaches is the
+   * table's business (./TokensTable): given an onDelete, it sends both the
+   * switch and the delete there.
+   */
+  async function handleTokenDeactivate(token: AdminToken) {
+    const confirmed = await confirmDanger({
+      title: "Deactivate this token?",
+      html: `Callers using <strong>${escHtml(token.username || token.id)}</strong> on <strong>${escHtml(
+        token.environment_name || "this environment",
+      )}</strong> will start getting 401s on their next request.`,
+      confirmText: "Deactivate",
+    });
+    if (!confirmed) return;
+
+    try {
+      await deactivateToken(token.id);
+      // Refetched rather than patched locally: this row left the list only if
+      // the applied filters exclude switched-off tokens, and whether it did is
+      // the server's answer to give, not this handler's to guess.
+      await loadTokens();
+      toast("Token deactivated", "success");
+    } catch (err: any) {
+      toast(err?.message || "Could not deactivate the token", "error");
+    }
+  }
+
   const [puUsers, setPuUsers] = useState<PortalUser[]>([]);
   // Mirrors envLoaded: the table shows its loading skeleton until the first
   // fetch resolves, so it never flashes the "no portal users" empty state.
@@ -890,6 +1227,7 @@ export default function AdminDashboard() {
     setMobileOpen(false);
 
     if (pageId === "users") loadPortalUsers();
+    if (pageId === "sessions") loadTokens();
     if (pageId === "cache-settings") loadCacheEntries(cacheSearchPatternRef.current);
   }
 
@@ -900,6 +1238,11 @@ export default function AdminDashboard() {
       refreshPromise = loadCacheEntries(cacheSearchPatternRef.current);
     } else if (activePage === "users") {
       refreshPromise = loadPortalUsers();
+    } else if (activePage === "sessions") {
+      refreshPromise = loadTokens();
+    } else if (activePage === "sync") {
+      setSyncRefreshKey((k) => k + 1);
+      refreshPromise = Promise.resolve();
     } else if (activePage === "activity-log") {
       // The Activity Log owns its own fetch (rows + summary) — bump its key
       // and let the child reload the current page.
@@ -959,9 +1302,7 @@ export default function AdminDashboard() {
         <div className="sidebar-logo-row">
           <a className="sidebar-logo" href="#">
             <div className="logo-mark">
-              <svg viewBox="0 0 31 20" role="img" aria-label="Wrike symbol" aria-hidden="true">
-                <path d="M20.78 1.404C21.885.298 22.587 0 24.113 0h6.878c.561 0 .684.509.35.842l-11.49 11.491c-.176.176-.246.21-.352.246-.035.018-.087.018-.122.018s-.088 0-.123-.018c-.106-.035-.176-.07-.351-.246L14.85 8.281c-.175-.176-.21-.246-.245-.351-.018-.035-.018-.088-.018-.123s0-.088.018-.123c.035-.105.07-.175.245-.35l5.93-5.93zM10.745 8.649C9.64 7.544 8.92 7.263 7.395 7.263H.534c-.562 0-.685.509-.351.842l11.49 11.492c.176.175.246.21.352.245a.299.299 0 00.123.018c.035 0 .087 0 .122-.018.105-.035.176-.07.351-.245l4.053-4.07c.175-.176.21-.246.245-.351a.3.3 0 00.018-.123c0-.035 0-.088-.018-.123-.035-.105-.07-.175-.245-.351l-5.93-5.93z" />
-              </svg>
+              <img src={xtendIcon} alt="Xtend" />
             </div>
             <div className="logo-text">
               <span className="brand">
@@ -1017,10 +1358,26 @@ export default function AdminDashboard() {
             <span className="nl">Users</span>
           </div>
 
+          <div
+            className={`nav-item${activePage === "sessions" ? " active" : ""}`}
+            onClick={() => {
+              // From the sidebar this means every token, so an environment
+              // scope left over from an Environments row is dropped here rather
+              // than persisting behind a nav item that just says "Sessions".
+              setTokensEnvScope(null);
+              handleNav("sessions");
+            }}
+          >
+            <span className="ni">
+              <i className="fa-solid fa-key" />
+            </span>
+            <span className="nl">Sessions</span>
+            <span className="nav-badge">{tokens.length}</span>
+          </div>
+
           <div className="nav-group-label" style={{ marginTop: 6 }}>
             Settings
           </div>
-
           <div
             className={`nav-item${activePage === "settings" ? " active" : ""}`}
             onClick={() => handleNav("settings")}
@@ -1042,8 +1399,26 @@ export default function AdminDashboard() {
           </div>
 
           <div
+            className={`nav-item${activePage === "sync" ? " active" : ""}`}
+            onClick={() => handleNav("sync")}
+          >
+            <span className="ni">
+              <i className="fa-solid fa-arrows-rotate" />
+            </span>
+            <span className="nl">Sync</span>
+          </div>
+
+          <div
             className={`nav-item${activePage === "activity-log" ? " active" : ""}`}
-            onClick={() => handleNav("activity-log")}
+            onClick={() => {
+              // Opening it from the sidebar means the whole log, so a token or
+              // environment scope left over from a row action is dropped here
+              // rather than silently persisting behind a nav item that says
+              // "Activity Log".
+              setActivityToken(null);
+              setActivityEnv(null);
+              handleNav("activity-log");
+            }}
           >
             <span className="ni">
               <i className="fa-solid fa-clock-rotate-left" />
@@ -1098,7 +1473,9 @@ export default function AdminDashboard() {
           <div className={`page${activePage === "overview" ? " active" : ""}`} id="page-overview">
             <div className="section-header">
               <div>
-                <div className="section-title">Dashboard Overview</div>
+                <div className="section-title">
+                  Dashboard Overview <PageInfo help={ADMIN_HELP.overview} />
+                </div>
                 <div className="section-subtitle">Welcome back, Administrator</div>
               </div>
             </div>
@@ -1232,7 +1609,9 @@ export default function AdminDashboard() {
           <div className={`page${activePage === "environments" ? " active" : ""}`} id="page-environments">
             <div className="section-header">
               <div>
-                <div className="section-title">Environments</div>
+                <div className="section-title">
+                  Environments <PageInfo help={ADMIN_HELP.environments} />
+                </div>
                 <div className="section-subtitle">Manage Wrike API credentials per environment</div>
               </div>
               <button className="btn btn-primary" onClick={openAddModal}>
@@ -1244,13 +1623,17 @@ export default function AdminDashboard() {
             <div className="card">
               <div className="card-body">
                 <EnvironmentsTable
-                  environments={environments}
+                  environments={envRows}
                   loading={!envLoaded}
+                  onSearch={searchEnvironments}
                   onAdd={openAddModal}
                   onEdit={(env) => openEditModal(env.id)}
                   onDuplicate={(env) => openDuplicateModal(env.id)}
                   onDelete={(env) => confirmDeleteEnvironment(env.id, env.environment_name)}
                   onOpenAccess={(env) => openAccessDrawer(env.id, env.environment_name)}
+                  onModulePermissions={openEnvironmentModules}
+                  onViewTokens={openTokensForEnv}
+                  onActivityLogs={openEnvActivityLogs}
                   onToggle={handleEnvToggle}
                 />
               </div>
@@ -1261,7 +1644,9 @@ export default function AdminDashboard() {
           <div className={`page${activePage === "users" ? " active" : ""}`} id="page-users">
             <div className="section-header">
               <div>
-                <div className="section-title">Portal Users</div>
+                <div className="section-title">
+                  Portal Users <PageInfo help={ADMIN_HELP.users} />
+                </div>
                 <div className="section-subtitle">Manage portal user accounts and environment access</div>
               </div>
               <button className="btn btn-primary" onClick={openAddUserModal}>
@@ -1284,11 +1669,49 @@ export default function AdminDashboard() {
             </div>
           </div>
 
+          {/* ══════ SESSIONS PAGE ══════ */}
+          <div className={`page${activePage === "sessions" ? " active" : ""}`} id="page-sessions">
+            <div className="section-header">
+              <div>
+                <div className="section-title">
+                  Sessions <PageInfo help={ADMIN_HELP.tokens} />
+                </div>
+                <div className="section-subtitle">
+                  Every token this service has issued, and the modules each one may call
+                </div>
+              </div>
+            </div>
+            <div className="card">
+              <div className="card-body">
+                <TokensTable
+                  tokens={tokens}
+                  loading={!tokLoaded}
+                  filters={tokenFilters}
+                  onApplyFilters={applyTokenFilters}
+                  environmentOptions={tokenEnvironments}
+                  hasUnassigned={tokenHasUnassigned}
+                  total={tokenTotal}
+                  onSearch={searchTokens}
+                  onPermissions={openTokenPermissions}
+                  onToggleStatus={handleTokenToggle}
+                  onActivityLogs={openTokenActivityLogs}
+                  envScope={tokensEnvScope}
+                  onClearEnvScope={() => setTokensEnvScope(null)}
+                  // The switch's OFF position is the delete verb, so it goes
+                  // through the delete route the portal also uses.
+                  onDelete={(token) => handleTokenDeactivate(token)}
+                />
+              </div>
+            </div>
+          </div>
+
           {/* ══════ SETTINGS PAGE ══════ */}
           <div className={`page${activePage === "settings" ? " active" : ""}`} id="page-settings">
             <div className="section-header">
               <div>
-                <div className="section-title">Settings</div>
+                <div className="section-title">
+                  Settings <PageInfo help={ADMIN_HELP.settings} />
+                </div>
                 <div className="section-subtitle">Configure system preferences</div>
               </div>
             </div>
@@ -1302,7 +1725,9 @@ export default function AdminDashboard() {
           <div className={`page${activePage === "cache-settings" ? " active" : ""}`} id="page-cache-settings">
             <div className="section-header">
               <div>
-                <div className="section-title">Cache Settings</div>
+                <div className="section-title">
+                  Cache Settings <PageInfo help={ADMIN_HELP.cache} />
+                </div>
                 <div className="section-subtitle">Manage cache keys and inspect Redis data</div>
               </div>
               <button
@@ -1333,12 +1758,31 @@ export default function AdminDashboard() {
             </div>
           </div>
 
+          {/* ══════ SYNC PAGE ══════ */}
+          <div className={`page${activePage === "sync" ? " active" : ""}`} id="page-sync">
+            <div className="section-header">
+              <div>
+                <div className="section-title">
+                  Sync <PageInfo help={ADMIN_HELP.sync} />
+                </div>
+                <div className="section-subtitle">
+                  Reload secrets without restarting the service
+                </div>
+              </div>
+            </div>
+
+            <SyncSettings refreshKey={syncRefreshKey} />
+          </div>
+
           {/* ══════ ACTIVITY LOG PAGE ══════ */}
           <div className={`page${activePage === "activity-log" ? " active" : ""}`} id="page-activity-log">
             <ActivityLog
               environments={environments}
               active={activePage === "activity-log"}
               refreshKey={activityRefreshKey}
+              tokenFilter={activityToken}
+              onClearTokenFilter={() => setActivityToken(null)}
+              envScope={activityEnv}
             />
           </div>
         </div>
@@ -1360,6 +1804,30 @@ export default function AdminDashboard() {
         username={permsUsername}
         open={permsOpen}
         onClose={() => setPermsOpen(false)}
+      />
+
+      {/* ═══════════ TOKEN: PERMISSIONS MODAL ═══════════ */}
+      <TokenPermissions
+        tokenId={tokPermsTokenId}
+        tokenLabel={tokPermsLabel}
+        open={tokPermsOpen}
+        onClose={() => setTokPermsOpen(false)}
+        // The Access column is derived from the matrix this popup saves, so the
+        // list has to be re-read or the row would keep showing its old badge.
+        onSaved={loadTokens}
+      />
+
+      {/* ═══════════ ENVIRONMENT: MODULE PERMISSIONS MODAL ═══════════ */}
+      <TokenPermissions
+        tokenId={envModsEnvId}
+        tokenLabel={envModsLabel}
+        open={envModsOpen}
+        onClose={() => setEnvModsOpen(false)}
+        copy={ENVIRONMENT_MODULES_COPY}
+        api={ENVIRONMENT_MODULES_API}
+        // Same reason as the token grid: the Modules column is derived from
+        // what this popup saves.
+        onSaved={loadEnvironments}
       />
 
       {/* ═══════════ PU: ADD USER MODAL ═══════════ */}
@@ -2168,6 +2636,23 @@ export default function AdminDashboard() {
                   value={envForm.campaign_space_id}
                   onChange={(e) => setEnvForm((f) => ({ ...f, campaign_space_id: e.target.value }))}
                 />
+              </div>
+
+              <div className="form-section-label">Wrike API</div>
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="wrikeApiHost">
+                  Wrike API Host
+                </label>
+                <input
+                  className="form-control"
+                  type="text"
+                  id="wrikeApiHost"
+                  placeholder="https://app-us.wrike.com (blank uses app-eu.wrike.com)"
+                  value={envForm.wrike_api_host}
+                  onChange={(e) => setEnvForm((f) => ({ ...f, wrike_api_host: e.target.value }))}
+                />
+                <WrikeEndpointPreview host={envForm.wrike_api_host} />
               </div>
 
               <hr className="form-divider" />

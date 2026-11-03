@@ -4,30 +4,47 @@ import { Tokens } from "../../controllers";
 
 import { WrikeTokenExchangeSchema } from "./schema/wrikeTokenExchange";
 import { GetUserDataSchema } from "./schema/getUserData";
-import { ValidateJWT } from "../../middlewares/authentication";
+import { ResolveAuthFromJWT } from "../../middlewares/authentication";
 import { log as logActivity } from "../../utils/activityLog";
+import { referenceFor } from "../../utils/activityReference";
+import { resolveReturnTarget } from "../../utils/wrikeRedirect";
 import { captureRequest, buildResponseSnapshot } from "../../utils/capture";
 import { clientIp } from "../../utils/environmentAccess";
 
-const ACTION_BY_METHOD = {
-  GET: "read",
-  HEAD: "read",
-  OPTIONS: "read",
-  POST: "create",
-  PUT: "update",
-  PATCH: "update",
-  DELETE: "delete",
+// The action label comes from the same authority the permission gate reads
+// (src/utils/tokenPermissionMap.js). This surface is ungoverned by the matrix,
+// but the audit log has to agree with the gate about what "update" means, or a
+// row would describe a call differently from the decision made about it. This
+// file used to carry its own copy of the table.
+import { actionForMethod } from "../../utils/tokenPermissionMap";
+
+/**
+ * Record who this request turned out to belong to, for the activity log.
+ *
+ * Wrike's contact response is the only place the token surface can learn a
+ * person's email, and both routes that can learn it already ask for it: the
+ * exchange reads the signed-in person before deciding whether they may have a
+ * token at all, and /view-tokens has to know the account it is listing tokens
+ * for. Without this the log row for either said "Unresolved" about a request
+ * whose caller had just been established.
+ *
+ * `req.callerEmail` is the same field the private router sets
+ * (src/middlewares/authentication.js), so both surfaces feed one column.
+ * Lower-cased to match: the console's filter compares case-insensitively, and
+ * one spelling in the column is easier to explain than two.
+ */
+const setCallerFromWrikeUser = (req, wrikeUserResponse) => {
+  const email = wrikeUserResponse?.data?.[0]?.primaryEmail;
+  req.callerEmail = email ? String(email).trim().toLowerCase() : null;
 };
-const actionForMethod = (method) =>
-  ACTION_BY_METHOD[String(method || "").toUpperCase()] || null;
 
 export const tokenRoute = (fastify, opts, done) => {
   // Token-service calls (OAuth exchange/callback/profile) are logged to the
-  // audit log too — category "token" — so token traffic is visible beside
+  // audit log too, category "token", so token traffic is visible beside
   // API/MCP calls. Anything secret in these calls (authorization codes,
   // refresh tokens, state) is redacted by captureRequest before storage.
-  // Store the response body for everything EXCEPT the 200/201 success path —
-  // most rows are those, so skipping them keeps the table lean while still
+  // Store the response body for everything EXCEPT the 200/201 success path.
+  // Most rows are those, so skipping them keeps the table lean while still
   // capturing the payloads that matter (OAuth errors, 4xx/5xx, etc.).
   fastify.addHook("onSend", (req, reply, payload, done) => {
     try {
@@ -53,8 +70,19 @@ export const tokenRoute = (fastify, opts, done) => {
     logActivity({
       envId: null,
       environmentName: null,
+      // Only set by a handler that has actually identified the calling token
+      // (see /view-tokens). The exchange and callback routes cannot: the
+      // token row is being created by the request being logged.
+      tokenId: req.tokenId || null,
       surface: "rest",
-      actorEmail: null,
+      // Set by a handler that resolved the Wrike user behind this request, which
+      // the exchange and /view-tokens both do on their way to doing their job:
+      // the first reads the signed-in person's email before it decides whether
+      // they may have a token at all, and the second has to know the account it
+      // is listing tokens for. A row here with no caller is therefore one whose
+      // request was never identified: a token that failed validation, or a
+      // lookup Wrike refused.
+      actorEmail: req.callerEmail || null,
       action: actionForMethod(req.method),
       resource,
       method: req.method,
@@ -62,6 +90,7 @@ export const tokenRoute = (fastify, opts, done) => {
       code: reply.statusCode >= 400 ? "TOKEN_ERROR" : null,
       statusCode: reply.statusCode,
       ip: req.ip || null,
+      referenceId: req.activityReference || null,
       category: "token",
       requestPayload: captureRequest(req),
       responsePayload: req.activityResponsePayload || null,
@@ -75,9 +104,14 @@ export const tokenRoute = (fastify, opts, done) => {
 
       if (!token) return reject({ message: "Access Token must not be empty" });
 
-      const wrikeToken = await ValidateJWT(token);
+      const { wrikeToken, environmentName } = await ResolveAuthFromJWT(token);
 
-      const result = await GetUserData(wrikeToken, fastify);
+      const result = await GetUserData(wrikeToken, fastify, environmentName);
+
+      // The token was validated and Wrike was asked who it belongs to, so the
+      // caller is known here even though nothing authenticated them to us: the
+      // activity log records that person rather than "Unresolved".
+      setCallerFromWrikeUser(req, result);
 
       return reply.code(200).send({
         success: true,
@@ -96,8 +130,18 @@ export const tokenRoute = (fastify, opts, done) => {
   fastify.get("/exchange", WrikeTokenExchangeSchema, async (req, reply) => {
     try {
       const result = await WrikeTokenExchange(
-        { ...req.query, ip: clientIp(req) },
+        {
+          ...req.query,
+          ip: clientIp(req),
+          // Nothing here knows who is asking. This route is reached from the
+          // hosted login page, so that is what the token gets called. The
+          // purpose is the one thing the login page CAN say about why it is
+          // asking, and it decides the token's lifetime (see the mint).
+          clientName: "Login page",
+          purpose: req.query.purpose,
+        },
         fastify,
+        req,
       );
 
       if (!result)
@@ -130,7 +174,7 @@ export const tokenRoute = (fastify, opts, done) => {
           // MCP OAuth flow (/oauth/authorize set code_challenge in state): wrap
           // Wrike's raw code in a short-lived signed JWT carrying the PKCE
           // challenge, so /oauth/token can verify code_verifier before ever
-          // spending it — the MCP client never sees Wrike's raw code.
+          // spending it. The MCP client never sees Wrike's raw code.
           if (decodedData.code_challenge) {
             const wrappedCode = fastify.jwt.sign(
               {
@@ -139,6 +183,10 @@ export const tokenRoute = (fastify, opts, done) => {
                 code_challenge: decodedData.code_challenge,
                 code_challenge_method: decodedData.code_challenge_method,
                 redirect_uri: decodedData.redirectUri,
+                // Carried through so the mint can name the token after the
+                // client that asked for it. The state this came out of already
+                // holds it and the client never sees it.
+                client_id: decodedData.client_id || null,
               },
               { expiresIn: "60s" },
             );
@@ -160,8 +208,22 @@ export const tokenRoute = (fastify, opts, done) => {
       }
 
       const result = await WrikeTokenExchange(
-        { ...req.query, ...decodedData, ip: clientIp(req) },
+        {
+          ...req.query,
+          ...decodedData,
+          ip: clientIp(req),
+          // A caller that named itself in the signed state gets labelled with
+          // that name, which is how an MCP client's OAuth flow shows up as
+          // itself in the admin console's Client column instead of being
+          // indistinguishable from a plain sign-in. Nothing else sets it any
+          // more: the consoles used to, and have no way to mint a token at all.
+          clientName: String(decodedData?.client_name || "Login page"),
+          // Also from the signed state (src/utils/wrikeRedirect.js), so only a
+          // link this service signed can ask for the Calendar Sync sign-in.
+          purpose: decodedData?.purpose,
+        },
         fastify,
+        req,
       );
 
       if (!result) {
@@ -169,6 +231,25 @@ export const tokenRoute = (fastify, opts, done) => {
           success: false,
           message: "Failed to process callback",
         });
+      }
+
+      // A Calendar Sync sign-in that started on the documentation page goes
+      // straight back to it with the connection it just created, so the
+      // address that person has to paste is assembled for them rather than
+      // described to them. The destination is one of a fixed set of paths
+      // looked up by name (src/utils/wrikeRedirect.js) from the signed state
+      // — never a URL the caller supplied — so this cannot be turned into an
+      // open redirect.
+      //
+      // The connection rides in the fragment, and a fragment is never sent to
+      // a server: it stays out of this service's logs and out of anything the
+      // request passes through. The page reads it and rewrites its own address
+      // to drop it before the person can copy or bookmark it by accident.
+      const docsReturn = resolveReturnTarget(decodedData?.returnTo);
+      if (docsReturn) {
+        return reply.redirect(
+          `${docsReturn}?xpiToken=${encodeURIComponent(result.token)}`,
+        );
       }
 
       const html = `
@@ -550,6 +631,29 @@ export const tokenRoute = (fastify, opts, done) => {
       margin: 16px 0 28px;
     }
 
+    /* The reference the same error carries in its JSON form. This page is the
+       one error a person reads in a browser rather than a client logs, and
+       without it "the login said something went wrong" is unanswerable. */
+    .ref {
+      margin: -12px 0 24px;
+      font-size: 0.85rem;
+      color: #ddd;
+    }
+
+    .ref code {
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.95rem;
+      color: #fff;
+      letter-spacing: 0.04em;
+    }
+
+    .ref small {
+      display: block;
+      margin-top: 4px;
+      font-size: 0.75rem;
+      opacity: 0.65;
+    }
+
     .btn {
       background: var(--accent);
       border: none;
@@ -573,6 +677,10 @@ export const tokenRoute = (fastify, opts, done) => {
   <div class="card">
     <h1>Oops! Something went wrong</h1>
     <div class="message">${err?.message || "Unexpected error occurred"}</div>
+    <div class="ref">
+      Reference: <code>${referenceFor(req)}</code>
+      <small>Quote it when you report this — it identifies this exact attempt in the activity log.</small>
+    </div>
     <a class="btn" href="${process.env.APP_URL}">⬅ Back to Login</a>
   </div>
 </body>
@@ -1255,6 +1363,11 @@ export const tokenRoute = (fastify, opts, done) => {
           message: "Invalid Token",
         });
       }
+
+      // The caller's own token id, so this lookup is attributed to it in the
+      // activity log. The onResponse hook above reads it back off the
+      // request.
+      req.tokenId = tid;
 
       const userToken = await Tokens.GetById(tid);
 

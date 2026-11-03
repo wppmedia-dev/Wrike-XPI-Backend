@@ -3,6 +3,7 @@ import { parseODataFilters } from "../../../utils/odataFilter";
 import {
   getCustomFields,
   getDatahubCustomFields,
+  getFolder,
   getTask,
   getTasksByFolderId,
 } from "../../../utils/wrike";
@@ -103,6 +104,7 @@ export const GetAllTasks = (wrikeToken, params, taskType) => {
 
           if (!recordId)
             throw {
+              statusCode: 400,
               message:
                 "The selected filters are invalid. Please review your filter values and try again.",
             };
@@ -118,30 +120,39 @@ export const GetAllTasks = (wrikeToken, params, taskType) => {
         value: "Task",
       });
 
-      if (taskType == "channel") {
-        const getTaskData = await getTask(wrikeToken, channelId);
+      let getChannelTaskData, subTaskId;
 
-        const channelCFValue = getTaskData?.data[0]?.customFields.find(
+      if (taskType == "channel") {
+        try {
+          getChannelTaskData = await getTask(wrikeToken, channelId);
+        } catch (err) {
+          if (err?.errorDescription == "Invalid Task ID") {
+            getChannelTaskData = await getFolder(wrikeToken, channelId);
+          }
+        }
+
+        const channelCFValue = getChannelTaskData?.data[0]?.customFields.find(
           (cf) => cf.id == datahubCustomFieldsData["workitemlevel"]["cfId"],
         )?.value;
 
         if (channelCFValue != "Channel/Media Type")
           throw { message: "Invalid channel ID" };
 
-        if (getTaskData?.errorDescription) throw err;
+        if (getChannelTaskData?.errorDescription) throw err;
         // console.log(
         //   "Error while retriving chennel task",
-        //   getTaskData?.errorDescription,
+        //   getChannelTaskData?.errorDescription,
         // );
 
-        channelId = getTaskData?.data[0]?.subTaskIds;
+        subTaskId = getChannelTaskData?.data[0]?.subTaskIds;
       }
 
       // Get task data
       let wrikeTaskData;
 
-      if (taskType == "channel")
-        wrikeTaskData = await getTask(wrikeToken, channelId);
+      if (taskType == "channel" && subTaskId)
+        // Channel id may change in the previous if condition
+        wrikeTaskData = await getTask(wrikeToken, subTaskId);
       else
         wrikeTaskData = await getTasksByFolderId(
           wrikeToken,
@@ -224,6 +235,9 @@ export const GetAllTasks = (wrikeToken, params, taskType) => {
       });
     } catch (err) {
       console.log(err?.message || err);
+      // Deliberate errors (e.g. invalid OData filters) carry a statusCode and a
+      // user-facing message; pass them through instead of masking as fatal.
+      if (err?.statusCode) return reject(err);
       reject({
         message:
           "Fatal error Unexpected error occurred and service is unable complete the request.",

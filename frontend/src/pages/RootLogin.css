@@ -106,7 +106,9 @@ a.button {
   font-weight: 600;
   color: white;
   background: #4caf50;
-  border: none;
+  /* Transparent rather than absent, so the outline variant below can add its
+     own border without ending up 2px taller than this one. */
+  border: 1px solid transparent;
   border-radius: 12px;
   text-decoration: none;
   cursor: pointer;
@@ -191,6 +193,50 @@ a.button svg {
 .env-select:focus {
   border-color: #34d399;
   box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+}
+
+/*
+  The two sign-ins, stacked: the ordinary one keeps the solid button this page
+  has always had, and Calendar Sync sits under it as the same button in
+  outline. Same size, same weight — one is the default, the other is a choice,
+  and the caption says which is which rather than the styling shouting it.
+
+  Both take the full width of the column. Their labels are different lengths,
+  and a pair of visibly different-sized buttons reads as an accident rather
+  than as a choice.
+*/
+.login-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.login-actions a.button {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+a.button.outline {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  color: #fff;
+  box-shadow: none;
+}
+
+a.button.outline:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: #34d399;
+  transform: translateY(-2px);
+}
+
+/* The icons are drawn, not filled: the button rule above fills every svg
+   white, which would turn an outlined glyph into a blob. */
+a.button svg.stroke-icon {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .top-nav {
