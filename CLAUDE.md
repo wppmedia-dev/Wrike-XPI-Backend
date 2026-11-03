@@ -64,7 +64,7 @@ Streamable-HTTP MCP endpoint; a fresh server + transport is built per POST. Auth
 
 ### Wrike credentials cache
 
-`src/utils/wrikeCredentials.js` holds an in-memory map of environment name → `{ id, clientId, clientSecret, accountId, datahub IDs, ... }` from `wrike_credentials`. Use `getCachedWrikeCredentials()` (all) or `getCachedVisibleWrikeCredentials()` (`is_visible` only, for user-facing dropdowns) rather than re-querying. Re-sync after admin CRUD on credentials (startup, `/sync-db-credentials`, or an explicit `syncWrikeCredentialsFromDB()`).
+`src/utils/wrikeCredentials.js` holds an in-memory map of environment name → `{ id, clientId, clientSecret, accountId, datahub IDs, ... }` from `wrike_credentials`. Use `getCachedWrikeCredentials()` (all) or `getCachedVisibleWrikeCredentials()` (`is_visible` only, for user-facing dropdowns) rather than re-querying. The admin and portal credential handlers already call `syncWrikeCredentialsFromDB()` after each write, but only on the instance that served the request; other instances need `/sync-db-credentials`. Client ID/secret are field-encrypted (AES-256-GCM, `ENCRYPTION_MASTER_KEY`) in the table and decrypted into this map.
 
 ### Persistence and secrets
 
