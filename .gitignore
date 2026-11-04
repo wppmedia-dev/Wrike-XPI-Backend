@@ -12,3 +12,6 @@ public/app
 
 data/sync-state.json
 reference
+
+# Local infra notes (contain credentials) — never commit
+redis-setup.md
