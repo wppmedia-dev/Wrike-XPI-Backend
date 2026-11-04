@@ -1,14 +1,15 @@
 import { ResolveAuthFromJWT } from "../../middlewares/authentication";
 
 /**
- * Validate an XPI bearer token (from the MCP OAuth flow, see src/routes/oauth)
- * and return auth data, or null on failure. Called once per HTTP request in
+ * Validate an MCP access token (from the MCP OAuth flow, see src/routes/oauth)
+ * and return auth data, or null on failure. The Xtend API's long-lived token is
+ * not accepted here. Called once per HTTP request in
  * src/plugins/mcp.js — not per tool call.
  */
 export const resolveAuth = async (authToken) => {
   if (!authToken?.trim()) return null;
   try {
-    return await ResolveAuthFromJWT(authToken.trim());
+    return await ResolveAuthFromJWT(authToken.trim(), { surface: "mcp" });
   } catch {
     return null;
   }

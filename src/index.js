@@ -27,6 +27,7 @@ import {
   stopCredentialsResync,
 } from "./utils/wrikeCredentials";
 import { startRetentionSweep } from "./utils/activityLog";
+import { startMcpTokenSweep } from "./utils/mcpTokenSweep";
 import { getBuildInfo } from "./utils/version";
 import { verifyAdminJWT } from "./middlewares/adminAuth";
 import redisClient from "./utils/redis";
@@ -186,6 +187,7 @@ const withTimeout = (promise, ms, label) =>
   // never grows unbounded. Idempotent; safe even if something elsewhere
   // imports src/utils/activityLog.js first.
   startRetentionSweep();
+  startMcpTokenSweep();
 
   // Operational re-syncs. Admin only: the same Authorization: Bearer <admin
   // token> every other admin API takes. Anonymous callers must not be able to

@@ -35,14 +35,23 @@ import { v4 as uuidv4 } from "uuid";
  * sign-in that created a token — or for one refused before it could — said
  * "Unresolved" about somebody we had just looked up.
  *
+ * `options.mcp` is the MCP OAuth flow. It is a separate argument, not a field
+ * of the data, because two callers spread request query strings into the data.
+ * It gets no signed token from here at all: the row is created and its DEK
+ * handed back, and the caller issues the short access token and rotating
+ * refresh token (src/routes/oauth). The 180-day token is for the Xtend API
+ * only.
+ *
  * @param {{code: string, environmentId: string, ip?: string, clientName?: string, purpose?: string}} data
  * @param {object} fastify - the app, for jwt.sign
  * @param {object} [req] - the request, so its log row can name the caller
+ * @param {{mcp?: boolean}} [options]
  */
 export const WrikeTokenExchange = (
   { code, environmentId, ip, clientName, purpose },
   fastify,
   req,
+  { mcp = false } = {},
 ) => {
   return new Promise(async (resolve, reject) => {
     // Transaction is opened later, right before the first write. It must
@@ -236,7 +245,10 @@ export const WrikeTokenExchange = (
       // leaves out its own expiry to match: the two halves of one lifetime are
       // decided together, so a row can never say "no expiry" while the token in
       // the caller's hands quietly stops after 180 days.
-      const tokenExpiresAt = isCalendarSync ? null : tokenExpiryFrom();
+      //
+      // Also null for an MCP sign-in, for a different reason: its expiry is the
+      // refresh token's, which does not exist yet. McpTokens.Issue stamps it.
+      const tokenExpiresAt = isCalendarSync || mcp ? null : tokenExpiryFrom();
 
       const newUserTokenData = await Tokens.Insert(
         userId,
@@ -293,21 +305,27 @@ export const WrikeTokenExchange = (
       // token; the signature is what protects the payload from tampering. The
       // lifetime is the same constant the row above was stamped with — or, for
       // Calendar Sync, the absence of one, matching the null expiry above.
-      const jweToken = fastify.jwt.sign(
-        {
-          t: userTokenId,
-          d: dek.toString("base64"),
-        },
-        isCalendarSync ? undefined : { expiresIn: `${TOKEN_TTL_DAYS}d` },
-      );
+      const jweToken = mcp
+        ? null
+        : fastify.jwt.sign(
+            {
+              t: userTokenId,
+              d: dek.toString("base64"),
+            },
+            isCalendarSync ? undefined : { expiresIn: `${TOKEN_TTL_DAYS}d` },
+          );
 
       await transaction.commit();
 
       console.log("XPI token has been generated successfully!");
 
       // Return credentials and JWE token
+      // The DEK and row id go back only to the MCP flow, which needs them to
+      // start a refresh token family. The other callers send this whole object
+      // to the browser.
       resolve({
         token: jweToken,
+        ...(mcp ? { tokenId: userTokenId, dek } : {}),
         credentials: {
           username,
           password,

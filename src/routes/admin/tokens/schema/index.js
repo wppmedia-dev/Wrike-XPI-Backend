@@ -92,3 +92,16 @@ export const SetStatusSchema = {
     },
   },
 };
+
+// POST /admin/tokens/:id/revoke-mcp: the id says everything. The empty body
+// schema is the point, a write that takes no input still declares so.
+export const RevokeMcpSchema = {
+  schema: {
+    params: {
+      type: "object",
+      required: ["id"],
+      properties: { id: { type: "string", format: "uuid" } },
+    },
+    body: { type: ["object", "null"], additionalProperties: false },
+  },
+};
