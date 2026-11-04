@@ -48,6 +48,7 @@ import {
 import ActivityLog from "./ActivityLog";
 import MfaSettings from "./MfaSettings";
 import SyncSettings from "./SyncSettings";
+import OAuthClients from "./OAuthClients";
 import { EnvironmentsTable } from "./admin/EnvironmentsTable";
 import { PortalUsersTable } from "./admin/PortalUsersTable";
 import {
@@ -76,6 +77,7 @@ type PageId =
   | "settings"
   | "cache-settings"
   | "sync"
+  | "oauth-clients"
   | "activity-log";
 
 const PAGE_NAMES: Record<PageId, string> = {
@@ -86,6 +88,7 @@ const PAGE_NAMES: Record<PageId, string> = {
   settings: "Settings",
   "cache-settings": "Cache Settings",
   sync: "Sync",
+  "oauth-clients": "OAuth Clients",
   "activity-log": "Activity Log",
 };
 
@@ -238,6 +241,8 @@ export default function AdminDashboard() {
   const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   // Same idea for the Sync page, which owns its own fetch.
   const [syncRefreshKey, setSyncRefreshKey] = useState(0);
+  // And for OAuth Clients, which also owns its fetch.
+  const [oauthClientsRefreshKey, setOAuthClientsRefreshKey] = useState(0);
 
   /* ── Environments ─────────────────────────────────────────────────── */
   /* Two lists, deliberately.
@@ -1243,6 +1248,9 @@ export default function AdminDashboard() {
     } else if (activePage === "sync") {
       setSyncRefreshKey((k) => k + 1);
       refreshPromise = Promise.resolve();
+    } else if (activePage === "oauth-clients") {
+      setOAuthClientsRefreshKey((k) => k + 1);
+      refreshPromise = Promise.resolve();
     } else if (activePage === "activity-log") {
       // The Activity Log owns its own fetch (rows + summary) — bump its key
       // and let the child reload the current page.
@@ -1406,6 +1414,16 @@ export default function AdminDashboard() {
               <i className="fa-solid fa-arrows-rotate" />
             </span>
             <span className="nl">Sync</span>
+          </div>
+
+          <div
+            className={`nav-item${activePage === "oauth-clients" ? " active" : ""}`}
+            onClick={() => handleNav("oauth-clients")}
+          >
+            <span className="ni">
+              <i className="fa-solid fa-plug" />
+            </span>
+            <span className="nl">OAuth Clients</span>
           </div>
 
           <div
@@ -1772,6 +1790,24 @@ export default function AdminDashboard() {
             </div>
 
             <SyncSettings refreshKey={syncRefreshKey} />
+          </div>
+
+          {/* ══════ OAUTH CLIENTS PAGE ══════ */}
+          <div className={`page${activePage === "oauth-clients" ? " active" : ""}`} id="page-oauth-clients">
+            <div className="section-header">
+              <div>
+                <div className="section-title">
+                  OAuth Clients <PageInfo help={ADMIN_HELP.oauthClients} />
+                </div>
+                <div className="section-subtitle">
+                  MCP connectors registered with this service, and revoking them
+                </div>
+              </div>
+            </div>
+
+            {/* Mounted only while open, so it fetches on first visit rather
+                than on every console load. */}
+            {activePage === "oauth-clients" && <OAuthClients refreshKey={oauthClientsRefreshKey} />}
           </div>
 
           {/* ══════ ACTIVITY LOG PAGE ══════ */}

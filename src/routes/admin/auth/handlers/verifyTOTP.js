@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import { verifyJwt } from "../../../../utils/jwtSecrets";
 import { verifyTOTP as verifyTOTPCode } from "../../../../utils/totp";
 import { AdminAuth } from "../../../../controllers";
 
@@ -15,7 +16,7 @@ export const VerifyTOTP = (body) => {
 
       let payload;
       try {
-        payload = jwt.verify(totp_token, process.env.JWT_SECRET);
+        payload = verifyJwt(totp_token);
       } catch {
         return reject({
           statusCode: 401,

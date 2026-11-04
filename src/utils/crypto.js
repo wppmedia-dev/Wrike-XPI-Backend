@@ -145,68 +145,162 @@ export const decrypt = (encryptedData, dek) => {
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
 };
 
-/**
- * Encrypt a string using AES-256-GCM with master key from env
- * @param {string} plaintext The data to encrypt
- * @returns {string} Encrypted data as base64 (IV || Auth Tag || Ciphertext)
+/* ── Master-key field encryption (with key versioning) ─────────────────────
+ *
+ * Fields such as the Wrike client id/secret are encrypted with a master key
+ * from the environment. To make that key rotatable, every value written now
+ * names the key that encrypted it:
+ *
+ *   v1:<keyId>:<base64(IV || AuthTag || Ciphertext)>
+ *
+ * Values written before versioning are bare base64 (no prefix; base64 never
+ * contains ':' so the two are unambiguous) and are still read.
+ *
+ * Keyring, all from the environment:
+ *   ENCRYPTION_MASTER_KEY        current key, 64 hex chars. Encrypts all new
+ *                                writes.
+ *   ENCRYPTION_MASTER_KEY_ID     id of the current key (default "k1").
+ *   ENCRYPTION_MASTER_KEYS_PREVIOUS
+ *                                retired keys still needed for reading, as
+ *                                "id:hex,id:hex". Decrypt-only.
+ *
+ * If the key is ever changed: move the current key into
+ * ENCRYPTION_MASTER_KEYS_PREVIOUS as "<oldId>:<oldHex>" and set
+ * ENCRYPTION_MASTER_KEY/_ID to the new key. Existing values keep decrypting
+ * and new writes use the new key. Values are not re-encrypted automatically
+ * (there is no migration script); they move to the new key when a credential
+ * is next saved, so keep the old key in ENCRYPTION_MASTER_KEYS_PREVIOUS until
+ * every credential has been re-saved.
  */
-export const encryptField = (plaintext) => {
-  const masterKey = process.env.ENCRYPTION_MASTER_KEY;
-  if (!masterKey) {
+const FIELD_VERSION = "v1";
+const KEY_ID_PATTERN = /^[A-Za-z0-9_-]{1,32}$/;
+
+const parseKey = (hex, label) => {
+  const key = Buffer.from(String(hex || "").trim(), "hex");
+  if (key.length !== 32) {
+    throw new Error(`${label} must be 64 hex characters (32 bytes)`);
+  }
+  return key;
+};
+
+export const currentKeyId = () => {
+  const id = (process.env.ENCRYPTION_MASTER_KEY_ID || "k1").trim();
+  if (!KEY_ID_PATTERN.test(id)) {
+    throw new Error("ENCRYPTION_MASTER_KEY_ID must match [A-Za-z0-9_-]{1,32}");
+  }
+  return id;
+};
+
+const currentKey = () => {
+  if (!process.env.ENCRYPTION_MASTER_KEY) {
     throw new Error("ENCRYPTION_MASTER_KEY not set in environment");
   }
+  return parseKey(process.env.ENCRYPTION_MASTER_KEY, "ENCRYPTION_MASTER_KEY");
+};
 
-  // Convert master key from hex string to buffer (should be 32 bytes for AES-256)
-  const key = Buffer.from(masterKey, "hex");
-  if (key.length !== 32) {
-    throw new Error(
-      "ENCRYPTION_MASTER_KEY must be 64 hex characters (32 bytes)",
-    );
+/** id -> key Buffer for every key that may decrypt (current first). */
+const keyring = () => {
+  const ring = new Map([[currentKeyId(), currentKey()]]);
+  const previous = (process.env.ENCRYPTION_MASTER_KEYS_PREVIOUS || "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  for (const entry of previous) {
+    const sep = entry.indexOf(":");
+    const id = sep > 0 ? entry.slice(0, sep).trim() : "";
+    if (!KEY_ID_PATTERN.test(id)) {
+      throw new Error(
+        'ENCRYPTION_MASTER_KEYS_PREVIOUS entries must look like "keyId:64hex"',
+      );
+    }
+    if (!ring.has(id)) {
+      ring.set(id, parseKey(entry.slice(sep + 1), `ENCRYPTION_MASTER_KEYS_PREVIOUS[${id}]`));
+    }
   }
+  return ring;
+};
 
+const gcmEncrypt = (plaintext, key) => {
   const iv = crypto.randomBytes(IV_LENGTH);
   const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
-
   const encrypted = Buffer.concat([
     cipher.update(plaintext, "utf8"),
     cipher.final(),
   ]);
-
-  const authTag = cipher.getAuthTag();
-
-  // Format: IV || Auth Tag || Ciphertext, encoded as base64
-  return Buffer.concat([iv, authTag, encrypted]).toString("base64");
+  // Format: IV || Auth Tag || Ciphertext
+  return Buffer.concat([iv, cipher.getAuthTag(), encrypted]).toString("base64");
 };
 
-/**
- * Decrypt a string using AES-256-GCM with master key from env
- * @param {string} encryptedData Encrypted data as base64 (IV || Auth Tag || Ciphertext)
- * @returns {string} Decrypted plaintext
- */
-export const decryptField = (encryptedData) => {
-  const masterKey = process.env.ENCRYPTION_MASTER_KEY;
-  if (!masterKey) {
-    throw new Error("ENCRYPTION_MASTER_KEY not set in environment");
-  }
-
-  // Convert master key from hex string to buffer
-  const key = Buffer.from(masterKey, "hex");
-  if (key.length !== 32) {
-    throw new Error(
-      "ENCRYPTION_MASTER_KEY must be 64 hex characters (32 bytes)",
-    );
-  }
-
-  const buffer = Buffer.from(encryptedData, "base64");
+const gcmDecrypt = (base64, key) => {
+  const buffer = Buffer.from(base64, "base64");
   const iv = buffer.slice(0, IV_LENGTH);
   const authTag = buffer.slice(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH);
   const ciphertext = buffer.slice(IV_LENGTH + AUTH_TAG_LENGTH);
 
   const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
   decipher.setAuthTag(authTag);
+  return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString(
+    "utf8",
+  );
+};
 
-  return Buffer.concat([
-    decipher.update(ciphertext),
-    decipher.final(),
-  ]).toString("utf8");
+/** Split a stored value into { keyId, payload }; keyId null = legacy. */
+export const parseFieldEnvelope = (value) => {
+  const str = String(value);
+  if (str.startsWith(`${FIELD_VERSION}:`)) {
+    const rest = str.slice(FIELD_VERSION.length + 1);
+    const sep = rest.indexOf(":");
+    if (sep > 0) return { keyId: rest.slice(0, sep), payload: rest.slice(sep + 1) };
+  }
+  return { keyId: null, payload: str };
+};
+
+/**
+ * Encrypt a string using AES-256-GCM with the current master key.
+ * @param {string} plaintext The data to encrypt
+ * @returns {string} "v1:<keyId>:<base64(IV || Auth Tag || Ciphertext)>"
+ */
+export const encryptField = (plaintext) => {
+  const key = currentKey();
+  return `${FIELD_VERSION}:${currentKeyId()}:${gcmEncrypt(plaintext, key)}`;
+};
+
+/**
+ * Decrypt a value written by encryptField, in either the versioned or the
+ * legacy (bare base64) format.
+ * @param {string} encryptedData Stored value
+ * @returns {string} Decrypted plaintext
+ */
+export const decryptField = (encryptedData) => {
+  const ring = keyring();
+  const { keyId, payload } = parseFieldEnvelope(encryptedData);
+
+  if (keyId) {
+    const key = ring.get(keyId);
+    if (!key) {
+      throw new Error(
+        `Encryption key "${keyId}" is not configured (ENCRYPTION_MASTER_KEY / ENCRYPTION_MASTER_KEYS_PREVIOUS)`,
+      );
+    }
+    return gcmDecrypt(payload, key);
+  }
+
+  // Legacy value: it does not say which key wrote it. Try the current key
+  // first (the only key before rotation existed), then the retired ones.
+  let lastError;
+  for (const key of ring.values()) {
+    try {
+      return gcmDecrypt(payload, key);
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError;
+};
+
+/** True when a stored value is not encrypted with the current key. */
+export const needsReencryption = (encryptedData) => {
+  if (!encryptedData) return false;
+  return parseFieldEnvelope(encryptedData).keyId !== currentKeyId();
 };

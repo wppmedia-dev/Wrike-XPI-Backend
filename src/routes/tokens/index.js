@@ -10,6 +10,7 @@ import { referenceFor } from "../../utils/activityReference";
 import { resolveReturnTarget } from "../../utils/wrikeRedirect";
 import { captureRequest, buildResponseSnapshot } from "../../utils/capture";
 import { clientIp } from "../../utils/environmentAccess";
+import { verifyFastifyJwt } from "../../utils/jwtSecrets";
 
 // The action label comes from the same authority the permission gate reads
 // (src/utils/tokenPermissionMap.js). This surface is ungoverned by the matrix,
@@ -168,7 +169,7 @@ export const tokenRoute = (fastify, opts, done) => {
     try {
       let decodedData;
       if (req.query.state) {
-        decodedData = fastify.jwt.verify(req.query.state);
+        decodedData = verifyFastifyJwt(fastify, req.query.state);
 
         if (decodedData.redirectUri) {
           // MCP OAuth flow (/oauth/authorize set code_challenge in state): wrap
@@ -1354,7 +1355,7 @@ export const tokenRoute = (fastify, opts, done) => {
         });
       }
 
-      const xpiPayload = await fastify.jwt.verify(token);
+      const xpiPayload = verifyFastifyJwt(fastify, token);
       const tid = xpiPayload.t ?? xpiPayload.tid;
 
       if (!tid) {

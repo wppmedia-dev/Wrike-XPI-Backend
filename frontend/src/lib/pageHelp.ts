@@ -21,6 +21,7 @@ export type AdminHelpKey =
   | "settings"
   | "cache"
   | "sync"
+  | "oauthClients"
   | "activity";
 
 export const ADMIN_HELP: Record<AdminHelpKey, PageHelp> = {
@@ -97,6 +98,18 @@ export const ADMIN_HELP: Record<AdminHelpKey, PageHelp> = {
       "Partial means some items could not be loaded. The server log says which.",
     ],
     note: "Only the latest run of each source is kept. A new run replaces the old one.",
+  },
+
+  oauthClients: {
+    summary:
+      "Every MCP connector that registered itself with this service through OAuth.",
+    points: [
+      "One row per registration: its name, where it redirects to, and when it last completed a sign-in.",
+      "Revoke stops that registration from starting or finishing any new sign-in.",
+      "Expired registrations can no longer sign in either; the connector registers again on its own.",
+      "Show revoked brings back the ones already switched off.",
+    ],
+    note: "Revoking does not touch tokens the connector already holds. Deactivate those from Tokens.",
   },
 
   activity: {

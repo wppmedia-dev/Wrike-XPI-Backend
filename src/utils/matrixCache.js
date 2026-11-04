@@ -1,4 +1,5 @@
 import redisClient from "./redis";
+import { broadcast, subscribe } from "./cacheBus";
 
 /**
  * The two-tier cache behind a per-record permission matrix, as a factory.
@@ -18,11 +19,12 @@ import redisClient from "./redis";
  *
  * Staleness is the whole cost model, because the entries are permission
  * decisions. Invalidation clears L1 for THIS process and L2 for everyone, and
- * is called by the controller that performed the write. On a multi-instance
- * deploy, other instances keep their own L1 copy until it expires, so the
- * memory TTL is the real upper bound on how long a grant an admin just
- * switched off can still answer cluster-wide. Keep it short; the L2 TTL is the
- * knob to raise, because invalidation clears that for every instance at once.
+ * is called by the controller that performed the write. Other instances are
+ * told to drop their L1 copy over the cache bus (src/utils/cacheBus.js); that
+ * is best effort, so the memory TTL stays the upper bound on how long a grant
+ * an admin just switched off can still answer cluster-wide if a message is
+ * lost. Keep it short; the L2 TTL is the knob to raise, because invalidation
+ * clears that for every instance at once.
  */
 export const createMatrixCache = ({
   /** Shows up in log lines, e.g. "token-perm". */
@@ -47,6 +49,13 @@ export const createMatrixCache = ({
   const memory = new Map();
 
   const key = (id) => `${keyPrefix}${id}`;
+
+  // Cross-instance L1 invalidation; the sender already cleared L2.
+  const busTopic = `l1:${name}`;
+  subscribe(busTopic, (data) => {
+    if (data?.all) return memory.clear();
+    (data?.keys || []).forEach((cacheKey) => memory.delete(cacheKey));
+  });
 
   const memoryGet = (cacheKey) => {
     const hit = memory.get(cacheKey);
@@ -105,6 +114,7 @@ export const createMatrixCache = ({
 
     const cacheKey = key(id);
     memory.delete(cacheKey);
+    broadcast(busTopic, { keys: [cacheKey] });
 
     await redisClient.delMany([cacheKey]).catch((err) => {
       console.warn(
@@ -119,6 +129,7 @@ export const createMatrixCache = ({
   /** Test/ops hook: forget every cached matrix of this kind. */
   const invalidateAll = async () => {
     memory.clear();
+    broadcast(busTopic, { all: true });
     const keys = await redisClient.keys(`${keyPrefix}*`).catch(() => []);
     if (keys && keys.length) await redisClient.delMany(keys).catch(() => {});
   };

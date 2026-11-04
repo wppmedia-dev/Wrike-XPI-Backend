@@ -2,6 +2,7 @@ import { Tokens } from "../controllers";
 import { getWrikeTokens } from "../utils/wrike";
 import * as crypto from "../utils/crypto";
 import jwt from "jsonwebtoken";
+import { verifyJwt } from "../utils/jwtSecrets";
 import {
   evaluateAccess,
   clientIp,
@@ -42,7 +43,7 @@ const verifyBasicAuth = async (credentials) => {
 
 // Verify the XPI token and extract the token-record id + DEK.
 const verifyJWE = async (jweToken) => {
-  const payload = jwt.verify(jweToken, process.env.JWT_SECRET);
+  const payload = verifyJwt(jweToken);
 
   // Current tokens carry the record id as `t` and the DEK inline as `d`.
   // Older tokens used `tid` plus `enc`, a second signed JWT wrapping the
@@ -50,7 +51,7 @@ const verifyJWE = async (jweToken) => {
   const tid = payload.t ?? payload.tid;
   let dekStr = payload.d;
   if (!dekStr && payload.enc) {
-    ({ dek: dekStr } = jwt.verify(payload.enc, process.env.JWT_SECRET));
+    ({ dek: dekStr } = verifyJwt(payload.enc));
   }
 
   if (!tid || !dekStr) {

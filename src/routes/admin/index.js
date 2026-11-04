@@ -6,6 +6,7 @@ import { adminCacheRoute } from "./cache";
 import { adminEnvironmentAccessRoute } from "./environmentAccess";
 import { adminActivityRoute } from "./activity";
 import { adminSyncRoute } from "./sync";
+import { adminOAuthClientsRoute } from "./oauthClients";
 
 // Page handlers
 const AdminIndexPage = (req, reply) => reply.redirect("/admin/login");
@@ -62,6 +63,7 @@ export const adminApiRoute = (fastify, opts, done) => {
   });
   fastify.register(adminActivityRoute, { prefix: "/activity" });
   fastify.register(adminSyncRoute, { prefix: "/sync" });
+  fastify.register(adminOAuthClientsRoute, { prefix: "/oauth-clients" });
 
   done();
 };

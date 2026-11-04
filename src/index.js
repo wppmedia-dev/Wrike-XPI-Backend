@@ -23,9 +23,32 @@ import { isCalendarSyncFlag, TOKEN_PURPOSE } from "./utils/tokenPurpose";
 import {
   syncWrikeCredentialsFromDB,
   getCachedVisibleWrikeCredentials,
+  startCredentialsResync,
+  stopCredentialsResync,
 } from "./utils/wrikeCredentials";
 import { startRetentionSweep } from "./utils/activityLog";
 import { getBuildInfo } from "./utils/version";
+import { verifyAdminJWT } from "./middlewares/adminAuth";
+import redisClient from "./utils/redis";
+import db from "../models";
+
+// Readiness / shutdown tuning.
+const READY_DB_TIMEOUT_MS =
+  parseInt(process.env.READY_DB_TIMEOUT_MS, 10) > 0
+    ? parseInt(process.env.READY_DB_TIMEOUT_MS, 10)
+    : 3000;
+const SHUTDOWN_TIMEOUT_MS =
+  parseInt(process.env.SHUTDOWN_TIMEOUT_MS, 10) > 0
+    ? parseInt(process.env.SHUTDOWN_TIMEOUT_MS, 10)
+    : 25000;
+
+const withTimeout = (promise, ms, label) =>
+  Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms).unref?.(),
+    ),
+  ]);
 
 (async () => {
   // Configure the framework and instantiate it
@@ -88,7 +111,12 @@ import { getBuildInfo } from "./utils/version";
     reply.send(getBuildInfo());
   });
 
-  // Health check endpoint
+  let shuttingDown = false;
+
+  // Health check endpoint — LIVENESS: "the process is up and serving".
+  // Deliberately checks no dependency, so a database or Redis blip never
+  // makes an orchestrator restart a healthy process. Unchanged contract.
+  // Use GET /ready for readiness (dependencies + draining).
   fastify.all("/health", async (request, reply) => {
     const healthcheck = {
       uptime: process.uptime(),
@@ -106,12 +134,43 @@ import { getBuildInfo } from "./utils/version";
     }
   });
 
+  // READINESS: "send me traffic". 503 while draining for shutdown or when
+  // PostgreSQL does not answer. Redis is reported but never fails readiness:
+  // every Redis-backed cache falls back to the source when it is down.
+  // Wrike is not pinged — it is an external dependency per request, and
+  // taking every instance out of rotation because Wrike is slow would turn a
+  // partial outage into a full one.
+  fastify.get("/ready", async (request, reply) => {
+    const checks = {};
+    let ready = !shuttingDown;
+
+    try {
+      const started = Date.now();
+      await withTimeout(db.sequelize.query("SELECT 1"), READY_DB_TIMEOUT_MS, "database ping");
+      checks.database = { ok: true, latencyMs: Date.now() - started };
+    } catch (err) {
+      ready = false;
+      checks.database = { ok: false, error: err?.message || String(err) };
+    }
+
+    const redis = redisClient.status();
+    checks.redis = { ok: redis.ready, required: false, ...redis };
+
+    reply.code(ready ? 200 : 503).send({
+      status: ready ? "ready" : shuttingDown ? "draining" : "not_ready",
+      checks,
+      timestamp: Date.now(),
+      build: getBuildInfo(),
+    });
+  });
+
   // Sync Secrets from Azure Vault at Startup
   await syncSecrets(AZURE_SECRET_NAMES);
 
-  // Sync Wrike Credentials from Database at Startup
+  // Sync Wrike Credentials from Database at Startup. No broadcast: a new
+  // instance coming up is not a change the others need to react to.
   try {
-    await syncWrikeCredentialsFromDB();
+    await syncWrikeCredentialsFromDB({ broadcast: false });
   } catch (err) {
     console.error(
       "Error syncing Wrike credentials from DB at startup:",
@@ -119,12 +178,21 @@ import { getBuildInfo } from "./utils/version";
     );
   }
 
+  // Safety-net resync so instances converge even if a cache-bus message is
+  // lost (src/utils/wrikeCredentials.js).
+  startCredentialsResync();
+
   // Activity log retention — starts a background sweep so the log table
   // never grows unbounded. Idempotent; safe even if something elsewhere
   // imports src/utils/activityLog.js first.
   startRetentionSweep();
 
-  fastify.get("/api/v1/sync-secrets", async (req, res) => {
+  // Operational re-syncs. Admin only: the same Authorization: Bearer <admin
+  // token> every other admin API takes. Anonymous callers must not be able to
+  // make the service hammer Key Vault or the database.
+  const syncGuard = { preHandler: [verifyAdminJWT] };
+
+  fastify.get("/api/v1/sync-secrets", syncGuard, async (req, res) => {
     try {
       await syncSecrets(AZURE_SECRET_NAMES);
       console.log("Secrets synchronized successfully");
@@ -135,7 +203,7 @@ import { getBuildInfo } from "./utils/version";
   });
 
   // Sync Wrike Credentials from Database
-  fastify.get("/api/v1/sync-db-credentials", async (req, res) => {
+  fastify.get("/api/v1/sync-db-credentials", syncGuard, async (req, res) => {
     try {
       await syncWrikeCredentialsFromDB();
       console.log("Database credentials synchronized successfully");
@@ -234,6 +302,45 @@ import { getBuildInfo } from "./utils/version";
 
     return res.sendFile("root-login.html", process.cwd() + "/public/app");
   });
+
+  // Graceful shutdown. On SIGTERM/SIGINT: mark not-ready (so a balancer polling
+  // /ready drains this instance), stop accepting connections and let in-flight
+  // requests finish (fastify.close), then release Redis and the DB pool. A
+  // hard deadline (SHUTDOWN_TIMEOUT_MS) guarantees the process still exits if
+  // something hangs. SIGUSR2 (nodemon restarts) is left alone.
+  const shutdown = async (signal) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    fastify.log.info(`${signal} received, shutting down gracefully`);
+
+    const deadline = setTimeout(() => {
+      fastify.log.error(`Shutdown exceeded ${SHUTDOWN_TIMEOUT_MS}ms, forcing exit`);
+      process.exit(1);
+    }, SHUTDOWN_TIMEOUT_MS);
+    deadline.unref?.();
+
+    let exitCode = 0;
+    try {
+      await fastify.close();
+    } catch (err) {
+      exitCode = 1;
+      fastify.log.error(err, "Error while closing HTTP server");
+    }
+
+    stopCredentialsResync();
+    await redisClient.disconnect().catch(() => {});
+    await db.sequelize.close().catch((err) => {
+      exitCode = 1;
+      fastify.log.error(err, "Error while closing database pool");
+    });
+
+    clearTimeout(deadline);
+    fastify.log.info("Shutdown complete");
+    process.exit(exitCode);
+  };
+
+  process.once("SIGTERM", () => shutdown("SIGTERM"));
+  process.once("SIGINT", () => shutdown("SIGINT"));
 
   // Run the server!
   fastify.listen(

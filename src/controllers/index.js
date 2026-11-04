@@ -11,3 +11,4 @@ export * as TokenPermissions from "./tokenPermissions";
 export * as EnvironmentModulePermissions from "./environmentModulePermissions";
 export * as ActivityLog from "./activityLog";
 export * as SyncRuns from "./syncRuns";
+export * as OAuthClients from "./oauthClients";
