@@ -189,6 +189,14 @@ export const RevokeByRefreshToken = async (refreshToken) => {
   return row ? revokeWhere({ id: row.family_id }, "client_revoked") : 0;
 };
 
+/**
+ * RFC 7009: revoke by family id, for a client that presents its (possibly
+ * expired) ACCESS token instead of its refresh token. The caller has already
+ * verified the token's signature, which is what vouches for the family id.
+ */
+export const RevokeFamily = async (familyId, reason = "client_revoked") =>
+  familyId ? revokeWhere({ id: familyId }, reason) : 0;
+
 /** Revoke every MCP sign-in behind a token row (admin action). */
 export const RevokeByTokenId = (tokenId, reason = "admin_revoked") =>
   revokeWhere({ token_id: tokenId }, reason);

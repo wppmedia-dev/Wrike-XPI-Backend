@@ -3,7 +3,7 @@ import { findRedirectionURL } from "../../utils/wrikeRedirect";
 import { getCachedVisibleWrikeCredentials } from "../../utils/wrikeCredentials";
 import { WrikeTokenExchange } from "../tokens/handlers/wrikeTokenExchange";
 import { clientIp } from "../../utils/environmentAccess";
-import { verifyFastifyJwt } from "../../utils/jwtSecrets";
+import { verifyFastifyJwt, verifyJwt } from "../../utils/jwtSecrets";
 import { OAuthClients } from "../../controllers";
 import { McpTokens } from "../../controllers";
 import { getMcpTokenLifetimes } from "../../utils/mcpTokenSettings";
@@ -597,16 +597,45 @@ export const oauthRoute = (fastify, opts, done) => {
     }
   });
 
-  // RFC 7009 token revocation. A client signing out revokes its refresh token,
-  // which switches off the whole family, access tokens included. Always 200,
-  // known token or not, so the endpoint cannot be used to probe for valid ones.
+  // RFC 7009 token revocation. A client signing out sends either its refresh
+  // token or its access token (RFC 7009 allows both, and clients differ), and
+  // either one switches off the whole sign-in, refresh tokens and access
+  // tokens alike. An access token is accepted even if it has expired, since a
+  // client that signs out late is still entitled to end its own sign-in.
+  // Always 200, known token or not, so the endpoint cannot be used to probe
+  // for valid ones. Each call is logged (never the token itself), because
+  // whether a client signs out at all is otherwise invisible.
   fastify.post("/revoke", async (req, reply) => {
+    let kind = "none";
+    let revoked = 0;
     try {
       const { token } = req.body || {};
-      await McpTokens.RevokeByRefreshToken(token);
+      if (typeof token === "string" && token) {
+        if (token.split(".").length === 3) {
+          // Looks like a JWT: an MCP access token. The signature is checked
+          // (with any retired secret still honoured); expiry is not.
+          kind = "access_token";
+          let claims = null;
+          try {
+            claims = verifyJwt(token, { ignoreExpiration: true });
+          } catch {
+            claims = null;
+          }
+          if (claims?.s === MCP_TOKEN_USE && claims.f) {
+            revoked = await McpTokens.RevokeFamily(claims.f);
+          }
+        } else {
+          kind = "refresh_token";
+          revoked = await McpTokens.RevokeByRefreshToken(token);
+        }
+      }
     } catch (err) {
       console.log("Error while revoking a token:", err?.message || err);
     }
+    console.log(
+      new Date().toISOString(),
+      `[oauth] /revoke called with ${kind}; ${revoked ? "sign-in revoked" : "nothing to revoke"}`,
+    );
     return reply.code(200).send({});
   });
 

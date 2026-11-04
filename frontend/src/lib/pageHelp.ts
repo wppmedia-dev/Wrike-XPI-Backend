@@ -105,13 +105,13 @@ export const ADMIN_HELP: Record<AdminHelpKey, PageHelp> = {
       "Every MCP connector that registered itself with this service through OAuth.",
     points: [
       "Beta: this page is new and may change.",
-      "Connected: the client has a sign-in that can still refresh. Disconnected: it has signed in before, but none is live now (signed out, revoked, or the refresh token lapsed).",
+      "Connected: the client has a sign-in that can still refresh and was used recently. Idle: the sign-in is live but nothing has used it for a while. Disconnected: it has signed in before, but none is live now (signed out, revoked, or the refresh token lapsed).",
       "Registered: it registered but has not signed in yet. Sign-ins made before this page existed cannot be matched to a client.",
       "Revoke stops that registration from starting or finishing any new sign-in. Expired registrations can no longer sign in either.",
       "Show revoked brings back the ones already switched off.",
       "Activity log (row menu) opens the Activity Log filtered to that client's sign-ins. Sign-ins from before this page existed cannot be matched, so they will not appear.",
     ],
-    note: "A client that just closes without signing out stays Connected until its refresh token expires. Revoking does not touch tokens it already holds; deactivate those from Tokens.",
+    note: "If a user disconnects inside the client app and the app does not sign out with the service, the client shows Idle (then Disconnected once its refresh token expires), because the service cannot see the disconnect. Revoking does not touch tokens it already holds; deactivate those from Tokens.",
   },
 
   activity: {

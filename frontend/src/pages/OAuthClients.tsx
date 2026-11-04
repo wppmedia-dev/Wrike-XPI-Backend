@@ -20,8 +20,6 @@ import "./OAuthClients.css";
  * sign-ins for that registration; tokens it already minted are separate
  * records, revoked from Tokens. */
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
 /** Same rules as src/utils/oauthClientStatus.js; the server's value wins. */
 const statusOf = (client: OAuthClient): OAuthClientStatus => {
   if (client.status) return client.status;
@@ -31,7 +29,8 @@ const statusOf = (client: OAuthClient): OAuthClientStatus => {
 };
 
 const STATUS_BADGE: Record<OAuthClientStatus, { tone: "success" | "warning" | "danger" | "neutral" | "info"; label: string; hint: string }> = {
-  connected: { tone: "success", label: "Connected", hint: "Has a sign-in that can still refresh" },
+  connected: { tone: "success", label: "Connected", hint: "Has a sign-in that can still refresh, and it was used recently" },
+  idle: { tone: "warning", label: "Idle", hint: "Has a live sign-in, but nothing has used it for a while. It may be unused, or disconnected on the client side, which the service only learns if the client signs out" },
   disconnected: { tone: "neutral", label: "Disconnected", hint: "Has signed in before, but no sign-in is live now" },
   registered: { tone: "info", label: "Registered", hint: "Registered, and has not signed in yet" },
   expired: { tone: "warning", label: "Expired", hint: "The registration's lifetime has passed" },
@@ -264,11 +263,7 @@ export default function OAuthClients({
   // Whole-table counts from the server; undefined if it could not read them.
   const connected = data?.counts.connected;
   const disconnected = data?.counts.disconnected;
-  const expiringSoon = rows.filter((c) => {
-    if (c.revoked_at || !c.expires_at) return false;
-    const left = new Date(c.expires_at).getTime() - Date.now();
-    return left > 0 && left <= 30 * DAY_MS;
-  }).length;
+  const idle = data?.counts.idle;
   const truncated = !!data && data.total > rows.length;
 
   return (
@@ -297,8 +292,8 @@ export default function OAuthClients({
             <i className="fa-solid fa-hourglass-half" />
           </div>
           <div className="stat-body">
-            <div className="stat-value">{data ? expiringSoon : EMPTY}</div>
-            <div className="stat-label">Expiring (30 days)</div>
+            <div className="stat-value">{data && idle !== undefined ? idle : EMPTY}</div>
+            <div className="stat-label">Idle</div>
           </div>
         </div>
         <div className="stat-card red">

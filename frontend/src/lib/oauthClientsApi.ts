@@ -10,11 +10,12 @@ export type OAuthClientStatus =
   | "revoked"
   | "expired"
   | "connected"
+  | "idle"
   | "disconnected"
   | "registered";
 
 export interface OAuthClientConnection {
-  state: "connected" | "disconnected" | "registered";
+  state: "connected" | "idle" | "disconnected" | "registered";
   /** Sign-ins that can still refresh. */
   live_sessions: number;
   /** Sign-ins this client has ever made. */
@@ -52,6 +53,7 @@ export interface OAuthClientList {
     revoked: number;
     /** Unrevoked, unexpired clients by connection; absent if unreadable. */
     connected?: number;
+    idle?: number;
     disconnected?: number;
     registered?: number;
   };

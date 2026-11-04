@@ -96,6 +96,7 @@ const sessionStatsFor = async (ids) => {
               COUNT(*)::int AS total_sessions,
               COUNT(*) FILTER (WHERE ${LIVE_SESSION_SQL})::int AS live_sessions,
               MAX(COALESCE(f.last_rotated_at, f.created_at)) AS last_active_at,
+              MAX(COALESCE(f.last_rotated_at, f.created_at)) FILTER (WHERE ${LIVE_SESSION_SQL}) AS live_last_active_at,
               MAX(f.revoked_at) AS last_disconnected_at
          FROM mcp_token_families f
         WHERE f.client_id IN (:ids)
@@ -113,25 +114,30 @@ const sessionStatsFor = async (ids) => {
 };
 
 /** Whole-table counts of unrevoked, unexpired clients by connection state. */
-const connectionCounts = async () => {
+const connectionCounts = async (idleAfterSeconds) => {
   try {
     const [row] = await models.sequelize.query(
       `WITH s AS (
          SELECT f.client_id,
                 COUNT(*) AS total,
-                COUNT(*) FILTER (WHERE ${LIVE_SESSION_SQL}) AS live
+                COUNT(*) FILTER (WHERE ${LIVE_SESSION_SQL}) AS live,
+                MAX(COALESCE(f.last_rotated_at, f.created_at)) FILTER (WHERE ${LIVE_SESSION_SQL}) AS live_active
            FROM mcp_token_families f
           WHERE f.client_id IS NOT NULL
           GROUP BY f.client_id
        )
        SELECT
-         COUNT(*) FILTER (WHERE COALESCE(s.live, 0) > 0)::int AS connected,
+         COUNT(*) FILTER (WHERE COALESCE(s.live, 0) > 0 AND (:idle::int IS NULL OR s.live_active >= NOW() - (:idle::int * INTERVAL '1 second')))::int AS connected,
+         COUNT(*) FILTER (WHERE COALESCE(s.live, 0) > 0 AND :idle::int IS NOT NULL AND s.live_active < NOW() - (:idle::int * INTERVAL '1 second'))::int AS idle,
          COUNT(*) FILTER (WHERE COALESCE(s.total, 0) > 0 AND COALESCE(s.live, 0) = 0)::int AS disconnected,
          COUNT(*) FILTER (WHERE COALESCE(s.total, 0) = 0)::int AS registered
          FROM oauth_clients c
          LEFT JOIN s ON s.client_id = c.id
         WHERE c.revoked_at IS NULL AND (c.expires_at IS NULL OR c.expires_at > NOW())`,
-      { type: models.Sequelize.QueryTypes.SELECT },
+      {
+        replacements: { idle: idleAfterSeconds || null },
+        type: models.Sequelize.QueryTypes.SELECT,
+      },
     );
     return row || null;
   } catch {
@@ -145,7 +151,12 @@ const connectionCounts = async () => {
  * carries `connection` (null if it could not be read) and `status`, the single
  * value the console displays (src/utils/oauthClientStatus.js).
  */
-export const List = async ({ includeRevoked = false, limit = 50, offset = 0 } = {}) => {
+export const List = async ({
+  includeRevoked = false,
+  limit = 50,
+  offset = 0,
+  idleAfterSeconds = null,
+} = {}) => {
   const { Op } = models.Sequelize;
   const where = includeRevoked ? {} : { revoked_at: null };
   const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), MAX_LIST_LIMIT);
@@ -162,7 +173,7 @@ export const List = async ({ includeRevoked = false, limit = 50, offset = 0 } = 
     }),
     models.OAuthClients.count({ where: { revoked_at: null } }),
     models.OAuthClients.count({ where: { revoked_at: { [Op.ne]: null } } }),
-    connectionCounts(),
+    connectionCounts(idleAfterSeconds),
   ]);
 
   const stats = await sessionStatsFor(rows.map((row) => row.id));
@@ -174,6 +185,8 @@ export const List = async ({ includeRevoked = false, limit = 50, offset = 0 } = 
           state: connectionState({
             totalSessions: s?.total_sessions || 0,
             liveSessions: s?.live_sessions || 0,
+            liveLastActiveAt: s?.live_last_active_at || null,
+            idleAfterSeconds,
           }),
           live_sessions: s?.live_sessions || 0,
           total_sessions: s?.total_sessions || 0,
