@@ -327,6 +327,60 @@ const bearer = { authorization: `Bearer ${adminToken}` };
     check("revoking an unknown client is a 404", res.statusCode, 404);
   }
 
+  /* ── Activity log: filter by OAuth client ──────────────────────────── */
+
+  section("activity log filtered by OAuth client");
+  {
+    const { Op } = require("sequelize");
+    const models = require("../models");
+    const ActivityLog = require("../src/controllers/activityLog");
+
+    let seen = null;
+    models.ApiActivityLogs.findAndCountAll = async (args) => ((seen = args), { rows: [], count: 0 });
+    models.ApiActivityLogs.findAll = async (args) => ((seen = args), []);
+    models.ApiActivityLogs.count = async (args) => ((seen = args), 0);
+
+    const clientId = uuid();
+    const tokenId = uuid();
+    // The sub-select the client filter adds, as SQL text.
+    const sqlOf = (where) =>
+      (where[Op.and] || [])
+        .map((clause) => clause.token_id && clause.token_id[Op.in] && clause.token_id[Op.in].val)
+        .find(Boolean);
+
+    await ActivityLog.List({});
+    check("no client filter: the query is unchanged", [seen.where[Op.and], seen.where.token_id], [undefined, undefined]);
+
+    await ActivityLog.List({ oauthClientId: clientId });
+    const sql = sqlOf(seen.where);
+    check("a client filter goes through that client's sign-ins", /SELECT token_id FROM mcp_token_families WHERE client_id = /.test(sql || ""), true);
+    check("and names exactly that client", (sql || "").includes(clientId), true);
+
+    await ActivityLog.List({ oauthClientId: clientId, tokenId, envId: "env-1", agent: "claude" });
+    check("it combines with the token and environment filters", [seen.where.token_id, seen.where.env_id], [tokenId, "env-1"]);
+    check("and with the agent filter (both kept in the same AND list)", seen.where[Op.and].length >= 2, true);
+
+    await ActivityLog.Summary({ oauthClientId: clientId });
+    check("the summary strip counts the same slice", /mcp_token_families/.test(sqlOf(seen.where) || ""), true);
+    await ActivityLog.ExportRows({ oauthClientId: clientId });
+    check("so does the export", /mcp_token_families/.test(sqlOf(seen.where) || ""), true);
+
+    await ActivityLog.List({ oauthClientId: "x'; DROP TABLE api_activity_logs; --" });
+    check(
+      "a hostile value is escaped, not spliced in raw",
+      (sqlOf(seen.where) || "").includes("DROP TABLE api_activity_logs; --'") && !/= 'x';/.test(sqlOf(seen.where) || ""),
+      true,
+    );
+
+    // The route lets only a UUID through.
+    const activityApp = Fastify();
+    activityApp.register(require("../src/routes/admin/activity").adminActivityRoute, { prefix: "/a" });
+    await activityApp.ready();
+    const bad = await activityApp.inject({ method: "GET", url: "/a?oauth_client_id=not-a-uuid", headers: bearer });
+    check("a non-UUID client id is a 400", bad.statusCode, 400);
+    await activityApp.close();
+  }
+
   await app.close();
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

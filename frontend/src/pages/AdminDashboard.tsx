@@ -748,7 +748,21 @@ export default function AdminDashboard() {
   const [activityEnv, setActivityEnv] = useState<{ id: string; name: string } | null>(null);
 
   function openTokenActivityLogs(token: AdminToken) {
+    setActivityOAuthClient(null);
     setActivityToken({ id: token.id, label: tokenLabel(token) });
+    handleNav("activity-log");
+  }
+
+  // OAuth client whose activity is being viewed, set by the OAuth Clients
+  // table's "Activity log" action. Cleared like the token scope above.
+  const [activityOAuthClient, setActivityOAuthClient] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
+
+  function openOAuthClientActivityLogs(client: { id: string; label: string }) {
+    setActivityToken(null);
+    setActivityOAuthClient(client);
     handleNav("activity-log");
   }
 
@@ -1437,6 +1451,7 @@ export default function AdminDashboard() {
               // rather than silently persisting behind a nav item that says
               // "Activity Log".
               setActivityToken(null);
+              setActivityOAuthClient(null);
               setActivityEnv(null);
               handleNav("activity-log");
             }}
@@ -1815,7 +1830,7 @@ export default function AdminDashboard() {
 
             {/* Mounted only while open, so it fetches on first visit rather
                 than on every console load. */}
-            {activePage === "oauth-clients" && <OAuthClients refreshKey={oauthClientsRefreshKey} />}
+            {activePage === "oauth-clients" && <OAuthClients refreshKey={oauthClientsRefreshKey} onViewActivity={openOAuthClientActivityLogs} />}
           </div>
 
           {/* ══════ ACTIVITY LOG PAGE ══════ */}
@@ -1826,6 +1841,8 @@ export default function AdminDashboard() {
               refreshKey={activityRefreshKey}
               tokenFilter={activityToken}
               onClearTokenFilter={() => setActivityToken(null)}
+              oauthClientFilter={activityOAuthClient}
+              onClearOAuthClientFilter={() => setActivityOAuthClient(null)}
               envScope={activityEnv}
             />
           </div>

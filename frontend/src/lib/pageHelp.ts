@@ -109,6 +109,7 @@ export const ADMIN_HELP: Record<AdminHelpKey, PageHelp> = {
       "Registered: it registered but has not signed in yet. Sign-ins made before this page existed cannot be matched to a client.",
       "Revoke stops that registration from starting or finishing any new sign-in. Expired registrations can no longer sign in either.",
       "Show revoked brings back the ones already switched off.",
+      "Activity log (row menu) opens the Activity Log filtered to that client's sign-ins. Sign-ins from before this page existed cannot be matched, so they will not appear.",
     ],
     note: "A client that just closes without signing out stays Connected until its refresh token expires. Revoking does not touch tokens it already holds; deactivate those from Tokens.",
   },

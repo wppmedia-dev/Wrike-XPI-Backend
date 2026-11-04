@@ -86,6 +86,13 @@ interface Props {
   /** Clears the token scope, returning the page to the whole log. */
   onClearTokenFilter?: () => void;
   /**
+   * Scope the page to the sign-ins of one registered OAuth client, set by the
+   * OAuth Clients table's "Activity log" row action. Same chip pattern as the
+   * token scope; `label` is only for the chip.
+   */
+  oauthClientFilter?: { id: string; label: string } | null;
+  onClearOAuthClientFilter?: () => void;
+  /**
    * Scope the page to one environment, set by the Environments table's
    * "Activity logs" row action. No chip for this one: the environment filter
    * below is a first-class control on this page, so the scope is already
@@ -106,6 +113,8 @@ export default function ActivityLog({
   refreshKey = 0,
   tokenFilter = null,
   onClearTokenFilter,
+  oauthClientFilter = null,
+  onClearOAuthClientFilter,
   envScope = null,
 }: Props) {
   const [config, setConfig] = useState<ActivityConfig | null>(null);
@@ -174,6 +183,7 @@ export default function ActivityLog({
   // Narrowed to a plain string so the effect below depends on the value
   // rather than on the object identity of the prop.
   const tokenFilterId = tokenFilter?.id || undefined;
+  const oauthClientId = oauthClientFilter?.id || undefined;
 
   // Follows the shell rather than just initialising: arriving from an
   // environment row pre-selects that environment here, and the shell clearing
@@ -193,6 +203,7 @@ export default function ActivityLog({
           listActivity({
             env_id: envFilter || undefined,
             token_id: tokenFilterId,
+            oauth_client_id: oauthClientId,
             surface: surfaceFilter || undefined,
             allowed: resultFilter ? resultFilter === "allowed" : undefined,
             agent: agentFilter || undefined,
@@ -205,6 +216,7 @@ export default function ActivityLog({
           getActivitySummary({
             env_id: envFilter || undefined,
             token_id: tokenFilterId,
+            oauth_client_id: oauthClientId,
           }),
         ]);
         setRows(list.rows);
@@ -218,7 +230,7 @@ export default function ActivityLog({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [envFilter, surfaceFilter, resultFilter, agentFilter, searchFilter, fromFilter, toFilter, pageSize, tokenFilterId],
+    [envFilter, surfaceFilter, resultFilter, agentFilter, searchFilter, fromFilter, toFilter, pageSize, tokenFilterId, oauthClientId],
   );
 
   useEffect(() => {
@@ -229,7 +241,7 @@ export default function ActivityLog({
     }
     load(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, envFilter, surfaceFilter, resultFilter, agentFilter, fromFilter, toFilter, pageSize, tokenFilterId]);
+  }, [active, envFilter, surfaceFilter, resultFilter, agentFilter, fromFilter, toFilter, pageSize, tokenFilterId, oauthClientId]);
 
   // Top-bar Refresh — reload the current page (keeps filters + page) and the
   // summary stats without resetting the view.
@@ -324,6 +336,7 @@ export default function ActivityLog({
       await exportActivityCsv({
         env_id: exportDraft.envFilter || undefined,
         token_id: tokenFilterId,
+            oauth_client_id: oauthClientId,
         surface: exportDraft.surfaceFilter || undefined,
         allowed: exportDraft.resultFilter ? exportDraft.resultFilter === "allowed" : undefined,
         agent: exportDraft.agentFilter || undefined,
@@ -422,6 +435,24 @@ export default function ActivityLog({
                   onClick={onClearTokenFilter}
                   aria-label="Clear the token filter"
                   title="Clear the token filter"
+                >
+                  <i className="fa-solid fa-xmark" aria-hidden="true" />
+                </button>
+              )}
+            </span>
+          )}
+
+          {oauthClientFilter && (
+            <span className="al-token-chip" title={`Filtered to the OAuth client ${oauthClientFilter.label}`}>
+              <i className="fa-solid fa-plug" aria-hidden="true" />
+              <span className="al-token-chip-label">OAuth client: {oauthClientFilter.label}</span>
+              {onClearOAuthClientFilter && (
+                <button
+                  type="button"
+                  className="al-token-chip-clear"
+                  onClick={onClearOAuthClientFilter}
+                  aria-label="Clear the OAuth client filter"
+                  title="Clear the OAuth client filter"
                 >
                   <i className="fa-solid fa-xmark" aria-hidden="true" />
                 </button>

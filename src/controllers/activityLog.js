@@ -135,12 +135,37 @@ const createdAtRange = (from, to) => {
 };
 
 /**
+ * Limit a query to the calls made with sign-ins that came from one registered
+ * OAuth client. An activity row records the token that made the call, not the
+ * client, and a client's sign-ins are recorded in mcp_token_families
+ * (client_id -> token_id), so the filter goes through that table. Only
+ * sign-ins made after connection tracking was added can be attributed.
+ *
+ * `clientId` is validated as a UUID by the route schema, and is escaped here
+ * as well because it is placed into a literal sub-select.
+ */
+const withOAuthClient = (where, clientId) => {
+  if (!clientId) return;
+  where[Op.and] = [
+    ...(where[Op.and] || []),
+    {
+      token_id: {
+        [Op.in]: models.sequelize.literal(
+          `(SELECT token_id FROM mcp_token_families WHERE client_id = ${models.sequelize.escape(clientId)})`,
+        ),
+      },
+    },
+  ];
+};
+
+/**
  * Paginated, filtered listing for the admin console. `limit` is capped hard
  * (this table can get large fast) rather than trusting the caller.
  */
 export const List = async ({
   envId,
   tokenId,
+  oauthClientId,
   search,
   surface,
   allowed,
@@ -155,6 +180,7 @@ export const List = async ({
   // Exact match, not a like: a token id is a UUID, and "show me everything
   // this token did" means that token, not anything whose id contains it.
   if (tokenId) where.token_id = tokenId;
+  withOAuthClient(where, oauthClientId);
   // One box, several columns. The consoles have a single search field, and
   // what gets typed into it is whatever the person already has in hand: the
   // caller's email, or the reference id out of an error message. Both are
@@ -215,6 +241,7 @@ const EXPORT_MAX = 20000;
 export const ExportRows = async ({
   envId,
   tokenId,
+  oauthClientId,
   search,
   surface,
   allowed,
@@ -225,6 +252,7 @@ export const ExportRows = async ({
   const where = {};
   if (envId) where.env_id = envId;
   if (tokenId) where.token_id = tokenId;
+  withOAuthClient(where, oauthClientId);
   if (search) {
     const term = `%${String(search).trim().toLowerCase()}%`;
     where[Op.or] = [
@@ -251,10 +279,11 @@ export const ExportRows = async ({
 };
 
 /** Quick counts for the console's summary strip. */
-export const Summary = async ({ envId, tokenId, since } = {}) => {
+export const Summary = async ({ envId, tokenId, oauthClientId, since } = {}) => {
   const where = {};
   if (envId) where.env_id = envId;
   if (tokenId) where.token_id = tokenId;
+  withOAuthClient(where, oauthClientId);
   if (since) where.created_at = { [Op.gte]: new Date(since) };
 
   const [total, denied] = await Promise.all([

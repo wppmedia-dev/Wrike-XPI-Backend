@@ -14,6 +14,9 @@ export const ListSchema = {
         // Set by the API Tokens table's "Activity logs" row action, so the
         // log opens filtered to one token instead of its whole environment.
         token_id: { type: "string", format: "uuid" },
+        // Set by the OAuth Clients table's "Activity log" row action: everything
+        // done with sign-ins that came from one registered OAuth client.
+        oauth_client_id: { type: "string", format: "uuid" },
         // The console's one search box. Free text across the columns a person
         // arrives with: the caller's email, or the reference id from an error
         // message. Both are matched as substrings, so a partial reference is
@@ -41,6 +44,9 @@ export const SummarySchema = {
       properties: {
         env_id: { type: "string", format: "uuid" },
         token_id: { type: "string", format: "uuid" },
+        // Set by the OAuth Clients table's "Activity log" row action: everything
+        // done with sign-ins that came from one registered OAuth client.
+        oauth_client_id: { type: "string", format: "uuid" },
         since: { type: "string" },
       },
     },
@@ -55,6 +61,9 @@ export const ExportSchema = {
       properties: {
         env_id: { type: "string", format: "uuid" },
         token_id: { type: "string", format: "uuid" },
+        // Set by the OAuth Clients table's "Activity log" row action: everything
+        // done with sign-ins that came from one registered OAuth client.
+        oauth_client_id: { type: "string", format: "uuid" },
         search: { type: "string", maxLength: 320 },
         surface: { type: "string", enum: ["rest", "mcp"] },
         allowed: { type: "string", enum: ["true", "false"] },

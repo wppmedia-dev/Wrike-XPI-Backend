@@ -68,7 +68,14 @@ const redirectHosts = (client: OAuthClient): string => {
   return [...new Set(hosts)].join(", ");
 };
 
-export default function OAuthClients({ refreshKey = 0 }: { refreshKey?: number }) {
+export default function OAuthClients({
+  refreshKey = 0,
+  onViewActivity,
+}: {
+  refreshKey?: number;
+  /** Open the Activity Log scoped to this client's sign-ins. */
+  onViewActivity?: (client: { id: string; label: string }) => void;
+}) {
   const [data, setData] = useState<OAuthClientList | null>(null);
   const [loading, setLoading] = useState(true);
   const [showRevoked, setShowRevoked] = useState(false);
@@ -203,19 +210,34 @@ export default function OAuthClients({ refreshKey = 0 }: { refreshKey?: number }
         header: "Actions",
         width: "64px",
         align: "center",
-        cell: (c) =>
-          statusOf(c) !== "revoked" && statusOf(c) !== "expired" ? (
-            <RowMenu
-              label={`Actions for ${c.client_name || c.id}`}
-              items={[
-                {
-                  label: "Revoke",
-                  icon: "fa-solid fa-ban",
-                  danger: true,
-                  onSelect: () => handleRevoke(c),
-                },
-              ]}
-            />
+        cell: (c) => {
+          const status = statusOf(c);
+          const canRevoke = status !== "revoked" && status !== "expired";
+          const items = [
+            // History is useful for a revoked or expired client too.
+            ...(onViewActivity
+              ? [
+                  {
+                    label: "Activity log",
+                    icon: "fa-solid fa-clock-rotate-left",
+                    onSelect: () =>
+                      onViewActivity({ id: c.id, label: c.client_name || c.id.slice(0, 8) }),
+                  },
+                ]
+              : []),
+            ...(canRevoke
+              ? [
+                  {
+                    label: "Revoke",
+                    icon: "fa-solid fa-ban",
+                    danger: true,
+                    onSelect: () => handleRevoke(c),
+                  },
+                ]
+              : []),
+          ];
+          return items.length ? (
+            <RowMenu label={`Actions for ${c.client_name || c.id}`} items={items} />
           ) : (
             <span
               className="text-muted"
@@ -223,10 +245,11 @@ export default function OAuthClients({ refreshKey = 0 }: { refreshKey?: number }
             >
               {EMPTY}
             </span>
-          ),
+          );
+        },
       },
     ],
-    [handleRevoke],
+    [handleRevoke, onViewActivity],
   );
 
   const table = useTable({
