@@ -1,8 +1,15 @@
+/* Same as the Activity Log table: every cell stays on one line and the table
+   scrolls sideways (DataTable's .dt2-scroll) when the row is wider than the
+   screen, instead of wrapping text. */
+.oc-table th,
+.oc-table td {
+  white-space: nowrap;
+}
+
 .oc-client {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .oc-id {
@@ -15,12 +22,7 @@
 }
 
 .oc-redirect {
-  display: inline-block;
-  max-width: 260px;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
-  vertical-align: bottom;
 }
 
 .oc-mono {
