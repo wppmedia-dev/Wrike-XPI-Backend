@@ -1,4 +1,5 @@
 import models from "../../models";
+import { connectionState, clientStatus } from "../utils/oauthClientStatus";
 
 /**
  * Storage for dynamically registered OAuth clients (migration
@@ -71,9 +72,78 @@ export const TouchLastUsed = async (id) => {
 
 export const MAX_LIST_LIMIT = 500;
 
+/* A sign-in is "live" while it is not revoked and still has a refresh token
+   that has not expired. Same test McpTokens.Rotate applies before it will
+   accept a refresh. */
+const LIVE_SESSION_SQL = `f.revoked_at IS NULL AND EXISTS (
+  SELECT 1 FROM mcp_refresh_tokens r WHERE r.family_id = f.id AND r.expires_at > NOW()
+)`;
+
+/**
+ * Connection data for the clients on this page: how many sign-ins each has
+ * ever made, how many are live, when it was last active and when a sign-in
+ * was last ended. Keyed by client id.
+ *
+ * Resolves null (never throws) if it cannot be read, e.g. the migration that
+ * adds mcp_token_families.client_id has not run yet. The list then falls back
+ * to showing registrations only, as it did before.
+ */
+const sessionStatsFor = async (ids) => {
+  if (!ids.length) return {};
+  try {
+    const found = await models.sequelize.query(
+      `SELECT f.client_id AS client_id,
+              COUNT(*)::int AS total_sessions,
+              COUNT(*) FILTER (WHERE ${LIVE_SESSION_SQL})::int AS live_sessions,
+              MAX(COALESCE(f.last_rotated_at, f.created_at)) AS last_active_at,
+              MAX(f.revoked_at) AS last_disconnected_at
+         FROM mcp_token_families f
+        WHERE f.client_id IN (:ids)
+        GROUP BY f.client_id`,
+      { replacements: { ids }, type: models.Sequelize.QueryTypes.SELECT },
+    );
+    return Object.fromEntries(found.map((row) => [row.client_id, row]));
+  } catch (err) {
+    console.warn(
+      new Date().toISOString(),
+      `[oauth-clients] could not read connection data: ${err?.message || err}`,
+    );
+    return null;
+  }
+};
+
+/** Whole-table counts of unrevoked, unexpired clients by connection state. */
+const connectionCounts = async () => {
+  try {
+    const [row] = await models.sequelize.query(
+      `WITH s AS (
+         SELECT f.client_id,
+                COUNT(*) AS total,
+                COUNT(*) FILTER (WHERE ${LIVE_SESSION_SQL}) AS live
+           FROM mcp_token_families f
+          WHERE f.client_id IS NOT NULL
+          GROUP BY f.client_id
+       )
+       SELECT
+         COUNT(*) FILTER (WHERE COALESCE(s.live, 0) > 0)::int AS connected,
+         COUNT(*) FILTER (WHERE COALESCE(s.total, 0) > 0 AND COALESCE(s.live, 0) = 0)::int AS disconnected,
+         COUNT(*) FILTER (WHERE COALESCE(s.total, 0) = 0)::int AS registered
+         FROM oauth_clients c
+         LEFT JOIN s ON s.client_id = c.id
+        WHERE c.revoked_at IS NULL AND (c.expires_at IS NULL OR c.expires_at > NOW())`,
+      { type: models.Sequelize.QueryTypes.SELECT },
+    );
+    return row || null;
+  } catch {
+    return null;
+  }
+};
+
 /**
  * Newest first. `counts` covers the whole table regardless of the filter, so
- * the console's stat cards stay correct when revoked rows are hidden.
+ * the console's stat cards stay correct when revoked rows are hidden. Each row
+ * carries `connection` (null if it could not be read) and `status`, the single
+ * value the console displays (src/utils/oauthClientStatus.js).
  */
 export const List = async ({ includeRevoked = false, limit = 50, offset = 0 } = {}) => {
   const { Op } = models.Sequelize;
@@ -81,7 +151,7 @@ export const List = async ({ includeRevoked = false, limit = 50, offset = 0 } = 
   const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), MAX_LIST_LIMIT);
   const safeOffset = Math.max(parseInt(offset, 10) || 0, 0);
 
-  const [{ rows, count }, active, revoked] = await Promise.all([
+  const [{ rows, count }, active, revoked, byConnection] = await Promise.all([
     models.OAuthClients.findAndCountAll({
       where,
       attributes: PUBLIC_FIELDS,
@@ -92,14 +162,34 @@ export const List = async ({ includeRevoked = false, limit = 50, offset = 0 } = 
     }),
     models.OAuthClients.count({ where: { revoked_at: null } }),
     models.OAuthClients.count({ where: { revoked_at: { [Op.ne]: null } } }),
+    connectionCounts(),
   ]);
 
+  const stats = await sessionStatsFor(rows.map((row) => row.id));
+
+  const withStatus = rows.map((row) => {
+    const s = stats?.[row.id];
+    const connection = stats
+      ? {
+          state: connectionState({
+            totalSessions: s?.total_sessions || 0,
+            liveSessions: s?.live_sessions || 0,
+          }),
+          live_sessions: s?.live_sessions || 0,
+          total_sessions: s?.total_sessions || 0,
+          last_active_at: s?.last_active_at || null,
+          last_disconnected_at: s?.last_disconnected_at || null,
+        }
+      : null;
+    return { ...row, connection, status: clientStatus(row, connection?.state) };
+  });
+
   return {
-    rows,
+    rows: withStatus,
     total: count,
     limit: safeLimit,
     offset: safeOffset,
-    counts: { active, revoked },
+    counts: { active, revoked, ...(byConnection || {}) },
   };
 };
 

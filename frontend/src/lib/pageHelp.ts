@@ -104,12 +104,13 @@ export const ADMIN_HELP: Record<AdminHelpKey, PageHelp> = {
     summary:
       "Every MCP connector that registered itself with this service through OAuth.",
     points: [
-      "One row per registration: its name, where it redirects to, and when it last completed a sign-in.",
-      "Revoke stops that registration from starting or finishing any new sign-in.",
-      "Expired registrations can no longer sign in either; the connector registers again on its own.",
+      "Beta: this page is new and may change.",
+      "Connected: the client has a sign-in that can still refresh. Disconnected: it has signed in before, but none is live now (signed out, revoked, or the refresh token lapsed).",
+      "Registered: it registered but has not signed in yet. Sign-ins made before this page existed cannot be matched to a client.",
+      "Revoke stops that registration from starting or finishing any new sign-in. Expired registrations can no longer sign in either.",
       "Show revoked brings back the ones already switched off.",
     ],
-    note: "Revoking does not touch tokens the connector already holds. Deactivate those from Tokens.",
+    note: "A client that just closes without signing out stays Connected until its refresh token expires. Revoking does not touch tokens it already holds; deactivate those from Tokens.",
   },
 
   activity: {

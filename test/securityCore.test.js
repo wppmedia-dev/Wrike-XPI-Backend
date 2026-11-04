@@ -343,6 +343,29 @@ const legacyEncrypt = (plaintext, keyHex) => {
     main.isReady = true;
   }
 
+  /* ── OAuth client status ───────────────────────────────────────────── */
+
+  section("OAuth client status");
+  {
+    const { connectionState, clientStatus, CLIENT_STATUS } = require("../src/utils/oauthClientStatus");
+    const future = new Date(Date.now() + 86400000).toISOString();
+    const past = new Date(Date.now() - 86400000).toISOString();
+    const live = { revoked_at: null, expires_at: future };
+
+    check("a live sign-in means connected", connectionState({ totalSessions: 3, liveSessions: 1 }), CLIENT_STATUS.CONNECTED);
+    check("sign-ins that are all over mean disconnected", connectionState({ totalSessions: 2, liveSessions: 0 }), CLIENT_STATUS.DISCONNECTED);
+    check("no sign-ins at all means registered", connectionState({ totalSessions: 0, liveSessions: 0 }), CLIENT_STATUS.REGISTERED);
+    check("no data defaults to registered", connectionState(), CLIENT_STATUS.REGISTERED);
+
+    check("a connected client shows connected, not 'active'", clientStatus(live, "connected"), "connected");
+    check("a disconnected client no longer reads as active", clientStatus(live, "disconnected"), "disconnected");
+    check("connection unknown: falls back to registered (the old behaviour)", clientStatus(live, null), "registered");
+    check("a revoked registration wins over a live connection", clientStatus({ ...live, revoked_at: past }, "connected"), "revoked");
+    check("an expired registration wins over a live connection", clientStatus({ revoked_at: null, expires_at: past }, "connected"), "expired");
+    check("no expiry date never expires", clientStatus({ revoked_at: null, expires_at: null }, "connected"), "connected");
+    check("revoked beats expired", clientStatus({ revoked_at: past, expires_at: past }, null), "revoked");
+  }
+
   Module._load = realLoad;
   out(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

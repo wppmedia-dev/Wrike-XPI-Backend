@@ -4,6 +4,7 @@ import {
   revokeOAuthClient,
   type OAuthClient,
   type OAuthClientList,
+  type OAuthClientStatus,
 } from "../lib/oauthClientsApi";
 import { DataTable } from "../components/ui/DataTable";
 import { useTable, type ColumnDef } from "../components/ui/useTable";
@@ -19,20 +20,22 @@ import "./OAuthClients.css";
  * sign-ins for that registration; tokens it already minted are separate
  * records, revoked from Tokens. */
 
-type ClientStatus = "active" | "expired" | "revoked";
-
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-const statusOf = (client: OAuthClient): ClientStatus => {
+/** Same rules as src/utils/oauthClientStatus.js; the server's value wins. */
+const statusOf = (client: OAuthClient): OAuthClientStatus => {
+  if (client.status) return client.status;
   if (client.revoked_at) return "revoked";
   if (client.expires_at && new Date(client.expires_at).getTime() <= Date.now()) return "expired";
-  return "active";
+  return client.connection?.state || "registered";
 };
 
-const STATUS_BADGE: Record<ClientStatus, { tone: "success" | "warning" | "danger"; label: string }> = {
-  active: { tone: "success", label: "Active" },
-  expired: { tone: "warning", label: "Expired" },
-  revoked: { tone: "danger", label: "Revoked" },
+const STATUS_BADGE: Record<OAuthClientStatus, { tone: "success" | "warning" | "danger" | "neutral" | "info"; label: string; hint: string }> = {
+  connected: { tone: "success", label: "Connected", hint: "Has a sign-in that can still refresh" },
+  disconnected: { tone: "neutral", label: "Disconnected", hint: "Has signed in before, but no sign-in is live now" },
+  registered: { tone: "info", label: "Registered", hint: "Registered, and has not signed in yet" },
+  expired: { tone: "warning", label: "Expired", hint: "The registration's lifetime has passed" },
+  revoked: { tone: "danger", label: "Revoked", hint: "Revoked by an administrator" },
 };
 
 /** "5 min ago" for anything recent, the date after that. */
@@ -45,6 +48,13 @@ function timeAgo(value: string | null | undefined): string {
   if (seconds < 86400) return `${Math.floor(seconds / 3600)} hr ago`;
   return formatDate(value);
 }
+
+const lastActive = (c: OAuthClient): string | null => {
+  const a = c.connection?.last_active_at;
+  const b = c.last_used_at;
+  if (a && b) return new Date(a) > new Date(b) ? a : b;
+  return a || b || null;
+};
 
 /** Host of each redirect URI: what an admin recognises a connector by. */
 const redirectHosts = (client: OAuthClient): string => {
@@ -139,10 +149,19 @@ export default function OAuthClients({ refreshKey = 0 }: { refreshKey?: number }
         accessor: (c) => statusOf(c),
         cell: (c) => {
           const s = STATUS_BADGE[statusOf(c)];
+          const sessions = c.connection;
           return (
-            <Badge tone={s.tone} dot>
-              {s.label}
-            </Badge>
+            <span
+              title={
+                sessions && sessions.total_sessions > 0
+                  ? `${s.hint}. ${sessions.live_sessions} of ${sessions.total_sessions} sign-in(s) live.`
+                  : s.hint
+              }
+            >
+              <Badge tone={s.tone} dot>
+                {s.label}
+              </Badge>
+            </span>
           );
         },
       },
@@ -154,13 +173,15 @@ export default function OAuthClients({ refreshKey = 0 }: { refreshKey?: number }
         cell: (c) => <span title={formatDateTime(c.created_at)}>{formatDate(c.created_at)}</span>,
       },
       {
-        id: "last_used_at",
-        header: "Last sign-in",
-        accessor: (c) => dateSortValue(c.last_used_at),
+        id: "last_active_at",
+        header: "Last active",
+        // Last refresh or sign-in, whichever is later; the sign-in time alone
+        // for clients whose sign-ins predate connection tracking.
+        accessor: (c) => dateSortValue(lastActive(c)),
         searchable: false,
         cell: (c) => (
-          <span title={c.last_used_at ? formatDateTime(c.last_used_at) : undefined}>
-            {timeAgo(c.last_used_at)}
+          <span title={lastActive(c) ? formatDateTime(lastActive(c)) : undefined}>
+            {timeAgo(lastActive(c))}
           </span>
         ),
       },
@@ -183,7 +204,7 @@ export default function OAuthClients({ refreshKey = 0 }: { refreshKey?: number }
         width: "64px",
         align: "center",
         cell: (c) =>
-          statusOf(c) === "active" ? (
+          statusOf(c) !== "revoked" && statusOf(c) !== "expired" ? (
             <RowMenu
               label={`Actions for ${c.client_name || c.id}`}
               items={[
@@ -216,11 +237,10 @@ export default function OAuthClients({ refreshKey = 0 }: { refreshKey?: number }
     initialPageSize: 10,
   });
 
-  const active = data?.counts.active ?? 0;
   const revoked = data?.counts.revoked ?? 0;
-  const usedRecently = rows.filter(
-    (c) => !c.revoked_at && c.last_used_at && Date.now() - new Date(c.last_used_at).getTime() <= 30 * DAY_MS,
-  ).length;
+  // Whole-table counts from the server; undefined if it could not read them.
+  const connected = data?.counts.connected;
+  const disconnected = data?.counts.disconnected;
   const expiringSoon = rows.filter((c) => {
     if (c.revoked_at || !c.expires_at) return false;
     const left = new Date(c.expires_at).getTime() - Date.now();
@@ -236,17 +256,17 @@ export default function OAuthClients({ refreshKey = 0 }: { refreshKey?: number }
             <i className="fa-solid fa-plug-circle-check" />
           </div>
           <div className="stat-body">
-            <div className="stat-value">{data ? active : EMPTY}</div>
-            <div className="stat-label">Active Clients</div>
+            <div className="stat-value">{data && connected !== undefined ? connected : EMPTY}</div>
+            <div className="stat-label">Connected</div>
           </div>
         </div>
         <div className="stat-card blue">
           <div className="stat-icon blue">
-            <i className="fa-solid fa-right-to-bracket" />
+            <i className="fa-solid fa-plug-circle-xmark" />
           </div>
           <div className="stat-body">
-            <div className="stat-value">{data ? usedRecently : EMPTY}</div>
-            <div className="stat-label">Signed In (30 days)</div>
+            <div className="stat-value">{data && disconnected !== undefined ? disconnected : EMPTY}</div>
+            <div className="stat-label">Disconnected</div>
           </div>
         </div>
         <div className="stat-card yellow">

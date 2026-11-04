@@ -514,6 +514,10 @@ export const oauthRoute = (fastify, opts, done) => {
           tokenId: result.tokenId,
           dek: result.dek,
           refreshTtlSeconds: lifetimes.refreshTtlSeconds,
+          // Only a registered client has an id to record.
+          clientId: OAuthClients.isClientId(client.claims?.jti)
+            ? client.claims.jti
+            : null,
         });
 
         noStore(reply);

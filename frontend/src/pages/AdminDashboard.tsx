@@ -1424,7 +1424,9 @@ export default function AdminDashboard() {
             <span className="ni">
               <i className="fa-solid fa-plug" />
             </span>
-            <span className="nl">OAuth Clients</span>
+            <span className="nl">
+              OAuth Clients <span className="oc-beta">Beta</span>
+            </span>
           </div>
 
           <div
@@ -1802,7 +1804,8 @@ export default function AdminDashboard() {
             <div className="section-header">
               <div>
                 <div className="section-title">
-                  OAuth Clients <PageInfo help={ADMIN_HELP.oauthClients} />
+                  OAuth Clients <span className="oc-beta" title="This page is new and may change">Beta</span>{" "}
+                  <PageInfo help={ADMIN_HELP.oauthClients} />
                 </div>
                 <div className="section-subtitle">
                   MCP connectors registered with this service, and revoking them

@@ -37,7 +37,7 @@ const stampTokenExpiry = (tokenId, expiresAt, transaction) =>
  * Start a family for a freshly minted token row and hand back its first
  * refresh token.
  */
-export const Issue = async ({ tokenId, dek, refreshTtlSeconds }) => {
+export const Issue = async ({ tokenId, dek, refreshTtlSeconds, clientId = null }) => {
   const now = new Date();
   const refreshToken = crypto.generateRefreshToken();
   const expiresAt = expiryFrom(now, refreshTtlSeconds);
@@ -60,6 +60,25 @@ export const Issue = async ({ tokenId, dek, refreshTtlSeconds }) => {
     await stampTokenExpiry(tokenId, expiresAt, transaction);
     return family.id;
   });
+
+  // clientId is the registered OAuth client this sign-in came from (null for an
+  // unregistered or pre-registry client). It only feeds the admin console's
+  // connection status, so it is recorded AFTER the sign-in committed and its
+  // failure is swallowed: a sign-in must never depend on it (for example when
+  // the column's migration has not run yet).
+  if (clientId) {
+    try {
+      await models.McpTokenFamilies.update(
+        { client_id: clientId },
+        { where: { id: familyId } },
+      );
+    } catch (err) {
+      console.warn(
+        new Date().toISOString(),
+        `[mcp-tokens] could not record the client for sign-in ${familyId}: ${err?.message || err}`,
+      );
+    }
+  }
 
   return { familyId, refreshToken, refreshExpiresAt: expiresAt };
 };

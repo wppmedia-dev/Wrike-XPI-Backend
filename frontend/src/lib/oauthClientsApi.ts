@@ -5,8 +5,30 @@ import { adminFetch } from "./authApi";
    row per dynamic client registration (POST /oauth/register), i.e. every MCP
    connector that has signed up with this service. */
 
+/** What the console shows for a client; computed by the server. */
+export type OAuthClientStatus =
+  | "revoked"
+  | "expired"
+  | "connected"
+  | "disconnected"
+  | "registered";
+
+export interface OAuthClientConnection {
+  state: "connected" | "disconnected" | "registered";
+  /** Sign-ins that can still refresh. */
+  live_sessions: number;
+  /** Sign-ins this client has ever made. */
+  total_sessions: number;
+  last_active_at: string | null;
+  last_disconnected_at: string | null;
+}
+
 export interface OAuthClient {
   id: string;
+  /** Absent only if the server predates connection tracking. */
+  status?: OAuthClientStatus;
+  /** Null when connection data could not be read. */
+  connection?: OAuthClientConnection | null;
   client_name: string | null;
   redirect_uris: string[];
   created_at: string;
@@ -25,7 +47,14 @@ export interface OAuthClientList {
   limit: number;
   offset: number;
   /** Whole-table counts, independent of the filter. */
-  counts: { active: number; revoked: number };
+  counts: {
+    active: number;
+    revoked: number;
+    /** Unrevoked, unexpired clients by connection; absent if unreadable. */
+    connected?: number;
+    disconnected?: number;
+    registered?: number;
+  };
 }
 
 /** The server's page-size cap (MAX_LIST_LIMIT in src/controllers/oauthClients.js). */

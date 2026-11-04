@@ -26,6 +26,11 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: DataTypes.UUIDV4,
       },
       token_id: { type: DataTypes.UUID, allowNull: false },
+      client_id: {
+        type: DataTypes.UUID,
+        allowNull: true,
+        comment: "oauth_clients.id this sign-in came from; null for older ones",
+      },
       created_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
       last_rotated_at: { type: DataTypes.DATE, allowNull: true },
       revoked_at: { type: DataTypes.DATE, allowNull: true },
