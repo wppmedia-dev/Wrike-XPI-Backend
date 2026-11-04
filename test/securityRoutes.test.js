@@ -61,6 +61,12 @@ let statusOf = async () => "active";
 let revokeCalls = [];
 let lastListArgs = null;
 
+const mcpTokens = require("../src/controllers/mcpTokens");
+let revokedFamilies = [];
+let revokedRefresh = [];
+mcpTokens.RevokeFamily = async (familyId) => (revokedFamilies.push(familyId), 1);
+mcpTokens.RevokeByRefreshToken = async (token) => (revokedRefresh.push(token), 1);
+
 oauthClients.Register = async (row) => {
   if (registerShouldFail) throw new Error("database is down");
   stored.push(row);
@@ -298,6 +304,56 @@ const bearer = { authorization: `Bearer ${adminToken}` };
   }
 
   /* ── Admin OAuth clients API ───────────────────────────────────────── */
+
+  section("signing out: POST /oauth/revoke");
+  {
+    const reset = () => ((revokedFamilies = []), (revokedRefresh = []));
+    const revoke = (token) =>
+      app.inject({
+        method: "POST",
+        url: "/oauth/revoke",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        payload: `token=${encodeURIComponent(token)}`,
+      });
+    const quiet = async (fn) => {
+      const { log } = console;
+      console.log = () => {};
+      try { return await fn(); } finally { console.log = log; }
+    };
+    const familyId = uuid();
+    const access = app.jwt.sign({ t: uuid(), d: "ZGVr", f: familyId, s: "mcp" }, { expiresIn: "1h" });
+
+    reset();
+    let res = await quiet(() => revoke("a-refresh-token-value"));
+    check("a refresh token ends its sign-in", [res.statusCode, revokedRefresh, revokedFamilies], [200, ["a-refresh-token-value"], []]);
+
+    reset();
+    res = await quiet(() => revoke(access));
+    check("an ACCESS token ends the sign-in too (a client may send either)", [res.statusCode, revokedFamilies, revokedRefresh], [200, [familyId], []]);
+
+    reset();
+    const now = Math.floor(Date.now() / 1000);
+    const expired = app.jwt.sign({ t: uuid(), d: "ZGVr", f: familyId, s: "mcp", iat: now - 7200, exp: now - 3600 });
+    res = await quiet(() => revoke(expired));
+    check("an expired access token can still sign out", [res.statusCode, revokedFamilies], [200, [familyId]]);
+
+    reset();
+    const rest = app.jwt.sign({ t: uuid(), d: "ZGVr" }, { expiresIn: "1h" });
+    res = await quiet(() => revoke(rest));
+    check("a REST (non-MCP) token is not an MCP sign-in", [res.statusCode, revokedFamilies], [200, []]);
+
+    reset();
+    res = await quiet(() => revoke(jsonwebtoken.sign({ f: familyId, s: "mcp" }, "someone-elses-secret")));
+    check("a token signed with another secret revokes nothing", [res.statusCode, revokedFamilies], [200, []]);
+
+    reset();
+    res = await quiet(() => app.inject({ method: "POST", url: "/oauth/revoke", payload: {} }));
+    check("no token: still 200, nothing revoked", [res.statusCode, revokedFamilies, revokedRefresh], [200, [], []]);
+
+    reset();
+    res = await quiet(() => app.inject({ method: "POST", url: "/oauth/revoke", payload: { token: access } }));
+    check("a JSON body works as well as a form", [res.statusCode, revokedFamilies], [200, [familyId]]);
+  }
 
   section("admin OAuth clients API");
   {

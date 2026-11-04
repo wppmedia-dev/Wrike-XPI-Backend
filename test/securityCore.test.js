@@ -353,6 +353,18 @@ const legacyEncrypt = (plaintext, keyHex) => {
     const live = { revoked_at: null, expires_at: future };
 
     check("a live sign-in means connected", connectionState({ totalSessions: 3, liveSessions: 1 }), CLIENT_STATUS.CONNECTED);
+
+    const now = Date.now();
+    const ago = (seconds) => new Date(now - seconds * 1000).toISOString();
+    const idleAfter = 4200; // an access token's lifetime plus a margin
+    check("live and recently refreshed: connected", connectionState({ totalSessions: 1, liveSessions: 1, liveLastActiveAt: ago(600), idleAfterSeconds: idleAfter, now }), "connected");
+    check("live but quiet for longer than the threshold: idle", connectionState({ totalSessions: 1, liveSessions: 1, liveLastActiveAt: ago(9000), idleAfterSeconds: idleAfter, now }), "idle");
+    check("just inside the threshold: still connected", connectionState({ totalSessions: 1, liveSessions: 1, liveLastActiveAt: ago(4100), idleAfterSeconds: idleAfter, now }), "connected");
+    check("no threshold given: never idle", connectionState({ totalSessions: 1, liveSessions: 1, liveLastActiveAt: ago(99999), now }), "connected");
+    check("no activity time known: connected, not idle", connectionState({ totalSessions: 1, liveSessions: 1, idleAfterSeconds: idleAfter, now }), "connected");
+    check("quiet but nothing live: disconnected beats idle", connectionState({ totalSessions: 2, liveSessions: 0, liveLastActiveAt: ago(99999), idleAfterSeconds: idleAfter, now }), "disconnected");
+    check("an idle client keeps that status", clientStatus({ revoked_at: null, expires_at: null }, "idle"), "idle");
+    check("a revoked registration still wins over idle", clientStatus({ revoked_at: ago(5), expires_at: null }, "idle"), "revoked");
     check("sign-ins that are all over mean disconnected", connectionState({ totalSessions: 2, liveSessions: 0 }), CLIENT_STATUS.DISCONNECTED);
     check("no sign-ins at all means registered", connectionState({ totalSessions: 0, liveSessions: 0 }), CLIENT_STATUS.REGISTERED);
     check("no data defaults to registered", connectionState(), CLIENT_STATUS.REGISTERED);

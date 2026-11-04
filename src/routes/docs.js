@@ -547,12 +547,12 @@ module.exports = async function (fastify, opts) {
           <p class="pg-p">The refresh token's lifetime restarts every time it is used, so a connection that keeps being used stays signed in. One that sits idle for longer than the refresh lifetime needs a new sign-in.</p>
 
           <h2 class="pg-h2">Signing out</h2>
-          <p class="pg-p">To end a connection, send the refresh token to the revocation endpoint. This switches off the refresh token <b>and</b> the access tokens issued with it. It always answers <code>200</code>, whether or not the token was known.</p>
+          <p class="pg-p">To end a connection, send either token (the refresh token or the access token) to the revocation endpoint. This switches off the refresh token <b>and</b> the access tokens issued with it. It always answers <code>200</code>, whether or not the token was known. An assistant that just forgets its tokens without calling this leaves the sign-in alive on the server until the refresh token expires.</p>
           ${codeBlock(
             "bash",
             `curl -X POST "${appUrl}/oauth/revoke" \\
   -H "Content-Type: application/x-www-form-urlencoded" \\
-  -d "token=<refresh_token>"`,
+  -d "token=<refresh_token or access_token>"`,
             "Revoke",
           )}
           <p class="pg-p">An administrator can also revoke a connection from the console.</p>
