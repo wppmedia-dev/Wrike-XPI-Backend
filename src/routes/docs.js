@@ -436,8 +436,9 @@ module.exports = async function (fastify, opts) {
           <ol class="ordered">
             <li>Your assistant requests authorization from the MCP OAuth server.</li>
             <li>You approve the login with Wrike.</li>
-            <li>The server exchanges the code (with PKCE) for a short-lived token.</li>
-            <li>Tool calls authenticate with that token until it expires.</li>
+            <li>The server exchanges the code (with PKCE) for a short-lived <b>access token</b> and a <b>refresh token</b>.</li>
+            <li>Tool calls authenticate with the access token until it expires.</li>
+            <li>When it expires, the assistant trades the refresh token for a new pair, without asking you to sign in again. See <a class="lnk" href="#/mcp/tokens">Token lifetime &amp; refresh</a>.</li>
           </ol>
 
           <h2 class="pg-h2">Scopes</h2>
@@ -450,6 +451,122 @@ module.exports = async function (fastify, opts) {
             "tip",
             "Reporting a refusal",
             "Keep the reference from the message. It turns “the assistant said FORBIDDEN” into one lookup in the console instead of a search by timestamp.",
+          )}`,
+      },
+      {
+        id: "mcp/tokens",
+        group: "MCP Docs",
+        groupId: "mcp",
+        label: "Token lifetime & refresh",
+        keywords:
+          "token tokens refresh refresh_token access expire expired expiry expires_in 401 invalid_token invalid_grant rotate rotation revoke sign out signout lifetime renew oauth",
+        html: `
+          <div class="pg-eyebrow">MCP Docs</div>
+          <h1 class="pg-title">Token lifetime &amp; refresh</h1>
+          <p class="pg-lede">An MCP connection uses a short-lived access token and a longer-lived refresh token. When the access token expires, the assistant swaps the refresh token for a new pair, so you are not asked to sign in again.</p>
+
+          <h2 class="pg-h2">The two tokens</h2>
+          ${table(
+            ["", "Access token", "Refresh token"],
+            [
+              [
+                "<b>Used for</b>",
+                "Every call to the MCP endpoint (<code>Authorization: Bearer …</code>).",
+                "Only to get a new access token, at <code>/oauth/token</code>.",
+              ],
+              [
+                "<b>Lifetime</b>",
+                "Short (about an hour by default).",
+                "Longer (days by default).",
+              ],
+              [
+                "<b>Set by</b>",
+                "An administrator, in the console settings.",
+                "An administrator, in the console settings.",
+              ],
+              [
+                "<b>After it is used</b>",
+                "Keeps working until it expires.",
+                "<b>Replaced</b> with a new one every time. Each can be used once.",
+              ],
+            ],
+          )}
+          <p class="pg-p">The sign-in response tells the assistant both lifetimes' starting point: <code>expires_in</code> is the access token's lifetime in seconds.</p>
+          ${codeBlock(
+            "json",
+            `{
+  "access_token": "eyJ…",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "…"
+}`,
+            "Sign-in response · POST /oauth/token",
+          )}
+
+          <h2 class="pg-h2">What the assistant does when the token expires</h2>
+          <ol class="ordered">
+            <li>A call to the MCP endpoint comes back <code>401</code> with <code>WWW-Authenticate: Bearer error="invalid_token"</code>. (An assistant can also refresh just before <code>expires_in</code> runs out.)</li>
+            <li>It sends the refresh token to the token endpoint.</li>
+            <li>It <b>stores the new refresh token it receives</b>, replacing the old one, and uses the new access token.</li>
+            <li>It repeats the original call. You see nothing.</li>
+          </ol>
+          ${codeBlock(
+            "bash",
+            `curl -X POST "${appUrl}/oauth/token" \\
+  -H "Content-Type: application/x-www-form-urlencoded" \\
+  -d "grant_type=refresh_token" \\
+  -d "refresh_token=<refresh_token>"`,
+            "Refresh request",
+          )}
+          <p class="pg-p">The reply has the same shape as the sign-in response: a new <code>access_token</code>, <code>expires_in</code> and a new <code>refresh_token</code>.</p>
+
+          <h2 class="pg-h2">Always keep the newest refresh token</h2>
+          <p class="pg-p">Each refresh token works once. The reply to a refresh carries the next one, and that is the only copy that will work next time.</p>
+          ${callout(
+            "warn",
+            "Replaying an old refresh token signs you out",
+            "A refresh token that was already used is tolerated for about 20 seconds, so a retry after a lost reply still works. After that, presenting it again is treated as a leaked copy and the <b>whole sign-in is revoked</b>, access tokens included. Save the new token as soon as the reply arrives, and refresh from one place at a time.",
+          )}
+
+          <h2 class="pg-h2">If the refresh fails</h2>
+          ${table(
+            ["Reply", "Meaning", "What to do"],
+            [
+              [
+                "<code>400</code> <code>invalid_grant</code>",
+                "The refresh token has expired, was already used, or the sign-in was revoked.",
+                "Start the sign-in again. Retrying will not help.",
+              ],
+              [
+                "<code>503</code> <code>temporarily_unavailable</code>",
+                "The service could not answer just now. The refresh token is still good.",
+                "Wait a moment and retry with the <b>same</b> refresh token.",
+              ],
+            ],
+          )}
+          <p class="pg-p">The refresh token's lifetime restarts every time it is used, so a connection that keeps being used stays signed in. One that sits idle for longer than the refresh lifetime needs a new sign-in.</p>
+
+          <h2 class="pg-h2">Signing out</h2>
+          <p class="pg-p">To end a connection, send the refresh token to the revocation endpoint. This switches off the refresh token <b>and</b> the access tokens issued with it. It always answers <code>200</code>, whether or not the token was known.</p>
+          ${codeBlock(
+            "bash",
+            `curl -X POST "${appUrl}/oauth/revoke" \\
+  -H "Content-Type: application/x-www-form-urlencoded" \\
+  -d "token=<refresh_token>"`,
+            "Revoke",
+          )}
+          <p class="pg-p">An administrator can also revoke a connection from the console.</p>
+
+          <h2 class="pg-h2">Where the endpoints are advertised</h2>
+          <p class="pg-p">An assistant does not need these written down: they are published for discovery.</p>
+          <ul class="bullets">
+            <li><code>/.well-known/oauth-protected-resource</code>, named in the <code>resource_metadata</code> part of every <code>401</code>.</li>
+            <li><code>/.well-known/oauth-authorization-server</code>, which lists <code>token_endpoint</code>, <code>revocation_endpoint</code> and <code>grant_types_supported</code> (<code>authorization_code</code>, <code>refresh_token</code>).</li>
+          </ul>
+          ${callout(
+            "info",
+            "The XPI API token is different",
+            "The long-lived token used with the REST API is not refreshed: it is valid for a fixed period and then you sign in again. This page is only about MCP connections.",
           )}`,
       },
       {
