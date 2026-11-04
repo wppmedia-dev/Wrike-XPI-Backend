@@ -27,6 +27,9 @@ export const startMcpTokenSweep = () => {
   if (started) return;
   started = true;
 
-  setTimeout(sweep, 60 * 1000);
-  setInterval(sweep, SWEEP_INTERVAL_MS).unref();
+  // DISABLED for now: expired refresh tokens are kept instead of purged.
+  // Re-enable both lines below to resume the cleanup (one run 60s after boot,
+  // then every SWEEP_INTERVAL_MS).
+  // setTimeout(sweep, 60 * 1000);
+  // setInterval(sweep, SWEEP_INTERVAL_MS).unref();
 };

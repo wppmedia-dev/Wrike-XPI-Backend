@@ -79,7 +79,10 @@ export const listOAuthClients = async (includeRevoked: boolean): Promise<OAuthCl
   return json.data;
 };
 
-export const revokeOAuthClient = async (id: string): Promise<OAuthClient> => {
+/** What revoking returns: the client, plus how many live sign-ins it ended. */
+export type RevokedOAuthClient = OAuthClient & { disconnected?: number };
+
+export const revokeOAuthClient = async (id: string): Promise<RevokedOAuthClient> => {
   const res = await adminFetch(`/api/v1/admin/oauth-clients/${encodeURIComponent(id)}/revoke`, {
     method: "POST",
   });
@@ -88,4 +91,19 @@ export const revokeOAuthClient = async (id: string): Promise<OAuthClient> => {
     throw new Error(json?.message || "Failed to revoke OAuth client");
   }
   return json.data;
+};
+
+/**
+ * End every live sign-in a client holds, keeping its registration. Resolves
+ * with how many were ended.
+ */
+export const disconnectOAuthClient = async (id: string): Promise<number> => {
+  const res = await adminFetch(`/api/v1/admin/oauth-clients/${encodeURIComponent(id)}/disconnect`, {
+    method: "POST",
+  });
+  const json = await parseJson(res);
+  if (!res.ok || !json?.success) {
+    throw new Error(json?.message || "Failed to disconnect OAuth client");
+  }
+  return Number(json.data?.disconnected) || 0;
 };

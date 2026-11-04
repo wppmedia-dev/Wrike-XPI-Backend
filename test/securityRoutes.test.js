@@ -61,6 +61,9 @@ let statusOf = async () => "active";
 let revokeCalls = [];
 let lastListArgs = null;
 
+const realOAuthClients = { Revoke: oauthClients.Revoke, Disconnect: oauthClients.Disconnect };
+let disconnectCalls = [];
+
 const mcpTokens = require("../src/controllers/mcpTokens");
 let revokedFamilies = [];
 let revokedRefresh = [];
@@ -81,6 +84,7 @@ oauthClients.Revoke = async (id, adminId) => {
   }
   return { id, revoked_at: new Date().toISOString() };
 };
+oauthClients.Disconnect = async (id) => (disconnectCalls.push(id), { id, disconnected: 2 });
 oauthClients.List = async (args) => {
   lastListArgs = args;
   return { rows: [], total: 0, limit: 50, offset: 0, counts: { active: 0, revoked: 0 } };
@@ -379,6 +383,12 @@ const bearer = { authorization: `Bearer ${adminToken}` };
     check("an admin can revoke", [res.statusCode, res.json().success], [200, true]);
     check("the controller is told who revoked", revokeCalls.length === 1 && revokeCalls[0][0] === id && typeof revokeCalls[0][1] === "string", true);
 
+    check("disconnecting needs an admin token", (await post(`${base}/${id}/disconnect`)).statusCode, 401);
+    check("a malformed id is a 400 on disconnect too", (await post(`${base}/not-a-uuid/disconnect`, undefined, bearer)).statusCode, 400);
+    disconnectCalls = [];
+    res = await post(`${base}/${id}/disconnect`, undefined, bearer);
+    check("an admin can disconnect a client", [res.statusCode, res.json().success, res.json().data.disconnected, disconnectCalls], [200, true, 2, [id]]);
+
     res = await post(`${base}/00000000-0000-4000-8000-000000000404/revoke`, undefined, bearer);
     check("revoking an unknown client is a 404", res.statusCode, 404);
   }
@@ -435,6 +445,109 @@ const bearer = { authorization: `Bearer ${adminToken}` };
     const bad = await activityApp.inject({ method: "GET", url: "/a?oauth_client_id=not-a-uuid", headers: bearer });
     check("a non-UUID client id is a 400", bad.statusCode, 400);
     await activityApp.close();
+  }
+
+  section("revoking or disconnecting a client ends its sign-ins");
+  {
+    const models = require("../models");
+    const clientId = uuid();
+    const adminId = uuid();
+    const calls = [];
+    let failEnding = false;
+    mcpTokens.RevokeByClient = async (id, reason) => {
+      if (failEnding) throw new Error("column client_id does not exist");
+      calls.push([id, reason]);
+      return 2;
+    };
+    const fakeRow = (revokedAt = null) => ({
+      revoked_at: revokedAt,
+      update: async function (values) { Object.assign(this, values); },
+      get: function () { return { id: clientId, revoked_at: this.revoked_at }; },
+    });
+    const quietly = async (fn) => {
+      const { warn } = console;
+      console.warn = () => {};
+      try { return await fn(); } finally { console.warn = warn; }
+    };
+
+    let row = fakeRow();
+    models.OAuthClients.findByPk = async () => row;
+    let result = await realOAuthClients.Revoke(clientId, adminId);
+    check("revoking a client also ends its sign-ins", [result.disconnected, calls], [2, [[clientId, "client_registration_revoked"]]]);
+    check("and records who revoked it", [!!row.revoked_at, row.revoked_by], [true, adminId]);
+
+    calls.length = 0;
+    row = fakeRow(new Date().toISOString());
+    result = await realOAuthClients.Revoke(clientId, adminId);
+    check("revoking an already-revoked client does nothing more", [result.disconnected, calls.length], [0, 0]);
+
+    failEnding = true;
+    row = fakeRow();
+    result = await quietly(() => realOAuthClients.Revoke(clientId, adminId));
+    check("if ending the sign-ins fails, the revoke still succeeds", [!!row.revoked_at, result.disconnected], [true, 0]);
+    failEnding = false;
+
+    calls.length = 0;
+    row = fakeRow();
+    result = await realOAuthClients.Disconnect(clientId);
+    check("disconnecting ends the sign-ins and keeps the registration", [result, calls, row.revoked_at], [{ id: clientId, disconnected: 2 }, [[clientId, "admin_disconnected"]], null]);
+
+    models.OAuthClients.findByPk = async () => null;
+    let thrown = null;
+    try { await realOAuthClients.Disconnect(clientId); } catch (err) { thrown = err.statusCode; }
+    check("disconnecting an unknown client is a 404", thrown, 404);
+    thrown = null;
+    try { await realOAuthClients.Disconnect("not-a-uuid"); } catch (err) { thrown = err.statusCode; }
+    check("a malformed id is a 400", thrown, 400);
+  }
+
+  section("usage stamp on /mcp requests");
+  {
+    const models = require("../models");
+    const realQuery = models.sequelize.query;
+    const statements = [];
+    let failWith = null;
+    models.sequelize.query = async (sql, opts) => {
+      statements.push(opts && opts.replacements && opts.replacements.familyId);
+      if (failWith) throw failWith;
+      return [[], { rowCount: 1 }];
+    };
+    const quietly = async (fn) => {
+      const { warn } = console;
+      console.warn = () => {};
+      try { return await fn(); } finally { console.warn = warn; }
+    };
+    const tick = (ms = 5) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const a = uuid();
+    const b = uuid();
+    mcpTokens.TouchFamily(a);
+    mcpTokens.TouchFamily(a);
+    mcpTokens.TouchFamily(a);
+    await tick();
+    check("a busy sign-in is written once, not once per request", statements.filter((x) => x === a).length, 1);
+    mcpTokens.TouchFamily(b);
+    await tick();
+    check("a different sign-in is written separately", statements.filter((x) => x === b).length, 1);
+    check("no sign-in id: nothing is written", (() => { const n = statements.length; mcpTokens.TouchFamily(null); return statements.length - n; })(), 0);
+
+    failWith = new Error("deadlock detected");
+    const c = uuid();
+    check("a failing write never throws into the request", await quietly(async () => { mcpTokens.TouchFamily(c); await tick(); return "ok"; }), "ok");
+    failWith = null;
+    const d = uuid();
+    mcpTokens.TouchFamily(d);
+    await tick();
+    check("an ordinary failure does not switch tracking off", statements.filter((x) => x === d).length, 1);
+
+    failWith = Object.assign(new Error("column does not exist"), { original: { code: "42703" } });
+    await quietly(async () => { mcpTokens.TouchFamily(uuid()); await tick(); });
+    failWith = null;
+    const e = uuid();
+    mcpTokens.TouchFamily(e);
+    await tick();
+    check("a missing column switches tracking off for the process", statements.filter((x) => x === e).length, 0);
+    models.sequelize.query = realQuery;
   }
 
   await app.close();

@@ -62,6 +62,8 @@ const verifyJWE = async (jweToken, surface = "rest") => {
   if (isMcpToken && !(await McpTokens.IsFamilyActive(payload.f))) {
     throw new Error("Invalid token");
   }
+  // Usage stamp for the admin console; throttled, non-blocking, never throws.
+  if (isMcpToken) McpTokens.TouchFamily(payload.f);
 
   // Current tokens carry the record id as `t` and the DEK inline as `d`.
   // Older tokens used `tid` plus `enc`, a second signed JWT wrapping the

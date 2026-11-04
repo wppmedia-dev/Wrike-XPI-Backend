@@ -1,11 +1,11 @@
 import { verifyAdminJWT } from "../../../middlewares/adminAuth";
 import { OAuthClients } from "../../../controllers";
 import { IdParamSchema, ListSchema } from "./schema";
-import { getMcpTokenLifetimes } from "../../../utils/mcpTokenSettings";
 
-// A live sign-in counts as idle once nothing has refreshed it for an access
-// token's lifetime plus this margin (a client only refreshes when it needs to).
-const IDLE_MARGIN_SECONDS = 10 * 60;
+// A live sign-in counts as idle once nothing has used it (an /mcp call or a
+// refresh) for this long. OAUTH_CLIENT_IDLE_MINUTES overrides the default.
+const idleMinutes = parseInt(process.env.OAUTH_CLIENT_IDLE_MINUTES, 10);
+const IDLE_AFTER_SECONDS = (idleMinutes > 0 ? idleMinutes : 15) * 60;
 
 /**
  * Admin API behind /api/v1/admin/oauth-clients: the dynamically registered
@@ -28,12 +28,11 @@ export const adminOAuthClientsRoute = (fastify, opts, done) => {
   fastify.get("/", { ...ListSchema, ...guard }, async (req, reply) => {
     try {
       const { include_revoked, limit, offset } = req.query || {};
-      const { accessTtlSeconds } = await getMcpTokenLifetimes();
       const data = await OAuthClients.List({
         includeRevoked: include_revoked === "true" || include_revoked === "1",
         limit,
         offset,
-        idleAfterSeconds: accessTtlSeconds + IDLE_MARGIN_SECONDS,
+        idleAfterSeconds: IDLE_AFTER_SECONDS,
       });
       return reply.code(200).send({
         success: true,
@@ -42,6 +41,27 @@ export const adminOAuthClientsRoute = (fastify, opts, done) => {
       });
     } catch (err) {
       return fail(reply, err, "Failed to fetch OAuth clients");
+    }
+  });
+
+  // POST /admin/oauth-clients/:id/disconnect: end its live sign-ins and keep
+  // the registration.
+  fastify.post("/:id/disconnect", { ...IdParamSchema, ...guard }, async (req, reply) => {
+    try {
+      const result = await OAuthClients.Disconnect(req.params.id);
+      req.log.info(
+        { oauthClientId: result.id, signIns: result.disconnected, admin: req.adminUser?.username },
+        "OAuth client disconnected",
+      );
+      return reply.code(200).send({
+        success: true,
+        message: result.disconnected
+          ? `Ended ${result.disconnected} sign-in(s)`
+          : "No live sign-ins to end",
+        data: result,
+      });
+    } catch (err) {
+      return fail(reply, err, "Failed to disconnect OAuth client");
     }
   });
 

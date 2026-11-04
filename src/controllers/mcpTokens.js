@@ -68,9 +68,9 @@ export const Issue = async ({ tokenId, dek, refreshTtlSeconds, clientId = null }
   // the column's migration has not run yet).
   if (clientId) {
     try {
-      await models.McpTokenFamilies.update(
-        { client_id: clientId },
-        { where: { id: familyId } },
+      await models.sequelize.query(
+        "UPDATE mcp_token_families SET client_id = :clientId WHERE id = :familyId",
+        { replacements: { clientId, familyId } },
       );
     } catch (err) {
       console.warn(
@@ -196,6 +196,71 @@ export const RevokeByRefreshToken = async (refreshToken) => {
  */
 export const RevokeFamily = async (familyId, reason = "client_revoked") =>
   familyId ? revokeWhere({ id: familyId }, reason) : 0;
+
+/** Revoke every live MCP sign-in a registered OAuth client holds (admin action). */
+export const RevokeByClient = async (clientId, reason = "admin_disconnected") => {
+  if (!clientId) return 0;
+  const [, meta] = await models.sequelize.query(
+    `UPDATE mcp_token_families
+        SET revoked_at = NOW(), revoked_reason = :reason
+      WHERE client_id = :clientId AND revoked_at IS NULL`,
+    { replacements: { clientId, reason } },
+  );
+  return meta?.rowCount ?? 0;
+};
+
+/**
+ * Note that an access token of this sign-in was just used at /mcp. This is
+ * what lets the admin console tell a client that is being used from one that
+ * has gone quiet (or was disconnected on its own side without telling us).
+ *
+ * Built never to hurt the request that triggers it: fire-and-forget, written
+ * at most once per TOUCH_EVERY_MS per sign-in (so a busy client costs one
+ * small UPDATE a minute), and any failure is swallowed. If the column's
+ * migration has not run, the first failure switches tracking off for this
+ * process instead of failing on every request.
+ */
+const TOUCH_EVERY_MS = 60 * 1000;
+const lastTouched = new Map();
+let touchDisabled = false;
+
+export const TouchFamily = (familyId) => {
+  if (touchDisabled || !familyId) return;
+
+  const now = Date.now();
+  const last = lastTouched.get(familyId);
+  if (last && now - last < TOUCH_EVERY_MS) return;
+  lastTouched.set(familyId, now);
+
+  // Bounded: forget the oldest entries rather than grow with every sign-in.
+  if (lastTouched.size > 5000) {
+    let drop = 1000;
+    for (const key of lastTouched.keys()) {
+      lastTouched.delete(key);
+      if (--drop <= 0) break;
+    }
+  }
+
+  Promise.resolve(
+    models.sequelize.query(
+      "UPDATE mcp_token_families SET last_used_at = NOW() WHERE id = :familyId",
+      { replacements: { familyId } },
+    ),
+  ).catch((err) => {
+    if ((err?.original?.code || err?.parent?.code) === "42703") {
+      touchDisabled = true; // column missing: the migration has not run yet
+      console.warn(
+        new Date().toISOString(),
+        "[mcp-tokens] last_used_at column missing; usage tracking is off until the migration runs and the process restarts",
+      );
+    } else {
+      console.warn(
+        new Date().toISOString(),
+        `[mcp-tokens] could not record use of sign-in ${familyId}: ${err?.message || err}`,
+      );
+    }
+  });
+};
 
 /** Revoke every MCP sign-in behind a token row (admin action). */
 export const RevokeByTokenId = (tokenId, reason = "admin_revoked") =>

@@ -1,5 +1,6 @@
 import models from "../../models";
 import { connectionState, clientStatus } from "../utils/oauthClientStatus";
+import * as McpTokens from "./mcpTokens";
 
 /**
  * Storage for dynamically registered OAuth clients (migration
@@ -95,8 +96,8 @@ const sessionStatsFor = async (ids) => {
       `SELECT f.client_id AS client_id,
               COUNT(*)::int AS total_sessions,
               COUNT(*) FILTER (WHERE ${LIVE_SESSION_SQL})::int AS live_sessions,
-              MAX(COALESCE(f.last_rotated_at, f.created_at)) AS last_active_at,
-              MAX(COALESCE(f.last_rotated_at, f.created_at)) FILTER (WHERE ${LIVE_SESSION_SQL}) AS live_last_active_at,
+              MAX(GREATEST(f.last_used_at, f.last_rotated_at, f.created_at)) AS last_active_at,
+              MAX(GREATEST(f.last_used_at, f.last_rotated_at, f.created_at)) FILTER (WHERE ${LIVE_SESSION_SQL}) AS live_last_active_at,
               MAX(f.revoked_at) AS last_disconnected_at
          FROM mcp_token_families f
         WHERE f.client_id IN (:ids)
@@ -121,7 +122,7 @@ const connectionCounts = async (idleAfterSeconds) => {
          SELECT f.client_id,
                 COUNT(*) AS total,
                 COUNT(*) FILTER (WHERE ${LIVE_SESSION_SQL}) AS live,
-                MAX(COALESCE(f.last_rotated_at, f.created_at)) FILTER (WHERE ${LIVE_SESSION_SQL}) AS live_active
+                MAX(GREATEST(f.last_used_at, f.last_rotated_at, f.created_at)) FILTER (WHERE ${LIVE_SESSION_SQL}) AS live_active
            FROM mcp_token_families f
           WHERE f.client_id IS NOT NULL
           GROUP BY f.client_id
@@ -212,8 +213,39 @@ export const Revoke = async (id, adminId) => {
   }
   const row = await models.OAuthClients.findByPk(id);
   if (!row) throw { statusCode: 404, message: "OAuth client not found" };
-  if (row.revoked_at) return row.get({ plain: true });
+  if (row.revoked_at) return { ...row.get({ plain: true }), disconnected: 0 };
 
   await row.update({ revoked_at: new Date(), revoked_by: adminId || null });
-  return row.get({ plain: true });
+
+  // A revoked client must not keep a working connection. Ending its sign-ins
+  // is best effort: the registration is already revoked (so it can start no
+  // new ones), and a failure here - e.g. the client_id column's migration has
+  // not run - must not turn that into an error.
+  let disconnected = 0;
+  try {
+    disconnected = await McpTokens.RevokeByClient(id, "client_registration_revoked");
+  } catch (err) {
+    console.warn(
+      new Date().toISOString(),
+      `[oauth-clients] revoked ${id} but could not end its sign-ins: ${err?.message || err}`,
+    );
+  }
+  return { ...row.get({ plain: true }), disconnected };
+};
+
+/**
+ * End every live sign-in a client holds, keeping its registration. For a
+ * client that was disconnected on its own side without telling us (so its
+ * sign-ins would otherwise stay alive until their refresh tokens expire), or
+ * to cut a client off without making it register again.
+ */
+export const Disconnect = async (id) => {
+  if (!isClientId(id)) {
+    throw { statusCode: 400, message: "Invalid client id" };
+  }
+  const row = await models.OAuthClients.findByPk(id, { attributes: ["id"] });
+  if (!row) throw { statusCode: 404, message: "OAuth client not found" };
+
+  const disconnected = await McpTokens.RevokeByClient(id, "admin_disconnected");
+  return { id, disconnected };
 };

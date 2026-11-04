@@ -70,11 +70,17 @@ const PUBLIC_ROUTES = [
 const BODYLESS_WRITES = [
   // A session ends by presenting the token being ended, nothing more.
   { file: "admin/auth/index.js", method: "POST", path: "/logout" },
-  // Revoking is addressed entirely by the :id in the path; there is no payload.
+  // Revoking and disconnecting are addressed entirely by the :id in the path;
+  // there is no payload.
   {
     file: "admin/oauthClients/index.js",
     method: "POST",
     path: "/:id/revoke",
+  },
+  {
+    file: "admin/oauthClients/index.js",
+    method: "POST",
+    path: "/:id/disconnect",
   },
   // Both generate a username and password server-side; the body is empty.
   {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   listOAuthClients,
   revokeOAuthClient,
+  disconnectOAuthClient,
   type OAuthClient,
   type OAuthClientList,
   type OAuthClientStatus,
@@ -100,8 +101,8 @@ export default function OAuthClients({
       const ok = await confirmDanger({
         title: "Revoke this OAuth client?",
         html:
-          `<b>${escHtml(name)}</b> will no longer be able to start or finish a sign-in.<br><br>` +
-          `Tokens it already obtained keep working until you revoke them from <b>Tokens</b>. ` +
+          `<b>${escHtml(name)}</b> will no longer be able to start or finish a sign-in, ` +
+          `and its live sign-ins (${client.connection?.live_sessions ?? 0}) are ended now.<br><br>` +
           `This cannot be undone; the connector has to register again.`,
         confirmText: "Revoke",
       });
@@ -109,11 +110,46 @@ export default function OAuthClients({
 
       progress.start();
       try {
-        await revokeOAuthClient(client.id);
-        toast(`${name} revoked`, "success");
+        const revoked = await revokeOAuthClient(client.id);
+        toast(
+          revoked.disconnected
+            ? `${name} revoked, ${revoked.disconnected} sign-in(s) ended`
+            : `${name} revoked`,
+          "success",
+        );
         await load();
       } catch (err: any) {
         toast(err?.message || "Failed to revoke OAuth client", "error");
+      } finally {
+        progress.done();
+      }
+    },
+    [load],
+  );
+
+  // End a client's live sign-ins but keep its registration: for a connector
+  // that was disconnected inside the app (which does not tell us), or to cut
+  // it off without making it register again.
+  const handleDisconnect = useCallback(
+    async (client: OAuthClient) => {
+      const name = client.client_name || "Unnamed client";
+      const live = client.connection?.live_sessions ?? 0;
+      const ok = await confirmDanger({
+        title: "Disconnect this client?",
+        html:
+          `<b>${escHtml(name)}</b> has ${live} live sign-in(s). They end now, so it has to sign in again ` +
+          `the next time it is used.<br><br>Its registration stays, so it does not need to register again.`,
+        confirmText: "Disconnect",
+      });
+      if (!ok) return;
+
+      progress.start();
+      try {
+        const ended = await disconnectOAuthClient(client.id);
+        toast(ended ? `${name} disconnected (${ended} sign-in(s) ended)` : `${name} had no live sign-ins`, "success");
+        await load();
+      } catch (err: any) {
+        toast(err?.message || "Failed to disconnect OAuth client", "error");
       } finally {
         progress.done();
       }
@@ -224,6 +260,18 @@ export default function OAuthClients({
                   },
                 ]
               : []),
+            // Offered whenever the client still holds a live sign-in, whatever its
+            // registration status.
+            ...((c.connection?.live_sessions ?? 0) > 0
+              ? [
+                  {
+                    label: "Disconnect",
+                    icon: "fa-solid fa-plug-circle-xmark",
+                    danger: true,
+                    onSelect: () => handleDisconnect(c),
+                  },
+                ]
+              : []),
             ...(canRevoke
               ? [
                   {
@@ -248,7 +296,7 @@ export default function OAuthClients({
         },
       },
     ],
-    [handleRevoke, onViewActivity],
+    [handleRevoke, handleDisconnect, onViewActivity],
   );
 
   const table = useTable({

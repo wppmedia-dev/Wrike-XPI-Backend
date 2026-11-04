@@ -26,11 +26,13 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: DataTypes.UUIDV4,
       },
       token_id: { type: DataTypes.UUID, allowNull: false },
-      client_id: {
-        type: DataTypes.UUID,
-        allowNull: true,
-        comment: "oauth_clients.id this sign-in came from; null for older ones",
-      },
+      // client_id (which registered OAuth client a sign-in came from) and
+      // last_used_at (last time it reached /mcp) are deliberately NOT declared
+      // here. Sequelize names every declared column in its own INSERT/SELECT,
+      // so declaring them would make sign-in and refresh fail on any database
+      // whose migrations have not caught up. They only feed the admin console,
+      // and are read and written with plain SQL (src/controllers/mcpTokens.js,
+      // src/controllers/oauthClients.js) that fails in isolation.
       created_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
       last_rotated_at: { type: DataTypes.DATE, allowNull: true },
       revoked_at: { type: DataTypes.DATE, allowNull: true },
