@@ -14,7 +14,7 @@ import { toast } from "../lib/notify";
 import { AGENT_OPTIONS } from "../lib/agentIdentity";
 import AdminSelect from "../components/AdminSelect";
 import { CopyButton } from "../components/ui/CopyButton";
-import { PageInfo } from "../components/ui/PageInfo";
+import { PageHeader } from "../components/ui/PageHeader";
 import { ADMIN_HELP } from "../lib/pageHelp";
 import { callerNote } from "../lib/activityCaller";
 import { InfoTip } from "../components/ui/InfoTip";
@@ -368,22 +368,20 @@ export default function ActivityLog({
 
   return (
     <>
-      <div className="section-header">
-        <div>
-          <div className="section-title">
-            Activity Log <PageInfo help={ADMIN_HELP.activity} />
-          </div>
-          <div className="section-subtitle">
-            Every API and MCP call: who called, what they called, and whether it was let through
-          </div>
-        </div>
-        {config && (
-          <span className="al-retention" title="Older rows are purged automatically">
-            <i className="fa-solid fa-clock-rotate-left" aria-hidden="true" />
-            Kept for {config.retention_days} day{config.retention_days === 1 ? "" : "s"}
-          </span>
-        )}
-      </div>
+      <PageHeader
+        page="activity-log"
+        title="Activity Log"
+        description="Every API and MCP call: who called, what they called, and whether it was let through"
+        help={ADMIN_HELP.activity}
+        actions={
+          config ? (
+            <span className="al-retention" title="Older rows are purged automatically">
+              <i className="fa-solid fa-clock-rotate-left" aria-hidden="true" />
+              Kept for {config.retention_days} day{config.retention_days === 1 ? "" : "s"}
+            </span>
+          ) : undefined
+        }
+      />
 
       <div className="stats-grid al-stats">
         <div className="stat-card blue">

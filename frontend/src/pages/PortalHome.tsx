@@ -18,6 +18,7 @@ import {
 } from "../lib/portalAuthApi";
 import { fetchAppConfig, DEFAULT_CONFIG, type AppConfig } from "../lib/appConfig";
 import type { AdminToken } from "../lib/tokenPermissionsApi";
+import { PageHeader, TopbarProvider, useTopbar } from "../components/ui/PageHeader";
 import { useHashPage } from "../lib/useHashPage";
 import EnvBadge from "../components/EnvBadge";
 import WrikeEndpointPreview from "../components/WrikeEndpointPreview";
@@ -31,7 +32,6 @@ import { portalOAuthClientsApi } from "../lib/portalOAuthClientsApi";
 import PortalApiTokensPage from "./PortalApiTokensPage";
 import PortalEnvironmentAccess from "./PortalEnvironmentAccess";
 import { PortalEnvironmentsTable } from "./PortalEnvironmentsTable";
-import { PageInfo } from "../components/ui/PageInfo";
 import { PORTAL_HELP } from "../lib/pageHelp";
 import TokenPermissions, {
   ENVIRONMENT_MODULES_COPY,
@@ -232,6 +232,8 @@ export default function PortalHome() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activePage, setActivePage] = useHashPage<PageId>(PAGE_IDS, "overview");
+  // Slots in the top bar that each page's <PageHeader /> fills.
+  const topbar = useTopbar(activePage);
   const [environments, setEnvironments] = useState<PortalEnvironmentFull[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -897,21 +899,27 @@ export default function PortalHome() {
 
       {/* ═══════════ MAIN ═══════════ */}
       <div id="main">
+        <TopbarProvider value={topbar.value}>
         <div id="topbar">
           <div className="topbar-left">
             <div className="topbar-mobile-btn" onClick={() => setMobileOpen((v) => !v)}>
               <i className="fa-solid fa-bars" />
             </div>
-            <div>
-              <div className="page-title">{pageTitle}</div>
+            <div className="topbar-heading">
+              <div className="page-title">
+                {pageTitle}
+                <span className="topbar-title-extra" ref={topbar.refs.titleExtra} />
+              </div>
               <div className="breadcrumb">
                 <span>Portal</span>
                 <span className="bc-sep">/</span>
                 <span>{pageTitle}</span>
               </div>
             </div>
+            <div className="topbar-desc" ref={topbar.refs.description} />
           </div>
           <div className="topbar-right">
+            <div className="topbar-actions" ref={topbar.refs.actions} />
             <div className="topbar-icon-btn" title="Refresh data" onClick={handleRefresh}>
               <i className={`fa-solid fa-rotate-right${refreshing ? " fa-spin" : ""}`} />
             </div>
@@ -938,14 +946,12 @@ export default function PortalHome() {
           {/* ══════ OVERVIEW PAGE ══════ */}
           {canSeeOverview && (
           <div className={`page${activePage === "overview" ? " active" : ""}`} id="page-overview">
-            <div className="section-header">
-              <div>
-                <div className="section-title">
-                  Dashboard Overview <PageInfo help={PORTAL_HELP.overview} />
-                </div>
-                <div className="section-subtitle">Welcome back, {username}</div>
-              </div>
-            </div>
+            <PageHeader
+              page="overview"
+              title="Dashboard Overview"
+              description={`Welcome back, ${username}`}
+              help={PORTAL_HELP.overview}
+            />
 
             <div className="stats-grid">
               <div className="stat-card blue">
@@ -1065,20 +1071,20 @@ export default function PortalHome() {
           {/* ══════ ENVIRONMENTS PAGE ══════ */}
           {canSeeEnvironments && (
           <div className={`page${activePage === "environments" ? " active" : ""}`} id="page-environments">
-            <div className="section-header">
-              <div>
-                <div className="section-title">
-                  My Environments <PageInfo help={PORTAL_HELP.environments} />
-                </div>
-                <div className="section-subtitle">Manage your Wrike environments</div>
-              </div>
-              {can("environments", "create") && (
-                <button className="btn btn-primary" onClick={() => openEnvModal(null)}>
-                  <i className="fa-solid fa-plus" />
-                  Add Environment
-                </button>
-              )}
-            </div>
+            <PageHeader
+              page="environments"
+              title="My Environments"
+              description="Manage your Wrike environments"
+              help={PORTAL_HELP.environments}
+              actions={
+                can("environments", "create") ? (
+                  <button className="btn btn-primary" onClick={() => openEnvModal(null)} title="Add Environment">
+                    <i className="fa-solid fa-plus" />
+                    <span className="btn-text">Add Environment</span>
+                  </button>
+                ) : undefined
+              }
+            />
 
             <div className="card">
               <div className="card-body">
@@ -1152,16 +1158,12 @@ export default function PortalHome() {
           {/* ══════ SYNC PAGE ══════ */}
           {canSeeSync && (
           <div className={`page${activePage === "sync" ? " active" : ""}`} id="page-sync">
-            <div className="section-header">
-              <div>
-                <div className="section-title">
-                  Sync <PageInfo help={PORTAL_HELP.sync} />
-                </div>
-                <div className="section-subtitle">
-                  Reload secrets without restarting the service
-                </div>
-              </div>
-            </div>
+            <PageHeader
+              page="sync"
+              title="Sync"
+              description="Reload secrets without restarting the service"
+              help={PORTAL_HELP.sync}
+            />
 
             <SyncSettings
               refreshKey={dataRefreshKey}
@@ -1174,17 +1176,13 @@ export default function PortalHome() {
           {/* ══════ OAUTH CLIENTS PAGE ══════ */}
           {canSeeOAuthClients && (
           <div className={`page${activePage === "oauth-clients" ? " active" : ""}`} id="page-oauth-clients">
-            <div className="section-header">
-              <div>
-                <div className="section-title">
-                  OAuth Clients <span className="oc-beta" title="This page is new and may change">Beta</span>{" "}
-                  <PageInfo help={PORTAL_HELP.oauthClients} />
-                </div>
-                <div className="section-subtitle">
-                  MCP connectors that signed in to your environments
-                </div>
-              </div>
-            </div>
+            <PageHeader
+              page="oauth-clients"
+              title="OAuth Clients"
+              description="MCP connectors that signed in to your environments"
+              help={PORTAL_HELP.oauthClients}
+              badge={<span className="oc-beta" title="This page is new and may change">Beta</span>}
+            />
 
             {/* Mounted only while open, so it fetches on first visit. */}
             {activePage === "oauth-clients" && (
@@ -1199,6 +1197,7 @@ export default function PortalHome() {
           </div>
           )}
         </div>
+      </TopbarProvider>
       </div>
 
       {/* ════════════ ENVIRONMENT API ACCESS DRAWER ════════════ */}

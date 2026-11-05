@@ -1,0 +1,88 @@
+/* The page header, as it appears in the top bar (see PageHeader.tsx).
+ *
+ * Written against #topbar, which all three consoles share, so one stylesheet
+ * covers them. The id selector also outranks each console's own .topbar-left /
+ * .topbar-right rules, which only set up the original title + refresh layout. */
+
+/* The left side takes the room the right side leaves, so the description can
+   use it and be cut with an ellipsis instead of pushing the buttons off. */
+#topbar .topbar-left {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+#topbar .topbar-right {
+  flex-shrink: 0;
+}
+
+#topbar .topbar-heading {
+  flex-shrink: 0;
+}
+
+/* The ⓘ and any badge, sitting on the title's line. */
+#topbar .topbar-title-extra {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+/* The one-line description, set off from the title by a thin rule. Hidden when
+   the page has none, so there is no stray divider. */
+#topbar .topbar-desc {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  padding-left: 16px;
+  border-left: 1px solid var(--border);
+}
+
+#topbar .topbar-desc:empty {
+  display: none;
+}
+
+#topbar .topbar-desc-text {
+  display: block;
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The page's buttons, to the left of the refresh button. */
+#topbar .topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#topbar .topbar-actions:empty {
+  display: none;
+}
+
+#topbar .topbar-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* Narrow screens: the description is the first thing to go (it is also in the
+   ⓘ), then the buttons' labels, leaving their icons. */
+@media (max-width: 1180px) {
+  #topbar .topbar-desc {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  #topbar .topbar-actions .btn-text {
+    display: none;
+  }
+
+  #topbar .topbar-actions .btn {
+    padding: 7px 10px;
+  }
+}

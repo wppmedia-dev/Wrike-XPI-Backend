@@ -15,7 +15,7 @@ import { AGENT_OPTIONS } from "../lib/agentIdentity";
 import { mcpMethodInfo, mcpRowMethod } from "../lib/mcpMethod";
 import AdminSelect from "../components/AdminSelect";
 import { CopyButton } from "../components/ui/CopyButton";
-import { PageInfo } from "../components/ui/PageInfo";
+import { PageHeader } from "../components/ui/PageHeader";
 import { PORTAL_HELP } from "../lib/pageHelp";
 import { callerNote } from "../lib/activityCaller";
 import { InfoTip } from "../components/ui/InfoTip";
@@ -432,25 +432,20 @@ export default function PortalActivityPage({
 
   return (
     <>
-      <div className="section-header">
-        <div>
-          <div className="section-title">
-            Activity Log <PageInfo help={PORTAL_HELP.activity} />
-          </div>
-          <div className="section-subtitle">
-            Every API and MCP call on your environments: who called, what they called, and whether
-            it was let through
-          </div>
-        </div>
-        <div className="pal-head-meta">
-          {config && (
+      <PageHeader
+        page="activity"
+        title="Activity Log"
+        description="Every API and MCP call on your environments: who called, what they called, and whether it was let through"
+        help={PORTAL_HELP.activity}
+        actions={
+          config ? (
             <span className="pal-retention" title="Older rows are purged automatically">
               <i className="fa-solid fa-clock-rotate-left" aria-hidden="true" />
               Kept for {config.retention_days} day{config.retention_days === 1 ? "" : "s"}
             </span>
-          )}
-        </div>
-      </div>
+          ) : undefined
+        }
+      />
 
       <div className="stats-grid pal-stats">
         <div className="stat-card blue">

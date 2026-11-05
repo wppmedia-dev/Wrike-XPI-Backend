@@ -3,6 +3,7 @@ import xtendIcon from "../assets/xtend-logo-icon.png";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { adminLogout, clearAdminSession, getAccessToken } from "../lib/authApi";
 import { fetchAppConfig, DEFAULT_CONFIG, type AppConfig } from "../lib/appConfig";
+import { PageHeader, TopbarProvider, useTopbar } from "../components/ui/PageHeader";
 import { useHashPage } from "../lib/useHashPage";
 import {
   assignPortalUserEnvironment,
@@ -62,7 +63,6 @@ import EnvBadge from "../components/EnvBadge";
 import WrikeEndpointPreview from "../components/WrikeEndpointPreview";
 import BuildTag from "../components/BuildTag";
 import { CopyButton } from "../components/ui/CopyButton";
-import { PageInfo } from "../components/ui/PageInfo";
 import { ADMIN_HELP } from "../lib/pageHelp";
 import { ActiveBadge } from "../components/ui/Badge";
 import { MaskedValue } from "../components/ui/MaskedValue";
@@ -235,6 +235,8 @@ export default function AdminDashboard() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activePage, setActivePage] = useHashPage<PageId>(PAGE_IDS, "overview");
+  // Slots in the top bar that each page's <PageHeader /> fills.
+  const topbar = useTopbar(activePage);
 
   const [refreshing, setRefreshing] = useState(false);
   // Bumped every time the top-bar Refresh is hit while the Activity Log page
@@ -1483,21 +1485,27 @@ export default function AdminDashboard() {
 
       {/* ═══════════ MAIN ═══════════ */}
       <div id="main">
+        <TopbarProvider value={topbar.value}>
         <div id="topbar">
           <div className="topbar-left">
             <div className="topbar-mobile-btn" onClick={() => setMobileOpen((v) => !v)}>
               <i className="fa-solid fa-bars" />
             </div>
-            <div>
-              <div className="page-title">{pageTitle}</div>
+            <div className="topbar-heading">
+              <div className="page-title">
+                {pageTitle}
+                <span className="topbar-title-extra" ref={topbar.refs.titleExtra} />
+              </div>
               <div className="breadcrumb">
                 <span>Admin</span>
                 <span className="bc-sep">/</span>
                 <span>{pageTitle}</span>
               </div>
             </div>
+            <div className="topbar-desc" ref={topbar.refs.description} />
           </div>
           <div className="topbar-right">
+            <div className="topbar-actions" ref={topbar.refs.actions} />
             <div className="topbar-icon-btn" title="Refresh data" onClick={handleRefresh}>
               <i className={`fa-solid fa-rotate-right${refreshing ? " fa-spin" : ""}`} />
             </div>
@@ -1507,14 +1515,12 @@ export default function AdminDashboard() {
         <div id="content">
           {/* ══════ OVERVIEW PAGE ══════ */}
           <div className={`page${activePage === "overview" ? " active" : ""}`} id="page-overview">
-            <div className="section-header">
-              <div>
-                <div className="section-title">
-                  Dashboard Overview <PageInfo help={ADMIN_HELP.overview} />
-                </div>
-                <div className="section-subtitle">Welcome back, Administrator</div>
-              </div>
-            </div>
+            <PageHeader
+              page="overview"
+              title="Dashboard Overview"
+              description="Welcome back, Administrator"
+              help={ADMIN_HELP.overview}
+            />
 
             <div className="stats-grid">
               <div className="stat-card blue">
@@ -1643,18 +1649,18 @@ export default function AdminDashboard() {
 
           {/* ══════ ENVIRONMENTS PAGE ══════ */}
           <div className={`page${activePage === "environments" ? " active" : ""}`} id="page-environments">
-            <div className="section-header">
-              <div>
-                <div className="section-title">
-                  Environments <PageInfo help={ADMIN_HELP.environments} />
-                </div>
-                <div className="section-subtitle">Manage Wrike API credentials per environment</div>
-              </div>
-              <button className="btn btn-primary" onClick={openAddModal}>
-                <i className="fa-solid fa-plus" />
-                Add Environment
-              </button>
-            </div>
+            <PageHeader
+              page="environments"
+              title="Environments"
+              description="Manage Wrike API credentials per environment"
+              help={ADMIN_HELP.environments}
+              actions={
+                <button className="btn btn-primary" onClick={openAddModal} title="Add Environment">
+                  <i className="fa-solid fa-plus" />
+                  <span className="btn-text">Add Environment</span>
+                </button>
+              }
+            />
 
             <div className="card">
               <div className="card-body">
@@ -1678,17 +1684,18 @@ export default function AdminDashboard() {
 
           {/* ══════ USERS PAGE ══════ */}
           <div className={`page${activePage === "users" ? " active" : ""}`} id="page-users">
-            <div className="section-header">
-              <div>
-                <div className="section-title">
-                  Portal Users <PageInfo help={ADMIN_HELP.users} />
-                </div>
-                <div className="section-subtitle">Manage portal user accounts and environment access</div>
-              </div>
-              <button className="btn btn-primary" onClick={openAddUserModal}>
-                <i className="fa-solid fa-plus" /> Add User
-              </button>
-            </div>
+            <PageHeader
+              page="users"
+              title="Portal Users"
+              description="Manage portal user accounts and environment access"
+              help={ADMIN_HELP.users}
+              actions={
+                <button className="btn btn-primary" onClick={openAddUserModal} title="Add User">
+                  <i className="fa-solid fa-plus" />
+                  <span className="btn-text">Add User</span>
+                </button>
+              }
+            />
             <div className="card">
               <div className="card-body">
                 <PortalUsersTable
@@ -1707,16 +1714,12 @@ export default function AdminDashboard() {
 
           {/* ══════ SESSIONS PAGE ══════ */}
           <div className={`page${activePage === "sessions" ? " active" : ""}`} id="page-sessions">
-            <div className="section-header">
-              <div>
-                <div className="section-title">
-                  Sessions <PageInfo help={ADMIN_HELP.tokens} />
-                </div>
-                <div className="section-subtitle">
-                  Every token this service has issued, and the modules each one may call
-                </div>
-              </div>
-            </div>
+            <PageHeader
+              page="sessions"
+              title="Sessions"
+              description="Every token this service has issued, and the modules each one may call"
+              help={ADMIN_HELP.tokens}
+            />
             <div className="card">
               <div className="card-body">
                 <TokensTable
@@ -1743,14 +1746,12 @@ export default function AdminDashboard() {
 
           {/* ══════ SETTINGS PAGE ══════ */}
           <div className={`page${activePage === "settings" ? " active" : ""}`} id="page-settings">
-            <div className="section-header">
-              <div>
-                <div className="section-title">
-                  Settings <PageInfo help={ADMIN_HELP.settings} />
-                </div>
-                <div className="section-subtitle">Configure system preferences</div>
-              </div>
-            </div>
+            <PageHeader
+              page="settings"
+              title="Settings"
+              description="Configure system preferences"
+              help={ADMIN_HELP.settings}
+            />
 
             <div className="card">
               <MfaSettings />
@@ -1763,21 +1764,23 @@ export default function AdminDashboard() {
 
           {/* ══════ CACHE SETTINGS PAGE ══════ */}
           <div className={`page${activePage === "cache-settings" ? " active" : ""}`} id="page-cache-settings">
-            <div className="section-header">
-              <div>
-                <div className="section-title">
-                  Cache Settings <PageInfo help={ADMIN_HELP.cache} />
-                </div>
-                <div className="section-subtitle">Manage cache keys and inspect Redis data</div>
-              </div>
-              <button
-                className="btn btn-danger"
-                disabled={cacheAllCount === 0 || cacheBulkDeleting}
-                onClick={handleCacheBulkDelete}
-              >
-                <i className="fa-solid fa-trash" /> {bulkDeleteLabel}
-              </button>
-            </div>
+            <PageHeader
+              page="cache-settings"
+              title="Cache Settings"
+              description="Manage cache keys and inspect Redis data"
+              help={ADMIN_HELP.cache}
+              actions={
+                <button
+                  className="btn btn-danger"
+                  disabled={cacheAllCount === 0 || cacheBulkDeleting}
+                  onClick={handleCacheBulkDelete}
+                  title={bulkDeleteLabel}
+                >
+                  <i className="fa-solid fa-trash" />
+                  <span className="btn-text">{bulkDeleteLabel}</span>
+                </button>
+              }
+            />
 
             <div className="card">
               <div className="card-body">
@@ -1800,33 +1803,25 @@ export default function AdminDashboard() {
 
           {/* ══════ SYNC PAGE ══════ */}
           <div className={`page${activePage === "sync" ? " active" : ""}`} id="page-sync">
-            <div className="section-header">
-              <div>
-                <div className="section-title">
-                  Sync <PageInfo help={ADMIN_HELP.sync} />
-                </div>
-                <div className="section-subtitle">
-                  Reload secrets without restarting the service
-                </div>
-              </div>
-            </div>
+            <PageHeader
+              page="sync"
+              title="Sync"
+              description="Reload secrets without restarting the service"
+              help={ADMIN_HELP.sync}
+            />
 
             <SyncSettings refreshKey={syncRefreshKey} />
           </div>
 
           {/* ══════ OAUTH CLIENTS PAGE ══════ */}
           <div className={`page${activePage === "oauth-clients" ? " active" : ""}`} id="page-oauth-clients">
-            <div className="section-header">
-              <div>
-                <div className="section-title">
-                  OAuth Clients <span className="oc-beta" title="This page is new and may change">Beta</span>{" "}
-                  <PageInfo help={ADMIN_HELP.oauthClients} />
-                </div>
-                <div className="section-subtitle">
-                  MCP connectors registered with this service, and revoking them
-                </div>
-              </div>
-            </div>
+            <PageHeader
+              page="oauth-clients"
+              title="OAuth Clients"
+              description="MCP connectors registered with this service, and revoking them"
+              help={ADMIN_HELP.oauthClients}
+              badge={<span className="oc-beta" title="This page is new and may change">Beta</span>}
+            />
 
             {/* Mounted only while open, so it fetches on first visit rather
                 than on every console load. */}
@@ -1847,6 +1842,7 @@ export default function AdminDashboard() {
             />
           </div>
         </div>
+      </TopbarProvider>
       </div>
 
       {/* ═══════════ ENVIRONMENT API ACCESS DRAWER ═══════════ */}

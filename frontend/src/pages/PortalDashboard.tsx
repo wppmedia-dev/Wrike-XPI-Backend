@@ -8,10 +8,10 @@ import {
   portalLogout,
   type PortalEnvironment,
 } from "../lib/portalAuthApi";
+import { PageHeader, TopbarProvider, useTopbar } from "../components/ui/PageHeader";
 import { useHashPage } from "../lib/useHashPage";
 import EnvBadge from "../components/EnvBadge";
 import BuildTag from "../components/BuildTag";
-import { PageInfo } from "../components/ui/PageInfo";
 import { PORTAL_ADMIN_HELP } from "../lib/pageHelp";
 import "./PortalDashboard.css";
 
@@ -163,6 +163,8 @@ export default function PortalDashboard() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activePage, setActivePage] = useHashPage<PageId>(PAGE_IDS, "overview");
+  // Slots in the top bar that each page's <PageHeader /> fills.
+  const topbar = useTopbar(activePage);
   const [environments, setEnvironments] = useState<PortalEnvironment[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -501,21 +503,27 @@ export default function PortalDashboard() {
 
       {/* ═══════════ MAIN ═══════════ */}
       <div id="main">
+        <TopbarProvider value={topbar.value}>
         <div id="topbar">
           <div className="topbar-left">
             <div className="topbar-mobile-btn" onClick={() => setMobileOpen((v) => !v)}>
               <i className="fa-solid fa-bars" />
             </div>
-            <div>
-              <div className="page-title">{pageTitle}</div>
+            <div className="topbar-heading">
+              <div className="page-title">
+                {pageTitle}
+                <span className="topbar-title-extra" ref={topbar.refs.titleExtra} />
+              </div>
               <div className="breadcrumb">
                 <span>Portal</span>
                 <span className="bc-sep">/</span>
                 <span>{pageTitle}</span>
               </div>
             </div>
+            <div className="topbar-desc" ref={topbar.refs.description} />
           </div>
           <div className="topbar-right">
+            <div className="topbar-actions" ref={topbar.refs.actions} />
             <div className="topbar-icon-btn" title="Refresh data" onClick={handleRefresh}>
               <i className={`fa-solid fa-rotate-right${refreshing ? " fa-spin" : ""}`} />
             </div>
@@ -525,17 +533,12 @@ export default function PortalDashboard() {
         <div id="content">
           {/* ══════ OVERVIEW PAGE ══════ */}
           <div className={`page${activePage === "overview" ? " active" : ""}`} id="page-overview">
-            <div className="section-header">
-              <div>
-                <div className="section-title">
-                  Dashboard Overview{" "}
-                  <PageInfo help={PORTAL_ADMIN_HELP.overview} />
-                </div>
-                <div className="section-subtitle">
-                  {loaded ? `Welcome back, ${username}` : "Welcome back"}
-                </div>
-              </div>
-            </div>
+            <PageHeader
+              page="overview"
+              title="Dashboard Overview"
+              description={loaded ? `Welcome back, ${username}` : "Welcome back"}
+              help={PORTAL_ADMIN_HELP.overview}
+            />
 
             <div className="stats-grid">
               <div className="stat-card blue">
@@ -639,14 +642,12 @@ export default function PortalDashboard() {
 
           {/* ══════ ENVIRONMENTS PAGE ══════ */}
           <div className={`page${activePage === "environments" ? " active" : ""}`} id="page-environments">
-            <div className="section-header">
-              <div>
-                <div className="section-title">
-                  Environments <PageInfo help={PORTAL_ADMIN_HELP.environments} />
-                </div>
-                <div className="section-subtitle">Your assigned Wrike environments</div>
-              </div>
-            </div>
+            <PageHeader
+              page="environments"
+              title="Environments"
+              description="Your assigned Wrike environments"
+              help={PORTAL_ADMIN_HELP.environments}
+            />
 
             <div className="card">
               <div className="card-body">
@@ -657,6 +658,7 @@ export default function PortalDashboard() {
             </div>
           </div>
         </div>
+      </TopbarProvider>
       </div>
     </div>
   );
