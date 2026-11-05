@@ -136,7 +136,8 @@ export type PortalHelpKey =
   | "apiTokens"
   | "activity"
   | "cache"
-  | "oauthClients";
+  | "oauthClients"
+  | "sync";
 
 export const PORTAL_HELP: Record<PortalHelpKey, PageHelp> = {
   overview: {
@@ -204,6 +205,17 @@ export const PORTAL_HELP: Record<PortalHelpKey, PageHelp> = {
       "Activity log (row menu) shows what that connector did.",
     ],
     note: "Removing a connector inside its own app does not tell this service. It shows as Idle until you Disconnect it or its sign-in expires.",
+  },
+
+  sync: {
+    summary:
+      "Reload the secrets the service keeps in memory from Azure Key Vault, without a restart.",
+    points: [
+      "Sync now runs a source straight away, for example after a secret was rotated.",
+      "Each card shows the last run: when, who ran it, how many items and how long it took.",
+      "Partial means some items could not be loaded. The server log says which.",
+    ],
+    note: "This affects the whole service, not only your environments. Only the latest run of each source is kept.",
   },
 };
 

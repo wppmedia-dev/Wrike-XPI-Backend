@@ -25,6 +25,8 @@ import BuildTag from "../components/BuildTag";
 import PortalActivityPage from "./PortalActivityPage";
 import PortalCachePage from "./PortalCachePage";
 import OAuthClients from "./OAuthClients";
+import SyncSettings from "./SyncSettings";
+import { portalSyncApi } from "../lib/portalSyncApi";
 import { portalOAuthClientsApi } from "../lib/portalOAuthClientsApi";
 import PortalApiTokensPage from "./PortalApiTokensPage";
 import PortalEnvironmentAccess from "./PortalEnvironmentAccess";
@@ -48,7 +50,8 @@ type PageId =
   | "api-tokens"
   | "activity"
   | "cache"
-  | "oauth-clients";
+  | "oauth-clients"
+  | "sync";
 
 /**
  * The environment module-permission grid, pointed at the portal's own
@@ -77,6 +80,7 @@ const PAGE_NAMES: Record<PageId, string> = {
   activity: "Activity Logs",
   cache: "Cache Settings",
   "oauth-clients": "OAuth Clients",
+  sync: "Sync",
 };
 
 const PAGE_IDS = Object.keys(PAGE_NAMES) as PageId[];
@@ -275,6 +279,8 @@ export default function PortalHome() {
   // to the page as flags, so a read-only user is never shown a control that
   // would 403 and sign them out.
   const canSeeOAuthClients = can("oauth_clients", "read");
+  // Read shows the Sync page; update (passed to it as a flag) draws Sync now.
+  const canSeeSync = can("sync", "read");
   const canSeeEnvironmentAccess = can("environment_access", "read");
   // The module ceiling of each environment. Read shows the Modules column and
   // the row action; update opens that grid as an editor. It hangs off the
@@ -291,7 +297,8 @@ export default function PortalHome() {
     canSeeApiTokens ||
     canSeeActivity ||
     canSeeCache ||
-    canSeeOAuthClients;
+    canSeeOAuthClients ||
+    canSeeSync;
 
   /* ── Session guard (mirrors the EJS inline script exactly) ──────────── */
   useEffect(() => {
@@ -378,12 +385,13 @@ export default function PortalHome() {
       activity: canSeeActivity,
       cache: canSeeCache,
       "oauth-clients": canSeeOAuthClients,
+      sync: canSeeSync,
     };
     if (granted[activePage]) return;
 
     // Order matters: this is where a user with a stale link lands.
     const fallback = (
-      ["overview", "environments", "api-tokens", "activity", "cache", "oauth-clients"] as PageId[]
+      ["overview", "environments", "api-tokens", "activity", "cache", "oauth-clients", "sync"] as PageId[]
     ).find((page) => granted[page]);
     if (fallback) setActivePage(fallback);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -396,6 +404,7 @@ export default function PortalHome() {
     canSeeActivity,
     canSeeCache,
     canSeeOAuthClients,
+    canSeeSync,
   ]);
 
   const recentEnvs = environments.slice(0, 5);
@@ -806,7 +815,7 @@ export default function PortalHome() {
             </div>
           )}
 
-          {(canSeeCache || canSeeActivity || canSeeOAuthClients) && (
+          {(canSeeCache || canSeeActivity || canSeeOAuthClients || canSeeSync) && (
             <div className="nav-group-label" style={{ marginTop: 6 }}>
               Settings
             </div>
@@ -820,6 +829,17 @@ export default function PortalHome() {
                 <i className="fa-solid fa-database" />
               </span>
               <span className="nl">Cache Settings</span>
+            </div>
+          )}
+          {canSeeSync && (
+            <div
+              className={`nav-item${activePage === "sync" ? " active" : ""}`}
+              onClick={() => handleNav("sync")}
+            >
+              <span className="ni">
+                <i className="fa-solid fa-arrows-rotate" />
+              </span>
+              <span className="nl">Sync</span>
             </div>
           )}
           {canSeeOAuthClients && (
@@ -1126,6 +1146,28 @@ export default function PortalHome() {
           {canSeeCache && (
           <div className={`page${activePage === "cache" ? " active" : ""}`} id="page-cache">
             <PortalCachePage active={activePage === "cache"} canDelete={can("cache", "delete")} />
+          </div>
+          )}
+
+          {/* ══════ SYNC PAGE ══════ */}
+          {canSeeSync && (
+          <div className={`page${activePage === "sync" ? " active" : ""}`} id="page-sync">
+            <div className="section-header">
+              <div>
+                <div className="section-title">
+                  Sync <PageInfo help={PORTAL_HELP.sync} />
+                </div>
+                <div className="section-subtitle">
+                  Reload secrets without restarting the service
+                </div>
+              </div>
+            </div>
+
+            <SyncSettings
+              refreshKey={dataRefreshKey}
+              api={portalSyncApi}
+              canRun={can("sync", "update")}
+            />
           </div>
           )}
 

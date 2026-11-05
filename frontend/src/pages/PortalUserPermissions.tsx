@@ -35,6 +35,7 @@ const MODULE_ICON: Record<string, string> = {
   activity_logs: "fa-clock-rotate-left",
   cache: "fa-database",
   oauth_clients: "fa-plug",
+  sync: "fa-arrows-rotate",
 };
 
 interface Props {

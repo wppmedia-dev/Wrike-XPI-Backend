@@ -8,6 +8,7 @@ import { portalEnvironmentAccessRoute } from "./environmentAccess";
 import { portalApiTokensRoute } from "./apiTokens";
 import { portalEnvironmentModulesRoute } from "./environmentModules";
 import { portalOAuthClientsRoute } from "./oauthClients";
+import { portalSyncRoute } from "./sync";
 
 // Page handlers
 const PortalIndexPage = (req, reply) => reply.redirect("/portal/login");
@@ -86,6 +87,8 @@ export const portalApiRoute = (fastify, opts, done) => {
   });
   // MCP connectors that signed in to this user's environments.
   fastify.register(portalOAuthClientsRoute, { prefix: "/oauth-clients" });
+  // The Sync page, for portal users granted it.
+  fastify.register(portalSyncRoute, { prefix: "/sync" });
 
   done();
 };

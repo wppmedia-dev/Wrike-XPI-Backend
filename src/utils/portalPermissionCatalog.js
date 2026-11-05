@@ -96,6 +96,19 @@ export const MODULES = [
     actions: ["read", "delete"],
   },
   {
+    key: "sync",
+    label: "Sync",
+    description:
+      "The Sync page: reload the Azure Key Vault secrets the service keeps in memory, see each source's last run, and run it now.",
+    // Two actions, one per route in src/routes/portal/sync: read shows the page and
+    // each source's last run, update runs a sync.
+    //
+    // No create or delete: the sources are fixed in code (src/utils/syncSources.js),
+    // so there is nothing to add or remove. Not scoped to the user's environments,
+    // because a sync is service-wide, which is why it is a grant of its own.
+    actions: ["read", "update"],
+  },
+  {
     key: "oauth_clients",
     label: "OAuth Clients",
     description:

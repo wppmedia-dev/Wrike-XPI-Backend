@@ -82,6 +82,17 @@ const BODYLESS_WRITES = [
     method: "POST",
     path: "/:id/disconnect",
   },
+  // Running a sync names its source in the path and takes no payload.
+  {
+    file: "admin/sync/index.js",
+    method: "POST",
+    path: "/:source/run",
+  },
+  {
+    file: "portal/sync/index.js",
+    method: "POST",
+    path: "/:source/run",
+  },
   // The portal's copies of the same two actions.
   {
     file: "portal/oauthClients/index.js",

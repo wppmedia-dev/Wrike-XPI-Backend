@@ -811,6 +811,122 @@ const bearer = { authorization: `Bearer ${adminToken}` };
     models.OAuthClients.findByPk = realFindByPk;
   }
 
+  /* ── The "Activity log" link needs activity_logs:read ──────────────── */
+
+  section("portal OAuth Clients: the Activity log link needs activity_logs:read");
+  {
+    const read = (rel) => fs.readFileSync(path.join(__dirname, "..", rel), "utf8").replace(/\r\n/g, "\n");
+    const shell = read("frontend/src/pages/PortalHome.tsx");
+    const page = read("frontend/src/pages/OAuthClients.tsx");
+
+    // The page: the menu item exists only when a handler is passed.
+    check(
+      "the page adds the link only when it is given a handler",
+      /\.\.\.\(onViewActivity\s*\?\s*\[[\s\S]*?label: "Activity log"/.test(page),
+      true,
+    );
+    // The shell: the handler is passed only with the grant.
+    check(
+      "the shell passes the handler only with activity_logs:read",
+      /onViewActivity=\{canSeeActivity \? openOAuthClientActivityLogs : undefined\}/.test(shell),
+      true,
+    );
+    check(
+      "and canSeeActivity is exactly activity_logs:read",
+      /const canSeeActivity = can\("activity_logs", "read"\);/.test(shell),
+      true,
+    );
+    check(
+      "the Activity Log page bounces a user without the grant",
+      /activity: canSeeActivity,/.test(shell),
+      true,
+    );
+
+    // The server: the activity API refuses without the grant, whatever the filter.
+    const activityCtl = require("../src/controllers/activityLog");
+    const listCalls = [];
+    activityCtl.List = async (args) => (listCalls.push(args), { rows: [], total: 0, limit: 50, offset: 0 });
+    activityCtl.Summary = async (args) => (listCalls.push(args), { total: 0, denied: 0, allowed: 0 });
+
+    const activityApp = Fastify();
+    activityApp.register(require("../src/routes/portal/activity").portalActivityRoute, { prefix: "/a" });
+    await activityApp.ready();
+
+    const userId = uuid();
+    const headers = { authorization: `Bearer ${jsonwebtoken.sign({ sub: userId, username: "pat", role: "user" }, process.env.JWT_SECRET)}` };
+    const clientId = uuid();
+    const env1 = uuid();
+    ownedEnvs = [{ id: env1 }];
+    const call = (url) => activityApp.inject({ method: "GET", url, headers });
+
+    portalMatrix = { oauth_clients: { read: true, create: false, update: true, delete: true } };
+    listCalls.length = 0;
+    check("OAuth Clients grants alone do not open the activity list", (await call(`/a?oauth_client_id=${clientId}`)).statusCode, 403);
+    check("nor its summary", (await call(`/a/summary?oauth_client_id=${clientId}`)).statusCode, 403);
+    check("nor its export", (await call(`/a/export?oauth_client_id=${clientId}`)).statusCode, 403);
+    check("and nothing was queried", listCalls.length, 0);
+
+    portalMatrix = { activity_logs: { read: false, create: false, update: false, delete: false } };
+    check("an explicit activity_logs:read = false is refused too", (await call(`/a?oauth_client_id=${clientId}`)).statusCode, 403);
+
+    portalMatrix = { activity_logs: { read: true, create: false, update: false, delete: false } };
+    const ok = await call(`/a?oauth_client_id=${clientId}`);
+    check("with activity_logs:read the filtered list is served", ok.statusCode, 200);
+    check(
+      "narrowed to the OAuth client, inside the user's own environments",
+      [listCalls[0].oauthClientId, listCalls[0].envId],
+      [clientId, [env1]],
+    );
+    check("a malformed client id is a 400", (await call("/a?oauth_client_id=not-a-uuid")).statusCode, 400);
+    await activityApp.close();
+  }
+
+  /* ── Portal Sync: who gets through ─────────────────────────────────── */
+
+  section("portal Sync: who gets through");
+  {
+    // syncSources builds an Azure client when it loads; nothing is contacted.
+    process.env.AZURE_VAULT_URL = process.env.AZURE_VAULT_URL || "https://example.vault.invalid/";
+
+    const syncRunsCtl = require("../src/controllers/syncRuns");
+    const syncSources = require("../src/utils/syncSources");
+    const lastRun = { source: "azure_secrets", status: "success", triggered_by: "root-admin", items_requested: 3, items_synced: 3 };
+    syncRunsCtl.LatestPerSource = async () => ({ azure_secrets: lastRun });
+    const runCalls = [];
+    syncSources.runSyncSource = async (key, ctx) => (runCalls.push([key, ctx]), { ...lastRun, status: "success" });
+
+    const syncApp = Fastify();
+    syncApp.register(require("../src/routes/portal/sync").portalSyncRoute, { prefix: "/s" });
+    await syncApp.ready();
+
+    const headers = { authorization: `Bearer ${jsonwebtoken.sign({ sub: uuid(), username: "pat", role: "user" }, process.env.JWT_SECRET)}` };
+    const grant = (actions) => {
+      portalMatrix = { sync: { read: false, create: false, update: false, delete: false, ...actions } };
+    };
+    const get = (h = headers) => syncApp.inject({ method: "GET", url: "/s", headers: h });
+    const run = (source = "azure_secrets") => syncApp.inject({ method: "POST", url: `/s/${source}/run`, headers });
+
+    check("no sign-in: 401", (await get({})).statusCode, 401);
+    grant({});
+    check("signed in, nothing granted: 403", (await get()).statusCode, 403);
+
+    grant({ read: true });
+    let res = await get();
+    const listed = res.json().data.sources.find((x) => x.key === "azure_secrets");
+    check("read grant: the sources are listed with their last run", [res.statusCode, listed.last_run.status], [200, "success"]);
+    runCalls.length = 0;
+    check("read-only cannot run it (403)", (await run()).statusCode, 403);
+    check("and nothing ran", runCalls.length, 0);
+
+    grant({ read: true, update: true });
+    res = await run();
+    check("update grant: it runs", [res.statusCode, res.json().success, res.json().message], [200, true, "Synced successfully"]);
+    check("the right source", runCalls[0][0], "azure_secrets");
+    check("stored as a portal run, so the admin console can tell", runCalls[0][1].admin.username, "portal:pat");
+    check("an unknown source is a 400", (await run("not-a-source")).statusCode, 400);
+    await syncApp.close();
+  }
+
   await app.close();
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

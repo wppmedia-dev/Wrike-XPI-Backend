@@ -403,6 +403,18 @@ const legacyEncrypt = (plaintext, keyHex) => {
     check("the other modules are untouched", catalogue.MODULES.map((m) => m.key).filter((k) => k !== "oauth_clients"), ["overview", "environments", "environment_access", "api_tokens", "environment_modules", "activity_logs", "cache"]);
   }
 
+  /* ── Portal Sync: permission module ───────────────────────────────── */
+
+  section("portal Sync: permission module");
+  {
+    const catalogue = require("../src/utils/portalPermissionCatalog");
+    const mod = catalogue.MODULES.find((m) => m.key === "sync");
+    check("the module is in the catalogue", !!mod, true);
+    check("it offers read and update only", mod && mod.actions, ["read", "update"]);
+    check("a stray create/delete tick is discarded on save", catalogue.normaliseMatrix({ sync: { read: true, create: true, update: true, delete: true } }).sync, { read: true, create: false, update: true, delete: false });
+    check("existing users start with nothing", catalogue.emptyMatrix().sync, { read: false, create: false, update: false, delete: false });
+    check("OAuth Clients is still there beside it", catalogue.MODULES.some((m) => m.key === "oauth_clients"), true);
+  }
   Module._load = realLoad;
   out(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

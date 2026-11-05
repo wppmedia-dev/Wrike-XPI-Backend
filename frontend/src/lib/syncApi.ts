@@ -55,3 +55,17 @@ export const runSync = async (source: string): Promise<SyncRun> => {
   if (run) return run;
   throw new Error(json?.message || "Sync could not be started");
 };
+
+/**
+ * The two calls the Sync page makes. The admin console and the portal each
+ * supply their own (different endpoints, different sign-in).
+ */
+export interface SyncApi {
+  list: () => Promise<SyncSource[]>;
+  run: (source: string) => Promise<SyncRun>;
+}
+
+export const adminSyncApi: SyncApi = {
+  list: listSyncSources,
+  run: runSync,
+};
