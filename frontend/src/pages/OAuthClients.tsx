@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  listOAuthClients,
-  revokeOAuthClient,
-  disconnectOAuthClient,
+  adminOAuthClientsApi,
   type OAuthClient,
   type OAuthClientList,
   type OAuthClientStatus,
+  type OAuthClientsApi,
 } from "../lib/oauthClientsApi";
 import { DataTable } from "../components/ui/DataTable";
 import { useTable, type ColumnDef } from "../components/ui/useTable";
@@ -71,10 +70,23 @@ const redirectHosts = (client: OAuthClient): string => {
 export default function OAuthClients({
   refreshKey = 0,
   onViewActivity,
+  api = adminOAuthClientsApi,
+  canDisconnect = true,
+  canRevoke = true,
 }: {
   refreshKey?: number;
   /** Open the Activity Log scoped to this client's sign-ins. */
   onViewActivity?: (client: { id: string; label: string }) => void;
+  /**
+   * Where the data comes from. The admin console's by default; the portal
+   * passes its own. Keep it a stable object (module scope), since the load
+   * effect depends on it.
+   */
+  api?: OAuthClientsApi;
+  /** Offer Disconnect (the portal's "update" grant). */
+  canDisconnect?: boolean;
+  /** Offer Revoke (the portal's "delete" grant). */
+  canRevoke?: boolean;
 }) {
   const [data, setData] = useState<OAuthClientList | null>(null);
   const [loading, setLoading] = useState(true);
@@ -83,13 +95,13 @@ export default function OAuthClients({
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setData(await listOAuthClients(showRevoked));
+      setData(await api.list(showRevoked));
     } catch (err: any) {
       toast(err?.message || "Failed to load OAuth clients", "error");
     } finally {
       setLoading(false);
     }
-  }, [showRevoked]);
+  }, [api, showRevoked]);
 
   useEffect(() => {
     load();
@@ -110,7 +122,7 @@ export default function OAuthClients({
 
       progress.start();
       try {
-        const revoked = await revokeOAuthClient(client.id);
+        const revoked = await api.revoke(client.id);
         toast(
           revoked.disconnected
             ? `${name} revoked, ${revoked.disconnected} sign-in(s) ended`
@@ -124,7 +136,7 @@ export default function OAuthClients({
         progress.done();
       }
     },
-    [load],
+    [api, load],
   );
 
   // End a client's live sign-ins but keep its registration: for a connector
@@ -145,7 +157,7 @@ export default function OAuthClients({
 
       progress.start();
       try {
-        const ended = await disconnectOAuthClient(client.id);
+        const ended = await api.disconnect(client.id);
         toast(ended ? `${name} disconnected (${ended} sign-in(s) ended)` : `${name} had no live sign-ins`, "success");
         await load();
       } catch (err: any) {
@@ -154,10 +166,12 @@ export default function OAuthClients({
         progress.done();
       }
     },
-    [load],
+    [api, load],
   );
 
   const rows = data?.rows || [];
+  // The server leaves the registrant's IP out for portal users.
+  const showIp = rows.some((c) => c.created_ip);
 
   const columns = useMemo<ColumnDef<OAuthClient>[]>(
     () => [
@@ -234,12 +248,16 @@ export default function OAuthClients({
         searchable: false,
         cell: (c) => (c.revoked_at ? <span className="text-muted">{EMPTY}</span> : formatDate(c.expires_at)),
       },
+      ...(showIp
+        ? [
       {
         id: "created_ip",
         header: "Registered from",
         accessor: (c) => c.created_ip || "",
         cell: (c) => (c.created_ip ? <span className="oc-mono">{c.created_ip}</span> : <span className="text-muted">{EMPTY}</span>),
-      },
+      } as ColumnDef<OAuthClient>,
+        ]
+        : []),
       {
         id: "actions",
         header: "Actions",
@@ -247,7 +265,7 @@ export default function OAuthClients({
         align: "center",
         cell: (c) => {
           const status = statusOf(c);
-          const canRevoke = status !== "revoked" && status !== "expired";
+          const revocable = canRevoke && status !== "revoked" && status !== "expired";
           const items = [
             // History is useful for a revoked or expired client too.
             ...(onViewActivity
@@ -262,7 +280,7 @@ export default function OAuthClients({
               : []),
             // Offered whenever the client still holds a live sign-in, whatever its
             // registration status.
-            ...((c.connection?.live_sessions ?? 0) > 0
+            ...(canDisconnect && (c.connection?.live_sessions ?? 0) > 0
               ? [
                   {
                     label: "Disconnect",
@@ -272,7 +290,7 @@ export default function OAuthClients({
                   },
                 ]
               : []),
-            ...(canRevoke
+            ...(revocable
               ? [
                   {
                     label: "Revoke",
@@ -296,7 +314,7 @@ export default function OAuthClients({
         },
       },
     ],
-    [handleRevoke, handleDisconnect, onViewActivity],
+    [handleRevoke, handleDisconnect, onViewActivity, canDisconnect, canRevoke, showIp],
   );
 
   const table = useTable({

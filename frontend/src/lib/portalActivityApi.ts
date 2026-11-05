@@ -62,6 +62,10 @@ export interface PortalActivityFilters {
       action applies. The server refuses to honour an id outside the caller's
       own environments (src/routes/portal/activity/index.js). */
   token_id?: string;
+  /** Everything done with sign-ins from one registered OAuth client, the
+      filter the OAuth Clients page's "Activity log" action applies. It narrows
+      on top of the caller's own environments; it never widens them. */
+  oauth_client_id?: string;
   /** The one search box: matched against the caller's email and the reference
       id of a failed call, as substrings. */
   search?: string;
@@ -91,6 +95,7 @@ const qs = (filters: PortalActivityFilters): string =>
   toQueryString({
     env_id: filters.env_id,
     token_id: filters.token_id,
+    oauth_client_id: filters.oauth_client_id,
     search: filters.search,
     surface: filters.surface,
     allowed: filters.allowed === undefined ? undefined : String(filters.allowed),
@@ -105,10 +110,11 @@ export const getPortalActivitySummary = (
   token: string,
   envId?: string,
   tokenId?: string,
+  oauthClientId?: string,
 ) =>
   request<PortalActivitySummary>(
     token,
-    `/summary${toQueryString({ env_id: envId, token_id: tokenId })}`,
+    `/summary${toQueryString({ env_id: envId, token_id: tokenId, oauth_client_id: oauthClientId })}`,
   );
 
 /** GET /api/v1/portal/activity-logs/config — how long rows are kept, so the

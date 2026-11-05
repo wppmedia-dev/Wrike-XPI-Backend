@@ -378,6 +378,31 @@ const legacyEncrypt = (plaintext, keyHex) => {
     check("revoked beats expired", clientStatus({ revoked_at: past, expires_at: past }, null), "revoked");
   }
 
+  /* ── Portal permission module: oauth_clients ───────────────────────── */
+
+  section("portal permission module: OAuth Clients");
+  {
+    const catalogue = require("../src/utils/portalPermissionCatalog");
+    const mod = catalogue.MODULES.find((m) => m.key === "oauth_clients");
+
+    check("the module is in the catalogue", !!mod, true);
+    check("it is listed under the label shown in the popup", mod && mod.label, "OAuth Clients");
+    check("it offers read, update and delete", mod && mod.actions, ["read", "update", "delete"]);
+    check("and no create (clients register themselves)", mod && mod.actions.includes("create"), false);
+    check("its key is a known module", catalogue.isKnownModule("oauth_clients"), true);
+
+    const empty = catalogue.emptyMatrix();
+    check("a new or existing user starts with nothing granted", empty.oauth_clients, { read: false, create: false, update: false, delete: false });
+
+    const granted = catalogue.normaliseMatrix({
+      oauth_clients: { read: true, create: true, update: true, delete: true },
+    });
+    check("a stray create tick is discarded on save", granted.oauth_clients, { read: true, create: false, update: true, delete: true });
+
+    check("a grant to another module does not leak into this one", catalogue.normaliseMatrix({ cache: { read: true, delete: true } }).oauth_clients, { read: false, create: false, update: false, delete: false });
+    check("the other modules are untouched", catalogue.MODULES.map((m) => m.key).filter((k) => k !== "oauth_clients"), ["overview", "environments", "environment_access", "api_tokens", "environment_modules", "activity_logs", "cache"]);
+  }
+
   Module._load = realLoad;
   out(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

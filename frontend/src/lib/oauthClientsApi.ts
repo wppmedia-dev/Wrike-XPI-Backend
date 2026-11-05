@@ -107,3 +107,20 @@ export const disconnectOAuthClient = async (id: string): Promise<number> => {
   }
   return Number(json.data?.disconnected) || 0;
 };
+
+/**
+ * The three calls the OAuth Clients page makes. The admin console and the
+ * portal each supply their own (different endpoints, different sign-in), and
+ * the page does not care which.
+ */
+export interface OAuthClientsApi {
+  list: (includeRevoked: boolean) => Promise<OAuthClientList>;
+  revoke: (id: string) => Promise<RevokedOAuthClient>;
+  disconnect: (id: string) => Promise<number>;
+}
+
+export const adminOAuthClientsApi: OAuthClientsApi = {
+  list: listOAuthClients,
+  revoke: revokeOAuthClient,
+  disconnect: disconnectOAuthClient,
+};

@@ -2,10 +2,7 @@ import { verifyAdminJWT } from "../../../middlewares/adminAuth";
 import { OAuthClients } from "../../../controllers";
 import { IdParamSchema, ListSchema } from "./schema";
 
-// A live sign-in counts as idle once nothing has used it (an /mcp call or a
-// refresh) for this long. OAUTH_CLIENT_IDLE_MINUTES overrides the default.
-const idleMinutes = parseInt(process.env.OAUTH_CLIENT_IDLE_MINUTES, 10);
-const IDLE_AFTER_SECONDS = (idleMinutes > 0 ? idleMinutes : 15) * 60;
+import { defaultIdleAfterSeconds } from "../../../utils/oauthClientStatus";
 
 /**
  * Admin API behind /api/v1/admin/oauth-clients: the dynamically registered
@@ -32,7 +29,7 @@ export const adminOAuthClientsRoute = (fastify, opts, done) => {
         includeRevoked: include_revoked === "true" || include_revoked === "1",
         limit,
         offset,
-        idleAfterSeconds: IDLE_AFTER_SECONDS,
+        idleAfterSeconds: defaultIdleAfterSeconds(),
       });
       return reply.code(200).send({
         success: true,

@@ -24,6 +24,8 @@ import WrikeEndpointPreview from "../components/WrikeEndpointPreview";
 import BuildTag from "../components/BuildTag";
 import PortalActivityPage from "./PortalActivityPage";
 import PortalCachePage from "./PortalCachePage";
+import OAuthClients from "./OAuthClients";
+import { portalOAuthClientsApi } from "../lib/portalOAuthClientsApi";
 import PortalApiTokensPage from "./PortalApiTokensPage";
 import PortalEnvironmentAccess from "./PortalEnvironmentAccess";
 import { PortalEnvironmentsTable } from "./PortalEnvironmentsTable";
@@ -40,7 +42,13 @@ import {
 } from "../lib/portalEnvironmentModulesApi";
 import "./PortalHome.css";
 
-type PageId = "overview" | "environments" | "api-tokens" | "activity" | "cache";
+type PageId =
+  | "overview"
+  | "environments"
+  | "api-tokens"
+  | "activity"
+  | "cache"
+  | "oauth-clients";
 
 /**
  * The environment module-permission grid, pointed at the portal's own
@@ -68,6 +76,7 @@ const PAGE_NAMES: Record<PageId, string> = {
   "api-tokens": "Sessions",
   activity: "Activity Logs",
   cache: "Cache Settings",
+  "oauth-clients": "OAuth Clients",
 };
 
 const PAGE_IDS = Object.keys(PAGE_NAMES) as PageId[];
@@ -262,6 +271,10 @@ export default function PortalHome() {
   const canSeeApiTokens = can("api_tokens", "read");
   const canSeeActivity = can("activity_logs", "read");
   const canSeeCache = can("cache", "read");
+  // Read lists the clients; update (Disconnect) and delete (Revoke) are passed
+  // to the page as flags, so a read-only user is never shown a control that
+  // would 403 and sign them out.
+  const canSeeOAuthClients = can("oauth_clients", "read");
   const canSeeEnvironmentAccess = can("environment_access", "read");
   // The module ceiling of each environment. Read shows the Modules column and
   // the row action; update opens that grid as an editor. It hangs off the
@@ -277,7 +290,8 @@ export default function PortalHome() {
     canSeeEnvironments ||
     canSeeApiTokens ||
     canSeeActivity ||
-    canSeeCache;
+    canSeeCache ||
+    canSeeOAuthClients;
 
   /* ── Session guard (mirrors the EJS inline script exactly) ──────────── */
   useEffect(() => {
@@ -363,12 +377,13 @@ export default function PortalHome() {
       "api-tokens": canSeeApiTokens,
       activity: canSeeActivity,
       cache: canSeeCache,
+      "oauth-clients": canSeeOAuthClients,
     };
     if (granted[activePage]) return;
 
     // Order matters: this is where a user with a stale link lands.
     const fallback = (
-      ["overview", "environments", "api-tokens", "activity", "cache"] as PageId[]
+      ["overview", "environments", "api-tokens", "activity", "cache", "oauth-clients"] as PageId[]
     ).find((page) => granted[page]);
     if (fallback) setActivePage(fallback);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -380,6 +395,7 @@ export default function PortalHome() {
     canSeeApiTokens,
     canSeeActivity,
     canSeeCache,
+    canSeeOAuthClients,
   ]);
 
   const recentEnvs = environments.slice(0, 5);
@@ -416,6 +432,14 @@ export default function PortalHome() {
   const [activityEnv, setActivityEnv] = useState<{ id: string; name: string } | null>(
     null,
   );
+
+  /* The OAuth client whose activity is being viewed. Set by the OAuth Clients
+     page's "Activity log" action, cleared by the chip on the log or by opening
+     the log from the sidebar. */
+  const [activityOAuthClient, setActivityOAuthClient] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
 
   function openAccessDrawer(env: PortalEnvironmentFull) {
     setAccessEnvId(env.id);
@@ -630,12 +654,25 @@ export default function PortalHome() {
    * passed, so nobody is sent to a page the guard would bounce them off).
    */
   const openTokenActivityLogs = (row: AdminToken) => {
+    setActivityOAuthClient(null);
     setActivityToken({
       id: row.id,
       label:
         [row.environment_name, row.account_id].filter(Boolean).join(" · ") ||
         row.id,
     });
+    setActivePage("activity");
+  };
+
+  /**
+   * The OAuth Clients page's "Activity log" row action: the log filtered to
+   * that client's sign-ins. Only offered with activity_logs:read (the page
+   * drops the action when no handler is passed), because the log and its API are
+   * behind that grant.
+   */
+  const openOAuthClientActivityLogs = (client: { id: string; label: string }) => {
+    setActivityToken(null);
+    setActivityOAuthClient(client);
     setActivePage("activity");
   };
 
@@ -769,7 +806,7 @@ export default function PortalHome() {
             </div>
           )}
 
-          {(canSeeCache || canSeeActivity) && (
+          {(canSeeCache || canSeeActivity || canSeeOAuthClients) && (
             <div className="nav-group-label" style={{ marginTop: 6 }}>
               Settings
             </div>
@@ -785,6 +822,19 @@ export default function PortalHome() {
               <span className="nl">Cache Settings</span>
             </div>
           )}
+          {canSeeOAuthClients && (
+            <div
+              className={`nav-item${activePage === "oauth-clients" ? " active" : ""}`}
+              onClick={() => handleNav("oauth-clients")}
+            >
+              <span className="ni">
+                <i className="fa-solid fa-plug" />
+              </span>
+              <span className="nl">
+                OAuth Clients <span className="oc-beta">Beta</span>
+              </span>
+            </div>
+          )}
           {canSeeActivity && (
             <div
               className={`nav-item${activePage === "activity" ? " active" : ""}`}
@@ -794,6 +844,7 @@ export default function PortalHome() {
                 // not persist silently under a nav click that did not ask for
                 // it.
                 setActivityToken(null);
+                setActivityOAuthClient(null);
                 setActivityEnv(null);
                 handleNav("activity");
               }}
@@ -1064,6 +1115,8 @@ export default function PortalHome() {
               refreshKey={dataRefreshKey}
               tokenFilter={activityToken}
               onClearTokenFilter={() => setActivityToken(null)}
+              oauthClientFilter={activityOAuthClient}
+              onClearOAuthClientFilter={() => setActivityOAuthClient(null)}
               envScope={activityEnv}
             />
           </div>
@@ -1073,6 +1126,34 @@ export default function PortalHome() {
           {canSeeCache && (
           <div className={`page${activePage === "cache" ? " active" : ""}`} id="page-cache">
             <PortalCachePage active={activePage === "cache"} canDelete={can("cache", "delete")} />
+          </div>
+          )}
+
+          {/* ══════ OAUTH CLIENTS PAGE ══════ */}
+          {canSeeOAuthClients && (
+          <div className={`page${activePage === "oauth-clients" ? " active" : ""}`} id="page-oauth-clients">
+            <div className="section-header">
+              <div>
+                <div className="section-title">
+                  OAuth Clients <span className="oc-beta" title="This page is new and may change">Beta</span>{" "}
+                  <PageInfo help={PORTAL_HELP.oauthClients} />
+                </div>
+                <div className="section-subtitle">
+                  MCP connectors that signed in to your environments
+                </div>
+              </div>
+            </div>
+
+            {/* Mounted only while open, so it fetches on first visit. */}
+            {activePage === "oauth-clients" && (
+              <OAuthClients
+                refreshKey={dataRefreshKey}
+                api={portalOAuthClientsApi}
+                canDisconnect={can("oauth_clients", "update")}
+                canRevoke={can("oauth_clients", "delete")}
+                onViewActivity={canSeeActivity ? openOAuthClientActivityLogs : undefined}
+              />
+            )}
           </div>
           )}
         </div>

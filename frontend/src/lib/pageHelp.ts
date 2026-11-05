@@ -135,7 +135,8 @@ export type PortalHelpKey =
   | "environments"
   | "apiTokens"
   | "activity"
-  | "cache";
+  | "cache"
+  | "oauthClients";
 
 export const PORTAL_HELP: Record<PortalHelpKey, PageHelp> = {
   overview: {
@@ -190,6 +191,19 @@ export const PORTAL_HELP: Record<PortalHelpKey, PageHelp> = {
       "Delete one key, or several, to force a fresh read.",
     ],
     note: "Clearing a key loses nothing. The next request is just slower.",
+  },
+
+  oauthClients: {
+    summary:
+      "The MCP connectors (Claude and others) that signed in to your environments.",
+    points: [
+      "Beta: this page is new and may change.",
+      "You see a connector when it has signed in to one of your environments, and its status counts only those sign-ins.",
+      "Connected: used recently. Idle: signed in but not used for about 15 minutes. Disconnected: no live sign-in.",
+      "Disconnect ends the sign-ins in your environments; the connector can sign in again. Revoke stops the connector for good, and is refused if other environments also use it.",
+      "Activity log (row menu) shows what that connector did.",
+    ],
+    note: "Removing a connector inside its own app does not tell this service. It shows as Idle until you Disconnect it or its sign-in expires.",
   },
 };
 

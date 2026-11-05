@@ -95,6 +95,26 @@ export const MODULES = [
       "Cached Redis keys and their values — read to browse, delete to clear keys.",
     actions: ["read", "delete"],
   },
+  {
+    key: "oauth_clients",
+    label: "OAuth Clients",
+    description:
+      "The MCP connectors (Claude and others) that signed in to the user's environments: whether each is connected, its history in the Activity Log, and cutting one off.",
+    // Three actions, one per route in src/routes/portal/oauthClients: read lists
+    // the clients, update disconnects one, delete revokes one.
+    //
+    // No create, deliberately. A client registers itself (POST /oauth/register,
+    // called by the MCP client, not by a person in a console), so there is no
+    // create route to grant. A tick that authorises nothing is the same dead
+    // control the api_tokens module explains, so it is not offered.
+    //
+    // Update and delete are split by how much they undo. Disconnect ends this
+    // user's environments' sign-ins and the client can simply sign in again, so
+    // it sits with update. Revoke stops the client signing in at all and cannot
+    // be undone, so it is its own grant (and is refused for a client other
+    // environments also use; see OAuthClients.RevokeScoped).
+    actions: ["read", "update", "delete"],
+  },
 ];
 
 export const MODULE_KEYS = MODULES.map((m) => m.key);

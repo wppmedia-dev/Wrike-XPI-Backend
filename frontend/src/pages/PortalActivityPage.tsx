@@ -161,6 +161,13 @@ interface Props {
   tokenFilter?: { id: string; label: string } | null;
   onClearTokenFilter?: () => void;
   /**
+   * Scope the page to the sign-ins of one registered OAuth client, set by the
+   * OAuth Clients page's "Activity log" row action. Same chip pattern as the
+   * token scope; `label` is only for the chip.
+   */
+  oauthClientFilter?: { id: string; label: string } | null;
+  onClearOAuthClientFilter?: () => void;
+  /**
    * Scope the page to one environment, set by the Environments table's
    * "Activity logs" row action. Like the admin console, no chip for this one:
    * the environment filter below is a first-class control here, so the scope
@@ -175,6 +182,8 @@ export default function PortalActivityPage({
   refreshKey = 0,
   tokenFilter = null,
   onClearTokenFilter,
+  oauthClientFilter = null,
+  onClearOAuthClientFilter,
   envScope = null,
 }: Props) {
   const token = getPortalToken();
@@ -238,6 +247,7 @@ export default function PortalActivityPage({
   // Read by the fetch callbacks, which is why it is a plain value here rather
   // than read off the prop at call time.
   const tokenFilterId = tokenFilter?.id || undefined;
+  const oauthClientId = oauthClientFilter?.id || undefined;
 
   // Follows the shell rather than just initialising: arriving from an
   // environment row pre-selects that environment here, and the shell clearing
@@ -259,6 +269,7 @@ export default function PortalActivityPage({
           listPortalActivity(token, {
             env_id: envFilter || undefined,
             token_id: tokenFilterId,
+            oauth_client_id: oauthClientId,
             surface: surfaceFilter || undefined,
             allowed: resultFilter ? resultFilter === "allowed" : undefined,
             agent: agentFilter || undefined,
@@ -268,7 +279,7 @@ export default function PortalActivityPage({
             limit: pageSize,
             offset: nextOffset,
           }),
-          getPortalActivitySummary(token, envFilter || undefined, tokenFilterId),
+          getPortalActivitySummary(token, envFilter || undefined, tokenFilterId, oauthClientId),
         ]);
         setRows(list.rows);
         setTotal(list.total);
@@ -281,7 +292,7 @@ export default function PortalActivityPage({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [token, envFilter, surfaceFilter, resultFilter, agentFilter, searchFilter, fromFilter, toFilter, pageSize, tokenFilterId],
+    [token, envFilter, surfaceFilter, resultFilter, agentFilter, searchFilter, fromFilter, toFilter, pageSize, tokenFilterId, oauthClientId],
   );
 
   useEffect(() => {
@@ -292,7 +303,7 @@ export default function PortalActivityPage({
     }
     load(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, token, envFilter, surfaceFilter, resultFilter, agentFilter, fromFilter, toFilter, pageSize, tokenFilterId]);
+  }, [active, token, envFilter, surfaceFilter, resultFilter, agentFilter, fromFilter, toFilter, pageSize, tokenFilterId, oauthClientId]);
 
   // Top-bar Refresh — reload the current page (keeping filters and page) and
   // the summary stats without resetting the view.
@@ -403,6 +414,7 @@ export default function PortalActivityPage({
       await exportPortalActivity(token, {
         env_id: exportDraft.envFilter || undefined,
         token_id: tokenFilterId,
+        oauth_client_id: oauthClientId,
         surface: exportDraft.surfaceFilter || undefined,
         allowed: exportDraft.resultFilter ? exportDraft.resultFilter === "allowed" : undefined,
         agent: exportDraft.agentFilter || undefined,
@@ -491,6 +503,24 @@ export default function PortalActivityPage({
                   onClick={onClearTokenFilter}
                   aria-label="Clear the token filter"
                   title="Clear the token filter"
+                >
+                  <i className="fa-solid fa-xmark" aria-hidden="true" />
+                </button>
+              )}
+            </span>
+          )}
+
+          {oauthClientFilter && (
+            <span className="pal-token-chip" title={`Filtered to the OAuth client ${oauthClientFilter.label}`}>
+              <i className="fa-solid fa-plug" aria-hidden="true" />
+              <span className="pal-token-chip-label">OAuth client: {oauthClientFilter.label}</span>
+              {onClearOAuthClientFilter && (
+                <button
+                  type="button"
+                  className="pal-token-chip-clear"
+                  onClick={onClearOAuthClientFilter}
+                  aria-label="Clear the OAuth client filter"
+                  title="Clear the OAuth client filter"
                 >
                   <i className="fa-solid fa-xmark" aria-hidden="true" />
                 </button>

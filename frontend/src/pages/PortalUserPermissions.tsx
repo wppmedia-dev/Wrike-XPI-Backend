@@ -34,6 +34,7 @@ const MODULE_ICON: Record<string, string> = {
   environment_access: "fa-shield-halved",
   activity_logs: "fa-clock-rotate-left",
   cache: "fa-database",
+  oauth_clients: "fa-plug",
 };
 
 interface Props {

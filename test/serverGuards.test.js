@@ -82,6 +82,17 @@ const BODYLESS_WRITES = [
     method: "POST",
     path: "/:id/disconnect",
   },
+  // The portal's copies of the same two actions.
+  {
+    file: "portal/oauthClients/index.js",
+    method: "POST",
+    path: "/:id/revoke",
+  },
+  {
+    file: "portal/oauthClients/index.js",
+    method: "POST",
+    path: "/:id/disconnect",
+  },
   // Both generate a username and password server-side; the body is empty.
   {
     file: "admin/users/index.js",

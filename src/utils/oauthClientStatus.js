@@ -74,3 +74,13 @@ export const clientStatus = (client, connection, now = Date.now()) => {
   }
   return connection || CLIENT_STATUS.REGISTERED;
 };
+
+/**
+ * How long a live sign-in may go unused before its client shows as idle.
+ * OAUTH_CLIENT_IDLE_MINUTES overrides the 15-minute default. One definition
+ * for the admin console and the portal, so they cannot disagree.
+ */
+export const defaultIdleAfterSeconds = () => {
+  const minutes = parseInt(process.env.OAUTH_CLIENT_IDLE_MINUTES, 10);
+  return (minutes > 0 ? minutes : 15) * 60;
+};

@@ -62,6 +62,32 @@ let revokeCalls = [];
 let lastListArgs = null;
 
 const realOAuthClients = { Revoke: oauthClients.Revoke, Disconnect: oauthClients.Disconnect };
+// The portal's scoped functions, kept for the tests of the scope itself; the
+// route tests below use the recording stubs.
+const realScoped = {
+  ListScoped: oauthClients.ListScoped,
+  DisconnectScoped: oauthClients.DisconnectScoped,
+  RevokeScoped: oauthClients.RevokeScoped,
+};
+let scopedCalls = [];
+let scopedError = null;
+
+// Portal sign-in, permission and environment lookups.
+const portalAuthCtl = require("../src/controllers/portalAuth");
+const portalPermissionsCtl = require("../src/controllers/portalPermissions");
+const wrikeCredentialsCtl = require("../src/controllers/wrikeCredentials");
+let portalMatrix = {};
+let ownedEnvs = [];
+portalAuthCtl.GetById = async (id) => ({
+  id,
+  is_active: true,
+  username: "pat",
+  role: "user",
+  must_change_password: false,
+});
+portalPermissionsCtl.GetMatrix = async () => portalMatrix;
+wrikeCredentialsCtl.GetByOwnerId = async () => ownedEnvs;
+wrikeCredentialsCtl.GetAllForPortal = async () => [{ id: "every-env" }];
 let disconnectCalls = [];
 
 const mcpTokens = require("../src/controllers/mcpTokens");
@@ -85,6 +111,20 @@ oauthClients.Revoke = async (id, adminId) => {
   return { id, revoked_at: new Date().toISOString() };
 };
 oauthClients.Disconnect = async (id) => (disconnectCalls.push(id), { id, disconnected: 2 });
+oauthClients.ListScoped = async (args) => (
+  scopedCalls.push(["list", args]),
+  { rows: [], total: 0, limit: 50, offset: 0, counts: { active: 0, revoked: 0, connected: 0, idle: 0, disconnected: 0, registered: 0 } }
+);
+oauthClients.DisconnectScoped = async (id, envIds) => {
+  scopedCalls.push(["disconnect", id, envIds]);
+  if (scopedError) throw scopedError;
+  return { id, disconnected: 1 };
+};
+oauthClients.RevokeScoped = async (id, envIds) => {
+  scopedCalls.push(["revoke", id, envIds]);
+  if (scopedError) throw scopedError;
+  return { id, revoked_at: new Date().toISOString(), disconnected: 1 };
+};
 oauthClients.List = async (args) => {
   lastListArgs = args;
   return { rows: [], total: 0, limit: 50, offset: 0, counts: { active: 0, revoked: 0 } };
@@ -548,6 +588,227 @@ const bearer = { authorization: `Bearer ${adminToken}` };
     await tick();
     check("a missing column switches tracking off for the process", statements.filter((x) => x === e).length, 0);
     models.sequelize.query = realQuery;
+  }
+
+  /* ── Portal: OAuth Clients permissions ─────────────────────────────── */
+
+  section("portal OAuth Clients: who gets through");
+  const portalOAuthApp = Fastify();
+  portalOAuthApp.register(require("../src/routes/portal/oauthClients").portalOAuthClientsRoute, { prefix: "/p" });
+  await portalOAuthApp.ready();
+  {
+    const portalUserId = uuid();
+    const portalToken = (role) => jsonwebtoken.sign({ sub: portalUserId, username: "pat", role }, process.env.JWT_SECRET);
+    const asUser = { authorization: `Bearer ${portalToken("user")}` };
+    const asPortalAdmin = { authorization: `Bearer ${portalToken("admin")}` };
+    const grant = (actions) => {
+      portalMatrix = { oauth_clients: { read: false, create: false, update: false, delete: false, ...actions } };
+    };
+    const get = (headers, url = "/p") => portalOAuthApp.inject({ method: "GET", url, headers });
+    const post = (path, headers) => portalOAuthApp.inject({ method: "POST", url: `/p/${path}`, headers });
+    const clientId = uuid();
+    const env1 = uuid();
+    const env2 = uuid();
+    ownedEnvs = [{ id: env1 }, { id: env2 }];
+    const writes = () => scopedCalls.filter(([kind]) => kind !== "list").length;
+
+    check("no sign-in: 401", (await get({})).statusCode, 401);
+
+    grant({});
+    check("signed in but nothing granted: 403", (await get(asUser)).statusCode, 403);
+
+    grant({ read: true });
+    scopedCalls = [];
+    let res = await get(asUser);
+    check("read grant: the list is served", [res.statusCode, res.json().success], [200, true]);
+    check("and it is limited to this user's environments", [scopedCalls[0][0], scopedCalls[0][1].envIds], ["list", [env1, env2]]);
+    check("revoked rows are left out by default", scopedCalls[0][1].includeRevoked, false);
+    check("and the idle threshold is the shared one", scopedCalls[0][1].idleAfterSeconds, 15 * 60);
+    await get(asUser, "/p?include_revoked=true");
+    check("include_revoked is passed through", scopedCalls[1][1].includeRevoked, true);
+    check("a bad limit is a 400", (await get(asUser, "/p?limit=100000")).statusCode, 400);
+
+    check("read-only cannot disconnect (403)", (await post(`${clientId}/disconnect`, asUser)).statusCode, 403);
+    check("read-only cannot revoke (403)", (await post(`${clientId}/revoke`, asUser)).statusCode, 403);
+    check("and nothing was attempted", writes(), 0);
+
+    grant({ read: true, update: true });
+    scopedCalls = [];
+    res = await post(`${clientId}/disconnect`, asUser);
+    check("update grant: disconnect works", [res.statusCode, res.json().data.disconnected], [200, 1]);
+    check("scoped to this user's environments", scopedCalls[0], ["disconnect", clientId, [env1, env2]]);
+    check("update does not include revoke (403)", (await post(`${clientId}/revoke`, asUser)).statusCode, 403);
+
+    grant({ read: true, delete: true });
+    scopedCalls = [];
+    res = await post(`${clientId}/revoke`, asUser);
+    check("delete grant: revoke works", [res.statusCode, res.json().success], [200, true]);
+    check("scoped to this user's environments", scopedCalls[0], ["revoke", clientId, [env1, env2]]);
+    check("delete does not include disconnect (403)", (await post(`${clientId}/disconnect`, asUser)).statusCode, 403);
+
+    grant({ read: true, update: true, delete: true });
+    check("a malformed id is a 400 on disconnect", (await post("not-a-uuid/disconnect", asUser)).statusCode, 400);
+    check("a malformed id is a 400 on revoke", (await post("not-a-uuid/revoke", asUser)).statusCode, 400);
+
+    scopedError = { statusCode: 404, message: "OAuth client not found" };
+    res = await post(`${clientId}/disconnect`, asUser);
+    check("a client outside the user's scope is a 404, never a 403", [res.statusCode, res.json().message], [404, "OAuth client not found"]);
+    scopedError = { statusCode: 409, message: "This client is also used by other environments, so only an administrator can revoke it." };
+    res = await post(`${clientId}/revoke`, asUser);
+    check("revoking a shared client is a 409 with a readable reason", [res.statusCode, /administrator/.test(res.json().message)], [409, true]);
+    scopedError = null;
+
+    ownedEnvs = [];
+    scopedCalls = [];
+    await get(asUser);
+    check("a user with no environments is passed an empty scope", scopedCalls[0][1].envIds, []);
+    ownedEnvs = [{ id: env1 }, { id: env2 }];
+
+    lastListArgs = null;
+    scopedCalls = [];
+    res = await get(asPortalAdmin);
+    check("an admin-role portal user gets the unscoped list", [res.statusCode, !!lastListArgs, scopedCalls.length], [200, true, 0]);
+    await portalOAuthApp.close();
+  }
+
+  /* ── Portal scope: what the controller restricts ───────────────────── */
+
+  section("portal OAuth Clients: the scope itself");
+  {
+    const models = require("../models");
+    const realQuery = models.sequelize.query;
+    const realFindAll = models.OAuthClients.findAll;
+    const realFindByPk = models.OAuthClients.findByPk;
+
+    const queries = [];
+    let statsRows = [];
+    let inScopeRows = [{ ok: 1 }];
+    let elsewhereRows = [];
+    let statsError = null;
+    models.sequelize.query = async (sql, opts) => {
+      queries.push({ sql, opts });
+      if (sql.includes("GROUP BY f.client_id")) {
+        if (statsError) throw statsError;
+        return statsRows;
+      }
+      if (sql.includes("SELECT 1 AS ok")) return inScopeRows;
+      if (sql.includes("SELECT 1 AS used")) return elsewhereRows;
+      if (sql.includes("UPDATE mcp_token_families f")) return [[], { rowCount: 3 }];
+      return [];
+    };
+
+    const envA = uuid();
+    const envB = uuid();
+    const now = Date.now();
+    const iso = (msAgo) => new Date(now - msAgo).toISOString();
+    const [live, quit, gone, quiet] = [uuid(), uuid(), uuid(), uuid()];
+    const client = (id, extra = {}) => ({
+      id,
+      client_name: `client ${id.slice(0, 4)}`,
+      redirect_uris: ["https://claude.ai/cb"],
+      created_at: iso(86400000),
+      expires_at: null,
+      last_used_at: null,
+      revoked_at: null,
+      ...extra,
+    });
+    let findAllArgs = null;
+    models.OAuthClients.findAll = async (args) => {
+      findAllArgs = args;
+      return [client(live), client(quit), client(quiet), client(gone, { revoked_at: iso(1000) })];
+    };
+    statsRows = [
+      { client_id: live, total_sessions: 2, live_sessions: 1, last_active_at: iso(60000), live_last_active_at: iso(60000), last_disconnected_at: null },
+      { client_id: quit, total_sessions: 1, live_sessions: 0, last_active_at: iso(7200000), live_last_active_at: null, last_disconnected_at: iso(3600000) },
+      { client_id: quiet, total_sessions: 1, live_sessions: 1, last_active_at: iso(10800000), live_last_active_at: iso(10800000), last_disconnected_at: null },
+      { client_id: gone, total_sessions: 1, live_sessions: 0, last_active_at: iso(9000000), live_last_active_at: null, last_disconnected_at: iso(9000000) },
+    ];
+
+    // — listing —
+    queries.length = 0;
+    let out = await realScoped.ListScoped({ envIds: [], idleAfterSeconds: 900 });
+    check("no environments: an empty list and no query at all", [out.rows, out.total, queries.length], [[], 0, 0]);
+
+    out = await realScoped.ListScoped({ envIds: [envA, envB], idleAfterSeconds: 900 });
+    const statsQuery = queries.find((q) => q.sql.includes("GROUP BY f.client_id"));
+    check("the sign-in counts only cover the user's environments", [/t\.env_id IN \(:envIds\)/.test(statsQuery.sql), statsQuery.opts.replacements.envIds], [true, [envA, envB]]);
+    check("the clients asked for are exactly the ones that signed in there", findAllArgs.where.id[models.Sequelize.Op.in].sort(), [live, quit, quiet, gone].sort());
+    check("registrant IP, user agent and admin id are not requested", ["created_ip", "user_agent", "revoked_by"].some((f) => findAllArgs.attributes.includes(f)), false);
+    check("statuses are worked out from those sign-ins", out.rows.map((r) => r.status), ["connected", "disconnected", "idle"]);
+    check("a revoked client is hidden by default", out.rows.some((r) => r.id === gone), false);
+    check("the counts cover every visible client", out.counts, { active: 3, revoked: 1, connected: 1, idle: 1, disconnected: 1, registered: 0 });
+    check("total and paging", [out.total, out.limit, out.offset], [3, 50, 0]);
+
+    out = await realScoped.ListScoped({ envIds: [envA], includeRevoked: true, limit: 2, offset: 1, idleAfterSeconds: 900 });
+    check("include_revoked brings it back, and paging slices the result", [out.total, out.rows.length, out.rows[0].id], [4, 2, quit]);
+
+    statsRows = [];
+    findAllArgs = null;
+    out = await realScoped.ListScoped({ envIds: [envA] });
+    check("no sign-ins in those environments: empty, and clients are not even queried", [out.rows, findAllArgs], [[], null]);
+
+    statsError = new Error('column "client_id" does not exist');
+    let failure = null;
+    try { await realScoped.ListScoped({ envIds: [envA] }); } catch (err) { failure = err.message; }
+    check("if attribution cannot be read it fails, it does NOT show everything", failure, 'column "client_id" does not exist');
+    statsError = null;
+
+    // — disconnect —
+    let thrown = null;
+    const attempt = async (fn) => { thrown = null; try { return await fn(); } catch (err) { thrown = err; return null; } };
+
+    await attempt(() => realScoped.DisconnectScoped("not-a-uuid", [envA]));
+    check("disconnect: a malformed id is a 400", thrown && thrown.statusCode, 400);
+
+    queries.length = 0;
+    inScopeRows = [];
+    await attempt(() => realScoped.DisconnectScoped(live, [envA]));
+    check("disconnect: a client with no sign-in here is a 404", thrown && thrown.statusCode, 404);
+    check("and nothing was ended", queries.some((q) => q.sql.includes("UPDATE")), false);
+
+    await attempt(() => realScoped.DisconnectScoped(live, []));
+    check("disconnect: no environments at all is also a 404", thrown && thrown.statusCode, 404);
+
+    inScopeRows = [{ ok: 1 }];
+    queries.length = 0;
+    out = await realScoped.DisconnectScoped(live, [envA, envB]);
+    const update = queries.find((q) => q.sql.includes("UPDATE mcp_token_families f"));
+    check("disconnect: only sign-ins in the user's environments are ended", [/t\.env_id IN \(:envIds\)/.test(update.sql), update.opts.replacements.envIds], [true, [envA, envB]]);
+    check("it is recorded as a portal action", update.opts.replacements.reason, "portal_disconnected");
+    check("and reports how many ended", out, { id: live, disconnected: 3 });
+
+    // — revoke —
+    await attempt(() => realScoped.RevokeScoped("not-a-uuid", [envA]));
+    check("revoke: a malformed id is a 400", thrown && thrown.statusCode, 400);
+
+    inScopeRows = [];
+    await attempt(() => realScoped.RevokeScoped(live, [envA]));
+    check("revoke: a client outside the scope is a 404", thrown && thrown.statusCode, 404);
+
+    inScopeRows = [{ ok: 1 }];
+    elsewhereRows = [{ used: 1 }];
+    let touched = false;
+    models.OAuthClients.findByPk = async () => ((touched = true), null);
+    await attempt(() => realScoped.RevokeScoped(live, [envA]));
+    check("revoke: a client other environments also use is a 409", thrown && thrown.statusCode, 409);
+    check("and it was not revoked", touched, false);
+    const probe = queries.filter((q) => q.sql.includes("SELECT 1 AS used")).pop();
+    check("the 'used elsewhere' test looks outside the user's environments", /NOT IN \(:envIds\)/.test(probe.sql), true);
+
+    elsewhereRows = [];
+    const revokedRow = {
+      revoked_at: null,
+      update: async function (values) { Object.assign(this, values); },
+      get: function () { return { id: live, revoked_at: this.revoked_at }; },
+    };
+    models.OAuthClients.findByPk = async () => revokedRow;
+    out = await realScoped.RevokeScoped(live, [envA]);
+    check("revoke: a client only this user's environments used is revoked", [!!revokedRow.revoked_at, out.id], [true, live]);
+    check("and no admin id is recorded for a portal user", revokedRow.revoked_by, null);
+
+    models.sequelize.query = realQuery;
+    models.OAuthClients.findAll = realFindAll;
+    models.OAuthClients.findByPk = realFindByPk;
   }
 
   await app.close();
