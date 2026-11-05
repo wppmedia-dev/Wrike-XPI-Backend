@@ -15,8 +15,8 @@ import "./PageHeader.css";
  * and its action buttons, directly under a top bar that already showed the same
  * title and the refresh button. This moves all of it up into that bar:
  *
- *     ≡  Environments ⓘ │ Manage Wrike API credentials…      [Add Environment] ↻
- *        Admin / Environments
+ *     ≡  Environments ⓘ                                [Add Environment] ↻
+ *        Manage Wrike API credentials per environment
  *
  * The page still declares its header where it always did, next to the state and
  * handlers its buttons use (the Cache page's bulk delete, for one), so nothing
@@ -24,7 +24,8 @@ import "./PageHeader.css";
  * body; it portals its three parts into slots the shell puts in the top bar:
  *
  *   title extra   the ⓘ and any badge, right after the title the bar already shows
- *   description   the one-line subtitle
+ *   description   the one-line subtitle, on the line under the title (where the
+ *                 breadcrumb used to be)
  *   actions       the page's buttons, to the left of the refresh button
  *
  * The title text itself is the bar's own (the page's name in the sidebar), so it

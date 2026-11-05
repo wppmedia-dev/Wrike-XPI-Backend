@@ -514,13 +514,8 @@ export default function PortalDashboard() {
                 {pageTitle}
                 <span className="topbar-title-extra" ref={topbar.refs.titleExtra} />
               </div>
-              <div className="breadcrumb">
-                <span>Portal</span>
-                <span className="bc-sep">/</span>
-                <span>{pageTitle}</span>
-              </div>
+              <div className="topbar-desc" ref={topbar.refs.description} />
             </div>
-            <div className="topbar-desc" ref={topbar.refs.description} />
           </div>
           <div className="topbar-right">
             <div className="topbar-actions" ref={topbar.refs.actions} />

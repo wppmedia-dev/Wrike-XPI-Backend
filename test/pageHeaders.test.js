@@ -6,7 +6,8 @@
  * (frontend/src/components/ui/PageHeader.tsx). This checks that stays true:
  *
  *   - no page draws a section-header of its own any more
- *   - every shell's top bar has the slots the headers fill, and provides them
+ *   - every shell's top bar has the slots the headers fill, and provides them,
+ *     with the description on the line under the title (there is no breadcrumb)
  *   - every <PageHeader page="…"> names a page that exists in a shell, so a
  *     typo cannot leave a page with no header at all
  *   - a header's buttons keep a .btn-text label, which is what lets them shrink
@@ -71,6 +72,14 @@ for (const shell of SHELLS) {
   const name = path.basename(shell, ".tsx");
   check(`${name}: title-extra slot`, /className="topbar-title-extra" ref=\{topbar\.refs\.titleExtra\}/.test(text), true);
   check(`${name}: description slot`, /className="topbar-desc" ref=\{topbar\.refs\.description\}/.test(text), true);
+  // ...directly under the title, inside the same heading block, in the place the
+  // breadcrumb used to be.
+  check(
+    `${name}: the description sits under the title`,
+    /className="topbar-heading">\n\s+<div className="page-title">[\s\S]*?<\/div>\n\s+<div className="topbar-desc" ref=\{topbar\.refs\.description\} \/>\n\s+<\/div>/.test(text),
+    true,
+  );
+  check(`${name}: no breadcrumb`, /className="breadcrumb"|bc-sep/.test(text), false);
   check(`${name}: actions slot`, /className="topbar-actions" ref=\{topbar\.refs\.actions\}/.test(text), true);
   check(`${name}: hook called with the active page`, /const topbar = useTopbar\(activePage\);/.test(text), true);
   check(`${name}: slots provided to the page`, /<TopbarProvider value=\{topbar\.value\}>/.test(text) && /<\/TopbarProvider>/.test(text), true);
@@ -142,7 +151,8 @@ section("the stylesheet is shared, not per console");
 {
   const css = read("components/ui/PageHeader.css");
   check("slots are styled once, against #topbar", ["#topbar .topbar-desc", "#topbar .topbar-actions", "#topbar .topbar-title-extra"].every((sel) => css.includes(sel)), true);
-  check("the description gives way before the buttons do", /max-width: 1180px[\s\S]*?\.topbar-desc[\s\S]*?display: none/.test(css), true);
+  check("the description is a clipped line under the title", /\.topbar-desc-text \{[^}]*white-space: nowrap[^}]*text-overflow: ellipsis/.test(css), true);
+  check("and it is no longer hidden on narrow screens", /max-width: 1180px/.test(css), false);
   check("labels drop on a phone", /max-width: 720px[\s\S]*?\.btn-text[\s\S]*?display: none/.test(css), true);
 }
 

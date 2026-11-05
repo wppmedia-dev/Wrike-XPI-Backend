@@ -4,8 +4,8 @@
  * covers them. The id selector also outranks each console's own .topbar-left /
  * .topbar-right rules, which only set up the original title + refresh layout. */
 
-/* The left side takes the room the right side leaves, so the description can
-   use it and be cut with an ellipsis instead of pushing the buttons off. */
+/* The left side takes the room the right side leaves, so a long description is
+   cut with an ellipsis instead of pushing the buttons off. */
 #topbar .topbar-left {
   flex: 1 1 auto;
   min-width: 0;
@@ -15,8 +15,10 @@
   flex-shrink: 0;
 }
 
+/* The title, with the description on a line under it. */
 #topbar .topbar-heading {
-  flex-shrink: 0;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 /* The ⓘ and any badge, sitting on the title's line. */
@@ -26,14 +28,13 @@
   vertical-align: middle;
 }
 
-/* The one-line description, set off from the title by a thin rule. Hidden when
-   the page has none, so there is no stray divider. */
+/* The one-line description, in the place the breadcrumb used to be. Only this
+   line is clipped: the ⓘ's panel is part of the title line above it, so it is
+   not cut off. Empty when the page has none, leaving just the title. */
 #topbar .topbar-desc {
-  flex: 1 1 auto;
   min-width: 0;
+  margin-top: 1px;
   overflow: hidden;
-  padding-left: 16px;
-  border-left: 1px solid var(--border);
 }
 
 #topbar .topbar-desc:empty {
@@ -42,7 +43,7 @@
 
 #topbar .topbar-desc-text {
   display: block;
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -69,14 +70,8 @@
   white-space: nowrap;
 }
 
-/* Narrow screens: the description is the first thing to go (it is also in the
-   ⓘ), then the buttons' labels, leaving their icons. */
-@media (max-width: 1180px) {
-  #topbar .topbar-desc {
-    display: none;
-  }
-}
-
+/* On a phone the buttons' labels drop away, leaving their icons; each button
+   keeps its label as a tooltip. The description stays, cut to fit. */
 @media (max-width: 720px) {
   #topbar .topbar-actions .btn-text {
     display: none;

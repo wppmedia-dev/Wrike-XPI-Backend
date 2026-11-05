@@ -1496,13 +1496,8 @@ export default function AdminDashboard() {
                 {pageTitle}
                 <span className="topbar-title-extra" ref={topbar.refs.titleExtra} />
               </div>
-              <div className="breadcrumb">
-                <span>Admin</span>
-                <span className="bc-sep">/</span>
-                <span>{pageTitle}</span>
-              </div>
+              <div className="topbar-desc" ref={topbar.refs.description} />
             </div>
-            <div className="topbar-desc" ref={topbar.refs.description} />
           </div>
           <div className="topbar-right">
             <div className="topbar-actions" ref={topbar.refs.actions} />
