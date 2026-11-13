@@ -11,6 +11,9 @@
 export const MCP_SETTING_KEYS = {
   ACCESS_TTL: "mcp_access_token_ttl_seconds",
   REFRESH_TTL: "mcp_refresh_token_ttl_seconds",
+  // Boolean. When true, an MCP access token is accepted on the REST API and the
+  // Xtend API token on /mcp. Off by default.
+  CROSS_TOKEN_ACCESS: "cross_token_access",
 };
 
 const MINUTE = 60;

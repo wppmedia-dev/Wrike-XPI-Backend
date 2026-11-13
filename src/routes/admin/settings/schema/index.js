@@ -12,3 +12,14 @@ export const SetMcpTokenLifetimesSchema = {
     },
   },
 };
+
+// PUT /admin/settings/cross-token-access
+export const SetCrossTokenAccessSchema = {
+  schema: {
+    body: {
+      type: "object",
+      required: ["enabled"],
+      properties: { enabled: { type: "boolean" } },
+    },
+  },
+};

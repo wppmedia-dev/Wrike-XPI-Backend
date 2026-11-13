@@ -2,12 +2,17 @@ import { verifyAdminJWT } from "../../../middlewares/adminAuth";
 import {
   getMcpTokenLifetimes,
   saveMcpTokenLifetimes,
+  getCrossTokenAccess,
+  saveCrossTokenAccess,
 } from "../../../utils/mcpTokenSettings";
 import {
   MCP_TOKEN_BOUNDS,
   MCP_TOKEN_DEFAULTS,
 } from "../../../utils/mcpTokenPolicy";
-import { SetMcpTokenLifetimesSchema } from "./schema";
+import {
+  SetMcpTokenLifetimesSchema,
+  SetCrossTokenAccessSchema,
+} from "./schema";
 
 /**
  * Admin API behind /api/v1/admin/settings: preferences the console edits.
@@ -55,6 +60,36 @@ export const adminSettingsRoute = (fastify, opts, done) => {
           await mcpTokenSettings(),
           "Saved. New lifetimes apply to tokens issued from now on.",
         );
+      } catch (err) {
+        return fail(reply, err);
+      }
+    },
+  );
+
+  // GET /admin/settings/cross-token-access
+  fastify.get("/cross-token-access", guard, async (req, reply) => {
+    try {
+      return ok(
+        reply,
+        { enabled: await getCrossTokenAccess() },
+        "Cross-token access setting",
+      );
+    } catch (err) {
+      return fail(reply, err);
+    }
+  });
+
+  // PUT /admin/settings/cross-token-access: { enabled: boolean }
+  fastify.put(
+    "/cross-token-access",
+    { ...SetCrossTokenAccessSchema, ...guard },
+    async (req, reply) => {
+      try {
+        const enabled = await saveCrossTokenAccess(
+          req.body.enabled,
+          req.adminUser.id,
+        );
+        return ok(reply, { enabled }, "Saved.");
       } catch (err) {
         return fail(reply, err);
       }

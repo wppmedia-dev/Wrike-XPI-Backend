@@ -51,6 +51,7 @@ import MfaSettings from "./MfaSettings";
 import SyncSettings from "./SyncSettings";
 import OAuthClients from "./OAuthClients";
 import McpTokenSettings from "./McpTokenSettings";
+import CrossTokenAccessSetting from "./CrossTokenAccessSetting";
 import { EnvironmentsTable } from "./admin/EnvironmentsTable";
 import { PortalUsersTable } from "./admin/PortalUsersTable";
 import {
@@ -1754,6 +1755,10 @@ export default function AdminDashboard() {
 
             <div className="card" style={{ marginTop: 16 }}>
               <McpTokenSettings />
+            </div>
+
+            <div className="card" style={{ marginTop: 16 }}>
+              <CrossTokenAccessSetting />
             </div>
           </div>
 

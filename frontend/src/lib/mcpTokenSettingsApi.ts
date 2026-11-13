@@ -46,3 +46,27 @@ export const saveMcpTokenSettings = async (values: {
 
   return body.data;
 };
+
+const CROSS_BASE = "/api/v1/admin/settings/cross-token-access";
+
+export const getCrossTokenAccess = async (): Promise<boolean> => {
+  const res = await adminFetch(CROSS_BASE);
+  const body = await res.json().catch(() => null);
+  if (!res.ok || !body?.success) {
+    throw new Error(body?.message || "Failed to load cross-token access setting");
+  }
+  return !!body.data.enabled;
+};
+
+export const saveCrossTokenAccess = async (enabled: boolean): Promise<boolean> => {
+  const res = await adminFetch(CROSS_BASE, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok || !body?.success) {
+    throw new Error(body?.message || "Failed to save cross-token access setting");
+  }
+  return !!body.data.enabled;
+};

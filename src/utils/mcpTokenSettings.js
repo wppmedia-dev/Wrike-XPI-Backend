@@ -62,3 +62,36 @@ export const saveMcpTokenLifetimes = async (input, adminId) => {
   invalidateMcpTokenLifetimes();
   return value;
 };
+
+/**
+ * Cross-token access: whether an MCP access token may be used on the REST API
+ * and the Xtend API token on /mcp. Off by default. Cached briefly like the
+ * lifetimes; on a read failure it serves the last good value, else "off".
+ */
+let crossCached = null;
+let crossCachedAt = 0;
+
+export const getCrossTokenAccess = async () => {
+  if (crossCached !== null && Date.now() - crossCachedAt < CACHE_MS) {
+    return crossCached;
+  }
+  try {
+    const stored = await AppSettings.Get(MCP_SETTING_KEYS.CROSS_TOKEN_ACCESS);
+    crossCached = stored === true;
+    crossCachedAt = Date.now();
+    return crossCached;
+  } catch (err) {
+    console.log("Could not read cross-token access setting:", err?.message || err);
+    return crossCached === true;
+  }
+};
+
+export const saveCrossTokenAccess = async (enabled, adminId) => {
+  if (typeof enabled !== "boolean") {
+    throw { statusCode: 400, message: "enabled must be true or false" };
+  }
+  await AppSettings.Set(MCP_SETTING_KEYS.CROSS_TOKEN_ACCESS, enabled, adminId);
+  crossCached = enabled;
+  crossCachedAt = Date.now();
+  return enabled;
+};

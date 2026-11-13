@@ -3,6 +3,7 @@ import { getWrikeTokens } from "../utils/wrike";
 import * as crypto from "../utils/crypto";
 import jwt from "jsonwebtoken";
 import { verifyJwt } from "../utils/jwtSecrets";
+import { getCrossTokenAccess } from "../utils/mcpTokenSettings";
 import {
   evaluateAccess,
   clientIp,
@@ -43,7 +44,8 @@ const verifyBasicAuth = async (credentials) => {
 
 // Which door a bearer token is presented at. The Xtend API's 180-day token and
 // the MCP OAuth access token are signed with the same secret and carry the same
-// `t` and `d`, so without this a token for one would open the other.
+// `t` and `d`, so without this a token for one would open the other. By default
+// that is kept apart; an admin can allow crossing (cross_token_access setting).
 const MCP_TOKEN_USE = "mcp";
 
 // Verify the XPI token and extract the token-record id + DEK.
@@ -56,7 +58,9 @@ const verifyJWE = async (jweToken, surface = "rest") => {
   const payload = verifyJwt(jweToken);
 
   const isMcpToken = payload.s === MCP_TOKEN_USE;
-  if ((surface === "mcp") !== isMcpToken) {
+  // An admin can switch on cross-token access (Settings), in which case a token
+  // for one door also opens the other.
+  if ((surface === "mcp") !== isMcpToken && !(await getCrossTokenAccess())) {
     throw new Error("Invalid token");
   }
   if (isMcpToken && !(await McpTokens.IsFamilyActive(payload.f))) {
