@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import redisClient from "./redis";
+import { broadcast, subscribe } from "./cacheBus";
 
 require("dotenv").config();
 
@@ -23,12 +24,13 @@ require("dotenv").config();
  *   L1  this process's Map, short TTL. Sub-millisecond, per-instance.
  *   L2  Redis, shared. Survives restarts and warms new instances.
  *
- * Invalidation clears L1 for THIS process and L2 for everyone. On a
- * multi-instance deploy, other instances keep their own L1 copy until it
- * expires, so ENV_ACCESS_MEMORY_TTL is the real upper bound on how long a
- * revoked caller can still get in cluster-wide. Keep it short; it is not the
- * knob to raise for performance. ENV_ACCESS_RULES_TTL (L2) is, because this
- * module clears it for every instance at once.
+ * Invalidation clears L1 for THIS process and L2 for everyone, and tells the
+ * other instances to drop their L1 copy too (src/utils/cacheBus.js). The bus
+ * is best effort, so ENV_ACCESS_MEMORY_TTL remains the upper bound on how long
+ * a revoked caller can still get in cluster-wide if a message is lost (Redis
+ * down). Keep it short; it is not the knob to raise for performance.
+ * ENV_ACCESS_RULES_TTL (L2) is, because this module clears it for every
+ * instance at once.
  */
 
 const seconds = (name, fallback) => {
@@ -93,6 +95,15 @@ export const cached = async (key, ttlSeconds, loader) => {
 
 /* ── Invalidation ──────────────────────────────────────────────────────── */
 
+const BUS_TOPIC = "l1:envaccess";
+
+// Another instance invalidated: drop our L1 copy only. L2 was already
+// cleared by the sender, so touching Redis again here would be redundant.
+subscribe(BUS_TOPIC, (data) => {
+  if (data?.all) return memory.clear();
+  (data?.keys || []).forEach((key) => memory.delete(key));
+});
+
 /**
  * Drop everything cached about one environment's access scope, L1 and L2:
  * its allow-list rules (every email, domain and IP entry) and both security
@@ -108,6 +119,7 @@ export const invalidateEnvironment = async (envId) => {
 
   const keys = [rulesKey(envId), switchesKey(envId)];
   keys.forEach((key) => memory.delete(key));
+  broadcast(BUS_TOPIC, { keys });
 
   await redisClient.delMany(keys).catch((err) => {
     console.warn(
@@ -122,6 +134,7 @@ export const invalidateEnvironment = async (envId) => {
 /** Test/ops hook: forget everything cached here, across all environments. */
 export const invalidateAll = async () => {
   memory.clear();
+  broadcast(BUS_TOPIC, { all: true });
   const keys = await redisClient.keys("xpi:envaccess:*").catch(() => []);
   if (keys && keys.length) await redisClient.delMany(keys).catch(() => {});
 };

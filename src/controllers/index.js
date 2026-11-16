@@ -11,3 +11,7 @@ export * as TokenPermissions from "./tokenPermissions";
 export * as EnvironmentModulePermissions from "./environmentModulePermissions";
 export * as ActivityLog from "./activityLog";
 export * as SyncRuns from "./syncRuns";
+export * as OAuthClients from "./oauthClients";
+export * as AppSettings from "./appSettings";
+// The MCP OAuth flow's rotating refresh tokens (src/routes/oauth).
+export * as McpTokens from "./mcpTokens";

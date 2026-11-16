@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  listSyncSources,
-  runSync,
+  adminSyncApi,
+  type SyncApi,
   type SyncRun,
   type SyncSource,
   type SyncStatus,
@@ -48,7 +48,17 @@ function describeAgent(ua: string | null): string {
   return os ? `${browser} on ${os}` : browser;
 }
 
-export default function SyncSettings({ refreshKey = 0 }: { refreshKey?: number }) {
+export default function SyncSettings({
+  refreshKey = 0,
+  api = adminSyncApi,
+  canRun = true,
+}: {
+  refreshKey?: number;
+  /** Where the data comes from: the admin console's by default, the portal's when passed. Keep it a stable object. */
+  api?: SyncApi;
+  /** Offer Sync now (the portal's "update" grant). */
+  canRun?: boolean;
+}) {
   const [sources, setSources] = useState<SyncSource[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [running, setRunning] = useState<string | null>(null);
@@ -63,13 +73,13 @@ export default function SyncSettings({ refreshKey = 0 }: { refreshKey?: number }
 
   const load = useCallback(async () => {
     try {
-      setSources(await listSyncSources());
+      setSources(await api.list());
     } catch (err: any) {
       toast(err?.message || "Failed to load syncs", "error");
     } finally {
       setLoaded(true);
     }
-  }, []);
+  }, [api]);
 
   useEffect(() => {
     load();
@@ -78,7 +88,7 @@ export default function SyncSettings({ refreshKey = 0 }: { refreshKey?: number }
   async function handleRun(source: SyncSource) {
     setRunning(source.key);
     try {
-      const run = await runSync(source.key);
+      const run = await api.run(source.key);
       if (run.status === "success") toast(`${source.label} synced`, "success");
       else if (run.status === "partial") toast(run.error || "Synced with some items missing", "warning");
       else toast(run.error || `${source.label} sync failed`, "error");
@@ -206,9 +216,11 @@ export default function SyncSettings({ refreshKey = 0 }: { refreshKey?: number }
                   <div className="sync-error">{last.error}</div>
                 )}
 
-                <button className="btn btn-primary" disabled={busy || running !== null} onClick={() => handleRun(source)}>
-                  <i className={`fa-solid fa-arrows-rotate${busy ? " fa-spin" : ""}`} /> {busy ? "Syncing" : "Sync now"}
-                </button>
+                {canRun && (
+                  <button className="btn btn-primary" disabled={busy || running !== null} onClick={() => handleRun(source)}>
+                    <i className={`fa-solid fa-arrows-rotate${busy ? " fa-spin" : ""}`} /> {busy ? "Syncing" : "Sync now"}
+                  </button>
+                )}
               </div>
             </div>
           );

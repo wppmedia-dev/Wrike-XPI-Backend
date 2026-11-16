@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import { verifyJwt } from "../utils/jwtSecrets";
 import { PortalAuth, PortalPermissions } from "../controllers";
 
 // Verifies portal user JWT from Authorization header.
@@ -13,7 +14,7 @@ export const verifyPortalJWT = async (req, reply) => {
     }
 
     const token = authHeader.slice(7);
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    const payload = verifyJwt(token);
 
     const user = await PortalAuth.GetById(payload?.sub);
     if (!user?.id || !user?.is_active) {

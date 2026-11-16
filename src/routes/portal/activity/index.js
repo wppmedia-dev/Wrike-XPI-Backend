@@ -173,6 +173,9 @@ export const portalActivityRoute = (fastify, opts, done) => {
         const data = await ActivityLog.Summary({
           envId: tokenFilter.envId,
           tokenId: tokenFilter.tokenId,
+          // Narrows further, on top of the environment scope above: only rows
+          // that are both in the user's environments and from this client.
+          oauthClientId: req.query.oauth_client_id,
           since: req.query.since,
         });
         return reply.code(200).send({ success: true, data });
@@ -195,6 +198,7 @@ export const portalActivityRoute = (fastify, opts, done) => {
       const data = await ActivityLog.List({
         envId: tokenFilter.envId,
         tokenId: tokenFilter.tokenId,
+        oauthClientId: req.query.oauth_client_id,
         search,
         surface,
         allowed: allowed === undefined ? undefined : allowed === "true",
@@ -231,6 +235,7 @@ export const portalActivityRoute = (fastify, opts, done) => {
         const rows = await ActivityLog.ExportRows({
           envId: tokenFilter.envId,
           tokenId: tokenFilter.tokenId,
+          oauthClientId: req.query.oauth_client_id,
           search,
           surface,
           allowed: allowed === undefined ? undefined : allowed === "true",

@@ -1,0 +1,423 @@
+import models from "../../models";
+import { connectionState, clientStatus } from "../utils/oauthClientStatus";
+import * as McpTokens from "./mcpTokens";
+
+/**
+ * Storage for dynamically registered OAuth clients (migration
+ * 20261104000000-create-oauth-clients). The signed client_id stays the source
+ * of truth for redirect_uris; this table exists so a registration can be
+ * listed and revoked.
+ */
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export const isClientId = (id) => typeof id === "string" && UUID_PATTERN.test(id);
+
+const PUBLIC_FIELDS = [
+  "id",
+  "client_name",
+  "redirect_uris",
+  "created_at",
+  "expires_at",
+  "last_used_at",
+  "created_ip",
+  "user_agent",
+  "revoked_at",
+  "revoked_by",
+];
+
+export const Register = async ({
+  id,
+  client_name,
+  redirect_uris,
+  expires_at,
+  created_ip,
+  user_agent,
+}) =>
+  models.OAuthClients.create({
+    id,
+    client_name: client_name || null,
+    redirect_uris,
+    expires_at: expires_at || null,
+    created_ip: created_ip ? String(created_ip).slice(0, 64) : null,
+    user_agent: user_agent ? String(user_agent).slice(0, 512) : null,
+  });
+
+/**
+ * Registration state for a jti: "active", "revoked", or "unknown" (no row).
+ * Throws on database errors so the caller decides how to degrade.
+ */
+export const GetStatus = async (id) => {
+  if (!isClientId(id)) return "unknown";
+  const row = await models.OAuthClients.findByPk(id, {
+    attributes: ["id", "revoked_at"],
+    raw: true,
+  });
+  if (!row) return "unknown";
+  return row.revoked_at ? "revoked" : "active";
+};
+
+/** Best-effort "last seen" stamp; never throws. */
+export const TouchLastUsed = async (id) => {
+  if (!isClientId(id)) return;
+  try {
+    await models.OAuthClients.update(
+      { last_used_at: new Date() },
+      { where: { id } },
+    );
+  } catch {
+    // Telemetry only.
+  }
+};
+
+export const MAX_LIST_LIMIT = 500;
+
+/* A sign-in is "live" while it is not revoked and still has a refresh token
+   that has not expired. Same test McpTokens.Rotate applies before it will
+   accept a refresh. */
+const LIVE_SESSION_SQL = `f.revoked_at IS NULL AND EXISTS (
+  SELECT 1 FROM mcp_refresh_tokens r WHERE r.family_id = f.id AND r.expires_at > NOW()
+)`;
+
+/**
+ * Connection data for the clients on this page: how many sign-ins each has
+ * ever made, how many are live, when it was last active and when a sign-in
+ * was last ended. Keyed by client id.
+ *
+ * Resolves null (never throws) if it cannot be read, e.g. the migration that
+ * adds mcp_token_families.client_id has not run yet. The list then falls back
+ * to showing registrations only, as it did before.
+ */
+const sessionStatsFor = async (ids) => {
+  if (!ids.length) return {};
+  try {
+    const found = await models.sequelize.query(
+      `SELECT f.client_id AS client_id,
+              COUNT(*)::int AS total_sessions,
+              COUNT(*) FILTER (WHERE ${LIVE_SESSION_SQL})::int AS live_sessions,
+              MAX(GREATEST(f.last_used_at, f.last_rotated_at, f.created_at)) AS last_active_at,
+              MAX(GREATEST(f.last_used_at, f.last_rotated_at, f.created_at)) FILTER (WHERE ${LIVE_SESSION_SQL}) AS live_last_active_at,
+              MAX(f.revoked_at) AS last_disconnected_at
+         FROM mcp_token_families f
+        WHERE f.client_id IN (:ids)
+        GROUP BY f.client_id`,
+      { replacements: { ids }, type: models.Sequelize.QueryTypes.SELECT },
+    );
+    return Object.fromEntries(found.map((row) => [row.client_id, row]));
+  } catch (err) {
+    console.warn(
+      new Date().toISOString(),
+      `[oauth-clients] could not read connection data: ${err?.message || err}`,
+    );
+    return null;
+  }
+};
+
+/** Whole-table counts of unrevoked, unexpired clients by connection state. */
+const connectionCounts = async (idleAfterSeconds) => {
+  try {
+    const [row] = await models.sequelize.query(
+      `WITH s AS (
+         SELECT f.client_id,
+                COUNT(*) AS total,
+                COUNT(*) FILTER (WHERE ${LIVE_SESSION_SQL}) AS live,
+                MAX(GREATEST(f.last_used_at, f.last_rotated_at, f.created_at)) FILTER (WHERE ${LIVE_SESSION_SQL}) AS live_active
+           FROM mcp_token_families f
+          WHERE f.client_id IS NOT NULL
+          GROUP BY f.client_id
+       )
+       SELECT
+         COUNT(*) FILTER (WHERE COALESCE(s.live, 0) > 0 AND (:idle::int IS NULL OR s.live_active >= NOW() - (:idle::int * INTERVAL '1 second')))::int AS connected,
+         COUNT(*) FILTER (WHERE COALESCE(s.live, 0) > 0 AND :idle::int IS NOT NULL AND s.live_active < NOW() - (:idle::int * INTERVAL '1 second'))::int AS idle,
+         COUNT(*) FILTER (WHERE COALESCE(s.total, 0) > 0 AND COALESCE(s.live, 0) = 0)::int AS disconnected,
+         COUNT(*) FILTER (WHERE COALESCE(s.total, 0) = 0)::int AS registered
+         FROM oauth_clients c
+         LEFT JOIN s ON s.client_id = c.id
+        WHERE c.revoked_at IS NULL AND (c.expires_at IS NULL OR c.expires_at > NOW())`,
+      {
+        replacements: { idle: idleAfterSeconds || null },
+        type: models.Sequelize.QueryTypes.SELECT,
+      },
+    );
+    return row || null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * One list row: the client, its connection data folded in, and the single
+ * status the consoles display. `stats` is null when connection data could not
+ * be read, which leaves `connection` null and the status registration-only.
+ */
+const shapeRow = (row, stats, idleAfterSeconds) => {
+  const s = stats?.[row.id];
+  const connection = stats
+    ? {
+        state: connectionState({
+          totalSessions: s?.total_sessions || 0,
+          liveSessions: s?.live_sessions || 0,
+          liveLastActiveAt: s?.live_last_active_at || null,
+          idleAfterSeconds,
+        }),
+        live_sessions: s?.live_sessions || 0,
+        total_sessions: s?.total_sessions || 0,
+        last_active_at: s?.last_active_at || null,
+        last_disconnected_at: s?.last_disconnected_at || null,
+      }
+    : null;
+  return { ...row, connection, status: clientStatus(row, connection?.state) };
+};
+
+/**
+ * Newest first. `counts` covers the whole table regardless of the filter, so
+ * the console's stat cards stay correct when revoked rows are hidden. Each row
+ * carries `connection` (null if it could not be read) and `status`, the single
+ * value the console displays (src/utils/oauthClientStatus.js).
+ */
+export const List = async ({
+  includeRevoked = false,
+  limit = 50,
+  offset = 0,
+  idleAfterSeconds = null,
+} = {}) => {
+  const { Op } = models.Sequelize;
+  const where = includeRevoked ? {} : { revoked_at: null };
+  const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), MAX_LIST_LIMIT);
+  const safeOffset = Math.max(parseInt(offset, 10) || 0, 0);
+
+  const [{ rows, count }, active, revoked, byConnection] = await Promise.all([
+    models.OAuthClients.findAndCountAll({
+      where,
+      attributes: PUBLIC_FIELDS,
+      order: [["created_at", "DESC"]],
+      limit: safeLimit,
+      offset: safeOffset,
+      raw: true,
+    }),
+    models.OAuthClients.count({ where: { revoked_at: null } }),
+    models.OAuthClients.count({ where: { revoked_at: { [Op.ne]: null } } }),
+    connectionCounts(idleAfterSeconds),
+  ]);
+
+  const stats = await sessionStatsFor(rows.map((row) => row.id));
+
+  const withStatus = rows.map((row) => shapeRow(row, stats, idleAfterSeconds));
+
+  return {
+    rows: withStatus,
+    total: count,
+    limit: safeLimit,
+    offset: safeOffset,
+    counts: { active, revoked, ...(byConnection || {}) },
+  };
+};
+
+export const Revoke = async (id, adminId) => {
+  if (!isClientId(id)) {
+    throw { statusCode: 400, message: "Invalid client id" };
+  }
+  const row = await models.OAuthClients.findByPk(id);
+  if (!row) throw { statusCode: 404, message: "OAuth client not found" };
+  if (row.revoked_at) return { ...row.get({ plain: true }), disconnected: 0 };
+
+  await row.update({ revoked_at: new Date(), revoked_by: adminId || null });
+
+  // A revoked client must not keep a working connection. Ending its sign-ins
+  // is best effort: the registration is already revoked (so it can start no
+  // new ones), and a failure here - e.g. the client_id column's migration has
+  // not run - must not turn that into an error.
+  let disconnected = 0;
+  try {
+    disconnected = await McpTokens.RevokeByClient(id, "client_registration_revoked");
+  } catch (err) {
+    console.warn(
+      new Date().toISOString(),
+      `[oauth-clients] revoked ${id} but could not end its sign-ins: ${err?.message || err}`,
+    );
+  }
+  return { ...row.get({ plain: true }), disconnected };
+};
+
+/**
+ * End every live sign-in a client holds, keeping its registration. For a
+ * client that was disconnected on its own side without telling us (so its
+ * sign-ins would otherwise stay alive until their refresh tokens expire), or
+ * to cut a client off without making it register again.
+ */
+export const Disconnect = async (id) => {
+  if (!isClientId(id)) {
+    throw { statusCode: 400, message: "Invalid client id" };
+  }
+  const row = await models.OAuthClients.findByPk(id, { attributes: ["id"] });
+  if (!row) throw { statusCode: 404, message: "OAuth client not found" };
+
+  const disconnected = await McpTokens.RevokeByClient(id, "admin_disconnected");
+  return { id, disconnected };
+};
+
+/* ── Scoped to a portal user's environments ─────────────────────────────────
+ *
+ * A registered client belongs to nobody in particular, so a portal user cannot
+ * be given "their" clients the way they are given their environments. What can
+ * be attributed is a client's SIGN-INS: each one minted a token in one
+ * environment (user_tokens.env_id). So the portal's rule is:
+ *
+ *   a client is visible to a portal user when at least one of its sign-ins
+ *   is in an environment mapped to them,
+ *
+ * and everything shown about it (status, sign-in counts, last activity) counts
+ * only the sign-ins in those environments. A client that has never signed in
+ * has no environment, so it is invisible to a scoped user; that is the safe
+ * default, as with the cache page (src/utils/portalCacheScope.js).
+ *
+ * Unlike the admin list these functions never fall back to an unscoped answer:
+ * if the attribution cannot be read they throw, because "show everything" is
+ * the wrong way to fail for a restricted user.
+ */
+
+const NOT_FOUND = () => ({ statusCode: 404, message: "OAuth client not found" });
+
+// The registration's network details are not for tenants to see.
+const SCOPED_FIELDS = PUBLIC_FIELDS.filter(
+  (f) => !['created_ip', 'user_agent', 'revoked_by'].includes(f),
+);
+
+const scopedStats = async (envIds) => {
+  const found = await models.sequelize.query(
+    `SELECT f.client_id AS client_id,
+            COUNT(*)::int AS total_sessions,
+            COUNT(*) FILTER (WHERE ${LIVE_SESSION_SQL})::int AS live_sessions,
+            MAX(GREATEST(f.last_used_at, f.last_rotated_at, f.created_at)) AS last_active_at,
+            MAX(GREATEST(f.last_used_at, f.last_rotated_at, f.created_at)) FILTER (WHERE ${LIVE_SESSION_SQL}) AS live_last_active_at,
+            MAX(f.revoked_at) AS last_disconnected_at
+       FROM mcp_token_families f
+       JOIN user_tokens t ON t.id = f.token_id
+      WHERE f.client_id IS NOT NULL AND t.env_id IN (:envIds)
+      GROUP BY f.client_id`,
+    { replacements: { envIds }, type: models.Sequelize.QueryTypes.SELECT },
+  );
+  return Object.fromEntries(found.map((row) => [row.client_id, row]));
+};
+
+/** Whether any sign-in of this client is in one of these environments. */
+const inScope = async (id, envIds) => {
+  if (!envIds?.length) return false;
+  const [row] = await models.sequelize.query(
+    `SELECT 1 AS ok
+       FROM mcp_token_families f
+       JOIN user_tokens t ON t.id = f.token_id
+      WHERE f.client_id = :id AND t.env_id IN (:envIds)
+      LIMIT 1`,
+    { replacements: { id, envIds }, type: models.Sequelize.QueryTypes.SELECT },
+  );
+  return !!row;
+};
+
+/**
+ * The clients visible to a user whose environments are `envIds`, newest first,
+ * with the same row shape as List(). `counts` covers every visible client, not
+ * only the page returned.
+ */
+export const ListScoped = async ({
+  envIds,
+  includeRevoked = false,
+  limit = 50,
+  offset = 0,
+  idleAfterSeconds = null,
+} = {}) => {
+  const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), MAX_LIST_LIMIT);
+  const safeOffset = Math.max(parseInt(offset, 10) || 0, 0);
+  const empty = {
+    rows: [],
+    total: 0,
+    limit: safeLimit,
+    offset: safeOffset,
+    counts: { active: 0, revoked: 0, connected: 0, idle: 0, disconnected: 0, registered: 0 },
+  };
+  if (!envIds?.length) return empty;
+
+  const stats = await scopedStats(envIds);
+  const ids = Object.keys(stats);
+  if (!ids.length) return empty;
+
+  const { Op } = models.Sequelize;
+  const clients = await models.OAuthClients.findAll({
+    where: { id: { [Op.in]: ids } },
+    attributes: SCOPED_FIELDS,
+    order: [["created_at", "DESC"]],
+    raw: true,
+  });
+  const shaped = clients.map((row) => shapeRow(row, stats, idleAfterSeconds));
+
+  const counts = { ...empty.counts };
+  for (const row of shaped) {
+    if (row.status === "revoked") counts.revoked += 1;
+    else counts.active += 1;
+    if (row.status in counts && row.status !== "revoked") counts[row.status] += 1;
+  }
+
+  const visible = includeRevoked ? shaped : shaped.filter((row) => row.status !== "revoked");
+  return {
+    rows: visible.slice(safeOffset, safeOffset + safeLimit),
+    total: visible.length,
+    limit: safeLimit,
+    offset: safeOffset,
+    counts,
+  };
+};
+
+/**
+ * End the live sign-ins a client holds in THESE environments, and only these:
+ * the same client may be signed in elsewhere, and one tenant must not be able
+ * to cut off another. 404 (not 403) for a client outside the user's scope, so
+ * the answer does not confirm that it exists.
+ */
+export const DisconnectScoped = async (id, envIds) => {
+  if (!isClientId(id)) throw { statusCode: 400, message: "Invalid client id" };
+  if (!(await inScope(id, envIds))) throw NOT_FOUND();
+
+  const [, meta] = await models.sequelize.query(
+    `UPDATE mcp_token_families f
+        SET revoked_at = NOW(), revoked_reason = :reason
+       FROM user_tokens t
+      WHERE t.id = f.token_id
+        AND f.client_id = :id
+        AND f.revoked_at IS NULL
+        AND t.env_id IN (:envIds)`,
+    { replacements: { id, envIds, reason: "portal_disconnected" } },
+  );
+  return { id, disconnected: meta?.rowCount ?? 0 };
+};
+
+/**
+ * Revoke a client's registration, for a scoped user. Revoking is global (it
+ * stops the client signing in anywhere), so it is only allowed when every
+ * sign-in the client has ever made is in this user's environments. If another
+ * environment has used it, the request is refused with 409 and the user is
+ * pointed at Disconnect, which only touches their own sign-ins.
+ */
+export const RevokeScoped = async (id, envIds) => {
+  if (!isClientId(id)) throw { statusCode: 400, message: "Invalid client id" };
+  if (!(await inScope(id, envIds))) throw NOT_FOUND();
+
+  const [elsewhere] = await models.sequelize.query(
+    `SELECT 1 AS used
+       FROM mcp_token_families f
+       LEFT JOIN user_tokens t ON t.id = f.token_id
+      WHERE f.client_id = :id AND (t.env_id IS NULL OR t.env_id NOT IN (:envIds))
+      LIMIT 1`,
+    { replacements: { id, envIds }, type: models.Sequelize.QueryTypes.SELECT },
+  );
+  if (elsewhere) {
+    throw {
+      statusCode: 409,
+      message:
+        "This client is also used by other environments, so only an administrator can revoke it. You can disconnect your own sign-ins instead.",
+    };
+  }
+
+  // revoked_by references admin accounts, which a portal user is not.
+  return Revoke(id, null);
+};

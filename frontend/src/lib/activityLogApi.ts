@@ -71,6 +71,9 @@ export interface ActivityFilters {
   /** Exact token id — what the API Tokens table's "Activity logs" action
       sets, so the page opens on one token's history. */
   token_id?: string;
+  /** Everything done with sign-ins from one registered OAuth client — what
+      the OAuth Clients table's "Activity log" action sets. */
+  oauth_client_id?: string;
   /** The one search box: matched against the caller's email and the reference
       id of a failed call, as substrings. */
   search?: string;
@@ -116,6 +119,7 @@ const qs = (filters: ActivityFilters): string => {
   const params = new URLSearchParams();
   if (filters.env_id) params.set("env_id", filters.env_id);
   if (filters.token_id) params.set("token_id", filters.token_id);
+  if (filters.oauth_client_id) params.set("oauth_client_id", filters.oauth_client_id);
   if (filters.search) params.set("search", filters.search);
   if (filters.surface) params.set("surface", filters.surface);
   if (filters.allowed !== undefined) params.set("allowed", String(filters.allowed));
@@ -133,11 +137,12 @@ export const getActivityConfig = () => request<ActivityConfig>("/config");
 /** The strip above the list counts the same slice of the log the list shows,
     so a token-filtered view does not report the whole environment's totals. */
 export const getActivitySummary = (
-  filters: { env_id?: string; token_id?: string } = {},
+  filters: { env_id?: string; token_id?: string; oauth_client_id?: string } = {},
 ) => {
   const params = new URLSearchParams();
   if (filters.env_id) params.set("env_id", filters.env_id);
   if (filters.token_id) params.set("token_id", filters.token_id);
+  if (filters.oauth_client_id) params.set("oauth_client_id", filters.oauth_client_id);
   const s = params.toString();
   return request<ActivitySummary>(`/summary${s ? `?${s}` : ""}`);
 };

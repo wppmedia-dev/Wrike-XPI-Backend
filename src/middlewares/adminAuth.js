@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import { verifyJwt } from "../utils/jwtSecrets";
 import { AdminAuth } from "../controllers";
 
 // Validates an admin JWT from the Authorization header.
@@ -13,7 +14,7 @@ export const verifyAdminJWT = async (req, reply) => {
 
     const token = authHeader.slice(7);
 
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    const payload = verifyJwt(token);
 
     const tokenData = await AdminAuth.GetById(payload?.sub);
     if (!tokenData.id) {

@@ -18,16 +18,20 @@ import {
 } from "../lib/portalAuthApi";
 import { fetchAppConfig, DEFAULT_CONFIG, type AppConfig } from "../lib/appConfig";
 import type { AdminToken } from "../lib/tokenPermissionsApi";
+import { PageHeader, TopbarProvider, useTopbar } from "../components/ui/PageHeader";
 import { useHashPage } from "../lib/useHashPage";
 import EnvBadge from "../components/EnvBadge";
 import WrikeEndpointPreview from "../components/WrikeEndpointPreview";
 import BuildTag from "../components/BuildTag";
 import PortalActivityPage from "./PortalActivityPage";
 import PortalCachePage from "./PortalCachePage";
+import OAuthClients from "./OAuthClients";
+import SyncSettings from "./SyncSettings";
+import { portalSyncApi } from "../lib/portalSyncApi";
+import { portalOAuthClientsApi } from "../lib/portalOAuthClientsApi";
 import PortalApiTokensPage from "./PortalApiTokensPage";
 import PortalEnvironmentAccess from "./PortalEnvironmentAccess";
 import { PortalEnvironmentsTable } from "./PortalEnvironmentsTable";
-import { PageInfo } from "../components/ui/PageInfo";
 import { PORTAL_HELP } from "../lib/pageHelp";
 import TokenPermissions, {
   ENVIRONMENT_MODULES_COPY,
@@ -40,7 +44,14 @@ import {
 } from "../lib/portalEnvironmentModulesApi";
 import "./PortalHome.css";
 
-type PageId = "overview" | "environments" | "api-tokens" | "activity" | "cache";
+type PageId =
+  | "overview"
+  | "environments"
+  | "api-tokens"
+  | "activity"
+  | "cache"
+  | "oauth-clients"
+  | "sync";
 
 /**
  * The environment module-permission grid, pointed at the portal's own
@@ -68,6 +79,8 @@ const PAGE_NAMES: Record<PageId, string> = {
   "api-tokens": "Sessions",
   activity: "Activity Logs",
   cache: "Cache Settings",
+  "oauth-clients": "OAuth Clients",
+  sync: "Sync",
 };
 
 const PAGE_IDS = Object.keys(PAGE_NAMES) as PageId[];
@@ -219,6 +232,8 @@ export default function PortalHome() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activePage, setActivePage] = useHashPage<PageId>(PAGE_IDS, "overview");
+  // Slots in the top bar that each page's <PageHeader /> fills.
+  const topbar = useTopbar(activePage);
   const [environments, setEnvironments] = useState<PortalEnvironmentFull[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -262,6 +277,12 @@ export default function PortalHome() {
   const canSeeApiTokens = can("api_tokens", "read");
   const canSeeActivity = can("activity_logs", "read");
   const canSeeCache = can("cache", "read");
+  // Read lists the clients; update (Disconnect) and delete (Revoke) are passed
+  // to the page as flags, so a read-only user is never shown a control that
+  // would 403 and sign them out.
+  const canSeeOAuthClients = can("oauth_clients", "read");
+  // Read shows the Sync page; update (passed to it as a flag) draws Sync now.
+  const canSeeSync = can("sync", "read");
   const canSeeEnvironmentAccess = can("environment_access", "read");
   // The module ceiling of each environment. Read shows the Modules column and
   // the row action; update opens that grid as an editor. It hangs off the
@@ -277,7 +298,9 @@ export default function PortalHome() {
     canSeeEnvironments ||
     canSeeApiTokens ||
     canSeeActivity ||
-    canSeeCache;
+    canSeeCache ||
+    canSeeOAuthClients ||
+    canSeeSync;
 
   /* ── Session guard (mirrors the EJS inline script exactly) ──────────── */
   useEffect(() => {
@@ -363,12 +386,14 @@ export default function PortalHome() {
       "api-tokens": canSeeApiTokens,
       activity: canSeeActivity,
       cache: canSeeCache,
+      "oauth-clients": canSeeOAuthClients,
+      sync: canSeeSync,
     };
     if (granted[activePage]) return;
 
     // Order matters: this is where a user with a stale link lands.
     const fallback = (
-      ["overview", "environments", "api-tokens", "activity", "cache"] as PageId[]
+      ["overview", "environments", "api-tokens", "activity", "cache", "oauth-clients", "sync"] as PageId[]
     ).find((page) => granted[page]);
     if (fallback) setActivePage(fallback);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -380,6 +405,8 @@ export default function PortalHome() {
     canSeeApiTokens,
     canSeeActivity,
     canSeeCache,
+    canSeeOAuthClients,
+    canSeeSync,
   ]);
 
   const recentEnvs = environments.slice(0, 5);
@@ -416,6 +443,14 @@ export default function PortalHome() {
   const [activityEnv, setActivityEnv] = useState<{ id: string; name: string } | null>(
     null,
   );
+
+  /* The OAuth client whose activity is being viewed. Set by the OAuth Clients
+     page's "Activity log" action, cleared by the chip on the log or by opening
+     the log from the sidebar. */
+  const [activityOAuthClient, setActivityOAuthClient] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
 
   function openAccessDrawer(env: PortalEnvironmentFull) {
     setAccessEnvId(env.id);
@@ -630,12 +665,25 @@ export default function PortalHome() {
    * passed, so nobody is sent to a page the guard would bounce them off).
    */
   const openTokenActivityLogs = (row: AdminToken) => {
+    setActivityOAuthClient(null);
     setActivityToken({
       id: row.id,
       label:
         [row.environment_name, row.account_id].filter(Boolean).join(" · ") ||
         row.id,
     });
+    setActivePage("activity");
+  };
+
+  /**
+   * The OAuth Clients page's "Activity log" row action: the log filtered to
+   * that client's sign-ins. Only offered with activity_logs:read (the page
+   * drops the action when no handler is passed), because the log and its API are
+   * behind that grant.
+   */
+  const openOAuthClientActivityLogs = (client: { id: string; label: string }) => {
+    setActivityToken(null);
+    setActivityOAuthClient(client);
     setActivePage("activity");
   };
 
@@ -769,7 +817,7 @@ export default function PortalHome() {
             </div>
           )}
 
-          {(canSeeCache || canSeeActivity) && (
+          {(canSeeCache || canSeeActivity || canSeeOAuthClients || canSeeSync) && (
             <div className="nav-group-label" style={{ marginTop: 6 }}>
               Settings
             </div>
@@ -785,6 +833,30 @@ export default function PortalHome() {
               <span className="nl">Cache Settings</span>
             </div>
           )}
+          {canSeeSync && (
+            <div
+              className={`nav-item${activePage === "sync" ? " active" : ""}`}
+              onClick={() => handleNav("sync")}
+            >
+              <span className="ni">
+                <i className="fa-solid fa-arrows-rotate" />
+              </span>
+              <span className="nl">Sync</span>
+            </div>
+          )}
+          {canSeeOAuthClients && (
+            <div
+              className={`nav-item${activePage === "oauth-clients" ? " active" : ""}`}
+              onClick={() => handleNav("oauth-clients")}
+            >
+              <span className="ni">
+                <i className="fa-solid fa-plug" />
+              </span>
+              <span className="nl">
+                OAuth Clients <span className="oc-beta">Beta</span>
+              </span>
+            </div>
+          )}
           {canSeeActivity && (
             <div
               className={`nav-item${activePage === "activity" ? " active" : ""}`}
@@ -794,6 +866,7 @@ export default function PortalHome() {
                 // not persist silently under a nav click that did not ask for
                 // it.
                 setActivityToken(null);
+                setActivityOAuthClient(null);
                 setActivityEnv(null);
                 handleNav("activity");
               }}
@@ -826,21 +899,22 @@ export default function PortalHome() {
 
       {/* ═══════════ MAIN ═══════════ */}
       <div id="main">
+        <TopbarProvider value={topbar.value}>
         <div id="topbar">
           <div className="topbar-left">
             <div className="topbar-mobile-btn" onClick={() => setMobileOpen((v) => !v)}>
               <i className="fa-solid fa-bars" />
             </div>
-            <div>
-              <div className="page-title">{pageTitle}</div>
-              <div className="breadcrumb">
-                <span>Portal</span>
-                <span className="bc-sep">/</span>
-                <span>{pageTitle}</span>
+            <div className="topbar-heading">
+              <div className="page-title">
+                {pageTitle}
+                <span className="topbar-title-extra" ref={topbar.refs.titleExtra} />
               </div>
+              <div className="topbar-desc" ref={topbar.refs.description} />
             </div>
           </div>
           <div className="topbar-right">
+            <div className="topbar-actions" ref={topbar.refs.actions} />
             <div className="topbar-icon-btn" title="Refresh data" onClick={handleRefresh}>
               <i className={`fa-solid fa-rotate-right${refreshing ? " fa-spin" : ""}`} />
             </div>
@@ -867,14 +941,12 @@ export default function PortalHome() {
           {/* ══════ OVERVIEW PAGE ══════ */}
           {canSeeOverview && (
           <div className={`page${activePage === "overview" ? " active" : ""}`} id="page-overview">
-            <div className="section-header">
-              <div>
-                <div className="section-title">
-                  Dashboard Overview <PageInfo help={PORTAL_HELP.overview} />
-                </div>
-                <div className="section-subtitle">Welcome back, {username}</div>
-              </div>
-            </div>
+            <PageHeader
+              page="overview"
+              title="Dashboard Overview"
+              description={`Welcome back, ${username}`}
+              help={PORTAL_HELP.overview}
+            />
 
             <div className="stats-grid">
               <div className="stat-card blue">
@@ -994,20 +1066,20 @@ export default function PortalHome() {
           {/* ══════ ENVIRONMENTS PAGE ══════ */}
           {canSeeEnvironments && (
           <div className={`page${activePage === "environments" ? " active" : ""}`} id="page-environments">
-            <div className="section-header">
-              <div>
-                <div className="section-title">
-                  My Environments <PageInfo help={PORTAL_HELP.environments} />
-                </div>
-                <div className="section-subtitle">Manage your Wrike environments</div>
-              </div>
-              {can("environments", "create") && (
-                <button className="btn btn-primary" onClick={() => openEnvModal(null)}>
-                  <i className="fa-solid fa-plus" />
-                  Add Environment
-                </button>
-              )}
-            </div>
+            <PageHeader
+              page="environments"
+              title="My Environments"
+              description="Manage your Wrike environments"
+              help={PORTAL_HELP.environments}
+              actions={
+                can("environments", "create") ? (
+                  <button className="btn btn-primary" onClick={() => openEnvModal(null)} title="Add Environment">
+                    <i className="fa-solid fa-plus" />
+                    <span className="btn-text">Add Environment</span>
+                  </button>
+                ) : undefined
+              }
+            />
 
             <div className="card">
               <div className="card-body">
@@ -1064,6 +1136,8 @@ export default function PortalHome() {
               refreshKey={dataRefreshKey}
               tokenFilter={activityToken}
               onClearTokenFilter={() => setActivityToken(null)}
+              oauthClientFilter={activityOAuthClient}
+              onClearOAuthClientFilter={() => setActivityOAuthClient(null)}
               envScope={activityEnv}
             />
           </div>
@@ -1075,7 +1149,50 @@ export default function PortalHome() {
             <PortalCachePage active={activePage === "cache"} canDelete={can("cache", "delete")} />
           </div>
           )}
+
+          {/* ══════ SYNC PAGE ══════ */}
+          {canSeeSync && (
+          <div className={`page${activePage === "sync" ? " active" : ""}`} id="page-sync">
+            <PageHeader
+              page="sync"
+              title="Sync"
+              description="Reload secrets without restarting the service"
+              help={PORTAL_HELP.sync}
+            />
+
+            <SyncSettings
+              refreshKey={dataRefreshKey}
+              api={portalSyncApi}
+              canRun={can("sync", "update")}
+            />
+          </div>
+          )}
+
+          {/* ══════ OAUTH CLIENTS PAGE ══════ */}
+          {canSeeOAuthClients && (
+          <div className={`page${activePage === "oauth-clients" ? " active" : ""}`} id="page-oauth-clients">
+            <PageHeader
+              page="oauth-clients"
+              title="OAuth Clients"
+              description="MCP connectors that signed in to your environments"
+              help={PORTAL_HELP.oauthClients}
+              badge={<span className="oc-beta" title="This page is new and may change">Beta</span>}
+            />
+
+            {/* Mounted only while open, so it fetches on first visit. */}
+            {activePage === "oauth-clients" && (
+              <OAuthClients
+                refreshKey={dataRefreshKey}
+                api={portalOAuthClientsApi}
+                canDisconnect={can("oauth_clients", "update")}
+                canRevoke={can("oauth_clients", "delete")}
+                onViewActivity={canSeeActivity ? openOAuthClientActivityLogs : undefined}
+              />
+            )}
+          </div>
+          )}
         </div>
+      </TopbarProvider>
       </div>
 
       {/* ════════════ ENVIRONMENT API ACCESS DRAWER ════════════ */}

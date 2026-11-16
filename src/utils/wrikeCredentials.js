@@ -1,5 +1,6 @@
 import { encryptField, decryptField } from "./crypto";
 import { WrikeCredentials } from "../controllers";
+import { broadcast, subscribe } from "./cacheBus";
 require("dotenv").config();
 
 // Fetch and decrypt Wrike credentials for an environment
@@ -75,10 +76,26 @@ export const getAllVisibleWrikeCredentials = async () => {
 };
 
 // Sync credentials from database into in-memory cache.
+//
+// The map is per process. Keeping instances consistent:
+//   - every sync that follows a write broadcasts "credentials changed" on the
+//     cache bus (src/utils/cacheBus.js), and every other instance re-reads
+//     the table on receipt;
+//   - startCredentialsResync() also re-reads it on a timer, which bounds the
+//     drift when a broadcast is lost (Redis down) or a row was changed
+//     outside the app.
 let cachedCredentials = {};
 let cachedVisibleCredentials = {};
 
-export const syncWrikeCredentialsFromDB = async () => {
+const BUS_TOPIC = "wrike-credentials:changed";
+
+/**
+ * @param {{ broadcast?: boolean }} [options]
+ *   broadcast (default true): tell the other instances to re-sync as well.
+ *   Pass false when this sync is itself a reaction (bus message, timer,
+ *   startup) so instances do not keep re-triggering each other.
+ */
+export const syncWrikeCredentialsFromDB = async ({ broadcast: notify = true } = {}) => {
   try {
     const allCredentials = await getAllWrikeCredentials();
     const visibleCredentials = await getAllVisibleWrikeCredentials();
@@ -87,11 +104,56 @@ export const syncWrikeCredentialsFromDB = async () => {
     cachedVisibleCredentials = visibleCredentials;
 
     console.log("Wrike credentials synced from database successfully");
+    if (notify) broadcast(BUS_TOPIC);
     return allCredentials;
   } catch (err) {
     console.error("Error syncing Wrike credentials:", err.message);
     throw err;
   }
+};
+
+// Re-sync triggered by another instance. Bursts (an admin saving several
+// environments in a row) collapse into at most one running + one queued sync.
+let remoteSyncRunning = false;
+let remoteSyncQueued = false;
+
+const resyncFromRemote = async () => {
+  if (remoteSyncRunning) {
+    remoteSyncQueued = true;
+    return;
+  }
+  remoteSyncRunning = true;
+  try {
+    do {
+      remoteSyncQueued = false;
+      await syncWrikeCredentialsFromDB({ broadcast: false }).catch(() => {});
+    } while (remoteSyncQueued);
+  } finally {
+    remoteSyncRunning = false;
+  }
+};
+
+subscribe(BUS_TOPIC, resyncFromRemote);
+
+let resyncTimer = null;
+
+/**
+ * Periodic safety-net resync. WRIKE_CREDENTIALS_RESYNC_MS (default 5 min;
+ * 0 disables). Idempotent. The timer is unref'd so it never keeps the
+ * process alive on its own.
+ */
+export const startCredentialsResync = () => {
+  if (resyncTimer) return;
+  const parsed = parseInt(process.env.WRIKE_CREDENTIALS_RESYNC_MS, 10);
+  const intervalMs = Number.isFinite(parsed) && parsed >= 0 ? parsed : 5 * 60 * 1000;
+  if (!intervalMs) return;
+  resyncTimer = setInterval(resyncFromRemote, intervalMs);
+  resyncTimer.unref?.();
+};
+
+export const stopCredentialsResync = () => {
+  if (resyncTimer) clearInterval(resyncTimer);
+  resyncTimer = null;
 };
 
 // Get cached credentials

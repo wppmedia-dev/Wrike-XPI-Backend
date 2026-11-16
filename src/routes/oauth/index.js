@@ -2,12 +2,118 @@ import crypto from "crypto";
 import { findRedirectionURL } from "../../utils/wrikeRedirect";
 import { getCachedVisibleWrikeCredentials } from "../../utils/wrikeCredentials";
 import { WrikeTokenExchange } from "../tokens/handlers/wrikeTokenExchange";
-import { ResolveAuthFromJWT } from "../../middlewares/authentication";
 import { clientIp } from "../../utils/environmentAccess";
-import { TOKEN_TTL_SECONDS } from "../../utils/tokenTtl";
+import { verifyFastifyJwt, verifyJwt } from "../../utils/jwtSecrets";
+import { OAuthClients } from "../../controllers";
+import { McpTokens } from "../../controllers";
+import { getMcpTokenLifetimes } from "../../utils/mcpTokenSettings";
 
-const ACCESS_TOKEN_TTL_SECONDS = TOKEN_TTL_SECONDS; // the JWE lifetime, one authority (src/utils/tokenTtl.js)
-const AUTH_CODE_TTL = "60s";
+// Marks a signed token as an MCP access token. Only /mcp accepts one, and /mcp
+// accepts nothing else (src/middlewares/authentication.js verifyJWE).
+export const MCP_TOKEN_USE = "mcp";
+
+// OAuth responses carry credentials, so no cache or intermediary may keep them
+// (RFC 6749 section 5.1).
+const noStore = (reply) =>
+  reply.header("Cache-Control", "no-store").header("Pragma", "no-cache");
+
+const positiveInt = (value, fallback) => {
+  const parsed = parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+/**
+ * Dynamic client registration hardening.
+ *
+ *   OAUTH_CLIENT_TTL_DAYS              lifetime of a newly registered
+ *                                      client_id (default 365; was 10 years).
+ *   OAUTH_REGISTER_RATE_LIMIT          registrations per IP per window
+ *                                      (default 20).
+ *   OAUTH_REGISTER_RATE_LIMIT_TIME     that window (default "1 hour").
+ *   OAUTH_ACCEPT_LEGACY_CLIENTS        "false" rejects client_ids minted
+ *                                      before registrations were stored (no
+ *                                      jti, so they cannot be revoked one by
+ *                                      one). Default: still accepted, so
+ *                                      existing connectors keep working.
+ */
+const OAUTH_CLIENT_TTL_DAYS = positiveInt(process.env.OAUTH_CLIENT_TTL_DAYS, 365);
+const REGISTER_RATE_LIMIT = {
+  max: positiveInt(process.env.OAUTH_REGISTER_RATE_LIMIT, 20),
+  timeWindow: process.env.OAUTH_REGISTER_RATE_LIMIT_TIME || "1 hour",
+};
+const acceptLegacyClients = () =>
+  process.env.OAUTH_ACCEPT_LEGACY_CLIENTS !== "false";
+
+// Bounds on an unauthenticated write.
+const MAX_REDIRECT_URIS = 20;
+const MAX_REDIRECT_URI_LENGTH = 2048;
+const MAX_CLIENT_NAME_LENGTH = 200;
+
+const isExpiredError = (err) =>
+  err?.code === "FAST_JWT_EXPIRED" || err?.name === "TokenExpiredError";
+
+/**
+ * Everything /authorize and /token need to know about a client_id.
+ *
+ *   absent            no client_id given
+ *   invalid           not a client_id we signed — treated as an unregistered
+ *                     client (loopback redirect only), exactly as before
+ *   expired           a client_id we signed whose lifetime has passed
+ *   revoked           an admin revoked this registration
+ *   legacy_rejected   pre-registry client_id while legacy ones are disabled
+ *   ok                usable; `claims` carries redirect_uris / client_name
+ *
+ * The revocation lookup fails OPEN on a database error (logged): signature
+ * and expiry are still enforced, and an outage of the registry table must not
+ * take every MCP sign-in down with it.
+ */
+const inspectClient = async (fastify, clientId) => {
+  if (!clientId) return { state: "absent" };
+
+  let claims;
+  try {
+    claims = verifyFastifyJwt(fastify, clientId);
+  } catch (err) {
+    return { state: isExpiredError(err) ? "expired" : "invalid" };
+  }
+
+  if (!claims?.jti) {
+    return acceptLegacyClients()
+      ? { state: "ok", claims }
+      : { state: "legacy_rejected" };
+  }
+
+  try {
+    if ((await OAuthClients.GetStatus(claims.jti)) === "revoked") {
+      return { state: "revoked", claims };
+    }
+  } catch (err) {
+    console.warn(
+      new Date().toISOString(),
+      `[oauth] client registry lookup failed, allowing signed client ${claims.jti}: ${err?.message || err}`,
+    );
+  }
+  return { state: "ok", claims };
+};
+
+const CLIENT_REJECTION = {
+  expired:
+    "This client registration has expired. Register the client again (POST /oauth/register).",
+  revoked: "This client registration has been revoked by an administrator.",
+  legacy_rejected:
+    "This client registration predates the client registry. Register the client again (POST /oauth/register).",
+};
+
+// The display name a client registered at /register, read back out of the
+// signed client_id it was given. This is what labels the token that client ends
+// up minting, and the only thing that distinguishes two tokens a user holds for
+// the same environment in the admin console. A missing label must never be a
+// reason to refuse a token, so anything unexpected yields null.
+const clientNameFromClaims = (claims) => {
+  const name = claims?.client_name;
+  if (typeof name !== "string") return null;
+  return name.trim().slice(0, 100) || null;
+};
 
 const isLoopback = (urlString) => {
   try {
@@ -26,40 +132,6 @@ const isHttps = (urlString) => {
   }
 };
 
-/**
- * Resolve the redirect_uris a client_id is allowed to use.
- * client_id is a signed JWT minted by /oauth/register embedding { redirect_uris }.
- * Returns null if client_id is absent/unverifiable (caller falls back to loopback-only).
- */
-const resolveRegisteredRedirectUris = (fastify, clientId) => {
-  if (!clientId) return null;
-  try {
-    const decoded = fastify.jwt.verify(clientId);
-    return Array.isArray(decoded.redirect_uris) ? decoded.redirect_uris : null;
-  } catch {
-    return null;
-  }
-};
-
-// The display name a client registered at /register, read back out of the
-// signed client_id it was given. This is what labels the token that client ends
-// up minting, and the only thing that distinguishes two tokens a user holds for
-// the same environment in the admin console.
-//
-// Verification can fail for reasons that are not the client's fault and an
-// unlabelled token is perfectly usable, so every failure returns null rather
-// than throwing: a missing label must never be a reason to refuse a token.
-const clientNameFrom = (fastify, clientId) => {
-  if (!clientId) return null;
-  try {
-    const decoded = fastify.jwt.verify(clientId);
-    const name = decoded?.client_name;
-    if (typeof name !== "string") return null;
-    return name.trim().slice(0, 100) || null;
-  } catch {
-    return null;
-  }
-};
 
 const renderEnvironmentPicker = ({ visibleCreds, query }) => {
   const hiddenFields = Object.entries(query)
@@ -223,6 +295,15 @@ export const oauthRoute = (fastify, opts, done) => {
     },
   );
 
+  // The access token: short-lived, signed, and good only on /mcp. `t` is the
+  // token row, `d` the DEK that opens its stored Wrike credential, `f` the
+  // refresh token family it belongs to, which is what revocation switches off.
+  const signAccessToken = ({ tokenId, familyId, dek, ttlSeconds }) =>
+    fastify.jwt.sign(
+      { t: tokenId, d: dek.toString("base64"), f: familyId, s: MCP_TOKEN_USE },
+      { expiresIn: ttlSeconds },
+    );
+
   /**
    * Shared body for both /authorize routes below. `environmentId` is passed
    * in explicitly rather than read from req.query, so it can come from a URL
@@ -261,10 +342,19 @@ export const oauthRoute = (fastify, opts, done) => {
         });
       }
 
-      const allowedRedirects = resolveRegisteredRedirectUris(
-        fastify,
-        client_id,
-      );
+      // client_id is a signed JWT minted by /oauth/register embedding
+      // { redirect_uris }. Unverifiable/absent ones fall back to loopback-only.
+      const client = await inspectClient(fastify, client_id);
+      if (CLIENT_REJECTION[client.state]) {
+        return reply.code(401).send({
+          error: "invalid_client",
+          error_description: CLIENT_REJECTION[client.state],
+        });
+      }
+      const allowedRedirects =
+        client.state === "ok" && Array.isArray(client.claims?.redirect_uris)
+          ? client.claims.redirect_uris
+          : null;
       if (allowedRedirects) {
         if (!allowedRedirects.includes(redirect_uri)) {
           return reply.code(400).send({
@@ -358,7 +448,7 @@ export const oauthRoute = (fastify, opts, done) => {
 
         let decoded;
         try {
-          decoded = fastify.jwt.verify(code);
+          decoded = verifyFastifyJwt(fastify, code);
         } catch {
           return reply.code(400).send({
             error: "invalid_grant",
@@ -389,6 +479,16 @@ export const oauthRoute = (fastify, opts, done) => {
           });
         }
 
+        // Re-check the client: a registration revoked between /authorize
+        // and here must not complete the exchange.
+        const client = await inspectClient(fastify, decoded.client_id);
+        if (CLIENT_REJECTION[client.state]) {
+          return reply.code(400).send({
+            error: "invalid_grant",
+            error_description: CLIENT_REJECTION[client.state],
+          });
+        }
+
         const result = await WrikeTokenExchange(
           {
             code: decoded.wrikeCode,
@@ -399,15 +499,38 @@ export const oauthRoute = (fastify, opts, done) => {
             // label that is at least honest: reaching this line means something
             // completed a PKCE flow, so it is an MCP client.
             clientName:
-              clientNameFrom(fastify, decoded.client_id) || "MCP client",
+              (client.state === "ok" && clientNameFromClaims(client.claims)) ||
+              "MCP client",
           },
           fastify,
+          req,
+          { mcp: true },
         );
 
+        if (client.claims?.jti) OAuthClients.TouchLastUsed(client.claims.jti);
+
+        const lifetimes = await getMcpTokenLifetimes();
+        const issued = await McpTokens.Issue({
+          tokenId: result.tokenId,
+          dek: result.dek,
+          refreshTtlSeconds: lifetimes.refreshTtlSeconds,
+          // Only a registered client has an id to record.
+          clientId: OAuthClients.isClientId(client.claims?.jti)
+            ? client.claims.jti
+            : null,
+        });
+
+        noStore(reply);
         return reply.code(200).send({
-          access_token: result.token,
+          access_token: signAccessToken({
+            tokenId: result.tokenId,
+            familyId: issued.familyId,
+            dek: result.dek,
+            ttlSeconds: lifetimes.accessTtlSeconds,
+          }),
           token_type: "Bearer",
-          expires_in: ACCESS_TOKEN_TTL_SECONDS,
+          expires_in: lifetimes.accessTtlSeconds,
+          refresh_token: issued.refreshToken,
         });
       }
 
@@ -416,22 +539,42 @@ export const oauthRoute = (fastify, opts, done) => {
         if (!refresh_token) {
           return reply.code(400).send({ error: "invalid_request" });
         }
+
+        const lifetimes = await getMcpTokenLifetimes();
+        let rotated;
         try {
-          // Re-validates (and, if near expiry, transparently refreshes the
-          // underlying Wrike token server-side). See authentication.js
-          // resolveAuth().
-          await ResolveAuthFromJWT(refresh_token);
-        } catch {
-          return reply.code(400).send({ error: "invalid_grant" });
+          rotated = await McpTokens.Rotate({
+            refreshToken: refresh_token,
+            refreshTtlSeconds: lifetimes.refreshTtlSeconds,
+          });
+        } catch (err) {
+          if (err?.code === "invalid_grant") {
+            return reply.code(400).send({
+              error: "invalid_grant",
+              error_description: err.message,
+            });
+          }
+          // Anything else is on our side (database down, lock timeout). Saying
+          // invalid_grant would make the client throw away a refresh token
+          // that is still good, and its user would have to sign in again.
+          console.log("Refresh failed:", err?.message || err);
+          return reply.code(503).send({
+            error: "temporarily_unavailable",
+            error_description: "Try again shortly",
+          });
         }
 
-        // The JWE is its own refresh handle: it already self-refreshes the
-        // underlying Wrike access token server-side, so no separate refresh
-        // token needs to be minted. It is echoed back with a fresh TTL.
+        noStore(reply);
         return reply.code(200).send({
-          access_token: refresh_token,
+          access_token: signAccessToken({
+            tokenId: rotated.tokenId,
+            familyId: rotated.familyId,
+            dek: rotated.dek,
+            ttlSeconds: lifetimes.accessTtlSeconds,
+          }),
           token_type: "Bearer",
-          expires_in: ACCESS_TOKEN_TTL_SECONDS,
+          expires_in: lifetimes.accessTtlSeconds,
+          refresh_token: rotated.refreshToken,
         });
       }
 
@@ -454,42 +597,137 @@ export const oauthRoute = (fastify, opts, done) => {
     }
   });
 
-  fastify.post("/register", async (req, reply) => {
-    const { redirect_uris, client_name } = req.body || {};
-
-    if (!Array.isArray(redirect_uris) || redirect_uris.length === 0) {
-      return reply.code(400).send({
-        error: "invalid_client_metadata",
-        error_description:
-          "redirect_uris is required and must be a non-empty array",
-      });
+  // RFC 7009 token revocation. A client signing out sends either its refresh
+  // token or its access token (RFC 7009 allows both, and clients differ), and
+  // either one switches off the whole sign-in, refresh tokens and access
+  // tokens alike. An access token is accepted even if it has expired, since a
+  // client that signs out late is still entitled to end its own sign-in.
+  // Always 200, known token or not, so the endpoint cannot be used to probe
+  // for valid ones. Each call is logged (never the token itself), because
+  // whether a client signs out at all is otherwise invisible.
+  fastify.post("/revoke", async (req, reply) => {
+    let kind = "none";
+    let revoked = 0;
+    try {
+      const { token } = req.body || {};
+      if (typeof token === "string" && token) {
+        if (token.split(".").length === 3) {
+          // Looks like a JWT: an MCP access token. The signature is checked
+          // (with any retired secret still honoured); expiry is not.
+          kind = "access_token";
+          let claims = null;
+          try {
+            claims = verifyJwt(token, { ignoreExpiration: true });
+          } catch {
+            claims = null;
+          }
+          if (claims?.s === MCP_TOKEN_USE && claims.f) {
+            revoked = await McpTokens.RevokeFamily(claims.f);
+          }
+        } else {
+          kind = "refresh_token";
+          revoked = await McpTokens.RevokeByRefreshToken(token);
+        }
+      }
+    } catch (err) {
+      console.log("Error while revoking a token:", err?.message || err);
     }
+    console.log(
+      new Date().toISOString(),
+      `[oauth] /revoke called with ${kind}; ${revoked ? "sign-in revoked" : "nothing to revoke"}`,
+    );
+    return reply.code(200).send({});
+  });
 
-    for (const uri of redirect_uris) {
-      if (!isLoopback(uri) && !isHttps(uri)) {
+  // Unauthenticated by nature (RFC 7591 open registration), so it is
+  // rate-limited per IP, bounded in size, and every registration is stored
+  // so an admin can see and revoke it (/api/v1/admin/oauth-clients).
+  fastify.post(
+    "/register",
+    { config: { rateLimit: REGISTER_RATE_LIMIT } },
+    async (req, reply) => {
+      const { redirect_uris, client_name } = req.body || {};
+
+      if (!Array.isArray(redirect_uris) || redirect_uris.length === 0) {
         return reply.code(400).send({
-          error: "invalid_redirect_uri",
-          error_description: `redirect_uri must be loopback (127.0.0.1/localhost) or https: ${uri}`,
+          error: "invalid_client_metadata",
+          error_description:
+            "redirect_uris is required and must be a non-empty array",
         });
       }
-    }
 
-    // Stateless DCR: client_id is a signed JWT embedding the registered
-    // redirect_uris, verified later at /authorize and /token. No DB row.
-    const client_id = fastify.jwt.sign(
-      { redirect_uris, client_name: client_name || null },
-      { expiresIn: "3650d" },
-    );
+      if (redirect_uris.length > MAX_REDIRECT_URIS) {
+        return reply.code(400).send({
+          error: "invalid_client_metadata",
+          error_description: `At most ${MAX_REDIRECT_URIS} redirect_uris may be registered`,
+        });
+      }
 
-    return reply.code(201).send({
-      client_id,
-      redirect_uris,
-      client_name: client_name || undefined,
-      token_endpoint_auth_method: "none",
-      grant_types: ["authorization_code", "refresh_token"],
-      response_types: ["code"],
-    });
-  });
+      for (const uri of redirect_uris) {
+        if (typeof uri !== "string" || uri.length > MAX_REDIRECT_URI_LENGTH) {
+          return reply.code(400).send({
+            error: "invalid_redirect_uri",
+            error_description: `redirect_uri must be a string of at most ${MAX_REDIRECT_URI_LENGTH} characters`,
+          });
+        }
+        if (!isLoopback(uri) && !isHttps(uri)) {
+          return reply.code(400).send({
+            error: "invalid_redirect_uri",
+            error_description: `redirect_uri must be loopback (127.0.0.1/localhost) or https: ${uri}`,
+          });
+        }
+      }
+
+      const name =
+        typeof client_name === "string" && client_name.trim()
+          ? client_name.trim().slice(0, MAX_CLIENT_NAME_LENGTH)
+          : null;
+
+      const id = crypto.randomUUID();
+      const issuedAt = Math.floor(Date.now() / 1000);
+      const expiresAt = new Date(
+        (issuedAt + OAUTH_CLIENT_TTL_DAYS * 24 * 60 * 60) * 1000,
+      );
+
+      // Stored so it can be listed and revoked. If the write fails the
+      // registration still succeeds (logged): the client_id is signed and
+      // expires on its own, and a registry outage must not block every new
+      // MCP connector. Such a client simply cannot be revoked individually.
+      try {
+        await OAuthClients.Register({
+          id,
+          client_name: name,
+          redirect_uris,
+          expires_at: expiresAt,
+          created_ip: clientIp(req),
+          user_agent: req.headers["user-agent"],
+        });
+      } catch (err) {
+        console.error(
+          new Date().toISOString(),
+          `[oauth] failed to store client registration ${id}: ${err?.message || err}`,
+        );
+      }
+
+      // client_id is a signed JWT embedding the registered redirect_uris
+      // (verified at /authorize and /token without a lookup); `jti` links it
+      // to the stored row for revocation.
+      const client_id = fastify.jwt.sign(
+        { jti: id, redirect_uris, client_name: name },
+        { expiresIn: `${OAUTH_CLIENT_TTL_DAYS}d` },
+      );
+
+      return reply.code(201).send({
+        client_id,
+        client_id_issued_at: issuedAt,
+        redirect_uris,
+        client_name: name || undefined,
+        token_endpoint_auth_method: "none",
+        grant_types: ["authorization_code", "refresh_token"],
+        response_types: ["code"],
+      });
+    },
+  );
 
   done();
 };

@@ -1,0 +1,414 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  adminOAuthClientsApi,
+  type OAuthClient,
+  type OAuthClientList,
+  type OAuthClientStatus,
+  type OAuthClientsApi,
+} from "../lib/oauthClientsApi";
+import { DataTable } from "../components/ui/DataTable";
+import { useTable, type ColumnDef } from "../components/ui/useTable";
+import { RowMenu } from "../components/ui/RowMenu";
+import { Badge } from "../components/ui/Badge";
+import { CopyButton } from "../components/ui/CopyButton";
+import { EMPTY, dateSortValue, formatDate, formatDateTime } from "../lib/format";
+import { confirmDanger, escHtml, progress, toast } from "../lib/notify";
+import "./OAuthClients.css";
+
+/* OAuth Clients: every MCP connector that registered itself through
+ * POST /oauth/register, and the switch to revoke one. Revoking blocks new
+ * sign-ins for that registration; tokens it already minted are separate
+ * records, revoked from Tokens. */
+
+/** Same rules as src/utils/oauthClientStatus.js; the server's value wins. */
+const statusOf = (client: OAuthClient): OAuthClientStatus => {
+  if (client.status) return client.status;
+  if (client.revoked_at) return "revoked";
+  if (client.expires_at && new Date(client.expires_at).getTime() <= Date.now()) return "expired";
+  return client.connection?.state || "registered";
+};
+
+const STATUS_BADGE: Record<OAuthClientStatus, { tone: "success" | "warning" | "danger" | "neutral" | "info"; label: string; hint: string }> = {
+  connected: { tone: "success", label: "Connected", hint: "Has a sign-in that can still refresh, and it was used recently" },
+  idle: { tone: "warning", label: "Idle", hint: "Has a live sign-in, but nothing has used it for a while. It may be unused, or disconnected on the client side, which the service only learns if the client signs out" },
+  disconnected: { tone: "neutral", label: "Disconnected", hint: "Has signed in before, but no sign-in is live now" },
+  registered: { tone: "info", label: "Registered", hint: "Registered, and has not signed in yet" },
+  expired: { tone: "warning", label: "Expired", hint: "The registration's lifetime has passed" },
+  revoked: { tone: "danger", label: "Revoked", hint: "Revoked by an administrator" },
+};
+
+/** "5 min ago" for anything recent, the date after that. */
+function timeAgo(value: string | null | undefined): string {
+  if (!value) return "Never";
+  const seconds = Math.round((Date.now() - new Date(value).getTime()) / 1000);
+  if (Number.isNaN(seconds)) return EMPTY;
+  if (seconds < 60) return "Just now";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} hr ago`;
+  return formatDate(value);
+}
+
+const lastActive = (c: OAuthClient): string | null => {
+  const a = c.connection?.last_active_at;
+  const b = c.last_used_at;
+  if (a && b) return new Date(a) > new Date(b) ? a : b;
+  return a || b || null;
+};
+
+/** Host of each redirect URI: what an admin recognises a connector by. */
+const redirectHosts = (client: OAuthClient): string => {
+  const hosts = (client.redirect_uris || []).map((uri) => {
+    try {
+      return new URL(uri).host;
+    } catch {
+      return uri;
+    }
+  });
+  return [...new Set(hosts)].join(", ");
+};
+
+export default function OAuthClients({
+  refreshKey = 0,
+  onViewActivity,
+  api = adminOAuthClientsApi,
+  canDisconnect = true,
+  canRevoke = true,
+}: {
+  refreshKey?: number;
+  /** Open the Activity Log scoped to this client's sign-ins. */
+  onViewActivity?: (client: { id: string; label: string }) => void;
+  /**
+   * Where the data comes from. The admin console's by default; the portal
+   * passes its own. Keep it a stable object (module scope), since the load
+   * effect depends on it.
+   */
+  api?: OAuthClientsApi;
+  /** Offer Disconnect (the portal's "update" grant). */
+  canDisconnect?: boolean;
+  /** Offer Revoke (the portal's "delete" grant). */
+  canRevoke?: boolean;
+}) {
+  const [data, setData] = useState<OAuthClientList | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [showRevoked, setShowRevoked] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      setData(await api.list(showRevoked));
+    } catch (err: any) {
+      toast(err?.message || "Failed to load OAuth clients", "error");
+    } finally {
+      setLoading(false);
+    }
+  }, [api, showRevoked]);
+
+  useEffect(() => {
+    load();
+  }, [load, refreshKey]);
+
+  const handleRevoke = useCallback(
+    async (client: OAuthClient) => {
+      const name = client.client_name || "Unnamed client";
+      const ok = await confirmDanger({
+        title: "Revoke this OAuth client?",
+        html:
+          `<b>${escHtml(name)}</b> will no longer be able to start or finish a sign-in, ` +
+          `and its live sign-ins (${client.connection?.live_sessions ?? 0}) are ended now.<br><br>` +
+          `This cannot be undone; the connector has to register again.`,
+        confirmText: "Revoke",
+      });
+      if (!ok) return;
+
+      progress.start();
+      try {
+        const revoked = await api.revoke(client.id);
+        toast(
+          revoked.disconnected
+            ? `${name} revoked, ${revoked.disconnected} sign-in(s) ended`
+            : `${name} revoked`,
+          "success",
+        );
+        await load();
+      } catch (err: any) {
+        toast(err?.message || "Failed to revoke OAuth client", "error");
+      } finally {
+        progress.done();
+      }
+    },
+    [api, load],
+  );
+
+  // End a client's live sign-ins but keep its registration: for a connector
+  // that was disconnected inside the app (which does not tell us), or to cut
+  // it off without making it register again.
+  const handleDisconnect = useCallback(
+    async (client: OAuthClient) => {
+      const name = client.client_name || "Unnamed client";
+      const live = client.connection?.live_sessions ?? 0;
+      const ok = await confirmDanger({
+        title: "Disconnect this client?",
+        html:
+          `<b>${escHtml(name)}</b> has ${live} live sign-in(s). They end now, so it has to sign in again ` +
+          `the next time it is used.<br><br>Its registration stays, so it does not need to register again.`,
+        confirmText: "Disconnect",
+      });
+      if (!ok) return;
+
+      progress.start();
+      try {
+        const ended = await api.disconnect(client.id);
+        toast(ended ? `${name} disconnected (${ended} sign-in(s) ended)` : `${name} had no live sign-ins`, "success");
+        await load();
+      } catch (err: any) {
+        toast(err?.message || "Failed to disconnect OAuth client", "error");
+      } finally {
+        progress.done();
+      }
+    },
+    [api, load],
+  );
+
+  const rows = data?.rows || [];
+  // The server leaves the registrant's IP out for portal users.
+  const showIp = rows.some((c) => c.created_ip);
+
+  const columns = useMemo<ColumnDef<OAuthClient>[]>(
+    () => [
+      {
+        id: "client_name",
+        header: "Client",
+        accessor: (c) => c.client_name || "",
+        cell: (c) => (
+          <div className="oc-client">
+            <strong>{c.client_name || <span className="text-muted">Unnamed client</span>}</strong>
+            <span className="oc-id" title={c.id}>
+              {c.id.slice(0, 8)}
+              <CopyButton value={c.id} title="Copy registration id" />
+            </span>
+          </div>
+        ),
+      },
+      {
+        id: "redirect",
+        header: "Redirect to",
+        accessor: (c) => (c.redirect_uris || []).join(" "),
+        cell: (c) => (
+          <span className="oc-redirect" title={(c.redirect_uris || []).join("\n")}>
+            {redirectHosts(c) || EMPTY}
+          </span>
+        ),
+      },
+      {
+        id: "status",
+        header: "Status",
+        accessor: (c) => statusOf(c),
+        cell: (c) => {
+          const s = STATUS_BADGE[statusOf(c)];
+          const sessions = c.connection;
+          return (
+            <span
+              title={
+                sessions && sessions.total_sessions > 0
+                  ? `${s.hint}. ${sessions.live_sessions} of ${sessions.total_sessions} sign-in(s) live.`
+                  : s.hint
+              }
+            >
+              <Badge tone={s.tone} dot>
+                {s.label}
+              </Badge>
+            </span>
+          );
+        },
+      },
+      {
+        id: "created_at",
+        header: "Registered",
+        accessor: (c) => dateSortValue(c.created_at),
+        searchable: false,
+        cell: (c) => <span title={formatDateTime(c.created_at)}>{formatDate(c.created_at)}</span>,
+      },
+      {
+        id: "last_active_at",
+        header: "Last active",
+        // Last refresh or sign-in, whichever is later; the sign-in time alone
+        // for clients whose sign-ins predate connection tracking.
+        accessor: (c) => dateSortValue(lastActive(c)),
+        searchable: false,
+        cell: (c) => (
+          <span title={lastActive(c) ? formatDateTime(lastActive(c)) : undefined}>
+            {timeAgo(lastActive(c))}
+          </span>
+        ),
+      },
+      {
+        id: "expires_at",
+        header: "Expires",
+        accessor: (c) => dateSortValue(c.expires_at),
+        searchable: false,
+        cell: (c) => (c.revoked_at ? <span className="text-muted">{EMPTY}</span> : formatDate(c.expires_at)),
+      },
+      ...(showIp
+        ? [
+      {
+        id: "created_ip",
+        header: "Registered from",
+        accessor: (c) => c.created_ip || "",
+        cell: (c) => (c.created_ip ? <span className="oc-mono">{c.created_ip}</span> : <span className="text-muted">{EMPTY}</span>),
+      } as ColumnDef<OAuthClient>,
+        ]
+        : []),
+      {
+        id: "actions",
+        header: "Actions",
+        width: "64px",
+        align: "center",
+        cell: (c) => {
+          const status = statusOf(c);
+          const revocable = canRevoke && status !== "revoked" && status !== "expired";
+          const items = [
+            // History is useful for a revoked or expired client too.
+            ...(onViewActivity
+              ? [
+                  {
+                    label: "Activity log",
+                    icon: "fa-solid fa-clock-rotate-left",
+                    onSelect: () =>
+                      onViewActivity({ id: c.id, label: c.client_name || c.id.slice(0, 8) }),
+                  },
+                ]
+              : []),
+            // Offered whenever the client still holds a live sign-in, whatever its
+            // registration status.
+            ...(canDisconnect && (c.connection?.live_sessions ?? 0) > 0
+              ? [
+                  {
+                    label: "Disconnect",
+                    icon: "fa-solid fa-plug-circle-xmark",
+                    danger: true,
+                    onSelect: () => handleDisconnect(c),
+                  },
+                ]
+              : []),
+            ...(revocable
+              ? [
+                  {
+                    label: "Revoke",
+                    icon: "fa-solid fa-ban",
+                    danger: true,
+                    onSelect: () => handleRevoke(c),
+                  },
+                ]
+              : []),
+          ];
+          return items.length ? (
+            <RowMenu label={`Actions for ${c.client_name || c.id}`} items={items} />
+          ) : (
+            <span
+              className="text-muted"
+              title={c.revoked_at ? `Revoked ${formatDateTime(c.revoked_at)}` : "Expired"}
+            >
+              {EMPTY}
+            </span>
+          );
+        },
+      },
+    ],
+    [handleRevoke, handleDisconnect, onViewActivity, canDisconnect, canRevoke, showIp],
+  );
+
+  const table = useTable({
+    data: rows,
+    columns,
+    getRowId: (c) => c.id,
+    initialSort: { columnId: "created_at", direction: "desc" },
+    initialPageSize: 10,
+  });
+
+  const revoked = data?.counts.revoked ?? 0;
+  // Whole-table counts from the server; undefined if it could not read them.
+  const connected = data?.counts.connected;
+  const disconnected = data?.counts.disconnected;
+  const idle = data?.counts.idle;
+  const truncated = !!data && data.total > rows.length;
+
+  return (
+    <>
+      <div className="stats-grid">
+        <div className="stat-card green">
+          <div className="stat-icon green">
+            <i className="fa-solid fa-plug-circle-check" />
+          </div>
+          <div className="stat-body">
+            <div className="stat-value">{data && connected !== undefined ? connected : EMPTY}</div>
+            <div className="stat-label">Connected</div>
+          </div>
+        </div>
+        <div className="stat-card blue">
+          <div className="stat-icon blue">
+            <i className="fa-solid fa-plug-circle-xmark" />
+          </div>
+          <div className="stat-body">
+            <div className="stat-value">{data && disconnected !== undefined ? disconnected : EMPTY}</div>
+            <div className="stat-label">Disconnected</div>
+          </div>
+        </div>
+        <div className="stat-card yellow">
+          <div className="stat-icon yellow">
+            <i className="fa-solid fa-hourglass-half" />
+          </div>
+          <div className="stat-body">
+            <div className="stat-value">{data && idle !== undefined ? idle : EMPTY}</div>
+            <div className="stat-label">Idle</div>
+          </div>
+        </div>
+        <div className="stat-card red">
+          <div className="stat-icon red">
+            <i className="fa-solid fa-ban" />
+          </div>
+          <div className="stat-body">
+            <div className="stat-value">{data ? revoked : EMPTY}</div>
+            <div className="stat-label">Revoked</div>
+          </div>
+        </div>
+      </div>
+
+      {truncated && (
+        <div className="oc-note">
+          <i className="fa-solid fa-circle-info" /> Showing the newest {rows.length} of {data!.total} registrations.
+        </div>
+      )}
+
+      <div className="card">
+        <div className="card-body">
+          <DataTable
+            table={table}
+            caption="OAuth clients"
+            loading={loading && !data}
+            className="oc-table"
+            searchPlaceholder="Search clients…"
+            toolbar={
+              <label className="oc-filter">
+                <input
+                  type="checkbox"
+                  checked={showRevoked}
+                  onChange={(e) => setShowRevoked(e.target.checked)}
+                />
+                Show revoked
+              </label>
+            }
+            empty={
+              <div className="dt2-empty">
+                <div className="dt2-empty-icon">
+                  <i className="fa-solid fa-plug" aria-hidden="true" />
+                </div>
+                <h3>No OAuth clients yet</h3>
+                <p>MCP connectors appear here once they register with this service.</p>
+              </div>
+            }
+          />
+        </div>
+      </div>
+    </>
+  );
+}

@@ -13,7 +13,13 @@ module.exports = fp(async function (fastify, opts) {
     saveUninitialized: false,
     secret: process.env.SESSION_SECRET,
     cookie: {
-      secure: false,
+      // "auto": Secure whenever the request arrived over HTTPS (honours
+      // X-Forwarded-Proto via trustProxy, see src/index.js), so production
+      // behind TLS gets a Secure cookie while plain-http local dev still works.
+      // SESSION_COOKIE_SECURE=true forces it on regardless.
+      secure: process.env.SESSION_COOKIE_SECURE === "true" ? true : "auto",
+      httpOnly: true,
+      sameSite: process.env.SESSION_COOKIE_SAMESITE || "lax",
       maxAge: 259200000,
     },
     store: new SessionStore({

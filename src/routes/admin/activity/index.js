@@ -38,6 +38,7 @@ export const adminActivityRoute = (fastify, opts, done) => {
           // token-filtered list counts that token's calls, not every call in
           // the environment.
           tokenId: req.query.token_id,
+          oauthClientId: req.query.oauth_client_id,
           since: req.query.since,
         });
         return reply.code(200).send({ success: true, data });
@@ -52,6 +53,7 @@ export const adminActivityRoute = (fastify, opts, done) => {
       const {
         env_id,
         token_id,
+        oauth_client_id,
         search,
         surface,
         allowed,
@@ -65,6 +67,8 @@ export const adminActivityRoute = (fastify, opts, done) => {
       const data = await ActivityLog.List({
         envId: env_id,
         tokenId: token_id,
+
+        oauthClientId: oauth_client_id,
         search,
         surface,
         allowed: allowed === undefined ? undefined : allowed === "true",
@@ -92,6 +96,7 @@ export const adminActivityRoute = (fastify, opts, done) => {
         const {
           env_id,
           token_id,
+          oauth_client_id,
           search,
           surface,
           allowed,
@@ -103,6 +108,8 @@ export const adminActivityRoute = (fastify, opts, done) => {
         const rows = await ActivityLog.ExportRows({
           envId: env_id,
           tokenId: token_id,
+
+          oauthClientId: oauth_client_id,
           search,
           surface,
           allowed: allowed === undefined ? undefined : allowed === "true",

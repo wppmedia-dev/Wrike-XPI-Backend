@@ -21,6 +21,7 @@ export type AdminHelpKey =
   | "settings"
   | "cache"
   | "sync"
+  | "oauthClients"
   | "activity";
 
 export const ADMIN_HELP: Record<AdminHelpKey, PageHelp> = {
@@ -99,6 +100,21 @@ export const ADMIN_HELP: Record<AdminHelpKey, PageHelp> = {
     note: "Only the latest run of each source is kept. A new run replaces the old one.",
   },
 
+  oauthClients: {
+    summary:
+      "Every MCP connector that registered itself with this service through OAuth.",
+    points: [
+      "Beta: this page is new and may change.",
+      "Connected: the client has a sign-in that can still refresh and was used recently. Idle: the sign-in is live but nothing has used it for about 15 minutes. Disconnected: it has signed in before, but none is live now (signed out, revoked, or the refresh token lapsed).",
+      "Registered: it registered but has not signed in yet. Sign-ins made before this page existed cannot be matched to a client.",
+      "Disconnect (row menu) ends the client's live sign-ins and keeps its registration. Use it when a connector was removed inside the app, which does not tell this service.",
+      "Revoke stops that registration from starting or finishing any sign-in, and ends its live sign-ins too. Expired registrations can no longer sign in either.",
+      "Show revoked brings back the ones already switched off.",
+      "Activity log (row menu) opens the Activity Log filtered to that client's sign-ins. Sign-ins from before this page existed cannot be matched, so they will not appear.",
+    ],
+    note: "If a user disconnects inside the client app and the app does not sign out with the service, the client shows Idle (then Disconnected once its refresh token expires), because the service cannot see the disconnect. Sign-ins from before this page existed cannot be matched to a client, so Disconnect and Revoke cannot end them; deactivate those from Tokens.",
+  },
+
   activity: {
     summary:
       "Every call into this service, allowed or refused, across REST, MCP and the sign-in flows.",
@@ -119,7 +135,9 @@ export type PortalHelpKey =
   | "environments"
   | "apiTokens"
   | "activity"
-  | "cache";
+  | "cache"
+  | "oauthClients"
+  | "sync";
 
 export const PORTAL_HELP: Record<PortalHelpKey, PageHelp> = {
   overview: {
@@ -174,6 +192,30 @@ export const PORTAL_HELP: Record<PortalHelpKey, PageHelp> = {
       "Delete one key, or several, to force a fresh read.",
     ],
     note: "Clearing a key loses nothing. The next request is just slower.",
+  },
+
+  oauthClients: {
+    summary:
+      "The MCP connectors (Claude and others) that signed in to your environments.",
+    points: [
+      "Beta: this page is new and may change.",
+      "You see a connector when it has signed in to one of your environments, and its status counts only those sign-ins.",
+      "Connected: used recently. Idle: signed in but not used for about 15 minutes. Disconnected: no live sign-in.",
+      "Disconnect ends the sign-ins in your environments; the connector can sign in again. Revoke stops the connector for good, and is refused if other environments also use it.",
+      "Activity log (row menu) shows what that connector did.",
+    ],
+    note: "Removing a connector inside its own app does not tell this service. It shows as Idle until you Disconnect it or its sign-in expires.",
+  },
+
+  sync: {
+    summary:
+      "Reload the secrets the service keeps in memory from Azure Key Vault, without a restart.",
+    points: [
+      "Sync now runs a source straight away, for example after a secret was rotated.",
+      "Each card shows the last run: when, who ran it, how many items and how long it took.",
+      "Partial means some items could not be loaded. The server log says which.",
+    ],
+    note: "This affects the whole service, not only your environments. Only the latest run of each source is kept.",
   },
 };
 

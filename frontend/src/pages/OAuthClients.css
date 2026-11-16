@@ -1,0 +1,73 @@
+/* Same as the Activity Log table: every cell stays on one line and the table
+   scrolls sideways (DataTable's .dt2-scroll) when the row is wider than the
+   screen, instead of wrapping text. */
+.oc-table th,
+.oc-table td {
+  white-space: nowrap;
+}
+
+.oc-client {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.oc-id {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.oc-redirect {
+  white-space: nowrap;
+}
+
+.oc-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.oc-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.oc-filter input {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.oc-note {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* "Beta" tag next to the page title and its sidebar entry. Defined here but
+   used by AdminDashboard.tsx; this file is always bundled with it. */
+.oc-beta {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.5;
+  vertical-align: middle;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 999px;
+}

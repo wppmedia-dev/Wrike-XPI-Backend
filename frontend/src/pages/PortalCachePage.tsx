@@ -9,7 +9,7 @@ import {
   type PortalCacheEntry,
 } from "../lib/portalCacheApi";
 import { CacheTable } from "../components/CacheTable";
-import { PageInfo } from "../components/ui/PageInfo";
+import { PageHeader } from "../components/ui/PageHeader";
 import { PORTAL_HELP } from "../lib/pageHelp";
 import { confirmDanger, escHtml, toast } from "../lib/notify";
 import "./PortalCachePage.css";
@@ -194,27 +194,29 @@ export default function PortalCachePage({ active, canDelete }: Props) {
 
   return (
     <>
-      <div className="section-header">
-        <div>
-          <div className="section-title">
-            Cache Settings <PageInfo help={PORTAL_HELP.cache} />
-          </div>
-          <div className="section-subtitle">
-            {canDelete
-              ? "Manage cache keys and inspect Redis data"
-              : "Read-only view of cached Redis keys"}
-          </div>
-        </div>
-        {canDelete && (
-          <button
-            className="btn btn-danger"
-            disabled={cacheAllCount === 0 || bulkDeleting}
-            onClick={handleBulkDelete}
-          >
-            <i className="fa-solid fa-trash" /> {bulkDeleteLabel}
-          </button>
-        )}
-      </div>
+      <PageHeader
+        page="cache"
+        title="Cache Settings"
+        description={
+          canDelete
+            ? "Manage cache keys and inspect Redis data"
+            : "Read-only view of cached Redis keys"
+        }
+        help={PORTAL_HELP.cache}
+        actions={
+          canDelete ? (
+            <button
+              className="btn btn-danger"
+              disabled={cacheAllCount === 0 || bulkDeleting}
+              onClick={handleBulkDelete}
+              title={bulkDeleteLabel}
+            >
+              <i className="fa-solid fa-trash" />
+              <span className="btn-text">{bulkDeleteLabel}</span>
+            </button>
+          ) : undefined
+        }
+      />
 
       <div className="card">
         <div className="card-body">

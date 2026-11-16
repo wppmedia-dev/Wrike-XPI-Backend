@@ -70,6 +70,40 @@ const PUBLIC_ROUTES = [
 const BODYLESS_WRITES = [
   // A session ends by presenting the token being ended, nothing more.
   { file: "admin/auth/index.js", method: "POST", path: "/logout" },
+  // Revoking and disconnecting are addressed entirely by the :id in the path;
+  // there is no payload.
+  {
+    file: "admin/oauthClients/index.js",
+    method: "POST",
+    path: "/:id/revoke",
+  },
+  {
+    file: "admin/oauthClients/index.js",
+    method: "POST",
+    path: "/:id/disconnect",
+  },
+  // Running a sync names its source in the path and takes no payload.
+  {
+    file: "admin/sync/index.js",
+    method: "POST",
+    path: "/:source/run",
+  },
+  {
+    file: "portal/sync/index.js",
+    method: "POST",
+    path: "/:source/run",
+  },
+  // The portal's copies of the same two actions.
+  {
+    file: "portal/oauthClients/index.js",
+    method: "POST",
+    path: "/:id/revoke",
+  },
+  {
+    file: "portal/oauthClients/index.js",
+    method: "POST",
+    path: "/:id/disconnect",
+  },
   // Both generate a username and password server-side; the body is empty.
   {
     file: "admin/users/index.js",

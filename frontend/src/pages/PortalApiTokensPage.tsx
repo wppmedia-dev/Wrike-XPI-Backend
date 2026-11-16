@@ -16,7 +16,7 @@ import {
   type PortalApiToken,
 } from "../lib/portalApiTokensApi";
 import type { AdminToken, TokenListQuery } from "../lib/tokenPermissionsApi";
-import { PageInfo } from "../components/ui/PageInfo";
+import { PageHeader } from "../components/ui/PageHeader";
 import { PORTAL_HELP } from "../lib/pageHelp";
 import TokenPermissions, { type TokenPermissionsApi } from "./TokenPermissions";
 
@@ -225,16 +225,12 @@ export default function PortalApiTokensPage({
 
   return (
     <>
-      <div className="section-header">
-        <div>
-          <div className="section-title">
-            Sessions <PageInfo help={PORTAL_HELP.apiTokens} />
-          </div>
-          <div className="section-subtitle">
-            Tokens issued for your environments
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        page="api-tokens"
+        title="Sessions"
+        description="Tokens issued for your environments"
+        help={PORTAL_HELP.apiTokens}
+      />
 
       <div className="card">
         <div className="card-body">
