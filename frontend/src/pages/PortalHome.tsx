@@ -22,6 +22,11 @@ import { PageHeader, TopbarProvider, useTopbar } from "../components/ui/PageHead
 import { useHashPage } from "../lib/useHashPage";
 import EnvBadge from "../components/EnvBadge";
 import WrikeEndpointPreview from "../components/WrikeEndpointPreview";
+import McpLifetimeFields, {
+  emptyLifetime,
+  lifetimeFromSeconds,
+  lifetimeToSeconds,
+} from "../components/McpLifetimeFields";
 import BuildTag from "../components/BuildTag";
 import PortalActivityPage from "./PortalActivityPage";
 import PortalCachePage from "./PortalCachePage";
@@ -201,6 +206,9 @@ const EMPTY_FORM = {
   xpiSpaceName: "",
   campaignSpace: "",
   wrikeApiHost: "",
+  // Per-environment MCP token lifetimes; a blank amount inherits the global value.
+  mcpAccess: emptyLifetime("hours"),
+  mcpRefresh: emptyLifetime("days"),
   active: true,
   visible: true,
 };
@@ -222,6 +230,8 @@ function formFromEnv(env: PortalEnvironmentFull): EnvForm {
     xpiSpaceName: env.xpi_space_name_datahub_id || "",
     campaignSpace: env.campaign_space_id || "",
     wrikeApiHost: env.wrike_api_host || "",
+    mcpAccess: lifetimeFromSeconds(env.mcp_access_token_ttl_seconds, "hours"),
+    mcpRefresh: lifetimeFromSeconds(env.mcp_refresh_token_ttl_seconds, "days"),
     active: !!env.is_active,
     visible: !!env.is_visible,
   };
@@ -289,6 +299,11 @@ export default function PortalHome() {
   // Environments page, so it is only reachable alongside environments:read.
   const canSeeEnvironmentModules = can("environment_modules", "read");
   const canUpdateEnvironmentModules = can("environment_modules", "update");
+  // Per-environment MCP token lifetimes. Update implies read (the server does
+  // the same), so a user who may change them always sees the current values.
+  const canEditMcpLifetimes = can("environment_token_lifetimes", "update");
+  const canSeeMcpLifetimes =
+    canEditMcpLifetimes || can("environment_token_lifetimes", "read");
 
   /** A portal user can legitimately be created with nothing granted; the
       shell then has no page to show, so it says so instead of rendering an
@@ -529,6 +544,24 @@ export default function PortalHome() {
     if (!xpiSpaceName) return toast("XPI Space Name Datahub ID is required", "warning");
     if (!campaignSpace) return toast("Campaign Space ID is required", "warning");
 
+    // Only sent by a user granted environment_token_lifetimes:update; the
+    // server refuses them from anyone else, and a user without the grant has
+    // not been shown the stored values to round-trip anyway.
+    let lifetimeInput: Pick<
+      PortalEnvironmentInput,
+      "mcp_access_token_ttl_seconds" | "mcp_refresh_token_ttl_seconds"
+    > = {};
+    if (canEditMcpLifetimes) {
+      try {
+        lifetimeInput = {
+          mcp_access_token_ttl_seconds: lifetimeToSeconds(form.mcpAccess, "Access token lifetime"),
+          mcp_refresh_token_ttl_seconds: lifetimeToSeconds(form.mcpRefresh, "Refresh token lifetime"),
+        };
+      } catch (err) {
+        return toast((err as Error).message, "warning");
+      }
+    }
+
     setSaving(true);
     try {
       const input: PortalEnvironmentInput = {
@@ -545,6 +578,7 @@ export default function PortalHome() {
         xpi_space_name_datahub_id: xpiSpaceName,
         campaign_space_id: campaignSpace,
         wrike_api_host: form.wrikeApiHost.trim(),
+        ...lifetimeInput,
         is_active: form.active,
         is_visible: form.visible,
       };
@@ -1517,6 +1551,17 @@ export default function PortalHome() {
               />
               <WrikeEndpointPreview host={form.wrikeApiHost} />
             </div>
+
+            {canSeeMcpLifetimes && (
+              <McpLifetimeFields
+                idPrefix="envModal"
+                access={form.mcpAccess}
+                refresh={form.mcpRefresh}
+                readOnly={!canEditMcpLifetimes}
+                onAccessChange={(next) => setField("mcpAccess", next)}
+                onRefreshChange={(next) => setField("mcpRefresh", next)}
+              />
+            )}
 
             <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "8px 0 14px" }} />
             <div className="toggle-row">

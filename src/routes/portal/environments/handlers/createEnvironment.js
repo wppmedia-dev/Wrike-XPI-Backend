@@ -2,6 +2,11 @@ import { WrikeCredentials, PortalAuth } from "../../../../controllers";
 import { encryptField } from "../../../../utils/crypto";
 import { syncWrikeCredentialsFromDB } from "../../../../utils/wrikeCredentials";
 import { normalizeWrikeApiHost } from "../../../../utils/wrikeEndpoint";
+import { validateEnvironmentMcpLifetimes } from "../../../../utils/mcpTokenSettings";
+import {
+  mcpLifetimeAccessFor,
+  forbidMcpLifetimeChange,
+} from "../../../../utils/mcpLifetimeAccess";
 
 export const CreateEnvironment = (portalUser, body) => {
   return new Promise(async (resolve, reject) => {
@@ -20,9 +25,21 @@ export const CreateEnvironment = (portalUser, body) => {
         xpi_space_name_datahub_id,
         campaign_space_id,
         wrike_api_host,
+        mcp_access_token_ttl_seconds,
+        mcp_refresh_token_ttl_seconds,
         is_active,
         is_visible,
       } = body;
+
+      // Its own grant (environment_token_lifetimes:update), not part of
+      // environments:create: a lifetime is a security setting.
+      if (
+        (mcp_access_token_ttl_seconds !== undefined ||
+          mcp_refresh_token_ttl_seconds !== undefined) &&
+        !(await mcpLifetimeAccessFor(portalUser)).update
+      ) {
+        return reject(forbidMcpLifetimeChange());
+      }
 
       if (!environment_name || !environment_name.trim())
         return reject({
@@ -84,6 +101,10 @@ export const CreateEnvironment = (portalUser, body) => {
         });
 
       const apiHost = normalizeWrikeApiHost(wrike_api_host);
+      const mcpLifetimes = await validateEnvironmentMcpLifetimes({
+        accessTtlSeconds: mcp_access_token_ttl_seconds,
+        refreshTtlSeconds: mcp_refresh_token_ttl_seconds,
+      });
 
       const data = {
         environment_name: environment_name.trim(),
@@ -101,6 +122,7 @@ export const CreateEnvironment = (portalUser, body) => {
         xpi_space_name_datahub_id: xpi_space_name_datahub_id.trim(),
         campaign_space_id: campaign_space_id.trim(),
         wrike_api_host: apiHost,
+        ...mcpLifetimes,
         is_active: is_active !== undefined ? Boolean(is_active) : true,
         is_visible: is_visible !== undefined ? Boolean(is_visible) : true,
       };

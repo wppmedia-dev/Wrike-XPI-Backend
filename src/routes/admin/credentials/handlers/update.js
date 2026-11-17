@@ -2,6 +2,10 @@ import { encryptField, decryptField } from "../../../../utils/crypto";
 import { syncWrikeCredentialsFromDB } from "../../../../utils/wrikeCredentials";
 import { WrikeCredentials } from "../../../../controllers";
 import { normalizeWrikeApiHost } from "../../../../utils/wrikeEndpoint";
+import {
+  validateEnvironmentMcpLifetimes,
+  invalidateEnvironmentMcpLifetimes,
+} from "../../../../utils/mcpTokenSettings";
 
 export const Update = (profile_id, { id }, body) => {
   return new Promise(async (resolve, reject) => {
@@ -20,6 +24,8 @@ export const Update = (profile_id, { id }, body) => {
         xpi_space_name_datahub_id,
         campaign_space_id,
         wrike_api_host,
+        mcp_access_token_ttl_seconds,
+        mcp_refresh_token_ttl_seconds,
         is_visible,
         is_active,
       } = body;
@@ -37,6 +43,17 @@ export const Update = (profile_id, { id }, body) => {
         });
 
       const apiHost = normalizeWrikeApiHost(wrike_api_host);
+
+      // Only touched when the request carries them, so a client that does not
+      // know about these fields cannot wipe an environment's overrides.
+      const mcpLifetimes =
+        mcp_access_token_ttl_seconds !== undefined ||
+        mcp_refresh_token_ttl_seconds !== undefined
+          ? await validateEnvironmentMcpLifetimes({
+              accessTtlSeconds: mcp_access_token_ttl_seconds,
+              refreshTtlSeconds: mcp_refresh_token_ttl_seconds,
+            })
+          : {};
 
       const credential = await WrikeCredentials.GetById(id);
       if (!credential)
@@ -63,6 +80,7 @@ export const Update = (profile_id, { id }, body) => {
         xpi_space_name_datahub_id: xpi_space_name_datahub_id || null,
         campaign_space_id: campaign_space_id || null,
         wrike_api_host: apiHost,
+        ...mcpLifetimes,
       };
       if (client_id) {
         const currentClientId = credential.client_id
@@ -84,6 +102,7 @@ export const Update = (profile_id, { id }, body) => {
       const updated = await WrikeCredentials.Update(profile_id, id, updates);
 
       await syncWrikeCredentialsFromDB();
+      invalidateEnvironmentMcpLifetimes(id);
 
       let message = "Credential updated successfully";
       let statusCode = 200;

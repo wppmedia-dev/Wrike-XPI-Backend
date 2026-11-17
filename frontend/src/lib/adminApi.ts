@@ -21,6 +21,9 @@ export interface AdminEnvironment {
   campaign_space_id: string;
   /** Wrike API host for this environment; empty means the server default (app-eu.wrike.com). */
   wrike_api_host: string;
+  /** Per-environment MCP token lifetimes in seconds; null uses the global value. */
+  mcp_access_token_ttl_seconds: number | null;
+  mcp_refresh_token_ttl_seconds: number | null;
   is_active: boolean;
   is_visible: boolean;
   /** Gate 1 master switch — email/domain/IP allow list. */
@@ -57,6 +60,9 @@ export interface EnvironmentPayload {
   xpi_space_name_datahub_id?: string;
   campaign_space_id?: string;
   wrike_api_host?: string;
+  /** Seconds, or null to inherit the global lifetime. */
+  mcp_access_token_ttl_seconds?: number | null;
+  mcp_refresh_token_ttl_seconds?: number | null;
   is_visible: boolean;
   is_active: boolean;
 }
@@ -98,6 +104,8 @@ export const listEnvironments = async (
       xpi_space_name_datahub_id: c.xpi_space_name_datahub_id || "",
       campaign_space_id: c.campaign_space_id || "",
       wrike_api_host: c.wrike_api_host || "",
+      mcp_access_token_ttl_seconds: c.mcp_access_token_ttl_seconds ?? null,
+      mcp_refresh_token_ttl_seconds: c.mcp_refresh_token_ttl_seconds ?? null,
       is_active: !!c.is_active,
       is_visible: !!c.is_visible,
       allowlist_check_enabled: c.allowlist_check_enabled !== false,

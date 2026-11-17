@@ -105,6 +105,18 @@ module.exports = (sequelize, DataTypes) => {
         comment:
           "Wrike API host for this environment (e.g. https://app-us.wrike.com). Null falls back to WRIKE_ENDPOINT",
       },
+      mcp_access_token_ttl_seconds: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment:
+          "Override of the global MCP access token lifetime for this environment. Null uses the global value",
+      },
+      mcp_refresh_token_ttl_seconds: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment:
+          "Override of the global MCP refresh token lifetime for this environment. Null uses the global value",
+      },
       is_visible: {
         type: DataTypes.BOOLEAN,
         defaultValue: true,

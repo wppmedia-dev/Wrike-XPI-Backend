@@ -174,6 +174,9 @@ export interface PortalEnvironmentFull {
   xpi_space_name_datahub_id: string;
   campaign_space_id: string;
   wrike_api_host?: string | null;
+  /** Per-environment MCP token lifetimes in seconds; null uses the global value. */
+  mcp_access_token_ttl_seconds?: number | null;
+  mcp_refresh_token_ttl_seconds?: number | null;
   is_active: boolean;
   is_visible: boolean;
   /** Gate 1 master switch — email/domain/IP allow list. Read by the
@@ -249,6 +252,9 @@ export interface PortalEnvironmentInput {
   xpi_space_name_datahub_id: string;
   campaign_space_id: string;
   wrike_api_host?: string | null;
+  /** Seconds, or null to inherit the global lifetime. */
+  mcp_access_token_ttl_seconds?: number | null;
+  mcp_refresh_token_ttl_seconds?: number | null;
   is_active: boolean;
   is_visible: boolean;
 }

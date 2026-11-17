@@ -61,6 +61,74 @@ export const resolveMcpTokenLifetimes = (stored = {}) => ({
 });
 
 /**
+ * Layer an environment's overrides on top of the global lifetimes. Each field
+ * is independent: an unset (null/undefined) or out-of-bounds override falls
+ * through to the global value. If the merge would leave the refresh token no
+ * longer than the access token (possible when the global value changed after
+ * the override was saved), the overrides are ignored as a whole and the
+ * global pair is used, so a token is never minted with an inverted pair.
+ */
+export const applyEnvironmentOverrides = (global, override = {}) => {
+  const merged = {
+    accessTtlSeconds:
+      toBoundedInt(override?.accessTtlSeconds, MCP_TOKEN_BOUNDS.accessTtlSeconds) ??
+      global.accessTtlSeconds,
+    refreshTtlSeconds:
+      toBoundedInt(override?.refreshTtlSeconds, MCP_TOKEN_BOUNDS.refreshTtlSeconds) ??
+      global.refreshTtlSeconds,
+  };
+  return merged.refreshTtlSeconds > merged.accessTtlSeconds ? merged : global;
+};
+
+/**
+ * Validate an environment's optional overrides. Blank (null, undefined, "")
+ * means "inherit the global value". The pair is checked as it will actually
+ * apply, i.e. against the global value for whichever side is left blank.
+ * Returns { value: { accessTtlSeconds|null, refreshTtlSeconds|null } } or { error }.
+ */
+export const validateEnvironmentLifetimeOverrides = (input = {}, global) => {
+  const blank = (v) => v === null || v === undefined || v === "";
+  const parse = (v, bounds, label) => {
+    if (blank(v)) return { value: null };
+    const n = toBoundedInt(v, bounds);
+    if (n === null) {
+      return {
+        error: `${label} must be a whole number of seconds between ${bounds.min} and ${bounds.max}, or left blank to use the global value`,
+      };
+    }
+    return { value: n };
+  };
+
+  const access = parse(
+    input.accessTtlSeconds,
+    MCP_TOKEN_BOUNDS.accessTtlSeconds,
+    "Access token lifetime",
+  );
+  if (access.error) return { error: access.error };
+  const refresh = parse(
+    input.refreshTtlSeconds,
+    MCP_TOKEN_BOUNDS.refreshTtlSeconds,
+    "Refresh token lifetime",
+  );
+  if (refresh.error) return { error: refresh.error };
+
+  const effectiveAccess = access.value ?? global.accessTtlSeconds;
+  const effectiveRefresh = refresh.value ?? global.refreshTtlSeconds;
+  if (effectiveRefresh <= effectiveAccess) {
+    return {
+      error:
+        "Refresh token lifetime must be longer than the access token's (blank fields use the global value)",
+    };
+  }
+  return {
+    value: {
+      accessTtlSeconds: access.value,
+      refreshTtlSeconds: refresh.value,
+    },
+  };
+};
+
+/**
  * Validate an admin's submission. Unlike resolve, this refuses: a value out of
  * range is an error the admin should see, not something to quietly replace.
  * Returns { value } or { error }.

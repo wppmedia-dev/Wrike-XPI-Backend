@@ -509,7 +509,8 @@ export const oauthRoute = (fastify, opts, done) => {
 
         if (client.claims?.jti) OAuthClients.TouchLastUsed(client.claims.jti);
 
-        const lifetimes = await getMcpTokenLifetimes();
+        // The environment's own lifetimes where set, the global ones otherwise.
+        const lifetimes = await getMcpTokenLifetimes(decoded.environmentId);
         const issued = await McpTokens.Issue({
           tokenId: result.tokenId,
           dek: result.dek,
@@ -540,12 +541,12 @@ export const oauthRoute = (fastify, opts, done) => {
           return reply.code(400).send({ error: "invalid_request" });
         }
 
-        const lifetimes = await getMcpTokenLifetimes();
         let rotated;
         try {
           rotated = await McpTokens.Rotate({
             refreshToken: refresh_token,
-            refreshTtlSeconds: lifetimes.refreshTtlSeconds,
+            // Resolved per environment once the sign-in's family is known.
+            lifetimesFor: getMcpTokenLifetimes,
           });
         } catch (err) {
           if (err?.code === "invalid_grant") {
@@ -570,10 +571,10 @@ export const oauthRoute = (fastify, opts, done) => {
             tokenId: rotated.tokenId,
             familyId: rotated.familyId,
             dek: rotated.dek,
-            ttlSeconds: lifetimes.accessTtlSeconds,
+            ttlSeconds: rotated.accessTtlSeconds,
           }),
           token_type: "Bearer",
-          expires_in: lifetimes.accessTtlSeconds,
+          expires_in: rotated.accessTtlSeconds,
           refresh_token: rotated.refreshToken,
         });
       }

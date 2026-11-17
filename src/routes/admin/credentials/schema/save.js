@@ -29,6 +29,10 @@ export const SaveSchema = {
         xpi_space_name_datahub_id: { type: "string" },
         campaign_space_id: { type: "string" },
         wrike_api_host: { type: "string" },
+        // Optional overrides of the global MCP token lifetimes; null inherits.
+        // Range and ordering are enforced by mcpTokenPolicy, not here.
+        mcp_access_token_ttl_seconds: { type: ["integer", "null"] },
+        mcp_refresh_token_ttl_seconds: { type: ["integer", "null"] },
         is_visible: { type: "boolean" },
       },
     },

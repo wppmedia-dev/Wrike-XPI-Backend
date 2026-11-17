@@ -124,6 +124,23 @@ export const GetById = async (id) => {
   }
 };
 
+// The environment's MCP token lifetime overrides only (null = use the global
+// value). Read on the token endpoint, which needs nothing else about the row.
+export const GetMcpTokenOverrides = async (id) => {
+  if (!id) return null;
+
+  const credential = await models.WrikeCredentials.findOne({
+    attributes: ["mcp_access_token_ttl_seconds", "mcp_refresh_token_ttl_seconds"],
+    where: { id },
+  });
+  if (!credential) return null;
+
+  return {
+    accessTtlSeconds: credential.mcp_access_token_ttl_seconds ?? null,
+    refreshTtlSeconds: credential.mcp_refresh_token_ttl_seconds ?? null,
+  };
+};
+
 // The two API-access security switches only — used by the request-path
 // gate (src/utils/environmentAccess.js), which must never touch a model
 // directly and reads nothing else about the environment.

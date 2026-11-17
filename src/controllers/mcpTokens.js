@@ -98,7 +98,11 @@ export const Issue = async ({ tokenId, dek, refreshTtlSeconds, clientId = null }
  *
  * Resolves { familyId, tokenId, dek, refreshToken, refreshExpiresAt }.
  */
-export const Rotate = async ({ refreshToken, refreshTtlSeconds }) => {
+export const Rotate = async ({
+  refreshToken,
+  refreshTtlSeconds,
+  lifetimesFor,
+}) => {
   if (typeof refreshToken !== "string" || !refreshToken) throw invalidGrant();
 
   const tokenHash = crypto.hashRefreshToken(refreshToken);
@@ -134,7 +138,23 @@ export const Rotate = async ({ refreshToken, refreshTtlSeconds }) => {
 
     const dek = crypto.unwrapDekForRefreshToken(row.wrapped_dek, refreshToken);
     const nextToken = crypto.generateRefreshToken();
-    const expiresAt = expiryFrom(now, refreshTtlSeconds);
+
+    // The lifetimes depend on the environment the sign-in belongs to, which
+    // is only known once the family is found. `lifetimesFor` (cached, and
+    // never throws for a missing override) supplies both; otherwise the
+    // caller's single refresh TTL is used as before.
+    let refreshTtl = refreshTtlSeconds;
+    let accessTtlSeconds;
+    if (typeof lifetimesFor === "function") {
+      const tokenRow = await models.UserTokens.findByPk(family.token_id, {
+        attributes: ["env_id"],
+        transaction,
+      });
+      const lifetimes = await lifetimesFor(tokenRow?.env_id ?? null);
+      refreshTtl = lifetimes.refreshTtlSeconds;
+      accessTtlSeconds = lifetimes.accessTtlSeconds;
+    }
+    const expiresAt = expiryFrom(now, refreshTtl);
 
     await models.McpRefreshTokens.create(
       {
@@ -155,6 +175,7 @@ export const Rotate = async ({ refreshToken, refreshTtlSeconds }) => {
       dek,
       refreshToken: nextToken,
       refreshExpiresAt: expiresAt,
+      accessTtlSeconds,
     };
   });
 

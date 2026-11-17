@@ -82,6 +82,22 @@ export const MODULES = [
     actions: ["read", "update"],
   },
   {
+    key: "environment_token_lifetimes",
+    label: "MCP Token Lifetimes",
+    description:
+      "The per-environment override of how long MCP access and refresh tokens live (blank uses the global value). Shown in the environment form, so it is worth granting alongside Environments.",
+    // Two actions, matching the two things the feature does: read shows an
+    // environment's override values, update sets or clears them.
+    //
+    // Its own module rather than a wider `environments` grant: token lifetimes
+    // are a security setting (a long refresh lifetime keeps a stolen token
+    // useful for longer), so being allowed to edit an environment's credentials
+    // must not silently include being allowed to change them. No create or
+    // delete: the override is two optional fields on an environment, so there is
+    // nothing to add or remove on its own.
+    actions: ["read", "update"],
+  },
+  {
     key: "activity_logs",
     label: "Activity Logs",
     description:

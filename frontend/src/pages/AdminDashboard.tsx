@@ -62,6 +62,12 @@ import {
 } from "../components/TokensTable";
 import EnvBadge from "../components/EnvBadge";
 import WrikeEndpointPreview from "../components/WrikeEndpointPreview";
+import McpLifetimeFields, {
+  emptyLifetime,
+  lifetimeFromSeconds,
+  lifetimeToSeconds,
+  type LifetimeField,
+} from "../components/McpLifetimeFields";
 import BuildTag from "../components/BuildTag";
 import { CopyButton } from "../components/ui/CopyButton";
 import { ADMIN_HELP } from "../lib/pageHelp";
@@ -127,6 +133,9 @@ interface EnvFormState {
   xpi_space_name_datahub_id: string;
   campaign_space_id: string;
   wrike_api_host: string;
+  /** Per-environment MCP token lifetimes; a blank amount inherits the global value. */
+  mcp_access: LifetimeField;
+  mcp_refresh: LifetimeField;
   is_visible: boolean;
   is_active: boolean;
 }
@@ -145,6 +154,8 @@ const EMPTY_ENV_FORM: EnvFormState = {
   xpi_space_name_datahub_id: "",
   campaign_space_id: "",
   wrike_api_host: "",
+  mcp_access: emptyLifetime("hours"),
+  mcp_refresh: emptyLifetime("days"),
   is_visible: true,
   is_active: true,
 };
@@ -164,6 +175,8 @@ function envToForm(env: AdminEnvironment): EnvFormState {
     xpi_space_name_datahub_id: env.xpi_space_name_datahub_id,
     campaign_space_id: env.campaign_space_id,
     wrike_api_host: env.wrike_api_host,
+    mcp_access: lifetimeFromSeconds(env.mcp_access_token_ttl_seconds, "hours"),
+    mcp_refresh: lifetimeFromSeconds(env.mcp_refresh_token_ttl_seconds, "days"),
     is_visible: env.is_visible,
     is_active: env.is_active,
   };
@@ -464,9 +477,24 @@ export default function AdminDashboard() {
       return toast("XPI Space Name Datahub ID is required", "error");
     if (!trimmed.campaign_space_id) return toast("Campaign Space ID is required", "error");
 
+    let mcpAccessSeconds: number | null;
+    let mcpRefreshSeconds: number | null;
+    try {
+      mcpAccessSeconds = lifetimeToSeconds(f.mcp_access, "Access token lifetime");
+      mcpRefreshSeconds = lifetimeToSeconds(f.mcp_refresh, "Refresh token lifetime");
+    } catch (err: any) {
+      return toast(err.message, "error");
+    }
+
     setEnvSaving(true);
     try {
-      const payload = { ...trimmed, is_visible: f.is_visible, is_active: f.is_active };
+      const payload = {
+        ...trimmed,
+        mcp_access_token_ttl_seconds: mcpAccessSeconds,
+        mcp_refresh_token_ttl_seconds: mcpRefreshSeconds,
+        is_visible: f.is_visible,
+        is_active: f.is_active,
+      };
       const result = editingId
         ? await updateEnvironment(editingId, payload)
         : await createEnvironment(payload);
@@ -2711,6 +2739,14 @@ export default function AdminDashboard() {
                 />
                 <WrikeEndpointPreview host={envForm.wrike_api_host} />
               </div>
+
+              <McpLifetimeFields
+                idPrefix="env"
+                access={envForm.mcp_access}
+                refresh={envForm.mcp_refresh}
+                onAccessChange={(next) => setEnvForm((f) => ({ ...f, mcp_access: next }))}
+                onRefreshChange={(next) => setEnvForm((f) => ({ ...f, mcp_refresh: next }))}
+              />
 
               <hr className="form-divider" />
 

@@ -2,6 +2,14 @@ import { WrikeCredentials } from "../../../../controllers";
 import { encryptField, decryptField } from "../../../../utils/crypto";
 import { syncWrikeCredentialsFromDB } from "../../../../utils/wrikeCredentials";
 import { normalizeWrikeApiHost } from "../../../../utils/wrikeEndpoint";
+import {
+  validateEnvironmentMcpLifetimes,
+  invalidateEnvironmentMcpLifetimes,
+} from "../../../../utils/mcpTokenSettings";
+import {
+  mcpLifetimeAccessFor,
+  forbidMcpLifetimeChange,
+} from "../../../../utils/mcpLifetimeAccess";
 
 export const UpdateEnvironment = (portalUser, id, body) => {
   return new Promise(async (resolve, reject) => {
@@ -43,6 +51,8 @@ export const UpdateEnvironment = (portalUser, id, body) => {
         xpi_space_name_datahub_id,
         campaign_space_id,
         wrike_api_host,
+        mcp_access_token_ttl_seconds,
+        mcp_refresh_token_ttl_seconds,
         is_active,
         is_visible,
       } = body;
@@ -110,6 +120,31 @@ export const UpdateEnvironment = (portalUser, id, body) => {
         updateData.campaign_space_id = campaign_space_id || null;
       if (wrike_api_host !== undefined)
         updateData.wrike_api_host = normalizeWrikeApiHost(wrike_api_host);
+      if (
+        mcp_access_token_ttl_seconds !== undefined ||
+        mcp_refresh_token_ttl_seconds !== undefined
+      ) {
+        // Its own grant (environment_token_lifetimes:update), not part of
+        // environments:update: a lifetime is a security setting.
+        if (!(await mcpLifetimeAccessFor(portalUser)).update) {
+          return reject(forbidMcpLifetimeChange());
+        }
+        // An omitted side keeps its stored value; null/blank clears it back to
+        // the global default. Validated as the pair that will actually apply.
+        Object.assign(
+          updateData,
+          await validateEnvironmentMcpLifetimes({
+            accessTtlSeconds:
+              mcp_access_token_ttl_seconds !== undefined
+                ? mcp_access_token_ttl_seconds
+                : env.mcp_access_token_ttl_seconds,
+            refreshTtlSeconds:
+              mcp_refresh_token_ttl_seconds !== undefined
+                ? mcp_refresh_token_ttl_seconds
+                : env.mcp_refresh_token_ttl_seconds,
+          }),
+        );
+      }
       if (is_active !== undefined) updateData.is_active = Boolean(is_active);
       if (is_visible !== undefined) updateData.is_visible = Boolean(is_visible);
 
@@ -121,6 +156,7 @@ export const UpdateEnvironment = (portalUser, id, body) => {
       // The beforeUpdate hook still sets updated_at = new Date() properly
       await WrikeCredentials.Update(null, id, updateData);
       await syncWrikeCredentialsFromDB();
+      invalidateEnvironmentMcpLifetimes(id);
 
       return resolve({
         statusCode: 200,

@@ -120,6 +120,86 @@ check(
   true,
 );
 
+section("Per-environment overrides");
+
+const G = { accessTtlSeconds: 3600, refreshTtlSeconds: 7 * 86400 };
+const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+check(
+  "no override resolves to the global pair",
+  eq(policy.applyEnvironmentOverrides(G, {}), G),
+  true,
+);
+check(
+  "null overrides resolve to the global pair",
+  eq(
+    policy.applyEnvironmentOverrides(G, {
+      accessTtlSeconds: null,
+      refreshTtlSeconds: null,
+    }),
+    G,
+  ),
+  true,
+);
+check(
+  "an access-only override leaves refresh global",
+  eq(policy.applyEnvironmentOverrides(G, { accessTtlSeconds: 900 }), {
+    accessTtlSeconds: 900,
+    refreshTtlSeconds: 7 * 86400,
+  }),
+  true,
+);
+check(
+  "a refresh-only override leaves access global",
+  eq(policy.applyEnvironmentOverrides(G, { refreshTtlSeconds: 86400 }), {
+    accessTtlSeconds: 3600,
+    refreshTtlSeconds: 86400,
+  }),
+  true,
+);
+check(
+  "an out-of-bounds override falls back to global",
+  eq(policy.applyEnvironmentOverrides(G, { accessTtlSeconds: 10 }), G),
+  true,
+);
+check(
+  "an override that inverts the pair against a changed global is ignored",
+  eq(
+    policy.applyEnvironmentOverrides(
+      { accessTtlSeconds: 3600, refreshTtlSeconds: 7200 },
+      { accessTtlSeconds: 86400 },
+    ),
+    { accessTtlSeconds: 3600, refreshTtlSeconds: 7200 },
+  ),
+  true,
+);
+
+const okEnv = policy.validateEnvironmentLifetimeOverrides(
+  { accessTtlSeconds: 900, refreshTtlSeconds: "" },
+  G,
+);
+check("blank refresh is stored as null", okEnv.value?.refreshTtlSeconds, null);
+check("a set access is kept", okEnv.value?.accessTtlSeconds, 900);
+check(
+  "both blank is valid (fully inherits)",
+  !!policy.validateEnvironmentLifetimeOverrides({}, G).value,
+  true,
+);
+check(
+  "an out-of-range override is refused",
+  !!policy.validateEnvironmentLifetimeOverrides({ accessTtlSeconds: 60 }, G)
+    .error,
+  true,
+);
+check(
+  "an override longer than the inherited refresh is refused",
+  !!policy.validateEnvironmentLifetimeOverrides(
+    { accessTtlSeconds: 86400 },
+    { accessTtlSeconds: 3600, refreshTtlSeconds: 7200 },
+  ).error,
+  true,
+);
+
 /* ── 2. Crypto ──────────────────────────────────────────────────────────── */
 
 section("Refresh token crypto");

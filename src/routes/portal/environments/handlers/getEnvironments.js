@@ -2,6 +2,7 @@ import { decryptField } from "../../../../utils/crypto";
 import { scopedEnvironmentsFor } from "../../../../utils/portalScope";
 import { EnvironmentModulePermissions } from "../../../../controllers";
 import { summarisePermissions } from "../../../../utils/tokenPermissionSummary";
+import { mcpLifetimeAccessFor } from "../../../../utils/mcpLifetimeAccess";
 
 export const GetMyEnvironments = (portalUser) => {
   return new Promise(async (resolve, reject) => {
@@ -19,6 +20,12 @@ export const GetMyEnvironments = (portalUser) => {
         await EnvironmentModulePermissions.GetMatrixForEnvironments(
           (environments || []).map((env) => env.id),
         );
+
+      // The override values are only sent to a user granted
+      // environment_token_lifetimes:read (or :update). Left out, not nulled:
+      // null already means "uses the global value", which would be a false
+      // statement about an environment whose override simply is not shown.
+      const lifetimeAccess = await mcpLifetimeAccessFor(portalUser);
 
       const data = (environments || []).map((env) => ({
         id: env.id,
@@ -39,6 +46,12 @@ export const GetMyEnvironments = (portalUser) => {
         xpi_space_name_datahub_id: env.xpi_space_name_datahub_id || null,
         campaign_space_id: env.campaign_space_id || null,
         wrike_api_host: env.wrike_api_host || null,
+        ...(lifetimeAccess.read && {
+          mcp_access_token_ttl_seconds:
+            env.mcp_access_token_ttl_seconds ?? null,
+          mcp_refresh_token_ttl_seconds:
+            env.mcp_refresh_token_ttl_seconds ?? null,
+        }),
         is_active: env.is_active,
         is_visible: env.is_visible,
         // Read by the portal's environment-access drawer (EnvironmentAccess

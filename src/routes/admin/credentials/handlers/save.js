@@ -2,6 +2,7 @@ import { encryptField, decryptField } from "../../../../utils/crypto";
 import { syncWrikeCredentialsFromDB } from "../../../../utils/wrikeCredentials";
 import { WrikeCredentials } from "../../../../controllers";
 import { normalizeWrikeApiHost } from "../../../../utils/wrikeEndpoint";
+import { validateEnvironmentMcpLifetimes } from "../../../../utils/mcpTokenSettings";
 
 export const Save = (body) => {
   return new Promise(async (resolve, reject) => {
@@ -21,6 +22,8 @@ export const Save = (body) => {
         xpi_space_name_datahub_id,
         campaign_space_id,
         wrike_api_host,
+        mcp_access_token_ttl_seconds,
+        mcp_refresh_token_ttl_seconds,
         is_visible,
         is_active,
       } = body;
@@ -38,6 +41,10 @@ export const Save = (body) => {
         });
 
       const apiHost = normalizeWrikeApiHost(wrike_api_host);
+      const mcpLifetimes = await validateEnvironmentMcpLifetimes({
+        accessTtlSeconds: mcp_access_token_ttl_seconds,
+        refreshTtlSeconds: mcp_refresh_token_ttl_seconds,
+      });
 
       const existing = await WrikeCredentials.GetByType(environment_name);
       if (existing)
@@ -62,6 +69,7 @@ export const Save = (body) => {
         xpi_space_name_datahub_id: xpi_space_name_datahub_id || null,
         campaign_space_id: campaign_space_id || null,
         wrike_api_host: apiHost,
+        ...mcpLifetimes,
         is_visible: is_visible !== undefined ? is_visible : true,
         is_active: is_active !== undefined ? is_active : true,
       });
@@ -97,6 +105,8 @@ const formatCredential = (cred) => ({
   xpi_space_name_datahub_id: cred.xpi_space_name_datahub_id || null,
   campaign_space_id: cred.campaign_space_id || null,
   wrike_api_host: cred.wrike_api_host || null,
+  mcp_access_token_ttl_seconds: cred.mcp_access_token_ttl_seconds ?? null,
+  mcp_refresh_token_ttl_seconds: cred.mcp_refresh_token_ttl_seconds ?? null,
   is_active: cred.is_active,
   is_visible: cred.is_visible,
 });
