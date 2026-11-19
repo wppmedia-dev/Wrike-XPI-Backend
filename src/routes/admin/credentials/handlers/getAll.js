@@ -59,6 +59,7 @@ export const GetAll = ({ search } = {}) => {
         module_permissions: summarisePermissions(matrices[cred.id]),
         is_active: cred.is_active,
         is_visible: cred.is_visible,
+        xtend_tools_enabled: cred.xtend_tools_enabled !== false,
         allowlist_check_enabled: cred.allowlist_check_enabled,
         custom_field_check_enabled: cred.custom_field_check_enabled,
         created_at: cred.created_at,

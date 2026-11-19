@@ -55,6 +55,7 @@ export const UpdateEnvironment = (portalUser, id, body) => {
         mcp_refresh_token_ttl_seconds,
         is_active,
         is_visible,
+        xtend_tools_enabled,
       } = body;
 
       const updateData = {};
@@ -147,6 +148,8 @@ export const UpdateEnvironment = (portalUser, id, body) => {
       }
       if (is_active !== undefined) updateData.is_active = Boolean(is_active);
       if (is_visible !== undefined) updateData.is_visible = Boolean(is_visible);
+      if (xtend_tools_enabled !== undefined)
+        updateData.xtend_tools_enabled = Boolean(xtend_tools_enabled);
 
       if (!Object.keys(updateData).length) {
         return reject({ statusCode: 400, message: "No fields to update" });

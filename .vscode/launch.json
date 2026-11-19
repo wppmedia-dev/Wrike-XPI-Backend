@@ -12,29 +12,37 @@
       "type": "node"
     },
     {
+      // Same command as `npm run dev`: Node's built-in watcher restarts on
+      // changes under src/ (replaces nodemon), @babel/register compiles on the
+      // fly (replaces babel-node). The debugger re-attaches after each restart.
       "type": "node",
       "request": "launch",
       "name": "Launch",
       "skipFiles": ["<node_internals>/**"],
-      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/nodemon",
+      "runtimeExecutable": "node",
       "runtimeArgs": [
-        "--exec",
-        "babel-node",
-        "--",
-        "${workspaceFolder}/src/index.js"
+        "--watch-path=src",
+        "--max-old-space-size=4096",
+        "-r",
+        "@babel/register"
       ],
+      "program": "${workspaceFolder}/src/index.js",
       "sourceMaps": true,
-      "cwd": "${workspaceFolder}"
-      // "console": "integratedTerminal"
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
     },
     {
+      // No restart on change — steadier when stepping through code.
       "type": "node",
       "request": "launch",
-      "name": "Launch with babel",
-      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/babel-node",
-      "runtimeArgs": ["${workspaceFolder}/src"],
+      "name": "Launch (no watch)",
+      "skipFiles": ["<node_internals>/**"],
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--max-old-space-size=4096", "-r", "@babel/register"],
+      "program": "${workspaceFolder}/src/index.js",
       "sourceMaps": true,
-      "cwd": "${workspaceFolder}"
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
     }
   ]
 }

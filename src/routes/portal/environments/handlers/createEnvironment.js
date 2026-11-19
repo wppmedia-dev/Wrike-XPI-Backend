@@ -29,6 +29,7 @@ export const CreateEnvironment = (portalUser, body) => {
         mcp_refresh_token_ttl_seconds,
         is_active,
         is_visible,
+        xtend_tools_enabled,
       } = body;
 
       // Its own grant (environment_token_lifetimes:update), not part of
@@ -53,52 +54,8 @@ export const CreateEnvironment = (portalUser, body) => {
           statusCode: 400,
           message: "Client Secret is required",
         });
-      if (!xpi_api_modules_datahub_id || !xpi_api_modules_datahub_id.trim())
-        return reject({
-          statusCode: 400,
-          message: "XPI API Modules Datahub ID is required",
-        });
-      if (!xpi_api_services_datahub_id || !xpi_api_services_datahub_id.trim())
-        return reject({
-          statusCode: 400,
-          message: "XPI API Services Datahub ID is required",
-        });
-      if (!xpi_entity_datahub_id || !xpi_entity_datahub_id.trim())
-        return reject({
-          statusCode: 400,
-          message: "XPI Entity Datahub ID is required",
-        });
-      if (!xpi_field_mapping_datahub_id || !xpi_field_mapping_datahub_id.trim())
-        return reject({
-          statusCode: 400,
-          message: "XPI Field Mapping Datahub ID is required",
-        });
-      if (
-        !xpi_request_form_field_mapping_datahub_id ||
-        !xpi_request_form_field_mapping_datahub_id.trim()
-      )
-        return reject({
-          statusCode: 400,
-          message: "XPI Request Form Field Mapping Datahub ID is required",
-        });
-      if (
-        !xpi_request_form_mapping_datahub_id ||
-        !xpi_request_form_mapping_datahub_id.trim()
-      )
-        return reject({
-          statusCode: 400,
-          message: "XPI Request Form Mapping Datahub ID is required",
-        });
-      if (!xpi_space_name_datahub_id || !xpi_space_name_datahub_id.trim())
-        return reject({
-          statusCode: 400,
-          message: "XPI Space Name Datahub ID is required",
-        });
-      if (!campaign_space_id || !campaign_space_id.trim())
-        return reject({
-          statusCode: 400,
-          message: "Campaign Space ID is required",
-        });
+      // The xpi_*_datahub_id fields and campaign_space_id are optional; a blank one
+      // is stored as null.
 
       const apiHost = normalizeWrikeApiHost(wrike_api_host);
       const mcpLifetimes = await validateEnvironmentMcpLifetimes({
@@ -111,20 +68,24 @@ export const CreateEnvironment = (portalUser, body) => {
         client_id: encryptField(client_id.trim()),
         client_secret: encryptField(client_secret.trim()),
         account_id: account_id ? account_id.trim() : null,
-        xpi_api_modules_datahub_id: xpi_api_modules_datahub_id.trim(),
-        xpi_api_services_datahub_id: xpi_api_services_datahub_id.trim(),
-        xpi_entity_datahub_id: xpi_entity_datahub_id.trim(),
-        xpi_field_mapping_datahub_id: xpi_field_mapping_datahub_id.trim(),
+        xpi_api_modules_datahub_id: xpi_api_modules_datahub_id?.trim() || null,
+        xpi_api_services_datahub_id:
+          xpi_api_services_datahub_id?.trim() || null,
+        xpi_entity_datahub_id: xpi_entity_datahub_id?.trim() || null,
+        xpi_field_mapping_datahub_id:
+          xpi_field_mapping_datahub_id?.trim() || null,
         xpi_request_form_field_mapping_datahub_id:
-          xpi_request_form_field_mapping_datahub_id.trim(),
+          xpi_request_form_field_mapping_datahub_id?.trim() || null,
         xpi_request_form_mapping_datahub_id:
-          xpi_request_form_mapping_datahub_id.trim(),
-        xpi_space_name_datahub_id: xpi_space_name_datahub_id.trim(),
-        campaign_space_id: campaign_space_id.trim(),
+          xpi_request_form_mapping_datahub_id?.trim() || null,
+        xpi_space_name_datahub_id: xpi_space_name_datahub_id?.trim() || null,
+        campaign_space_id: campaign_space_id?.trim() || null,
         wrike_api_host: apiHost,
         ...mcpLifetimes,
         is_active: is_active !== undefined ? Boolean(is_active) : true,
         is_visible: is_visible !== undefined ? Boolean(is_visible) : true,
+        xtend_tools_enabled:
+          xtend_tools_enabled !== undefined ? Boolean(xtend_tools_enabled) : true,
       };
 
       // Pass null as profile_id — updated_by FK references admin_users, not portal_users

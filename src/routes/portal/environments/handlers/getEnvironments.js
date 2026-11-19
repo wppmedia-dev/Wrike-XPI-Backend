@@ -54,6 +54,7 @@ export const GetMyEnvironments = (portalUser) => {
         }),
         is_active: env.is_active,
         is_visible: env.is_visible,
+        xtend_tools_enabled: env.xtend_tools_enabled !== false,
         // Read by the portal's environment-access drawer (EnvironmentAccess
         // canWrite=false) to show the two gate switches in their real state
         // — omitting them would render both as unchecked regardless of the

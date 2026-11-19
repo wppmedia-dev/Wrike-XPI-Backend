@@ -138,6 +138,7 @@ interface EnvFormState {
   mcp_refresh: LifetimeField;
   is_visible: boolean;
   is_active: boolean;
+  xtend_tools_enabled: boolean;
 }
 
 const EMPTY_ENV_FORM: EnvFormState = {
@@ -158,6 +159,7 @@ const EMPTY_ENV_FORM: EnvFormState = {
   mcp_refresh: emptyLifetime("days"),
   is_visible: true,
   is_active: true,
+  xtend_tools_enabled: true,
 };
 
 function envToForm(env: AdminEnvironment): EnvFormState {
@@ -179,6 +181,7 @@ function envToForm(env: AdminEnvironment): EnvFormState {
     mcp_refresh: lifetimeFromSeconds(env.mcp_refresh_token_ttl_seconds, "days"),
     is_visible: env.is_visible,
     is_active: env.is_active,
+    xtend_tools_enabled: env.xtend_tools_enabled,
   };
 }
 
@@ -441,6 +444,18 @@ export default function AdminDashboard() {
     envModalMode === "edit" && !!wrikeRedirectUrl && !!editingId && !!appUrl;
   const editModalLoginUrl = editingId && appUrl ? `${appUrl}?environmentId=${editingId}` : "";
 
+  // The xtend_* MCP tools need all five of these; a blank one switches them off.
+  const xtendIdsMissing = (f: EnvFormState) =>
+    [
+      f.xpi_entity_datahub_id,
+      f.xpi_field_mapping_datahub_id,
+      f.xpi_request_form_field_mapping_datahub_id,
+      f.xpi_request_form_mapping_datahub_id,
+      f.xpi_space_name_datahub_id,
+      f.campaign_space_id,
+    ].some((v) => !v.trim());
+  const xtendMissing = xtendIdsMissing(envForm);
+
   async function handleSaveEnvironment() {
     const f = envForm;
     const trimmed = {
@@ -462,20 +477,6 @@ export default function AdminDashboard() {
     if (!trimmed.environment_name) return toast("Environment name is required", "error");
     if (!trimmed.client_id) return toast("Client ID is required", "error");
     if (!trimmed.client_secret) return toast("Client Secret is required", "error");
-    if (!trimmed.xpi_api_modules_datahub_id)
-      return toast("XPI API Modules Datahub ID is required", "error");
-    if (!trimmed.xpi_api_services_datahub_id)
-      return toast("XPI API Services Datahub ID is required", "error");
-    if (!trimmed.xpi_entity_datahub_id) return toast("XPI Entity Datahub ID is required", "error");
-    if (!trimmed.xpi_field_mapping_datahub_id)
-      return toast("XPI Field Mapping Datahub ID is required", "error");
-    if (!trimmed.xpi_request_form_field_mapping_datahub_id)
-      return toast("XPI Request Form Field Mapping Datahub ID is required", "error");
-    if (!trimmed.xpi_request_form_mapping_datahub_id)
-      return toast("XPI Request Form Mapping Datahub ID is required", "error");
-    if (!trimmed.xpi_space_name_datahub_id)
-      return toast("XPI Space Name Datahub ID is required", "error");
-    if (!trimmed.campaign_space_id) return toast("Campaign Space ID is required", "error");
 
     let mcpAccessSeconds: number | null;
     let mcpRefreshSeconds: number | null;
@@ -494,6 +495,8 @@ export default function AdminDashboard() {
         mcp_refresh_token_ttl_seconds: mcpRefreshSeconds,
         is_visible: f.is_visible,
         is_active: f.is_active,
+        // Blank Datahub IDs force the flag off, matching the warning on the form.
+        xtend_tools_enabled: f.xtend_tools_enabled && !xtendIdsMissing(f),
       };
       const result = editingId
         ? await updateEnvironment(editingId, payload)
@@ -2601,14 +2604,13 @@ export default function AdminDashboard() {
 
               <div className="form-group">
                 <label className="form-label" htmlFor="xpiApiModulesDatahubId">
-                  XPI API Modules Datahub ID <span style={{ color: "var(--danger)" }}>*</span>
+                  XPI API Modules Datahub ID
                 </label>
                 <input
                   className="form-control"
                   type="text"
                   id="xpiApiModulesDatahubId"
-                  placeholder="Enter XPI API Modules Datahub ID"
-                  required
+                  placeholder="Enter XPI API Modules Datahub ID (optional)"
                   value={envForm.xpi_api_modules_datahub_id}
                   onChange={(e) => setEnvForm((f) => ({ ...f, xpi_api_modules_datahub_id: e.target.value }))}
                 />
@@ -2616,14 +2618,13 @@ export default function AdminDashboard() {
 
               <div className="form-group">
                 <label className="form-label" htmlFor="xpiApiServicesDatahubId">
-                  XPI API Services Datahub ID <span style={{ color: "var(--danger)" }}>*</span>
+                  XPI API Services Datahub ID
                 </label>
                 <input
                   className="form-control"
                   type="text"
                   id="xpiApiServicesDatahubId"
-                  placeholder="Enter XPI API Services Datahub ID"
-                  required
+                  placeholder="Enter XPI API Services Datahub ID (optional)"
                   value={envForm.xpi_api_services_datahub_id}
                   onChange={(e) => setEnvForm((f) => ({ ...f, xpi_api_services_datahub_id: e.target.value }))}
                 />
@@ -2631,14 +2632,13 @@ export default function AdminDashboard() {
 
               <div className="form-group">
                 <label className="form-label" htmlFor="xpiEntityDatahubId">
-                  XPI Entity Datahub ID <span style={{ color: "var(--danger)" }}>*</span>
+                  XPI Entity Datahub ID
                 </label>
                 <input
                   className="form-control"
                   type="text"
                   id="xpiEntityDatahubId"
-                  placeholder="Enter XPI Entity Datahub ID"
-                  required
+                  placeholder="Enter XPI Entity Datahub ID (optional)"
                   value={envForm.xpi_entity_datahub_id}
                   onChange={(e) => setEnvForm((f) => ({ ...f, xpi_entity_datahub_id: e.target.value }))}
                 />
@@ -2646,14 +2646,13 @@ export default function AdminDashboard() {
 
               <div className="form-group">
                 <label className="form-label" htmlFor="xpiFieldMappingDatahubId">
-                  XPI Field Mapping Datahub ID <span style={{ color: "var(--danger)" }}>*</span>
+                  XPI Field Mapping Datahub ID
                 </label>
                 <input
                   className="form-control"
                   type="text"
                   id="xpiFieldMappingDatahubId"
-                  placeholder="Enter XPI Field Mapping Datahub ID"
-                  required
+                  placeholder="Enter XPI Field Mapping Datahub ID (optional)"
                   value={envForm.xpi_field_mapping_datahub_id}
                   onChange={(e) => setEnvForm((f) => ({ ...f, xpi_field_mapping_datahub_id: e.target.value }))}
                 />
@@ -2661,14 +2660,13 @@ export default function AdminDashboard() {
 
               <div className="form-group">
                 <label className="form-label" htmlFor="xpiRequestFormFieldMappingDatahubId">
-                  XPI Request Form Field Mapping Datahub ID <span style={{ color: "var(--danger)" }}>*</span>
+                  XPI Request Form Field Mapping Datahub ID
                 </label>
                 <input
                   className="form-control"
                   type="text"
                   id="xpiRequestFormFieldMappingDatahubId"
-                  placeholder="Enter XPI Request Form Field Mapping Datahub ID"
-                  required
+                  placeholder="Enter XPI Request Form Field Mapping Datahub ID (optional)"
                   value={envForm.xpi_request_form_field_mapping_datahub_id}
                   onChange={(e) =>
                     setEnvForm((f) => ({ ...f, xpi_request_form_field_mapping_datahub_id: e.target.value }))
@@ -2678,14 +2676,13 @@ export default function AdminDashboard() {
 
               <div className="form-group">
                 <label className="form-label" htmlFor="xpiRequestFormMappingDatahubId">
-                  XPI Request Form Mapping Datahub ID <span style={{ color: "var(--danger)" }}>*</span>
+                  XPI Request Form Mapping Datahub ID
                 </label>
                 <input
                   className="form-control"
                   type="text"
                   id="xpiRequestFormMappingDatahubId"
-                  placeholder="Enter XPI Request Form Mapping Datahub ID"
-                  required
+                  placeholder="Enter XPI Request Form Mapping Datahub ID (optional)"
                   value={envForm.xpi_request_form_mapping_datahub_id}
                   onChange={(e) => setEnvForm((f) => ({ ...f, xpi_request_form_mapping_datahub_id: e.target.value }))}
                 />
@@ -2693,14 +2690,13 @@ export default function AdminDashboard() {
 
               <div className="form-group">
                 <label className="form-label" htmlFor="xpiSpaceNameDatahubId">
-                  XPI Space Name Datahub ID <span style={{ color: "var(--danger)" }}>*</span>
+                  XPI Space Name Datahub ID
                 </label>
                 <input
                   className="form-control"
                   type="text"
                   id="xpiSpaceNameDatahubId"
-                  placeholder="Enter XPI Space Name Datahub ID"
-                  required
+                  placeholder="Enter XPI Space Name Datahub ID (optional)"
                   value={envForm.xpi_space_name_datahub_id}
                   onChange={(e) => setEnvForm((f) => ({ ...f, xpi_space_name_datahub_id: e.target.value }))}
                 />
@@ -2710,14 +2706,13 @@ export default function AdminDashboard() {
 
               <div className="form-group">
                 <label className="form-label" htmlFor="campaignSpaceId">
-                  Campaign Space ID <span style={{ color: "var(--danger)" }}>*</span>
+                  Campaign Space ID
                 </label>
                 <input
                   className="form-control"
                   type="text"
                   id="campaignSpaceId"
-                  placeholder="Enter Campaign Space ID"
-                  required
+                  placeholder="Enter Campaign Space ID (optional)"
                   value={envForm.campaign_space_id}
                   onChange={(e) => setEnvForm((f) => ({ ...f, campaign_space_id: e.target.value }))}
                 />
@@ -2760,6 +2755,28 @@ export default function AdminDashboard() {
                     type="checkbox"
                     checked={envForm.is_visible}
                     onChange={(e) => setEnvForm((f) => ({ ...f, is_visible: e.target.checked }))}
+                  />
+                  <div className="toggle-track" />
+                </label>
+              </div>
+
+              <hr className="form-divider" />
+
+              <div className="toggle-row">
+                <div className="toggle-row-info">
+                  <div className="toggle-row-label">Xtend MCP Tools</div>
+                  <div className="toggle-row-desc" style={xtendMissing ? { color: "var(--danger)" } : undefined}>
+                    {xtendMissing
+                      ? "Some Datahub IDs or the Campaign Space ID are empty (all except API Modules / Services). The xtend_* MCP tools will be lost for this environment and this switch will be saved as off. Fill in all of them to keep them."
+                      : "Offer the xtend_* MCP tools for this environment."}
+                  </div>
+                </div>
+                <label className="toggle-wrap">
+                  <input
+                    type="checkbox"
+                    checked={envForm.xtend_tools_enabled && !xtendMissing}
+                    disabled={xtendMissing}
+                    onChange={(e) => setEnvForm((f) => ({ ...f, xtend_tools_enabled: e.target.checked }))}
                   />
                   <div className="toggle-track" />
                 </label>

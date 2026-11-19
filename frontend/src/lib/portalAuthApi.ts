@@ -179,6 +179,8 @@ export interface PortalEnvironmentFull {
   mcp_refresh_token_ttl_seconds?: number | null;
   is_active: boolean;
   is_visible: boolean;
+  /** Offers the xtend_* MCP tools; only effective while the five Datahub IDs they need are filled in. */
+  xtend_tools_enabled?: boolean;
   /** Gate 1 master switch — email/domain/IP allow list. Read by the
       environment-access drawer (rendered read-only for a portal user). */
   allowlist_check_enabled: boolean;
@@ -257,6 +259,7 @@ export interface PortalEnvironmentInput {
   mcp_refresh_token_ttl_seconds?: number | null;
   is_active: boolean;
   is_visible: boolean;
+  xtend_tools_enabled?: boolean;
 }
 
 /**

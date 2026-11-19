@@ -28,6 +28,7 @@ export const Update = (profile_id, { id }, body) => {
         mcp_refresh_token_ttl_seconds,
         is_visible,
         is_active,
+        xtend_tools_enabled,
       } = body;
 
       if (!environment_name)
@@ -98,6 +99,8 @@ export const Update = (profile_id, { id }, body) => {
       }
       if (is_visible !== undefined) updates.is_visible = is_visible;
       if (is_active !== undefined) updates.is_active = is_active;
+      if (xtend_tools_enabled !== undefined)
+        updates.xtend_tools_enabled = xtend_tools_enabled;
 
       const updated = await WrikeCredentials.Update(profile_id, id, updates);
 

@@ -26,6 +26,7 @@ export const Save = (body) => {
         mcp_refresh_token_ttl_seconds,
         is_visible,
         is_active,
+        xtend_tools_enabled,
       } = body;
 
       if (!environment_name)
@@ -72,6 +73,8 @@ export const Save = (body) => {
         ...mcpLifetimes,
         is_visible: is_visible !== undefined ? is_visible : true,
         is_active: is_active !== undefined ? is_active : true,
+        xtend_tools_enabled:
+          xtend_tools_enabled !== undefined ? xtend_tools_enabled : true,
       });
 
       await syncWrikeCredentialsFromDB();
@@ -109,4 +112,5 @@ const formatCredential = (cred) => ({
   mcp_refresh_token_ttl_seconds: cred.mcp_refresh_token_ttl_seconds ?? null,
   is_active: cred.is_active,
   is_visible: cred.is_visible,
+  xtend_tools_enabled: cred.xtend_tools_enabled !== false,
 });

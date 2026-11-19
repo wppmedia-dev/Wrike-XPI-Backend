@@ -10,6 +10,8 @@ import { EnvironmentModulePermissions, TokenPermissions } from "../controllers";
 import { denialFor } from "../utils/tokenPermissionMap";
 import { newReference } from "../utils/activityReference";
 import { permissionDenied, resolveToolRoute } from "./tools/permission.js";
+import { getCachedWrikeCredentials } from "../utils/wrikeCredentials";
+import { xtendToolsActive } from "../utils/xtendTools";
 
 /**
  * Top-level instructions surfaced to the connected agent during handshake.
@@ -33,7 +35,7 @@ const MCP_INSTRUCTIONS = `You are connected to the WrikeXPI MCP server. This ser
 HOW TO CHOOSE — avoid conflict
 - Let the resource decide the family, not the tool list: XPI-managed resource -> xtend_* tool; a generic Wrike item/space/user/approval/comment/etc. -> wrike_* tool.
 - Never call an xtend_* tool and a wrike_* tool for the same job, and never invent a combined flow when a single call does it.
-- If an expected wrike_* tool is missing, fall back to the xtend_* toolset (always present) or tell the user it is unavailable — do not improvise a substitute.
+- If an expected wrike_* tool is missing, fall back to the xtend_* toolset (present only when it is enabled for this environment) or tell the user it is unavailable — do not improvise a substitute.
 
 CONFIRMING WRITE OPERATIONS — every update and delete is gated
 - All mutating tools are gated: the native update/delete tools (xtend_campaign_update, xtend_campaign_delete, xtend_channel_update, xtend_channel_delete, xtend_task_update, xtend_task_delete) and every mutating wrike_* tool (update_items, create_task_item, add_attachments_to_item, and any other that writes).
@@ -220,11 +222,19 @@ export const createMcpServer = async (fastify, serverUrl, auth, onToolCall) => {
   // Wraps registerTool before anything registers, so the native tools below
   // and the proxied wrike_* tools further down are all covered by one gate.
   installPermissionGate(server, auth, onToolCall);
-  registerCampaignTools(server, fastify, serverUrl, auth);
-  registerChannelTools(server, serverUrl, auth);
-  registerTaskTools(server, serverUrl, auth);
-  registerDatahubTools(server, serverUrl, auth);
-  registerIdsTools(server, serverUrl, auth);
+  // The xtend_* family is per-environment: off when the environment's switch is
+  // off, and off while any Datahub ID it runs against is blank
+  // (src/utils/xtendTools.js). Not registered at all rather than refused per
+  // call, so the agent never sees a tool it cannot use. The server is rebuilt
+  // per request and the credential cache is re-synced on every environment
+  // save, so a flipped switch applies on the next request.
+  if (xtendToolsActive(getCachedWrikeCredentials(auth?.environmentName))) {
+    registerCampaignTools(server, fastify, serverUrl, auth);
+    registerChannelTools(server, serverUrl, auth);
+    registerTaskTools(server, serverUrl, auth);
+    registerDatahubTools(server, serverUrl, auth);
+    registerIdsTools(server, serverUrl, auth);
+  }
 
   // Merges in Wrike's own hosted MCP tools (no-ops if WRIKE_MCP_URL is unset
   // or unreachable — native XPI tools above are unaffected either way).

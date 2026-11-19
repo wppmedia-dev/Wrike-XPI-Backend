@@ -26,6 +26,8 @@ export interface AdminEnvironment {
   mcp_refresh_token_ttl_seconds: number | null;
   is_active: boolean;
   is_visible: boolean;
+  /** Offers the xtend_* MCP tools; only effective while the five Datahub IDs they need are filled in. */
+  xtend_tools_enabled: boolean;
   /** Gate 1 master switch — email/domain/IP allow list. */
   allowlist_check_enabled: boolean;
   /** Gate 2 master switch — Wrike Xtend API custom field. Flag only for now;
@@ -65,6 +67,7 @@ export interface EnvironmentPayload {
   mcp_refresh_token_ttl_seconds?: number | null;
   is_visible: boolean;
   is_active: boolean;
+  xtend_tools_enabled?: boolean;
 }
 
 async function parseJson(res: Response): Promise<any> {
@@ -108,6 +111,7 @@ export const listEnvironments = async (
       mcp_refresh_token_ttl_seconds: c.mcp_refresh_token_ttl_seconds ?? null,
       is_active: !!c.is_active,
       is_visible: !!c.is_visible,
+      xtend_tools_enabled: c.xtend_tools_enabled !== false,
       allowlist_check_enabled: c.allowlist_check_enabled !== false,
       custom_field_check_enabled: !!c.custom_field_check_enabled,
       created_at: c.created_at,

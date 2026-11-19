@@ -211,6 +211,7 @@ const EMPTY_FORM = {
   mcpRefresh: emptyLifetime("days"),
   active: true,
   visible: true,
+  xtendTools: true,
 };
 
 type EnvForm = typeof EMPTY_FORM;
@@ -234,6 +235,7 @@ function formFromEnv(env: PortalEnvironmentFull): EnvForm {
     mcpRefresh: lifetimeFromSeconds(env.mcp_refresh_token_ttl_seconds, "days"),
     active: !!env.is_active,
     visible: !!env.is_visible,
+    xtendTools: env.xtend_tools_enabled !== false,
   };
 }
 
@@ -533,16 +535,6 @@ export default function PortalHome() {
     if (!name) return toast("Environment name is required", "warning");
     if (!clientId) return toast("Client ID is required", "warning");
     if (!clientSecret) return toast("Client Secret is required", "warning");
-    if (!xpiApiModules) return toast("XPI API Modules Datahub ID is required", "warning");
-    if (!xpiApiServices) return toast("XPI API Services Datahub ID is required", "warning");
-    if (!xpiEntity) return toast("XPI Entity Datahub ID is required", "warning");
-    if (!xpiFieldMapping) return toast("XPI Field Mapping Datahub ID is required", "warning");
-    if (!xpiReqFormField)
-      return toast("XPI Request Form Field Mapping Datahub ID is required", "warning");
-    if (!xpiReqFormMapping)
-      return toast("XPI Request Form Mapping Datahub ID is required", "warning");
-    if (!xpiSpaceName) return toast("XPI Space Name Datahub ID is required", "warning");
-    if (!campaignSpace) return toast("Campaign Space ID is required", "warning");
 
     // Only sent by a user granted environment_token_lifetimes:update; the
     // server refuses them from anyone else, and a user without the grant has
@@ -581,6 +573,9 @@ export default function PortalHome() {
         ...lifetimeInput,
         is_active: form.active,
         is_visible: form.visible,
+        // Blank Datahub IDs force the flag off, matching the warning on the form.
+        xtend_tools_enabled:
+          form.xtendTools && !!(xpiEntity && xpiFieldMapping && xpiReqFormField && xpiReqFormMapping && xpiSpaceName && campaignSpace),
       };
 
       const isEdit = !!envEditId;
@@ -773,6 +768,9 @@ export default function PortalHome() {
   };
 
   const pageTitle = PAGE_NAMES[activePage];
+
+  // The xtend_* MCP tools need all five of these; a blank one switches them off.
+  const xtendMissing = [form.xpiEntity, form.xpiFieldMapping, form.xpiReqFormField, form.xpiReqFormMapping, form.xpiSpaceName, form.campaignSpace].some((v) => !v.trim());
 
   if (!token || role === "admin") return null;
 
@@ -1429,91 +1427,91 @@ export default function PortalHome() {
 
             <div className="form-group">
               <label className="form-label" htmlFor="envModalXpiApiModules">
-                XPI API Modules Datahub ID <span style={{ color: "var(--danger)" }}>*</span>
+                XPI API Modules Datahub ID
               </label>
               <input
                 type="text"
                 className="form-control"
                 id="envModalXpiApiModules"
-                placeholder="Enter XPI API Modules Datahub ID"
+                placeholder="Enter XPI API Modules Datahub ID (optional)"
                 value={form.xpiApiModules}
                 onChange={(e) => setField("xpiApiModules", e.target.value)}
               />
             </div>
             <div className="form-group">
               <label className="form-label" htmlFor="envModalXpiApiServices">
-                XPI API Services Datahub ID <span style={{ color: "var(--danger)" }}>*</span>
+                XPI API Services Datahub ID
               </label>
               <input
                 type="text"
                 className="form-control"
                 id="envModalXpiApiServices"
-                placeholder="Enter XPI API Services Datahub ID"
+                placeholder="Enter XPI API Services Datahub ID (optional)"
                 value={form.xpiApiServices}
                 onChange={(e) => setField("xpiApiServices", e.target.value)}
               />
             </div>
             <div className="form-group">
               <label className="form-label" htmlFor="envModalXpiEntity">
-                XPI Entity Datahub ID <span style={{ color: "var(--danger)" }}>*</span>
+                XPI Entity Datahub ID
               </label>
               <input
                 type="text"
                 className="form-control"
                 id="envModalXpiEntity"
-                placeholder="Enter XPI Entity Datahub ID"
+                placeholder="Enter XPI Entity Datahub ID (optional)"
                 value={form.xpiEntity}
                 onChange={(e) => setField("xpiEntity", e.target.value)}
               />
             </div>
             <div className="form-group">
               <label className="form-label" htmlFor="envModalXpiFieldMapping">
-                XPI Field Mapping Datahub ID <span style={{ color: "var(--danger)" }}>*</span>
+                XPI Field Mapping Datahub ID
               </label>
               <input
                 type="text"
                 className="form-control"
                 id="envModalXpiFieldMapping"
-                placeholder="Enter XPI Field Mapping Datahub ID"
+                placeholder="Enter XPI Field Mapping Datahub ID (optional)"
                 value={form.xpiFieldMapping}
                 onChange={(e) => setField("xpiFieldMapping", e.target.value)}
               />
             </div>
             <div className="form-group">
               <label className="form-label" htmlFor="envModalXpiReqFormField">
-                XPI Request Form Field Mapping Datahub ID <span style={{ color: "var(--danger)" }}>*</span>
+                XPI Request Form Field Mapping Datahub ID
               </label>
               <input
                 type="text"
                 className="form-control"
                 id="envModalXpiReqFormField"
-                placeholder="Enter XPI Request Form Field Mapping Datahub ID"
+                placeholder="Enter XPI Request Form Field Mapping Datahub ID (optional)"
                 value={form.xpiReqFormField}
                 onChange={(e) => setField("xpiReqFormField", e.target.value)}
               />
             </div>
             <div className="form-group">
               <label className="form-label" htmlFor="envModalXpiReqFormMapping">
-                XPI Request Form Mapping Datahub ID <span style={{ color: "var(--danger)" }}>*</span>
+                XPI Request Form Mapping Datahub ID
               </label>
               <input
                 type="text"
                 className="form-control"
                 id="envModalXpiReqFormMapping"
-                placeholder="Enter XPI Request Form Mapping Datahub ID"
+                placeholder="Enter XPI Request Form Mapping Datahub ID (optional)"
                 value={form.xpiReqFormMapping}
                 onChange={(e) => setField("xpiReqFormMapping", e.target.value)}
               />
             </div>
             <div className="form-group">
               <label className="form-label" htmlFor="envModalXpiSpaceName">
-                XPI Space Name Datahub ID <span style={{ color: "var(--danger)" }}>*</span>
+                XPI Space Name Datahub ID
               </label>
               <input
                 type="text"
                 className="form-control"
                 id="envModalXpiSpaceName"
-                placeholder="Enter XPI Space Name Datahub ID"
+                placeholder="Enter XPI Space Name Datahub ID (optional)"
                 value={form.xpiSpaceName}
                 onChange={(e) => setField("xpiSpaceName", e.target.value)}
               />
@@ -1523,13 +1521,13 @@ export default function PortalHome() {
 
             <div className="form-group">
               <label className="form-label" htmlFor="envModalCampaignSpace">
-                Campaign Space ID <span style={{ color: "var(--danger)" }}>*</span>
+                Campaign Space ID
               </label>
               <input
                 type="text"
                 className="form-control"
                 id="envModalCampaignSpace"
-                placeholder="Enter Campaign Space ID"
+                placeholder="Enter Campaign Space ID (optional)"
                 value={form.campaignSpace}
                 onChange={(e) => setField("campaignSpace", e.target.value)}
               />
@@ -1574,6 +1572,25 @@ export default function PortalHome() {
                   type="checkbox"
                   checked={form.active}
                   onChange={(e) => setField("active", e.target.checked)}
+                />
+                <span className="toggle-track"></span>
+              </label>
+            </div>
+            <div className="toggle-row">
+              <div className="toggle-row-info">
+                <div className="toggle-row-label">Xtend MCP Tools</div>
+                <div className="toggle-row-desc" style={xtendMissing ? { color: "var(--danger)" } : undefined}>
+                  {xtendMissing
+                    ? "Some Datahub IDs or the Campaign Space ID are empty (all except API Modules / Services). The xtend_* MCP tools will be lost for this environment and this switch will be saved as off. Fill in all of them to keep them."
+                    : "Offer the xtend_* MCP tools for this environment."}
+                </div>
+              </div>
+              <label className="toggle-wrap">
+                <input
+                  type="checkbox"
+                  checked={form.xtendTools && !xtendMissing}
+                  disabled={xtendMissing}
+                  onChange={(e) => setField("xtendTools", e.target.checked)}
                 />
                 <span className="toggle-track"></span>
               </label>

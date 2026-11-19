@@ -126,6 +126,12 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.BOOLEAN,
         defaultValue: true,
       },
+      xtend_tools_enabled: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true,
+        comment:
+          "Offer the native xtend_* MCP tools for this environment. Only effective while the Datahub IDs they need are filled in (src/utils/xtendTools.js)",
+      },
       allowlist_check_enabled: {
         type: DataTypes.BOOLEAN,
         defaultValue: false,
