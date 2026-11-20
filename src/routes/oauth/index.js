@@ -389,7 +389,9 @@ export const oauthRoute = (fastify, opts, done) => {
         });
       }
 
-      const { redirectUrl } = findRedirectionURL(
+      // trusted: redirect_uri was checked above against the client's
+      // registration, and `extra` is built here, not taken from the request.
+      const { redirectUrl } = await findRedirectionURL(
         {
           environmentId: environment_id,
           environment,
@@ -406,6 +408,7 @@ export const oauthRoute = (fastify, opts, done) => {
           },
         },
         fastify,
+        { trusted: true },
       );
 
       return reply.redirect(redirectUrl);

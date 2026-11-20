@@ -114,27 +114,31 @@ const { findRedirectionURL } = require("../src/utils/wrikeRedirect");
 const signState = (payload) => JSON.stringify(payload);
 const fakeFastify = { jwt: { sign: signState } };
 
-const stateOf = (query) => {
-  const { redirectUrl } = findRedirectionURL(query, fakeFastify);
+const stateOf = async (query) => {
+  const { redirectUrl } = await findRedirectionURL(query, fakeFastify);
   return JSON.parse(new URL(redirectUrl).searchParams.get("state"));
 };
 
-const calendarState = stateOf({
+// findRedirectionURL is async now (it may consult the redirect allow list), so
+// these run in their own block and the main block below waits for it.
+const stateChecks = (async () => {
+const calendarState = await stateOf({
   environment: "PROD",
   purpose: "calendar_sync",
 });
 check("calendar_sync is carried", calendarState.purpose, "calendar_sync");
 check("with the environment", calendarState.environmentId, ENV_ID);
 
-const loginState = stateOf({ environment: "PROD", purpose: "login" });
+const loginState = await stateOf({ environment: "PROD", purpose: "login" });
 check("a normal sign-in claims no purpose", "purpose" in loginState, false);
 check("but still carries the environment", loginState.environmentId, ENV_ID);
 
-const junkState = stateOf({ environment: "PROD", purpose: "forever" });
+const junkState = await stateOf({ environment: "PROD", purpose: "forever" });
 check("junk claims no purpose", "purpose" in junkState, false);
 
-const absentState = stateOf({ environment: "PROD" });
+const absentState = await stateOf({ environment: "PROD" });
 check("and neither does an absent one", "purpose" in absentState, false);
+})();
 
 /* Fastify's default query validation strips what the schema does not declare,
    so an undeclared purpose would never reach the mint from /exchange or
@@ -210,6 +214,8 @@ const {
 } = require("../src/routes/tokens/handlers/wrikeTokenExchange");
 
 (async () => {
+  await stateChecks;
+
   const runMint = async (data) => {
     lastInsert = null;
     seeded = null;

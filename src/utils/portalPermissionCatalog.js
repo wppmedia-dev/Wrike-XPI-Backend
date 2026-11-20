@@ -43,6 +43,20 @@ export const MODULES = [
     actions: ALL,
   },
   {
+    key: "redirect_urls",
+    label: "Redirect URLs",
+    description:
+      "The addresses a sign-in may send the browser back to, per environment. Anything not listed is refused, so this decides where an OAuth authorization code can be delivered.",
+    // All four, one per route in src/routes/portal/redirectUrls: read lists the
+    // entries and tests an address, create adds one, update edits or switches
+    // one off, delete removes one.
+    //
+    // Its own module rather than part of environment_access: that list says who
+    // may call the API, this one says where a login's code may be sent, and
+    // granting somebody the first should not quietly grant the second.
+    actions: ALL,
+  },
+  {
     key: "api_tokens",
     label: "Token management",
     description:
@@ -122,6 +136,22 @@ export const MODULES = [
     // No create or delete: the sources are fixed in code (src/utils/syncSources.js),
     // so there is nothing to add or remove. Not scoped to the user's environments,
     // because a sync is service-wide, which is why it is a grant of its own.
+    actions: ["read", "update"],
+  },
+  {
+    key: "security",
+    label: "Security",
+    description:
+      "The Security page: how long MCP access and refresh tokens live, and whether a token may be used on both the REST API and MCP. These apply to the whole service, not one environment.",
+    // Two actions, one per kind of route in src/routes/portal/security: read
+    // shows the current values, update changes them.
+    //
+    // No create or delete: these are two fixed settings, not records. Not scoped
+    // to the user's environments because they are service-wide, which is why
+    // this is its own grant (as sync is) and why it deserves care: a longer
+    // refresh lifetime keeps a stolen token useful for longer, and cross-token
+    // access widens what each token opens. The admin's own MFA card is not part
+    // of it: that belongs to that admin's account.
     actions: ["read", "update"],
   },
   {

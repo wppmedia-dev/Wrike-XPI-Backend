@@ -400,7 +400,7 @@ const legacyEncrypt = (plaintext, keyHex) => {
     check("a stray create tick is discarded on save", granted.oauth_clients, { read: true, create: false, update: true, delete: true });
 
     check("a grant to another module does not leak into this one", catalogue.normaliseMatrix({ cache: { read: true, delete: true } }).oauth_clients, { read: false, create: false, update: false, delete: false });
-    check("the other modules are untouched", catalogue.MODULES.map((m) => m.key).filter((k) => k !== "oauth_clients"), ["overview", "environments", "environment_access", "api_tokens", "environment_modules", "environment_token_lifetimes", "activity_logs", "cache", "sync"]);
+    check("the other modules are untouched", catalogue.MODULES.map((m) => m.key).filter((k) => k !== "oauth_clients"), ["overview", "environments", "environment_access", "redirect_urls", "api_tokens", "environment_modules", "environment_token_lifetimes", "activity_logs", "cache", "sync", "security"]);
 
     const lifetimes = catalogue.MODULES.find((m) => m.key === "environment_token_lifetimes");
     check("MCP Token Lifetimes offers read and update only", lifetimes?.actions, ["read", "update"]);

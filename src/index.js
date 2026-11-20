@@ -231,15 +231,20 @@ const withTimeout = (promise, ms, label) =>
   });
 
   // Generate redirect URL dynamically based on environment selection
+  //
+  // Open on purpose (the login page calls it before anyone has signed in), so
+  // a redirectUri it is given is checked against the environment's redirect
+  // allow list before it is signed into the state: an unlisted one is a 400.
   fastify.get("/get-redirect-url", async (req, res) => {
-    const { environment, environmentId, redirectUri, accountId } = req.query;
+    try {
+      const { redirectUrl } = await findRedirectionURL(req.query, fastify);
 
-    const { selectedEnvironment, redirectUrl } = findRedirectionURL(
-      req.query,
-      fastify,
-    );
-
-    res.send({ success: true, redirectUrl });
+      res.send({ success: true, redirectUrl });
+    } catch (err) {
+      res
+        .code(err?.statusCode || 400)
+        .send({ success: false, message: err?.message || "Bad request" });
+    }
   });
 
   // Environment list + which one is currently selected, for the root
@@ -247,7 +252,12 @@ const withTimeout = (promise, ms, label) =>
   // client-side instead of it being server-injected into the HTML — see
   // frontend/src/lib/rootLoginApi.ts).
   fastify.get("/environments", async (req, res) => {
-    const { selectedEnvironment } = findRedirectionURL(req.query, fastify);
+    // Only the picker's selection is wanted here, so any redirectUri is left
+    // out: it is neither used nor worth refusing the list of environments over.
+    const { selectedEnvironment } = await findRedirectionURL(
+      { ...req.query, redirectUri: undefined },
+      fastify,
+    );
     const visibleCreds = getCachedVisibleWrikeCredentials();
     const environments = Object.keys(visibleCreds || {});
 
@@ -290,7 +300,7 @@ const withTimeout = (promise, ms, label) =>
     // same rule /docs/calendar/connect follows, and the flag is spelled out
     // rather than "anything truthy" so a typo starts no sign-in at all.
     if (isCalendarSyncFlag(calendarSync)) {
-      const { redirectUrl } = findRedirectionURL(
+      const { redirectUrl } = await findRedirectionURL(
         { ...req.query, purpose: TOKEN_PURPOSE.CALENDAR_SYNC },
         fastify,
       );
@@ -298,7 +308,7 @@ const withTimeout = (promise, ms, label) =>
     }
 
     if (autoRedirect == "true" || autoRedirect == "1") {
-      const { redirectUrl } = findRedirectionURL(req.query, fastify);
+      const { redirectUrl } = await findRedirectionURL(req.query, fastify);
       return res.redirect(redirectUrl);
     }
 

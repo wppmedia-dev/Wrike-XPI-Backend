@@ -4,6 +4,8 @@ export * as WrikeCredentials from "./wrikeCredentials";
 export * as AdminAuth from "./adminAuth";
 export * as PortalAuth from "./portalAuth";
 export * as EnvironmentAccess from "./environmentAccess";
+// Where a sign-in may send the browser back to, per environment.
+export * as RedirectRules from "./redirectRules";
 export * as PortalPermissions from "./portalPermissions";
 export * as TokenPermissions from "./tokenPermissions";
 // The layer above TokenPermissions: what an environment allows at all, before

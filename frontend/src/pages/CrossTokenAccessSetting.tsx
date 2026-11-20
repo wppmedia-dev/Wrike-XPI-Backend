@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
-import { getCrossTokenAccess, saveCrossTokenAccess } from "../lib/mcpTokenSettingsApi";
+import {
+  getCrossTokenAccess,
+  saveCrossTokenAccess,
+  type Transport,
+} from "../lib/mcpTokenSettingsApi";
 import { toast } from "../lib/notify";
 import "./MfaSettings.css";
 
@@ -7,21 +11,29 @@ import "./MfaSettings.css";
  * On: an MCP access token works on the REST API and the Xtend API token works
  * on /mcp. Off (default): each token only opens its own door.
  */
-export default function CrossTokenAccessSetting() {
+export default function CrossTokenAccessSetting({
+  transport,
+  canUpdate = true,
+}: {
+  /** Defaults to the admin console's own sign-in. */
+  transport?: Transport;
+  /** security:update for a portal user; the admin console always may. */
+  canUpdate?: boolean;
+}) {
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    getCrossTokenAccess()
+    getCrossTokenAccess(transport)
       .then(setEnabled)
       .catch((err: any) => toast(err?.message || "Failed to load setting", "error"));
-  }, []);
+  }, [transport]);
 
   if (enabled === null) return <div className="mfa-card">Loading…</div>;
 
   const toggle = () => {
     setBusy(true);
-    saveCrossTokenAccess(!enabled)
+    saveCrossTokenAccess(!enabled, transport)
       .then((next) => {
         setEnabled(next);
         toast(`Cross-token access ${next ? "allowed" : "not allowed"}`, "success");
@@ -43,9 +55,11 @@ export default function CrossTokenAccessSetting() {
         </p>
       </div>
       <div className="mfa-action-row">
-        <button className="btn btn-primary" disabled={busy} onClick={toggle}>
-          {busy ? "Saving…" : enabled ? "Turn off (don't allow)" : "Turn on (allow)"}
-        </button>
+        {canUpdate && (
+          <button className="btn btn-primary" disabled={busy} onClick={toggle}>
+            {busy ? "Saving…" : enabled ? "Turn off (don't allow)" : "Turn on (allow)"}
+          </button>
+        )}
         <span className="mfa-switch-desc">Currently: {enabled ? "Allowed" : "Not allowed"}</span>
       </div>
     </div>

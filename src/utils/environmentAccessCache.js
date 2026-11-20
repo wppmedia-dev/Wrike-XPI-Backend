@@ -46,6 +46,10 @@ export const L1_TTL_MS = seconds("ENV_ACCESS_MEMORY_TTL", 30) * 1000;
 
 export const rulesKey = (envId) => `xpi:envaccess:rules:${envId}`;
 export const switchesKey = (envId) => `xpi:envaccess:switches:${envId}`;
+// The redirect-URI allow list (src/utils/redirectAllowlist.js) shares this cache,
+// its bus topic and its L1/L2 tiers, but is invalidated on its own: editing a
+// redirect entry says nothing about the API allow list.
+export const redirectRulesKey = (envId) => `xpi:redirect:rules:${envId}`;
 export const identityKey = (fingerprintValue) => `xpi:envaccess:identity:${fingerprintValue}`;
 
 // The token is never stored, only an opaque digest of it, so a cache dump
@@ -125,6 +129,28 @@ export const invalidateEnvironment = async (envId) => {
     console.warn(
       new Date().toISOString(),
       `[env-access] Redis invalidation failed for ${envId}, entry will expire in <=${RULES_TTL}s: ${
+        err?.message || err
+      }`,
+    );
+  });
+};
+
+/**
+ * Drop one environment's cached redirect-URI allow list, L1 and L2. Same
+ * contract as invalidateEnvironment: never throws, because the write that
+ * triggered it has already committed.
+ */
+export const invalidateRedirectRules = async (envId) => {
+  if (!envId) return;
+
+  const keys = [redirectRulesKey(envId)];
+  keys.forEach((key) => memory.delete(key));
+  broadcast(BUS_TOPIC, { keys });
+
+  await redisClient.delMany(keys).catch((err) => {
+    console.warn(
+      new Date().toISOString(),
+      `[redirect-allowlist] Redis invalidation failed for ${envId}, entry will expire in <=${RULES_TTL}s: ${
         err?.message || err
       }`,
     );

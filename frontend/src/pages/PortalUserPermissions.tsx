@@ -32,11 +32,13 @@ const MODULE_ICON: Record<string, string> = {
   // beside Environments rather than among the admin-side modules.
   api_tokens: "fa-key",
   environment_access: "fa-shield-halved",
+  redirect_urls: "fa-arrow-up-right-from-square",
   activity_logs: "fa-clock-rotate-left",
   cache: "fa-database",
   oauth_clients: "fa-plug",
   environment_token_lifetimes: "fa-hourglass-half",
   sync: "fa-arrows-rotate",
+  security: "fa-lock",
 };
 
 interface Props {

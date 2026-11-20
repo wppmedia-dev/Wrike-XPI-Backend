@@ -45,7 +45,22 @@ export const normaliseWrikeScope = (value) => {
 export const resolveReturnTarget = (name) =>
   RETURN_TARGETS[String(name ?? "")] || null;
 
-export const findRedirectionURL = (
+/**
+ * Build the Wrike authorize URL for a sign-in.
+ *
+ * `options.trusted` is for callers that have ALREADY vetted the redirectUri and
+ * built `extra` themselves: today only the MCP OAuth flow (src/routes/oauth),
+ * which checks redirect_uri against the client's registration. Everyone else,
+ * meaning anything that passes a request's query straight in, is untrusted:
+ *
+ *   - its redirectUri must be on the environment's redirect allow list
+ *     (src/utils/redirectAllowlist.js), or this throws a 400, and
+ *   - its `extra` is dropped. `extra` is spread into the signed state after
+ *     redirectUri, so honouring it from a query string would let a caller
+ *     overwrite the redirectUri that was just checked, or supply the PKCE
+ *     fields that route the callback down the MCP branch.
+ */
+export const findRedirectionURL = async (
   {
     accountId,
     redirectUri,
@@ -58,6 +73,7 @@ export const findRedirectionURL = (
     scope,
   },
   fastify,
+  { trusted = false } = {},
 ) => {
   try {
     const { WRIKE_LOGIN_ENDPOINT, WRIKE_REDIRECT_URL } = process.env;
@@ -110,6 +126,18 @@ export const findRedirectionURL = (
         new Error("Missing WRIKE_CLIENT_ID. Please contact your admin"),
         { statusCode: 400 },
       );
+    }
+
+    if (!trusted) extra = undefined;
+
+    // Checked against the environment this sign-in is actually for, after it
+    // has been resolved above, so an entry on one environment's list cannot be
+    // used to return from another's.
+    if (redirectUri && !trusted) {
+      // Loaded here, not at the top, so reading this file for its pure helpers
+      // (RETURN_TARGETS, normaliseWrikeScope) does not open the database.
+      const { assertRedirectUriAllowed } = await import("./redirectAllowlist");
+      await assertRedirectUriAllowed(selectedCred?.id, redirectUri);
     }
 
     let state = "";

@@ -36,6 +36,7 @@ import {
   type TokenListQuery,
 } from "../lib/tokenPermissionsApi";
 import EnvironmentAccess from "./EnvironmentAccess";
+import RedirectUrls from "./RedirectUrls";
 import PortalUserPermissions from "./PortalUserPermissions";
 import TokenPermissions, {
   ENVIRONMENT_MODULES_COPY,
@@ -295,6 +296,17 @@ export default function AdminDashboard() {
   const [accessDrawerEnvId, setAccessDrawerEnvId] = useState<string | null>(null);
   const [accessDrawerEnvName, setAccessDrawerEnvName] = useState<string | null>(null);
   const [accessDrawerOpen, setAccessDrawerOpen] = useState(false);
+
+  // Redirect URL allow list drawer, opened from the same row.
+  const [redirectDrawerEnvId, setRedirectDrawerEnvId] = useState<string | null>(null);
+  const [redirectDrawerEnvName, setRedirectDrawerEnvName] = useState<string | null>(null);
+  const [redirectDrawerOpen, setRedirectDrawerOpen] = useState(false);
+
+  function openRedirectDrawer(envId: string, envName: string) {
+    setRedirectDrawerEnvId(envId);
+    setRedirectDrawerEnvName(envName);
+    setRedirectDrawerOpen(true);
+  }
 
   function openAccessDrawer(envId: string, envName: string) {
     setAccessDrawerEnvId(envId);
@@ -1650,6 +1662,14 @@ export default function AdminDashboard() {
                               <button
                                 type="button"
                                 className="icon-btn"
+                                title="Redirect URLs"
+                                onClick={() => openRedirectDrawer(env.id, env.environment_name)}
+                              >
+                                <i className="fa-solid fa-arrow-up-right-from-square" />
+                              </button>
+                              <button
+                                type="button"
+                                className="icon-btn"
                                 title="Edit environment"
                                 onClick={() => openEditModal(env.id)}
                               >
@@ -1700,6 +1720,7 @@ export default function AdminDashboard() {
                   onDuplicate={(env) => openDuplicateModal(env.id)}
                   onDelete={(env) => confirmDeleteEnvironment(env.id, env.environment_name)}
                   onOpenAccess={(env) => openAccessDrawer(env.id, env.environment_name)}
+                  onOpenRedirectUrls={(env) => openRedirectDrawer(env.id, env.environment_name)}
                   onModulePermissions={openEnvironmentModules}
                   onViewTokens={openTokensForEnv}
                   onActivityLogs={openEnvActivityLogs}
@@ -1884,6 +1905,14 @@ export default function AdminDashboard() {
         open={accessDrawerOpen}
         onClose={() => setAccessDrawerOpen(false)}
         onChanged={loadEnvironments}
+      />
+
+      {/* ═══════════ REDIRECT URL ALLOW LIST DRAWER ═══════════ */}
+      <RedirectUrls
+        envId={redirectDrawerEnvId}
+        envName={redirectDrawerEnvName}
+        open={redirectDrawerOpen}
+        onClose={() => setRedirectDrawerOpen(false)}
       />
 
       {/* ═══════════ PU: PERMISSIONS MODAL ═══════════ */}

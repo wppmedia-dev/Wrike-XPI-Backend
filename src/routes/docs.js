@@ -1118,7 +1118,7 @@ async ({ taskId }, extra) => {
               ],
               [
                 "<code>redirectUri</code>",
-                "Where to send the browser once the sign-in finishes, instead of showing the token screen. The callback appends <code>?code=...&amp;environmentId=...</code> to it.",
+                "Where to send the browser once the sign-in finishes, instead of showing the token screen. The callback appends <code>code</code> and <code>environmentId</code> to it. It must be on the environment&#39;s Redirect URLs list (managed in the admin console, or the portal with the Redirect URLs permission); anything else is refused with a 400, as is every address for an environment with no entries.",
               ],
               [
                 "<code>accountId</code>",
@@ -3038,7 +3038,7 @@ async ({ taskId }, extra) => {
     }
 
     try {
-      const { redirectUrl } = findRedirectionURL(
+      const { redirectUrl } = await findRedirectionURL(
         {
           environmentId,
           purpose: "calendar_sync",

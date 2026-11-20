@@ -27,6 +27,8 @@ export interface PortalEnvironmentsTableProps {
   /** environment_access:read — shows the "API access scope" row action,
       matching the admin table's shield-icon button (see AdminDashboard.tsx). */
   canSeeAccess: boolean;
+  /** redirect_urls:read — shows the "Redirect URLs" row action. */
+  canSeeRedirectUrls: boolean;
   /** api_tokens:read — shows the "View tokens" row action, the same one the
       admin console's Environments table offers: straight to the tokens issued
       for this environment, already filtered to it. */
@@ -44,6 +46,7 @@ export interface PortalEnvironmentsTableProps {
   onEdit: (env: PortalEnvironmentFull) => void;
   onDelete: (env: PortalEnvironmentFull) => void;
   onManageAccess: (env: PortalEnvironmentFull) => void;
+  onManageRedirectUrls: (env: PortalEnvironmentFull) => void;
   onViewTokens: (env: PortalEnvironmentFull) => void;
   onViewActivityLogs: (env: PortalEnvironmentFull) => void;
   /** Opens this environment's module ceiling. */
@@ -62,6 +65,7 @@ export function PortalEnvironmentsTable({
   canUpdate,
   canDelete,
   canSeeAccess,
+  canSeeRedirectUrls,
   canViewTokens,
   canSeeModules,
   canUpdateModules,
@@ -69,6 +73,7 @@ export function PortalEnvironmentsTable({
   onEdit,
   onDelete,
   onManageAccess,
+  onManageRedirectUrls,
   onViewTokens,
   onViewActivityLogs,
   onModulePermissions,
@@ -190,6 +195,15 @@ export function PortalEnvironmentsTable({
                     },
                   ]
                 : []),
+              ...(canSeeRedirectUrls
+                ? [
+                    {
+                      label: "Redirect URLs",
+                      icon: "fa-solid fa-arrow-up-right-from-square",
+                      onSelect: () => onManageRedirectUrls(env),
+                    },
+                  ]
+                : []),
               ...(canViewTokens
                 ? [
                     {
@@ -255,6 +269,7 @@ export function PortalEnvironmentsTable({
     canUpdate,
     canDelete,
     canSeeAccess,
+    canSeeRedirectUrls,
     canViewTokens,
     canSeeModules,
     canUpdateModules,
@@ -262,6 +277,7 @@ export function PortalEnvironmentsTable({
     onEdit,
     onDelete,
     onManageAccess,
+    onManageRedirectUrls,
     onViewTokens,
     onViewActivityLogs,
   ]);

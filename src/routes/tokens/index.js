@@ -11,6 +11,7 @@ import { resolveReturnTarget } from "../../utils/wrikeRedirect";
 import { captureRequest, buildResponseSnapshot } from "../../utils/capture";
 import { clientIp } from "../../utils/environmentAccess";
 import { verifyFastifyJwt } from "../../utils/jwtSecrets";
+import { assertRedirectUriAllowed } from "../../utils/redirectAllowlist";
 
 // The action label comes from the same authority the permission gate reads
 // (src/utils/tokenPermissionMap.js). This surface is ungoverned by the matrix,
@@ -200,11 +201,27 @@ export const tokenRoute = (fastify, opts, done) => {
             return reply.redirect(relayUrl.toString());
           }
 
-          // Construct the final redirect URL
-          const redirectUrl = `${decodedData.redirectUri}?code=${req.query.code}&environmentId=${decodedData?.environmentId || null}`;
+          // The state is signed, so this address was one we agreed to when the
+          // sign-in began. It is checked again here anyway: the list can have
+          // changed since (an entry removed, or switched off) and a link
+          // issued before the allow list existed carries no check at all.
+          // Nothing is appended to an address that is not on the list, so the
+          // authorization code goes nowhere it should not.
+          await assertRedirectUriAllowed(
+            decodedData.environmentId,
+            decodedData.redirectUri,
+          );
 
-          // Redirect the user
-          return reply.redirect(redirectUrl);
+          // Built with URL so a redirectUri that already has a query string
+          // gets `&code=` rather than a second `?`.
+          const target = new URL(decodedData.redirectUri);
+          target.searchParams.set("code", req.query.code);
+          target.searchParams.set(
+            "environmentId",
+            decodedData?.environmentId || "",
+          );
+
+          return reply.redirect(target.toString());
         }
       }
 

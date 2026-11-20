@@ -3,6 +3,7 @@ import {
   getMcpTokenSettings,
   saveMcpTokenSettings,
   type McpTokenSettings as Settings,
+  type Transport,
 } from "../lib/mcpTokenSettingsApi";
 import { toast } from "../lib/notify";
 import "./MfaSettings.css";
@@ -46,11 +47,13 @@ function DurationInput({
   help,
   value,
   onChange,
+  disabled = false,
 }: {
   label: string;
   help: string;
   value: Field;
   onChange: (next: Field) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="form-group">
@@ -61,12 +64,14 @@ function DurationInput({
           type="number"
           min={1}
           style={{ maxWidth: 120 }}
+          disabled={disabled}
           value={value.amount}
           onChange={(e) => onChange({ ...value, amount: e.target.value })}
         />
         <select
           className="form-control"
           style={{ maxWidth: 140 }}
+          disabled={disabled}
           value={value.unit}
           onChange={(e) => onChange({ ...value, unit: e.target.value as Unit })}
         >
@@ -84,7 +89,15 @@ function DurationInput({
  * Lifetimes of the tokens the MCP OAuth flow issues. The Xtend REST API's
  * 180-day token is not affected. Changes apply to tokens issued from now on.
  */
-export default function McpTokenSettings() {
+export default function McpTokenSettings({
+  transport,
+  canUpdate = true,
+}: {
+  /** Defaults to the admin console's own sign-in. */
+  transport?: Transport;
+  /** security:update for a portal user; the admin console always may. */
+  canUpdate?: boolean;
+}) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [access, setAccess] = useState<Field>({ amount: "", unit: "hours" });
   const [refresh, setRefresh] = useState<Field>({ amount: "", unit: "days" });
@@ -98,12 +111,12 @@ export default function McpTokenSettings() {
   };
 
   useEffect(() => {
-    getMcpTokenSettings()
+    getMcpTokenSettings(transport)
       .then(apply)
       .catch((err: any) =>
         toast(err?.message || "Failed to load MCP token settings", "error"),
       );
-  }, []);
+  }, [transport]);
 
   if (!settings) return <div className="mfa-card">Loading…</div>;
 
@@ -141,10 +154,13 @@ export default function McpTokenSettings() {
     if (problem) return;
     setError(null);
     setBusy(true);
-    saveMcpTokenSettings({
-      accessTtlSeconds: accessSeconds,
-      refreshTtlSeconds: refreshSeconds,
-    })
+    saveMcpTokenSettings(
+      {
+        accessTtlSeconds: accessSeconds,
+        refreshTtlSeconds: refreshSeconds,
+      },
+      transport,
+    )
       .then((next) => {
         apply(next);
         toast("MCP token lifetimes saved", "success");
@@ -177,17 +193,20 @@ export default function McpTokenSettings() {
           help="How long a request can be made before the client has to refresh."
           value={access}
           onChange={setAccess}
+          disabled={!canUpdate}
         />
         <DurationInput
           label="Refresh token lifetime"
           help="How long a connection can sit idle before the user has to sign in again. Each refresh starts a new period."
           value={refresh}
           onChange={setRefresh}
+          disabled={!canUpdate}
         />
       </div>
 
-      {(problem || error) && <div className="mfa-error">{error || problem}</div>}
+      {canUpdate && (problem || error) && <div className="mfa-error">{error || problem}</div>}
 
+      {canUpdate && (
       <div className="mfa-action-row">
         <button className="btn btn-primary" disabled={busy || !!problem || unchanged} onClick={save}>
           {busy ? "Saving…" : "Save"}
@@ -197,6 +216,7 @@ export default function McpTokenSettings() {
           {describe(settings.defaults.refreshTtlSeconds)})
         </button>
       </div>
+      )}
     </div>
   );
 }

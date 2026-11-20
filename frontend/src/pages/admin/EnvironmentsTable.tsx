@@ -36,6 +36,8 @@ export interface EnvironmentsTableProps {
   onDuplicate: (env: AdminEnvironment) => void;
   onDelete: (env: AdminEnvironment) => void;
   onOpenAccess: (env: AdminEnvironment) => void;
+  /** Opens the list of addresses a sign-in may return the browser to. */
+  onOpenRedirectUrls: (env: AdminEnvironment) => void;
   /** Opens the module ceiling this environment holds every token to. */
   onModulePermissions: (env: AdminEnvironment) => void;
   /** Opens the API Tokens page scoped to this environment. */
@@ -62,6 +64,7 @@ export function EnvironmentsTable({
   onDuplicate,
   onDelete,
   onOpenAccess,
+  onOpenRedirectUrls,
   onModulePermissions,
   onViewTokens,
   onActivityLogs,
@@ -182,6 +185,13 @@ export function EnvironmentsTable({
                 onSelect: () => onOpenAccess(env),
               },
               {
+                // Where a sign-in may return the browser to: the login code is
+                // delivered to one of these, so it is its own list.
+                label: "Redirect URLs",
+                icon: "fa-solid fa-arrow-up-right-from-square",
+                onSelect: () => onOpenRedirectUrls(env),
+              },
+              {
                 // The other half of "who may call this, and what may they
                 // reach": the access scope decides who gets in, this decides
                 // what any of them can touch once they are in.
@@ -225,7 +235,7 @@ export function EnvironmentsTable({
         ),
       },
     ],
-    [onEdit, onDuplicate, onDelete, onOpenAccess, onModulePermissions, onViewTokens, onActivityLogs, onToggle],
+    [onEdit, onDuplicate, onDelete, onOpenAccess, onOpenRedirectUrls, onModulePermissions, onViewTokens, onActivityLogs, onToggle],
   );
 
   const table = useTable({

@@ -1,6 +1,9 @@
 import { adminFetch } from "./authApi";
+import { portalFetch } from "./portalAuthApi";
 
-/* Mirrors /api/v1/admin/settings/mcp-tokens (src/routes/admin/settings). The
+/* Mirrors /api/v1/admin/settings/* (src/routes/admin/settings) and, for portal
+   users granted the "security" module, /api/v1/portal/security/*
+   (src/routes/portal/security): the same two settings behind two sign-ins. The
    bounds and defaults come from the server so the form checks against what is
    actually enforced. */
 
@@ -16,57 +19,54 @@ export interface McpTokenSettings {
   defaults: { accessTtlSeconds: number; refreshTtlSeconds: number };
 }
 
-const BASE = "/api/v1/admin/settings/mcp-tokens";
+/** The admin console's own sign-in by default; the portal passes its token.
+    Explicit per call, never module state, so the two cannot bleed together. */
+export interface Transport {
+  surface: "admin" | "portal";
+  token?: string | null;
+}
 
-export const getMcpTokenSettings = async (): Promise<McpTokenSettings> => {
-  const res = await adminFetch(BASE);
+async function request(
+  path: string,
+  init: RequestInit | undefined,
+  transport: Transport | undefined,
+  failure: string,
+): Promise<any> {
+  const res =
+    transport?.surface === "portal"
+      ? await portalFetch(`/api/v1/portal/security${path}`, transport.token || "", init)
+      : await adminFetch(`/api/v1/admin/settings${path}`, init);
   const body = await res.json().catch(() => null);
 
   if (!res.ok || !body?.success) {
-    throw new Error(body?.message || "Failed to load MCP token settings");
+    throw new Error(body?.message || failure);
   }
 
   return body.data;
-};
+}
 
-export const saveMcpTokenSettings = async (values: {
-  accessTtlSeconds: number;
-  refreshTtlSeconds: number;
-}): Promise<McpTokenSettings> => {
-  const res = await adminFetch(BASE, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(values),
-  });
-  const body = await res.json().catch(() => null);
+const put = (body: unknown): RequestInit => ({
+  method: "PUT",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body),
+});
 
-  if (!res.ok || !body?.success) {
-    throw new Error(body?.message || "Failed to save MCP token settings");
-  }
+export const getMcpTokenSettings = (t?: Transport): Promise<McpTokenSettings> =>
+  request("/mcp-tokens", undefined, t, "Failed to load MCP token settings");
 
-  return body.data;
-};
+export const saveMcpTokenSettings = (
+  values: { accessTtlSeconds: number; refreshTtlSeconds: number },
+  t?: Transport,
+): Promise<McpTokenSettings> =>
+  request("/mcp-tokens", put(values), t, "Failed to save MCP token settings");
 
-const CROSS_BASE = "/api/v1/admin/settings/cross-token-access";
+export const getCrossTokenAccess = async (t?: Transport): Promise<boolean> =>
+  !!(await request("/cross-token-access", undefined, t, "Failed to load cross-token access setting"))
+    .enabled;
 
-export const getCrossTokenAccess = async (): Promise<boolean> => {
-  const res = await adminFetch(CROSS_BASE);
-  const body = await res.json().catch(() => null);
-  if (!res.ok || !body?.success) {
-    throw new Error(body?.message || "Failed to load cross-token access setting");
-  }
-  return !!body.data.enabled;
-};
-
-export const saveCrossTokenAccess = async (enabled: boolean): Promise<boolean> => {
-  const res = await adminFetch(CROSS_BASE, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ enabled }),
-  });
-  const body = await res.json().catch(() => null);
-  if (!res.ok || !body?.success) {
-    throw new Error(body?.message || "Failed to save cross-token access setting");
-  }
-  return !!body.data.enabled;
-};
+export const saveCrossTokenAccess = async (
+  enabled: boolean,
+  t?: Transport,
+): Promise<boolean> =>
+  !!(await request("/cross-token-access", put({ enabled }), t, "Failed to save cross-token access setting"))
+    .enabled;

@@ -137,7 +137,8 @@ export type PortalHelpKey =
   | "activity"
   | "cache"
   | "oauthClients"
-  | "sync";
+  | "sync"
+  | "security";
 
 export const PORTAL_HELP: Record<PortalHelpKey, PageHelp> = {
   overview: {
@@ -216,6 +217,17 @@ export const PORTAL_HELP: Record<PortalHelpKey, PageHelp> = {
       "Partial means some items could not be loaded. The server log says which.",
     ],
     note: "This affects the whole service, not only your environments. Only the latest run of each source is kept.",
+  },
+
+  security: {
+    summary:
+      "How long MCP sign-ins last, and whether a token may be used on both the REST API and MCP.",
+    points: [
+      "MCP token lifetimes: how long an access token and a refresh token live. A change applies to tokens issued from now on; connections already signed in keep the lifetime they were given.",
+      "Cross-token access: when allowed, an MCP token can call the REST API and the Xtend API token can be used on MCP.",
+      "Without the update permission you can see the current values but not change them.",
+    ],
+    note: "These settings cover the whole service, not only your environments, and a longer refresh lifetime keeps a stolen token useful for longer.",
   },
 };
 

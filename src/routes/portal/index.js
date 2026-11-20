@@ -9,6 +9,8 @@ import { portalApiTokensRoute } from "./apiTokens";
 import { portalEnvironmentModulesRoute } from "./environmentModules";
 import { portalOAuthClientsRoute } from "./oauthClients";
 import { portalSyncRoute } from "./sync";
+import { portalRedirectUrlsRoute } from "./redirectUrls";
+import { portalSecurityRoute } from "./security";
 
 // Page handlers
 const PortalIndexPage = (req, reply) => reply.redirect("/portal/login");
@@ -89,6 +91,10 @@ export const portalApiRoute = (fastify, opts, done) => {
   fastify.register(portalOAuthClientsRoute, { prefix: "/oauth-clients" });
   // The Sync page, for portal users granted it.
   fastify.register(portalSyncRoute, { prefix: "/sync" });
+  // Where a sign-in may return the browser to, for users granted redirect_urls.
+  fastify.register(portalRedirectUrlsRoute, { prefix: "/redirect-urls" });
+  // The Security page's service-wide settings, for users granted security.
+  fastify.register(portalSecurityRoute, { prefix: "/security" });
 
   done();
 };

@@ -32,10 +32,13 @@ import PortalActivityPage from "./PortalActivityPage";
 import PortalCachePage from "./PortalCachePage";
 import OAuthClients from "./OAuthClients";
 import SyncSettings from "./SyncSettings";
+import McpTokenSettings from "./McpTokenSettings";
+import CrossTokenAccessSetting from "./CrossTokenAccessSetting";
 import { portalSyncApi } from "../lib/portalSyncApi";
 import { portalOAuthClientsApi } from "../lib/portalOAuthClientsApi";
 import PortalApiTokensPage from "./PortalApiTokensPage";
 import PortalEnvironmentAccess from "./PortalEnvironmentAccess";
+import RedirectUrls from "./RedirectUrls";
 import { PortalEnvironmentsTable } from "./PortalEnvironmentsTable";
 import { PORTAL_HELP } from "../lib/pageHelp";
 import TokenPermissions, {
@@ -56,7 +59,8 @@ type PageId =
   | "activity"
   | "cache"
   | "oauth-clients"
-  | "sync";
+  | "sync"
+  | "security";
 
 /**
  * The environment module-permission grid, pointed at the portal's own
@@ -86,6 +90,7 @@ const PAGE_NAMES: Record<PageId, string> = {
   cache: "Cache Settings",
   "oauth-clients": "OAuth Clients",
   sync: "Sync",
+  security: "Security",
 };
 
 const PAGE_IDS = Object.keys(PAGE_NAMES) as PageId[];
@@ -295,7 +300,10 @@ export default function PortalHome() {
   const canSeeOAuthClients = can("oauth_clients", "read");
   // Read shows the Sync page; update (passed to it as a flag) draws Sync now.
   const canSeeSync = can("sync", "read");
+  // Read shows the Security page; update lets its two settings be changed.
+  const canSeeSecurity = can("security", "read");
   const canSeeEnvironmentAccess = can("environment_access", "read");
+  const canSeeRedirectUrls = can("redirect_urls", "read");
   // The module ceiling of each environment. Read shows the Modules column and
   // the row action; update opens that grid as an editor. It hangs off the
   // Environments page, so it is only reachable alongside environments:read.
@@ -317,7 +325,8 @@ export default function PortalHome() {
     canSeeActivity ||
     canSeeCache ||
     canSeeOAuthClients ||
-    canSeeSync;
+    canSeeSync ||
+    canSeeSecurity;
 
   /* ── Session guard (mirrors the EJS inline script exactly) ──────────── */
   useEffect(() => {
@@ -405,12 +414,13 @@ export default function PortalHome() {
       cache: canSeeCache,
       "oauth-clients": canSeeOAuthClients,
       sync: canSeeSync,
+      security: canSeeSecurity,
     };
     if (granted[activePage]) return;
 
     // Order matters: this is where a user with a stale link lands.
     const fallback = (
-      ["overview", "environments", "api-tokens", "activity", "cache", "oauth-clients", "sync"] as PageId[]
+      ["overview", "environments", "api-tokens", "activity", "cache", "oauth-clients", "sync", "security"] as PageId[]
     ).find((page) => granted[page]);
     if (fallback) setActivePage(fallback);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -424,6 +434,7 @@ export default function PortalHome() {
     canSeeCache,
     canSeeOAuthClients,
     canSeeSync,
+    canSeeSecurity,
   ]);
 
   const recentEnvs = environments.slice(0, 5);
@@ -468,6 +479,21 @@ export default function PortalHome() {
     id: string;
     label: string;
   } | null>(null);
+
+  /* ── Redirect URL allow list drawer (redirect_urls:read) ─────────────
+     Opened from an environment row's "Redirect URLs" action. Memoised: the
+     drawer reloads when its transport changes, and a fresh object per render
+     would make that every render. */
+  const [redirectEnvId, setRedirectEnvId] = useState<string | null>(null);
+  const [redirectEnvName, setRedirectEnvName] = useState<string | null>(null);
+  const [redirectOpen, setRedirectOpen] = useState(false);
+  const redirectTransport = useMemo(() => ({ surface: "portal" as const, token }), [token]);
+
+  function openRedirectDrawer(env: PortalEnvironmentFull) {
+    setRedirectEnvId(env.id);
+    setRedirectEnvName(env.environment_name);
+    setRedirectOpen(true);
+  }
 
   function openAccessDrawer(env: PortalEnvironmentFull) {
     setAccessEnvId(env.id);
@@ -849,7 +875,7 @@ export default function PortalHome() {
             </div>
           )}
 
-          {(canSeeCache || canSeeActivity || canSeeOAuthClients || canSeeSync) && (
+          {(canSeeCache || canSeeActivity || canSeeOAuthClients || canSeeSync || canSeeSecurity) && (
             <div className="nav-group-label" style={{ marginTop: 6 }}>
               Settings
             </div>
@@ -863,6 +889,17 @@ export default function PortalHome() {
                 <i className="fa-solid fa-database" />
               </span>
               <span className="nl">Cache Settings</span>
+            </div>
+          )}
+          {canSeeSecurity && (
+            <div
+              className={`nav-item${activePage === "security" ? " active" : ""}`}
+              onClick={() => handleNav("security")}
+            >
+              <span className="ni">
+                <i className="fa-solid fa-lock" />
+              </span>
+              <span className="nl">Security</span>
             </div>
           )}
           {canSeeSync && (
@@ -1121,6 +1158,7 @@ export default function PortalHome() {
                   canUpdate={can("environments", "update")}
                   canDelete={can("environments", "delete")}
                   canSeeAccess={canSeeEnvironmentAccess}
+                  canSeeRedirectUrls={canSeeRedirectUrls}
                   // The admin console's Environments table offers this too; a
                   // portal user with api_tokens:read gets the same shortcut
                   // (the server scopes the list to their own environments).
@@ -1135,6 +1173,7 @@ export default function PortalHome() {
                   onEdit={openEnvModal}
                   onDelete={(env) => handleDeleteEnvironment(env.id, env.environment_name)}
                   onManageAccess={openAccessDrawer}
+                  onManageRedirectUrls={openRedirectDrawer}
                   onViewTokens={openTokensForEnv}
                   onViewActivityLogs={openEnvActivityLogs}
                   onAdd={() => openEnvModal(null)}
@@ -1200,6 +1239,26 @@ export default function PortalHome() {
           </div>
           )}
 
+          {/* ══════ SECURITY PAGE ══════ */}
+          {canSeeSecurity && (
+          <div className={`page${activePage === "security" ? " active" : ""}`} id="page-security">
+            <PageHeader
+              page="security"
+              title="Security"
+              description="Token lifetimes and cross-token access"
+              help={PORTAL_HELP.security}
+            />
+
+            <div className="card">
+              <McpTokenSettings transport={redirectTransport} canUpdate={can("security", "update")} />
+            </div>
+
+            <div className="card" style={{ marginTop: 16 }}>
+              <CrossTokenAccessSetting transport={redirectTransport} canUpdate={can("security", "update")} />
+            </div>
+          </div>
+          )}
+
           {/* ══════ OAUTH CLIENTS PAGE ══════ */}
           {canSeeOAuthClients && (
           <div className={`page${activePage === "oauth-clients" ? " active" : ""}`} id="page-oauth-clients">
@@ -1238,6 +1297,18 @@ export default function PortalHome() {
         canCreate={can("environment_access", "create")}
         canUpdate={can("environment_access", "update")}
         canDelete={can("environment_access", "delete")}
+      />
+
+      {/* ════════════ REDIRECT URL ALLOW LIST DRAWER ════════════ */}
+      <RedirectUrls
+        envId={redirectEnvId}
+        envName={redirectEnvName}
+        open={redirectOpen}
+        onClose={() => setRedirectOpen(false)}
+        canCreate={can("redirect_urls", "create")}
+        canUpdate={can("redirect_urls", "update")}
+        canDelete={can("redirect_urls", "delete")}
+        transport={redirectTransport}
       />
 
       {/* ════════ ENVIRONMENT MODULE PERMISSIONS GRID ════════ */}
