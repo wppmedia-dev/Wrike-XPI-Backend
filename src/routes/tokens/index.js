@@ -11,6 +11,14 @@ import { resolveReturnTarget } from "../../utils/wrikeRedirect";
 import { captureRequest, buildResponseSnapshot } from "../../utils/capture";
 import { clientIp } from "../../utils/environmentAccess";
 import { verifyFastifyJwt } from "../../utils/jwtSecrets";
+import { escapeHtml } from "../../utils/escapeHtml";
+
+// The callback's pages show a bearer token or credentials. no-store keeps them
+// out of the browser's back/forward cache, shared caches and proxies.
+const NO_STORE = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, private",
+  Pragma: "no-cache",
+};
 import { assertRedirectUriAllowed } from "../../utils/redirectAllowlist";
 
 // The action label comes from the same authority the permission gate reads
@@ -265,7 +273,7 @@ export const tokenRoute = (fastify, opts, done) => {
       // to drop it before the person can copy or bookmark it by accident.
       const docsReturn = resolveReturnTarget(decodedData?.returnTo);
       if (docsReturn) {
-        return reply.redirect(
+        return reply.headers(NO_STORE).redirect(
           `${docsReturn}?xpiToken=${encodeURIComponent(result.token)}`,
         );
       }
@@ -506,12 +514,12 @@ export const tokenRoute = (fastify, opts, done) => {
       
       <div class="credentials-section">
         <h3>Your API Access Credentials</h3>
-        <p class="warning">${result.credentials.message}</p>
+        <p class="warning">${escapeHtml(result.credentials.message)}</p>
         <div class="credential-item">
           <label>Username:</label>
           <div class="code-with-copy">
-            <code>${result.credentials.username}</code>
-            <button class="copy-icon" onclick="copyCredential('${result.credentials.username}', 'username')">
+            <code>${escapeHtml(result.credentials.username)}</code>
+            <button class="copy-icon" data-copy="${escapeHtml(result.credentials.username)}" data-type="username" onclick="copyCredential(this.dataset.copy, this.dataset.type)">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -522,8 +530,8 @@ export const tokenRoute = (fastify, opts, done) => {
         <div class="credential-item">
           <label>Password:</label>
           <div class="code-with-copy">
-            <code>${result.credentials.password}</code>
-            <button class="copy-icon" onclick="copyCredential('${result.credentials.password}', 'password')">
+            <code>${escapeHtml(result.credentials.password)}</code>
+            <button class="copy-icon" data-copy="${escapeHtml(result.credentials.password)}" data-type="password" onclick="copyCredential(this.dataset.copy, this.dataset.type)">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -535,7 +543,7 @@ export const tokenRoute = (fastify, opts, done) => {
 
       <div class="token-section">
         <h3>JWT Token</h3>
-        <div class="token-box" id="tokenBox">${result.token}</div>
+        <div class="token-box" id="tokenBox">${escapeHtml(result.token)}</div>
         <button class="copy-btn" onclick="copyToken()">Copy Token to Clipboard</button>
         <div class="success-msg" id="successMsg">Token copied to clipboard ✅</div>
       </div>
@@ -567,7 +575,7 @@ export const tokenRoute = (fastify, opts, done) => {
 </html>
 `;
 
-      reply.type("text/html").send(html);
+      reply.headers(NO_STORE).type("text/html").send(html);
     } catch (err) {
       // reply.code(err?.statusCode || 400).send({
       //   success: false,
@@ -694,12 +702,12 @@ export const tokenRoute = (fastify, opts, done) => {
 <body>
   <div class="card">
     <h1>Oops! Something went wrong</h1>
-    <div class="message">${err?.message || "Unexpected error occurred"}</div>
+    <div class="message">${escapeHtml(err?.message || "Unexpected error occurred")}</div>
     <div class="ref">
-      Reference: <code>${referenceFor(req)}</code>
+      Reference: <code>${escapeHtml(referenceFor(req))}</code>
       <small>Quote it when you report this — it identifies this exact attempt in the activity log.</small>
     </div>
-    <a class="btn" href="${process.env.APP_URL}">⬅ Back to Login</a>
+    <a class="btn" href="${escapeHtml(process.env.APP_URL)}">⬅ Back to Login</a>
   </div>
 </body>
 </html>
@@ -707,6 +715,7 @@ export const tokenRoute = (fastify, opts, done) => {
 
       reply
         .code(err?.statusCode || 400)
+        .headers(NO_STORE)
         .type("text/html")
         .send(html);
     }

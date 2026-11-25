@@ -15,6 +15,14 @@ import { TOKEN_PURPOSE, normalisePurpose } from "./tokenPurpose";
  * it needs them returned to the page they started from rather than dropped on
  * the generic token screen.
  */
+/**
+ * How long a sign-in link stays good. The state is signed and carries the
+ * redirectUri, so without an expiry a link issued once would work, and could be
+ * replayed, forever. Ten minutes is ample for a person to finish signing in to
+ * Wrike. Overridable for slow SSO setups.
+ */
+export const STATE_TTL = process.env.OAUTH_STATE_TTL || "10m";
+
 export const RETURN_TARGETS = {
   "calendar-docs": "/docs/calendar#/calendar/setup",
 };
@@ -163,22 +171,16 @@ export const findRedirectionURL = async (
     const returnClaim =
       purposeClaim.purpose && returnTarget ? { returnTo: returnTo } : {};
 
-    if (redirectUri) {
-      state = fastify.jwt.sign({
-        redirectUri,
+    state = fastify.jwt.sign(
+      {
+        ...(redirectUri ? { redirectUri } : {}),
         environmentId: selectedCred ? selectedCred?.id : "",
         ...(extra || {}),
         ...purposeClaim,
         ...returnClaim,
-      });
-    } else {
-      state = fastify.jwt.sign({
-        environmentId: selectedCred ? selectedCred?.id : "",
-        ...(extra || {}),
-        ...purposeClaim,
-        ...returnClaim,
-      });
-    }
+      },
+      { expiresIn: STATE_TTL },
+    );
 
     let redirectUrl = `${WRIKE_LOGIN_ENDPOINT}/authorize/v4?client_id=${WRIKE_CLIENT_ID}&response_type=code&state=${state}&redirect_uri=${WRIKE_REDIRECT_URL}`;
 
